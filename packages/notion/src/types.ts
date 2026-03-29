@@ -1,4 +1,10 @@
-import type { BulkWriteFile, FileSemantics } from '@relayfile/sdk';
+import type {
+  BulkWriteFile,
+  ConnectionProvider,
+  FileSemantics,
+} from '@relayfile/sdk';
+
+export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 export const NOTION_PROVIDER_NAME = 'notion';
 export const NOTION_PATH_ROOT = '/notion';
@@ -14,27 +20,7 @@ export interface JsonObject {
 }
 export type JsonArray = JsonValue[];
 
-export interface ProxyRequest {
-  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-  baseUrl: string;
-  endpoint: string;
-  connectionId: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: Record<string, string>;
-}
-
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  data: unknown;
-}
-
-export interface NotionConnectionProvider {
-  readonly name: string;
-  proxy?(request: ProxyRequest): Promise<ProxyResponse>;
-  healthCheck?(connectionId: string): Promise<boolean>;
-}
+export type NotionConnectionProvider = ConnectionProvider;
 
 export interface NotionAdapterConfig {
   apiBaseUrl?: string;

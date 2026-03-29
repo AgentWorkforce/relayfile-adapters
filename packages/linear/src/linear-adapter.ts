@@ -1,3 +1,6 @@
+import type { ConnectionProvider } from '@relayfile/sdk';
+export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
+
 import {
   computeLinearPath,
   linearCyclePath,
@@ -69,28 +72,6 @@ export interface DeleteFileInput {
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
-}
-
-export interface ProxyRequest {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  baseUrl: string;
-  endpoint: string;
-  connectionId: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: Record<string, string>;
-}
-
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  data: unknown;
-}
-
-export interface ConnectionProvider {
-  readonly name: string;
-  proxy?(request: ProxyRequest): Promise<ProxyResponse>;
-  healthCheck?(connectionId: string): Promise<boolean>;
 }
 
 export abstract class IntegrationAdapter {

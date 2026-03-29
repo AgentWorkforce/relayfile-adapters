@@ -1,35 +1,18 @@
-import type { FileSemantics, WebhookInput as RelayWebhookInput } from '@relayfile/sdk';
+import type {
+  ConnectionProvider,
+  FileSemantics,
+  ProxyMethod,
+  ProxyRequest,
+  ProxyResponse,
+  WebhookInput as RelayWebhookInput,
+} from '@relayfile/sdk';
 
 export type WebhookInput = RelayWebhookInput;
+export type { ConnectionProvider, ProxyMethod, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 export type JsonPrimitive = boolean | number | null | string;
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type JsonArray = JsonValue[];
 export type JsonObject = { [key: string]: JsonValue };
-
-export type ProxyMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
-
-export interface ProxyRequest {
-  method: ProxyMethod;
-  baseUrl: string;
-  endpoint: string;
-  connectionId?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: Record<string, string>;
-}
-
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  data: unknown;
-}
-
-export interface ConnectionProvider {
-  readonly name: string;
-  proxy(request: ProxyRequest): Promise<ProxyResponse>;
-  healthCheck?(connectionId: string): Promise<boolean>;
-  handleWebhook?(rawPayload: unknown): Promise<WebhookInput>;
-}
 
 export interface GitLabAdapterConfig {
   baseUrl: string;
