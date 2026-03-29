@@ -24,7 +24,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@agent-relay/sdk": "^3.2.22"
+    "@agent-relay/sdk": "^3.2.22",
+    "@relayfile/sdk": "^0.1.6"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
