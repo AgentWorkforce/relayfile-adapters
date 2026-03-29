@@ -263,7 +263,7 @@ function convertProviderWebhook(
   payload: Record<string, unknown>,
   normalized: NormalizedWebhook,
 ): WebhookEvent {
-  const eventType = normalized.event;
+  const eventType = normalized.eventType;
   const objectType =
     readString(payload.objectType) ??
     readString(payload.object_type) ??
@@ -282,7 +282,6 @@ function convertProviderWebhook(
     objectId,
     payload: normalized.payload,
     ...(normalized.connectionId ? { connectionId: normalized.connectionId } : {}),
-    ...(normalized.raw === undefined ? {} : { raw: normalized.raw }),
   };
 }
 
