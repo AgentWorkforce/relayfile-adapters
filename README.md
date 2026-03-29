@@ -13,6 +13,31 @@ Each adapter has exactly 3 jobs:
 npm install @relayfile/sdk @relayfile/adapter-github @relayfile/provider-nango
 ```
 
+### Getting a token
+
+**Hosted (api.relayfile.dev):** Create a workspace at [relayfile.dev](https://relayfile.dev) and generate an API token from the dashboard.
+
+**Self-hosted:** Tokens are JWTs issued by [relayauth](https://github.com/AgentWorkforce/relayauth). Use the dev token script for local development:
+
+```bash
+# Generate a dev token (requires SIGNING_KEY to match your relayfile server)
+export SIGNING_KEY="your-jwt-secret"
+./scripts/generate-dev-token.sh
+```
+
+Or mint tokens programmatically via the relayauth SDK:
+
+```ts
+import { createToken } from "@relayauth/sdk";
+
+const token = await createToken({
+  subject: "my-agent",
+  workspace: "ws_123",
+  scopes: ["relayfile:fs:read:*", "relayfile:fs:write:*"],
+  signingKey: process.env.SIGNING_KEY!,
+});
+```
+
 ### Receive a webhook and write to relayfile
 
 ```ts
