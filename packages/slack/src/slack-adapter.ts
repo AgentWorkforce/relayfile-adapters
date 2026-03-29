@@ -1,3 +1,6 @@
+import type { ConnectionProvider } from '@relayfile/sdk';
+export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
+
 import type { NormalizedWebhook } from './webhook-normalizer.js';
 import type { SlackAdapterConfig, SlackChannelEvent, SlackEvent, SlackMessageEvent } from './types.js';
 import {
@@ -34,29 +37,6 @@ export interface IngestResult {
   filesDeleted: number;
   paths: string[];
   errors: IngestError[];
-}
-
-export interface ProxyRequest {
-  method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
-  baseUrl: string;
-  endpoint: string;
-  connectionId: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: Record<string, string>;
-}
-
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  data: unknown;
-}
-
-export interface ConnectionProvider {
-  readonly name: string;
-  proxy(request: ProxyRequest): Promise<ProxyResponse>;
-  healthCheck(connectionId: string): Promise<boolean>;
-  handleWebhook?(rawPayload: unknown): Promise<NormalizedWebhook>;
 }
 
 export interface WriteFileInput {

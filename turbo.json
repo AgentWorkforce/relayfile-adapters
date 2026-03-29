@@ -5,6 +5,12 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@relayfile/adapter-linear#build": {
+      "outputs": ["dist/**"]
+    },
+    "@relayfile/adapter-slack#build": {
+      "outputs": ["dist/**"]
+    },
     "test": {
       "dependsOn": ["build"],
       "outputs": []

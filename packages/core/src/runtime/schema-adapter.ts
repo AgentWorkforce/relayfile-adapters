@@ -1,46 +1,10 @@
 import {
   computeCanonicalPath,
   type ConnectionProvider,
+  type FileSemantics,
+  type ProxyResponse,
   type RelayFileClient,
 } from "@relayfile/sdk";
-
-/** Semantics metadata attached to VFS files. */
-export interface FileSemantics {
-  properties: Record<string, string>;
-}
-
-/** Normalized webhook event from any provider. */
-export interface NormalizedWebhook {
-  eventType: string;
-  objectType: string;
-  objectId?: string;
-  payload: Record<string, unknown>;
-  provider?: string;
-  connectionId?: string;
-  metadata?: Record<string, string>;
-}
-
-/** Structured error from an ingest operation. */
-export interface IngestError {
-  path: string;
-  error: string;
-}
-
-/** Result of ingesting a webhook into the VFS. */
-export interface IngestResult {
-  filesWritten: number;
-  filesUpdated: number;
-  filesDeleted: number;
-  paths: string[];
-  errors: IngestError[];
-}
-
-/** Response from a provider proxy call. */
-export interface ProxyResponse {
-  status: number;
-  data: unknown;
-  headers?: Record<string, string>;
-}
 import { minimatch } from "minimatch";
 import { interpolateTemplate, pickFields } from "../spec/template.js";
 import type {
@@ -72,19 +36,69 @@ export interface SchemaAdapterOptions {
   }) => Promise<string> | string;
 }
 
-export class SchemaAdapter {
+export interface AdapterWebhookMetadata {
+  deliveryId?: string;
+  delivery_id?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+export interface AdapterWebhook {
+  provider: string;
+  connectionId?: string;
+  eventType: string;
+  objectType: string;
+  objectId: string;
+  payload: Record<string, unknown>;
+  metadata?: AdapterWebhookMetadata;
+  raw?: unknown;
+}
+
+export interface IngestError {
+  path: string;
+  error: string;
+}
+
+export interface IngestResult {
+  filesWritten: number;
+  filesUpdated: number;
+  filesDeleted: number;
+  paths: string[];
+  errors: IngestError[];
+}
+
+abstract class IntegrationAdapter {
+  protected readonly client: RelayFileClient;
+  protected readonly provider: ConnectionProvider;
+
+  abstract readonly name: string;
+  abstract readonly version: string;
+
+  constructor(client: RelayFileClient, provider: ConnectionProvider) {
+    this.client = client;
+    this.provider = provider;
+  }
+
+  abstract ingestWebhook(workspaceId: string, event: AdapterWebhook): Promise<IngestResult>;
+  abstract computePath(objectType: string, objectId: string): string;
+  abstract computeSemantics(
+    objectType: string,
+    objectId: string,
+    payload: Record<string, unknown>,
+  ): FileSemantics;
+  supportedEvents?(): string[];
+}
+
+export class SchemaAdapter extends IntegrationAdapter {
   readonly name: string;
   readonly version: string;
-  readonly client: RelayFileClient;
-  readonly provider: ConnectionProvider;
 
   private readonly spec: MappingSpec;
   private readonly defaultConnectionId?: string;
   private readonly resolveConnectionIdFn?: SchemaAdapterOptions["resolveConnectionId"];
 
   constructor(options: SchemaAdapterOptions) {
-    this.client = options.client;
-    this.provider = options.provider;
+    super(options.client, options.provider);
     this.spec = options.spec;
     this.name = options.spec.adapter.name;
     this.version = options.spec.adapter.version;
@@ -96,7 +110,7 @@ export class SchemaAdapter {
     return computeCanonicalPath(this.name, objectType, objectId);
   }
 
-  computeWebhookPath(event: NormalizedWebhook): string {
+  computeWebhookPath(event: AdapterWebhook): string {
     const mapping = this.resolveWebhookMapping(event);
     return interpolateTemplate(mapping.path, event.payload, { strict: true });
   }
@@ -113,7 +127,7 @@ export class SchemaAdapter {
   }
 
   normalizePayload(
-    event: NormalizedWebhook,
+    event: AdapterWebhook,
     mapping?: WebhookMapping | ResourceMapping
   ): Record<string, unknown> {
     const payload = event.payload;
@@ -144,7 +158,7 @@ export class SchemaAdapter {
 
   async ingestWebhook(
     workspaceId: string,
-    event: NormalizedWebhook
+    event: AdapterWebhook
   ): Promise<IngestResult> {
     const mapping = this.resolveWebhookMapping(event);
     const path = interpolateTemplate(mapping.path, event.payload, { strict: true });
@@ -239,7 +253,7 @@ export class SchemaAdapter {
     }
   }
 
-  private resolveWebhookMapping(event: NormalizedWebhook): WebhookMapping {
+  private resolveWebhookMapping(event: AdapterWebhook): WebhookMapping {
     for (const key of webhookLookupKeys(event)) {
       const mapping = this.spec.webhooks[key];
       if (mapping) {
@@ -289,7 +303,7 @@ export class SchemaAdapter {
   }
 }
 
-function webhookLookupKeys(event: NormalizedWebhook): string[] {
+function webhookLookupKeys(event: AdapterWebhook): string[] {
   const eventRoot = event.eventType.split(".")[0] ?? event.eventType;
   return [...new Set([event.eventType, event.objectType, eventRoot])];
 }

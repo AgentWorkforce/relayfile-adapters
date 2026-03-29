@@ -1,6 +1,6 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
-  GitHubProxyProvider,
+  GitHubRequestProvider,
   JsonObject,
   JsonValue,
   ProxyResponse,
@@ -10,7 +10,7 @@ const DEFAULT_GITHUB_API_VERSION = '2022-11-28';
 const DEFAULT_PER_PAGE = 100;
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 
-type ConnectionAwareProvider = GitHubProxyProvider & {
+type ConnectionAwareProvider = GitHubRequestProvider & {
   connectionId?: string;
   defaultConnectionId?: string;
   providerConfigKey?: string;
@@ -77,7 +77,7 @@ export class GitHubCommitFetchError extends Error {
 }
 
 export async function fetchPRCommits(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -101,7 +101,7 @@ export async function fetchPRCommits(
 }
 
 export async function fetchCommitDetail(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   sha: string,
@@ -135,7 +135,7 @@ function buildCommitDetailEndpoint(owner: string, repo: string, sha: string): st
 }
 
 async function proxyGitHubRequest(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   endpoint: string,
   options: Omit<FetchCommitsOptions, 'perPage'>,
 ): Promise<ProxyResponse> {
@@ -156,7 +156,7 @@ async function proxyGitHubRequest(
 }
 
 function resolveConnectionId(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   endpoint: string,
   explicitConnectionId?: string,
 ): string {
@@ -178,7 +178,7 @@ function resolveConnectionId(
 }
 
 function resolveProviderConfigKey(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   explicitProviderConfigKey?: string,
 ): string {
   return (
@@ -190,7 +190,7 @@ function resolveProviderConfigKey(
 }
 
 function readProviderString(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   key: keyof ConnectionAwareProvider,
 ): string | undefined {
   const value = (provider as ConnectionAwareProvider)[key];

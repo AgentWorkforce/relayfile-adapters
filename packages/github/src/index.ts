@@ -1,9 +1,9 @@
 import type { SchemaAdapter } from '@relayfile/adapter-core';
+import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import {
-  type ConnectionProvider,
   type FileSemantics,
   type GitHubAdapterConfig,
   type IngestResult,
@@ -12,7 +12,8 @@ import {
   type SyncOptions,
   type SyncResult,
 } from './types.js';
-import { extractEventKey, extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event-map.js';
+import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event-map.js';
+import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
 
 const EMPTY_RESULT: IngestResult = {
@@ -39,7 +40,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     });
     super(provider, validatedConfig);
     this.schemaAdapter = createGitHubSchemaAdapter(provider, validatedConfig);
-    this.writebackHandler = new GitHubWritebackHandler(provider, {
+    this.writebackHandler = new GitHubWritebackHandler(provider as never, {
       defaultConnectionId: validatedConfig.connectionId,
       defaultProviderConfigKey: validatedConfig.providerConfigKey,
     });
@@ -58,7 +59,11 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     explicitEventType?: string,
     headers?: Headers | Record<string, string | string[] | undefined>,
   ): Promise<IngestResult> {
-    const eventType = explicitEventType ?? (headers ? extractEventKey(headers, payload) : '');
+    if (headers && !explicitEventType) {
+      return createRouter(this).route(headers, payload);
+    }
+
+    const eventType = explicitEventType ?? '';
     const handler = EVENT_MAP[eventType];
 
     if (!handler) {

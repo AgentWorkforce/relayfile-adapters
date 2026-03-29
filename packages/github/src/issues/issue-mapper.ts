@@ -1,7 +1,7 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
 
-import type { GitHubProxyProvider, JsonObject, JsonValue } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
 interface IssueMeta {
   assignees: string[];
@@ -62,7 +62,7 @@ export function mapIssue(issue: JsonObject, owner: string, repo: string): IssueM
 }
 
 export async function ingestIssue(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,

@@ -10,7 +10,7 @@ import {
   mockRepoContext,
 } from '../../__tests__/fixtures/index.js';
 import { type VfsLike } from '../../files/content-fetcher.js';
-import type { GitHubProxyProvider, ProxyRequest, ProxyResponse } from '../../types.js';
+import type { GitHubRequestProvider, ProxyRequest, ProxyResponse } from '../../types.js';
 import { fetchAndWriteDiff, ingestPullRequest } from '../diff-writer.js';
 import { buildVFSPath, mapPRFiles } from '../file-mapper.js';
 import { parsePullRequest } from '../parser.js';
@@ -101,7 +101,7 @@ function createFixtureProvider(options: FixtureProviderOptions = {}) {
     throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
   });
 
-  const provider: GitHubProxyProvider = {
+  const provider: GitHubRequestProvider = {
     name: 'fixture-github',
     connectionId: 'conn-fixture',
     proxy,

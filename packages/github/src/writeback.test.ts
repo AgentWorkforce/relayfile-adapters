@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 
 import { GitHubWritebackHandler } from './writeback.js';
 import type {
-  GitHubProxyProvider,
+  GitHubRequestProvider,
   JsonObject,
   ProxyRequest,
   ProxyResponse,
 } from './types.js';
 
-class FakeProvider implements GitHubProxyProvider {
+class FakeProvider implements GitHubRequestProvider {
   readonly name = 'fake-nango';
   readonly requests: ProxyRequest[] = [];
   private readonly responseFactory: (request: ProxyRequest) => Promise<ProxyResponse> | ProxyResponse;

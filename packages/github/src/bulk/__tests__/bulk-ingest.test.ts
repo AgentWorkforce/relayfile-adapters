@@ -12,7 +12,7 @@ import {
   mockRepoContext,
 } from '../../__tests__/fixtures/index.js';
 import type { VfsLike } from '../../files/content-fetcher.js';
-import type { GitHubProxyProvider, ProxyRequest, ProxyResponse } from '../../types.js';
+import type { GitHubRequestProvider, ProxyRequest, ProxyResponse } from '../../types.js';
 import {
   batchFetchFiles,
   checkRateLimit,
@@ -73,7 +73,7 @@ function createMemoryVfs(initialEntries: Record<string, string> = {}) {
 
 function createProvider(
   handler: (request: ProxyRequest) => Promise<ProxyResponse> | ProxyResponse,
-): GitHubProxyProvider & { proxy: ReturnType<typeof mock.fn> } {
+): GitHubRequestProvider & { proxy: ReturnType<typeof mock.fn> } {
   const proxy = mock.fn(handler);
 
   return {

@@ -150,6 +150,10 @@ GitHub/GitLab/Slack/...
 | `@relayfile/adapter-linear` | Linear (issues, projects, cycles) |
 | `@relayfile/adapter-notion` | Notion (pages, databases, blocks, comments) |
 
+## Mapping YAML Specification
+
+See [docs/MAPPING_YAML_SPEC.md](docs/MAPPING_YAML_SPEC.md) for the formal specification of the mapping YAML format used by `@relayfile/adapter-core`.
+
 ## Creating a New Adapter
 
 Use `@relayfile/adapter-core` to generate an adapter from an OpenAPI spec:

@@ -5,6 +5,10 @@ export class MockProvider implements ConnectionProvider {
   readonly requests: ProxyRequest[] = [];
   private readonly handlers = new Map<string, ProxyResponse | ((request: ProxyRequest) => ProxyResponse | Promise<ProxyResponse>)>();
 
+  async healthCheck(): Promise<boolean> {
+    return true;
+  }
+
   register(
     method: string,
     endpoint: string,

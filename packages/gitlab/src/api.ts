@@ -61,7 +61,7 @@ export class GitLabApiClient {
       method,
       baseUrl: this.config.baseUrl,
       endpoint,
-      connectionId: this.config.connectionId,
+      connectionId: this.requireConnectionId(),
       headers: options.headers,
       body: options.body,
       query: options.query,
@@ -89,7 +89,7 @@ export class GitLabApiClient {
         method: 'GET',
         baseUrl: this.config.baseUrl,
         endpoint,
-        connectionId: this.config.connectionId,
+        connectionId: this.requireConnectionId(),
         query: {
           ...query,
           page: String(page),
@@ -127,5 +127,15 @@ export class GitLabApiClient {
           : 'Unknown provider error';
 
     throw new Error(`${method} ${endpoint} failed with ${response.status}: ${detail}`);
+  }
+
+  private requireConnectionId(): string {
+    if (!this.config.connectionId) {
+      throw new Error(
+        'GitLabAdapterConfig.connectionId is required for provider-backed GitLab API calls',
+      );
+    }
+
+    return this.config.connectionId;
   }
 }

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "bin": {
     "adapter-core": "./dist/src/cli.js"
   },

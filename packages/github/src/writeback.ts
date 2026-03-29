@@ -4,8 +4,8 @@ import {
   GITHUB_REVIEW_SIDES,
   type AgentComment,
   type AgentReview,
+  type GitHubRequestProvider,
   type GitHubCreateReviewInput,
-  type GitHubProxyProvider,
   type JsonObject,
   type JsonValue,
   type ProxyResponse,
@@ -33,12 +33,12 @@ interface GitHubWritebackHandlerOptions {
  * @see https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request
  */
 export class GitHubWritebackHandler {
-  private readonly provider: GitHubProxyProvider;
+  private readonly provider: GitHubRequestProvider;
   private readonly defaultConnectionId?: string;
   private readonly defaultProviderConfigKey: string;
   private readonly resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
 
-  constructor(provider: GitHubProxyProvider, options: GitHubWritebackHandlerOptions = {}) {
+  constructor(provider: GitHubRequestProvider, options: GitHubWritebackHandlerOptions = {}) {
     this.provider = provider;
     this.defaultConnectionId = options.defaultConnectionId;
     this.defaultProviderConfigKey =
@@ -115,7 +115,7 @@ export class GitHubWritebackHandler {
     repo: string,
     prNumber: number,
     review: AgentReview,
-    provider: GitHubProxyProvider = this.provider,
+    provider: GitHubRequestProvider = this.provider,
     connectionId?: string,
   ): Promise<ProxyResponse> {
     const mappedReview = this.toGitHubReview(review);
@@ -405,7 +405,7 @@ function formatThrownError(error: unknown): string {
 }
 
 export function createGitHubWritebackHandler(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options?: GitHubWritebackHandlerOptions,
 ): GitHubWritebackHandler {
   return new GitHubWritebackHandler(provider, options);

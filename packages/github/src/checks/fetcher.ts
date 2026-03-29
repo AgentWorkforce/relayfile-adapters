@@ -1,5 +1,5 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const CHECK_RUNS_PER_PAGE = 100;
 const GITHUB_API_HEADERS = {
@@ -9,7 +9,7 @@ const GITHUB_API_HEADERS = {
 
 type ConnectionIdResolver = (() => Promise<string> | string) | undefined;
 
-export interface GitHubCheckRunProvider extends GitHubProxyProvider {
+export interface GitHubCheckRunProvider extends GitHubRequestProvider {
   connectionId?: string;
   defaultConnectionId?: string;
   getConnectionId?: ConnectionIdResolver;

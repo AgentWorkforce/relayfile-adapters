@@ -1,6 +1,6 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
-  GitHubProxyProvider,
+  GitHubRequestProvider,
   JsonObject,
   JsonValue,
   ProxyResponse,
@@ -15,13 +15,13 @@ type GitHubIssue = JsonObject & {
 
 type GitHubIssueComment = JsonObject;
 
-type ConnectionAwareProvider = GitHubProxyProvider & {
+type ConnectionAwareProvider = GitHubRequestProvider & {
   readonly connectionId?: string;
   readonly defaultConnectionId?: string;
 };
 
 export async function fetchIssue(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -41,7 +41,7 @@ export async function fetchIssue(
 }
 
 export async function fetchIssueComments(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -104,7 +104,7 @@ function formatIssueNumber(value: number): string {
 }
 
 function resolveConnectionId(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   connectionId?: string,
 ): string {
   const explicitConnectionId = connectionId?.trim();
