@@ -1,3 +1,11 @@
+import type {
+  ConnectionProvider as SharedConnectionProvider,
+  ProxyRequest as SharedProxyRequest,
+  ProxyResponse as SharedProxyResponse,
+} from '@relayfile/sdk';
+
+export type { ConnectionProvider } from '@relayfile/sdk';
+
 export const GITHUB_REVIEW_EVENTS = ['APPROVE', 'COMMENT', 'REQUEST_CHANGES'] as const;
 export const GITHUB_REVIEW_SIDES = ['LEFT', 'RIGHT'] as const;
 export const DEFAULT_GITHUB_EVENTS = [
@@ -54,24 +62,10 @@ export interface GitHubCreateReviewInput {
   comments: GitHubReviewComment[];
 }
 
-export interface ProxyRequest {
-  method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
-  baseUrl: string;
-  endpoint: string;
-  connectionId: string;
-  headers?: Record<string, string>;
-  body?: JsonValue;
-  query?: Record<string, string>;
-}
+export type ProxyRequest = SharedProxyRequest;
+export type ProxyResponse<T = JsonValue | null> = SharedProxyResponse<T>;
 
-export interface ProxyResponse {
-  status: number;
-  headers: Record<string, string>;
-  data: JsonValue | null;
-}
-
-export interface GitHubProxyProvider {
-  readonly name: string;
+export interface GitHubProxyProvider extends Pick<SharedConnectionProvider, 'name'> {
   proxy(request: ProxyRequest): Promise<ProxyResponse>;
 }
 
@@ -212,7 +206,6 @@ export interface SyncResult {
   errors: Array<{ objectType?: string; error: string }>;
 }
 
-export { type ConnectionProvider } from '@relayfile/sdk';
 import type { ConnectionProvider } from '@relayfile/sdk';
 
 export abstract class IntegrationAdapter {

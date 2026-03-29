@@ -15,6 +15,8 @@ import {
   validateLinearWebhookSignature,
   type ConnectionProvider,
   type LinearAdapterConfig,
+  type ProxyRequest,
+  type ProxyResponse,
   type RelayFileClientLike,
 } from '../index.ts';
 
@@ -28,7 +30,19 @@ function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
     },
   };
 
-  const provider: ConnectionProvider = { name: 'relayfile-test-provider' };
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
+      return {
+        status: 200,
+        headers: {},
+        data: null as never,
+      };
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
   return new LinearAdapter(client, provider, config);
 }
 

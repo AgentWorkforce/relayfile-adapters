@@ -1,5 +1,5 @@
 import type {
-  GitHubProxyProvider as ConnectionProvider,
+  ConnectionProvider,
   JsonObject,
   ProxyRequest,
   ProxyResponse,
@@ -37,7 +37,7 @@ export function createMockProvider(): MockConnectionProvider {
     reset() {
       requests.length = 0;
     },
-    async proxy(request: ProxyRequest): Promise<ProxyResponse> {
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
       requests.push(request);
 
       if (request.baseUrl !== GITHUB_API_BASE_URL) {
@@ -51,25 +51,25 @@ export function createMockProvider(): MockConnectionProvider {
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
       ) {
-        return jsonResponse(mockPRFiles);
+        return jsonResponse(mockPRFiles) as ProxyResponse<T>;
       }
 
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/commits`
       ) {
-        return jsonResponse(mockCommits);
+        return jsonResponse(mockCommits) as ProxyResponse<T>;
       }
 
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/reviews`
       ) {
-        return jsonResponse(mockReviews);
+        return jsonResponse(mockReviews) as ProxyResponse<T>;
       }
 
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/comments`
       ) {
-        return jsonResponse(mockReviewComments);
+        return jsonResponse(mockReviewComments) as ProxyResponse<T>;
       }
 
       if (
@@ -78,11 +78,11 @@ export function createMockProvider(): MockConnectionProvider {
           `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/issues/10/comments?`,
         )
       ) {
-        return jsonResponse(mockIssueComments);
+        return jsonResponse(mockIssueComments) as ProxyResponse<T>;
       }
 
       if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/issues/10`) {
-        return jsonResponse(mockIssuePayload);
+        return jsonResponse(mockIssuePayload) as ProxyResponse<T>;
       }
 
       if (
@@ -92,7 +92,7 @@ export function createMockProvider(): MockConnectionProvider {
         return jsonResponse({
           total_count: mockCheckRuns.length,
           check_runs: mockCheckRuns,
-        });
+        }) as ProxyResponse<T>;
       }
 
       if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
@@ -100,18 +100,21 @@ export function createMockProvider(): MockConnectionProvider {
           return {
             status: 200,
             headers: { 'content-type': 'text/plain; charset=utf-8' },
-            data: mockDiff,
-          };
+            data: mockDiff as T,
+          } satisfies ProxyResponse<T>;
         }
 
-        return jsonResponse(mockPRPayload);
+        return jsonResponse(mockPRPayload) as ProxyResponse<T>;
       }
 
       if (request.endpoint.startsWith(CONTENTS_PREFIX)) {
-        return jsonResponse(resolveContentsResponse(request));
+        return jsonResponse(resolveContentsResponse(request)) as ProxyResponse<T>;
       }
 
       throw new Error(`No mock fixture for ${request.method} ${request.endpoint}`);
+    },
+    async healthCheck() {
+      return true;
     },
   };
 }

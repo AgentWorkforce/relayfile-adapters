@@ -7,12 +7,16 @@ import type { ConnectionProvider, ProxyRequest, ProxyResponse } from './types.js
 class MockProvider implements ConnectionProvider {
   readonly name = 'mock-provider';
 
-  async proxy(_request: ProxyRequest): Promise<ProxyResponse> {
+  async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
     return {
       status: 200,
       headers: {},
-      data: null,
+      data: null as T,
     };
+  }
+
+  async healthCheck(): Promise<boolean> {
+    return true;
   }
 }
 

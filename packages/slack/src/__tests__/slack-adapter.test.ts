@@ -15,6 +15,8 @@ import {
   normalizeSlackWebhook,
   validateSlackWebhookSignature,
   type ConnectionProvider,
+  type ProxyRequest,
+  type ProxyResponse,
   type RelayFileClientLike,
 } from '../index.js';
 
@@ -35,11 +37,11 @@ const SUPPORTED_EVENTS = [
 function createProvider(): ConnectionProvider {
   return {
     name: 'mock-slack-provider',
-    async proxy() {
+    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
       return {
         status: 200,
         headers: {},
-        data: null,
+        data: null as never,
       };
     },
     async healthCheck() {
