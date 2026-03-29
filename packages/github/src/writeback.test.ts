@@ -1,6 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import type { WritebackItem } from '@relayfile/sdk';
+
 import { GitHubWritebackHandler } from './writeback.js';
 import type {
   GitHubProxyProvider,
@@ -21,6 +23,10 @@ class FakeProvider implements GitHubProxyProvider {
   async proxy(request: ProxyRequest): Promise<ProxyResponse> {
     this.requests.push(request);
     return this.responseFactory(request);
+  }
+
+  async healthCheck(_connectionId: string): Promise<boolean> {
+    return true;
   }
 }
 
@@ -44,6 +50,31 @@ function createHandler(
 }
 
 describe('writeback', () => {
+  it('canHandle matches github VFS paths', () => {
+    const { handler } = createHandler();
+
+    assert.strictEqual(handler.canHandle('/github/repos/acme/widgets/pulls/7/reviews/1.json'), true);
+    assert.strictEqual(handler.canHandle('/gitlab/projects/acme/widgets/merge_requests/7.json'), false);
+  });
+
+  it('execute maps a queued review path to the GitHub reviews endpoint', async () => {
+    const { handler, provider } = createHandler();
+    const item: WritebackItem = {
+      id: 'wb_1',
+      workspaceId: 'workspace-1',
+      path: '/github/repos/acme/widgets/pulls/12/reviews/1.json',
+      revision: 'rev_1',
+      correlationId: 'corr_1',
+    };
+
+    await handler.execute(item, provider);
+
+    assert.strictEqual(provider.requests.length, 1);
+    assert.strictEqual(provider.requests[0]?.method, 'POST');
+    assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/12/reviews');
+    assert.strictEqual(provider.requests[0]?.connectionId, 'conn-default');
+  });
+
   it('parseReviewPayload maps agent review JSON into typed GitHub review input', () => {
     const { handler } = createHandler();
     const content = JSON.stringify({

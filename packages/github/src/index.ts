@@ -318,4 +318,4 @@ export * from './config.js';
 export * from './adapter.js';
 export * from './types.js';
 export * from './webhook/event-map.js';
-export * from './writeback.js';
+export { GitHubWritebackHandler, createGitHubWritebackHandler } from './writeback.js';

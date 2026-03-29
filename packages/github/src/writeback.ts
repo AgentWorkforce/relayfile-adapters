@@ -1,3 +1,8 @@
+import type {
+  ConnectionProvider as RelayConnectionProvider,
+  WritebackItem,
+} from '@relayfile/sdk';
+
 import { GITHUB_API_BASE_URL } from './config.js';
 import {
   GITHUB_REVIEW_EVENTS,
@@ -44,6 +49,31 @@ export class GitHubWritebackHandler {
     this.defaultProviderConfigKey =
       options.defaultProviderConfigKey ?? DEFAULT_PROVIDER_CONFIG_KEY;
     this.resolveConnectionId = options.resolveConnectionId;
+  }
+
+  canHandle(path: string): boolean {
+    return path.startsWith('/github/');
+  }
+
+  async execute(item: WritebackItem, provider: RelayConnectionProvider): Promise<void> {
+    const connectionId = await this.resolveConnectionIdFromWorkspace(item.workspaceId);
+    const target = this.extractWritebackTarget(item.path);
+    const response = await provider.proxy({
+      method: 'POST',
+      baseUrl: GITHUB_API_BASE_URL,
+      endpoint: `/repos/${target.owner}/${target.repo}/pulls/${target.prNumber}/reviews`,
+      connectionId,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'Provider-Config-Key': this.defaultProviderConfigKey,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+
+    if (response.status >= 400) {
+      throw new Error(formatQueuedWritebackError(item.path, response));
+    }
   }
 
   parseReviewPayload(content: string): AgentReview {
@@ -201,9 +231,9 @@ export class GitHubWritebackHandler {
 
   private async resolveConnectionIdFromWorkspace(
     workspaceId: string,
-    review: AgentReview,
+    review?: AgentReview,
   ): Promise<string> {
-    const metadataConnectionId = review.metadata?.connectionId?.trim();
+    const metadataConnectionId = review?.metadata?.connectionId?.trim();
     if (metadataConnectionId) {
       return metadataConnectionId;
     }
@@ -388,6 +418,31 @@ function formatProviderError(response: ProxyResponse): string {
 
   if (!Array.isArray(responseData) && typeof responseData === 'object') {
     const message = responseData.message;
+    if (typeof message === 'string' && message.trim().length > 0) {
+      return `${baseMessage}: ${message}`;
+    }
+  }
+
+  return baseMessage;
+}
+
+function formatQueuedWritebackError(
+  path: string,
+  response: { status: number; data: unknown },
+): string {
+  const baseMessage = `GitHub writeback failed for ${path} with status ${response.status}`;
+  const responseData = response.data;
+
+  if (responseData === null) {
+    return baseMessage;
+  }
+
+  if (typeof responseData === 'string' && responseData.trim().length > 0) {
+    return `${baseMessage}: ${responseData}`;
+  }
+
+  if (!Array.isArray(responseData) && typeof responseData === 'object') {
+    const message = (responseData as { message?: unknown }).message;
     if (typeof message === 'string' && message.trim().length > 0) {
       return `${baseMessage}: ${message}`;
     }
