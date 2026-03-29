@@ -214,12 +214,13 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
 test('GitHubAdapter.routeWebhook delegates to the router', async () => {
   const adapter = new RecordingAdapter();
   const result = await adapter.routeWebhook(
-    { 'x-github-event': 'issues' },
     {
       action: 'opened',
       repository: { full_name: 'acme/widgets' },
       issue: { number: 9 },
     },
+    undefined,
+    { 'x-github-event': 'issues' },
   );
 
   assert.deepEqual(adapter.calls, ['ingestIssue:opened']);

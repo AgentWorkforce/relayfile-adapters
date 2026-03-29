@@ -347,7 +347,7 @@ describe('commit mapping', () => {
     );
     assert.strictEqual(proxy.mock.calls.length, 3);
     assert.deepStrictEqual(
-      proxy.mock.calls.map(([request]: [ProxyRequest]) => request.endpoint),
+      proxy.mock.calls.map((call) => (call.arguments[0] as ProxyRequest).endpoint),
       [
         `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=1&per_page=100`,
         `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=2&per_page=100`,
