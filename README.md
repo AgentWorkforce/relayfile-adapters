@@ -10,7 +10,7 @@ Each adapter has exactly 3 jobs:
 ## Quick Start
 
 ```bash
-npm install @relayfile/sdk @relayfile/adapter-github @relayfile/provider-nango
+npm install @relayfile/sdk @relayfile/adapter-github @relayfile/provider-nango @relayfile/webhook-server
 ```
 
 ### Getting started
@@ -149,6 +149,7 @@ GitHub/GitLab/Slack/...
 | `@relayfile/adapter-slack` | Slack (channels, messages, reactions) |
 | `@relayfile/adapter-linear` | Linear (issues, projects, cycles) |
 | `@relayfile/adapter-notion` | Notion (pages, databases, blocks, comments) |
+| `@relayfile/webhook-server` | Hono webhook receiver for adapter-driven relayfile ingestion |
 
 ## Mapping YAML Specification
 
