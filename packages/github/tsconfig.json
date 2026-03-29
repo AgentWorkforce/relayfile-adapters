@@ -10,7 +10,10 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "types": [
+      "node",
+      "vitest/globals"
+    ]
   },
   "files": [
     "src/adapter.ts",
@@ -20,5 +23,12 @@
     "src/writeback.ts",
     "src/webhook/event-map.ts"
   ],
-  "exclude": ["dist", "node_modules"]
+  "exclude": [
+    "dist",
+    "node_modules"
+  ],
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src"
+  ]
 }

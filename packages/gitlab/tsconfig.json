@@ -8,8 +8,17 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "rootDir": "src"
   },
-  "include": ["src"],
-  "exclude": ["dist", "test"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "dist",
+    "test"
+  ],
+  "extends": "../../tsconfig.base.json"
 }

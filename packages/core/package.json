@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
     "adapter-core": "./dist/src/cli.js"
@@ -17,7 +17,8 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "test": "npm run build && node --test dist/tests/**/*.test.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@relayfile/sdk": "^0.1.3"

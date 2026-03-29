@@ -18,7 +18,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "lint": "tsc --noEmit -p tsconfig.json"
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@relayfile/sdk": "^0.1.3"
