@@ -26,6 +26,8 @@ writebacks:
     endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
 ```
 
+See [../../docs/MAPPING_YAML_SPEC.md](../../docs/MAPPING_YAML_SPEC.md) for the full mapping YAML specification.
+
 ## CLI
 
 ```bash
