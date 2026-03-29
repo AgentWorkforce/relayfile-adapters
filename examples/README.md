@@ -1,57 +1,56 @@
 # Relayfile Adapter Examples
 
-End-to-end examples showing the three things adapters do:
-**path mapping**, **webhook normalization**, and **writeback**.
+Examples for the two halves of the adapter lifecycle:
+ingest with `@relayfile/webhook-server`, then write back with
+`WritebackConsumer` plus an adapter-specific handler.
+
+## Prerequisites
+
+- Node.js 20+
+- These demos are self-contained with mocked providers and an in-memory relayfile stub.
+- For a real local relayfile backend, start the sibling stack first:
+
+```bash
+cd ../AgentWorkforce-relayfile/docker
+docker compose up -d
+```
 
 ## Examples
 
 | # | Example | What it covers |
-|-|-|-|
-| 01 | [GitHub Webhook Ingest](./01-github-webhook-ingest/) | `GitHubAdapter` normalizes a PR webhook → VFS path |
-| 02 | [Schema-Driven Adapter](./02-schema-driven-adapter/) | `SchemaAdapter` built from an inline mapping spec (no custom class) |
-| 03 | [Writeback](./03-writeback/) | Agent writes a review → adapter maps VFS path back to GitHub API |
-| 04 | [Full Loop: GitHub](./04-full-loop-github/) | **Flagship** — webhook → VFS → agent reads → agent writes → writeback |
-| 05 | [Custom Adapter: Stripe](./05-custom-adapter/) | Build a Stripe adapter with ~30 lines YAML + few lines TS |
+|---|---|---|
+| 01 | [GitHub Webhook Ingest](./01-github-webhook-ingest/) | `webhook-server` + `GitHubAdapter` + shared `ConnectionProvider` |
+| 02 | [Schema-Driven Adapter](./02-schema-driven-adapter/) | `SchemaAdapter` from inline mapping spec ([YAML spec](../docs/MAPPING_YAML_SPEC.md)) |
+| 03 | [Writeback Consumer](./03-writeback/) | `WritebackConsumer` + `GitHubWritebackHandler` — pending review → GitHub API |
+| 04 | [Full Loop: GitHub](./04-full-loop-github/) | **Flagship** — `webhook-server` + shared `ConnectionProvider` + `WritebackConsumer` |
+| 05 | [Custom Adapter: Stripe](./05-custom-adapter/) | YAML mapping + `SchemaAdapter` ([spec](../docs/MAPPING_YAML_SPEC.md)) |
 
 ## Running
 
-All examples are self-contained TypeScript files with mocked providers.
-No API keys or external services needed.
-
 ```bash
-# Run any example
 npx tsx examples/01-github-webhook-ingest/index.ts
+npx tsx examples/03-writeback/index.ts
 npx tsx examples/04-full-loop-github/index.ts
 ```
 
-## Adapter packages
+## How It Fits Together
 
-| Package | Adapts |
-|-|-|
-| `@relayfile/adapter-core` | Schema-driven adapter runtime (YAML + OpenAPI) |
-| `@relayfile/adapter-github` | GitHub (PRs, issues, reviews, commits) |
-| `@relayfile/adapter-gitlab` | GitLab |
-| `@relayfile/adapter-slack` | Slack |
-| `@relayfile/adapter-teams` | Microsoft Teams |
-| `@relayfile/adapter-linear` | Linear |
-| `@relayfile/adapter-notion` | Notion |
+```text
+GitHub webhook
+  -> @relayfile/webhook-server
+  -> GitHubAdapter
+  -> relayfile VFS path + metadata
 
-## How adapters work
+Agent reads and writes files
 
-```
-External Service                    VFS (Virtual Filesystem)
-┌──────────────┐                   ┌──────────────────────────────────┐
-│   Webhook    │──── normalize ───▶│ /github/repos/acme/api/pulls/42/ │
-│   payload    │     + path map    │   metadata.json                  │
-└──────────────┘                   └──────────┬───────────────────────┘
-                                              │
-                                     Agent reads & writes
-                                              │
-┌──────────────┐                   ┌──────────▼───────────────────────┐
-│  GitHub API  │◀─── writeback ────│ /github/repos/acme/api/pulls/42/ │
-│  POST review │     (path→API)    │   reviews/agent-review.json      │
-└──────────────┘                   └──────────────────────────────────┘
+WritebackConsumer
+  -> GitHubWritebackHandler
+  -> provider proxy
+  -> GitHub API
 ```
 
-See also: `packages/core/examples/resend/` for a real-world schema-driven
-adapter built from an OpenAPI spec.
+Key packages:
+`@relayfile/webhook-server` for inbound HTTP,
+`@relayfile/sdk` for `ConnectionProvider` and `WritebackConsumer`,
+`@relayfile/adapter-github` for GitHub-specific routing,
+and `@relayfile/adapter-core` for mapping-driven adapters.

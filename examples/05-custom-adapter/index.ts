@@ -3,7 +3,9 @@
  *
  * Demonstrates: building a new adapter for an unsupported service using
  * just a YAML mapping spec (~30 lines) and a few lines of TypeScript.
- * No custom adapter class needed.
+ *
+ * Mapping spec format: see docs/MAPPING_YAML_SPEC.md
+ * Stripe spec: ./stripe.mapping.yaml
  *
  * Run: npx tsx examples/05-custom-adapter/index.ts
  */
@@ -15,7 +17,7 @@ import { SchemaAdapter } from "@relayfile/adapter-core";
 import type { MappingSpec } from "@relayfile/adapter-core";
 
 // ---------------------------------------------------------------------------
-// 1. Load the Stripe mapping spec from YAML
+// 1. Load the Stripe mapping spec from YAML (see docs/MAPPING_YAML_SPEC.md)
 // ---------------------------------------------------------------------------
 const mappingPath = fileURLToPath(
   new URL("./stripe.mapping.yaml", import.meta.url),
@@ -35,11 +37,7 @@ const adapter = new SchemaAdapter({
     name: "stripe",
     async proxy(req) {
       console.log("  [proxy →]", req.method, req.endpoint);
-      return {
-        status: 200,
-        headers: {},
-        data: { id: "re_mock123", status: "succeeded" },
-      };
+      return { status: 200, headers: {}, data: { id: "re_mock123" } };
     },
   },
   spec,
@@ -47,78 +45,38 @@ const adapter = new SchemaAdapter({
 });
 
 // ---------------------------------------------------------------------------
-// 3. Simulate a charge.succeeded webhook from Stripe
-// ---------------------------------------------------------------------------
-const chargeWebhook = {
-  id: "evt_1abc",
-  type: "charge.succeeded",
-  account: "acct_demo",
-  data: {
-    object: {
-      id: "ch_3xyz",
-      amount: 4999,
-      currency: "usd",
-      status: "succeeded",
-      customer: "cus_abc",
-      description: "Pro plan — monthly",
-    },
-  },
-};
-
-// ---------------------------------------------------------------------------
-// 4. Run through the capabilities
+// 3. Run through capabilities
 // ---------------------------------------------------------------------------
 async function main() {
   console.log("--- Example 05: Custom Stripe Adapter ---\n");
   console.log(`Adapter: ${adapter.name} v${adapter.version}`);
-  console.log("Supported events:", adapter.supportedEvents());
+  console.log("Events:", adapter.supportedEvents());
 
-  // Webhook → VFS path
   const webhookPath = adapter.computeWebhookPath({
     provider: "stripe",
     connectionId: "conn_stripe_live",
     eventType: "charge.succeeded",
     objectType: "charge",
     objectId: "ch_3xyz",
-    payload: chargeWebhook,
+    payload: {
+      id: "evt_1abc", type: "charge.succeeded", account: "acct_demo",
+      data: { object: { id: "ch_3xyz", amount: 4999, currency: "usd" } },
+    },
   });
   console.log("\nWebhook VFS path:", webhookPath);
 
-  // Ingest the webhook
-  const result = await adapter.ingestWebhook("ws_demo", {
-    provider: "stripe",
-    connectionId: "conn_stripe_live",
-    eventType: "charge.succeeded",
-    objectType: "charge",
-    objectId: "ch_3xyz",
-    payload: chargeWebhook,
-  });
-  console.log("Ingest result:", JSON.stringify(result, null, 2));
+  const chargePath = adapter.computeResourcePath("get-charge", { charge_id: "ch_3xyz" });
+  console.log("Resource path:", chargePath);
 
-  // Resource path
-  const chargePath = adapter.computeResourcePath("get-charge", {
-    charge_id: "ch_3xyz",
-  });
-  console.log("\nResource path:", chargePath);
-
-  // Writeback: issue a refund
   const refundPath = "/stripe/charges/ch_3xyz/refunds/agent-refund.json";
   const match = adapter.matchWriteback(refundPath);
-  console.log("\nWriteback match for", refundPath);
-  console.log("  Rule:", match?.name);
-  console.log("  Endpoint:", match?.endpointPath);
+  console.log("\nWriteback:", match?.name, "→", match?.method, match?.endpointPath);
 
   console.log("\nIssuing refund via writeback...");
-  await adapter.writeBack(
-    "ws_demo",
-    refundPath,
-    JSON.stringify({
-      amount: 4999,
-      reason: "requested_by_customer",
-      connectionId: "conn_stripe_live",
-    }),
-  );
-  console.log("Refund writeback complete.\n");
+  await adapter.writeBack("ws_demo", refundPath, JSON.stringify({
+    amount: 4999, reason: "requested_by_customer", connectionId: "conn_stripe_live",
+  }));
+  console.log("Done.\n");
 }
 
 main().catch(console.error);

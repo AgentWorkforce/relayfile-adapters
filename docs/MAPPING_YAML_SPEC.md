@@ -60,8 +60,10 @@ At least one of `openapi`, `postman`, `samples`, or `docs` must be present.
 | `endpoint` | string | Custom LLM endpoint URL |
 | `model` | string | Model identifier |
 | `maxTokens` | number | Max tokens per request |
+| `apiKey` | string | API key (omitted from generated metadata) |
 | `concurrency` | number | Parallel extraction requests |
 | `chunkSize` | number | Characters per chunk |
+| `headers` | object | Custom HTTP headers for the LLM endpoint |
 
 ## `webhooks`
 
@@ -103,7 +105,7 @@ Path templates use `{{ field }}` (double curly braces) to interpolate values fro
 
 - **Dot notation**: `{{ repository.owner.login }}` traverses nested objects
 - **Array indexing**: `{{ items.0.id }}` accesses array elements by index
-- **Encoding**: String values are URI-encoded; numbers and booleans are stringified; arrays join with `/`
+- **Encoding**: String values are URI-encoded; numbers and booleans are stringified; arrays join with `/`; objects are JSON-stringified then URI-encoded
 - **Strict mode**: Missing fields raise an error at runtime (used by `SchemaAdapter`)
 
 Endpoint descriptors use `{param}` (single curly braces) for REST-style path parameters. These are distinct from template interpolation.
@@ -125,7 +127,7 @@ The parser enforces:
 2. At least one source (`openapi`, `postman`, `samples`, or `docs`) is required
 3. `docs.url` must be non-empty when `docs` is present
 4. Webhook `path` must start with `/`
-5. Resource and writeback `endpoint` must match `METHOD /path` (e.g., `GET /resource`)
+5. Resource and writeback `endpoint` must match `METHOD /path` where method is one of `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
 6. `sync.trigger` must be one of `content-hash`, `changelog-rss`, `github-release`
 
 When a `ServiceSpec` is available, validation also checks that template fields and `extract` fields exist in the referenced schemas.
