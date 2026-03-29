@@ -24,6 +24,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 function readString(value: unknown): string | undefined {
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
@@ -44,7 +45,7 @@ function readNestedString(payload: Record<string, unknown>, ...path: string[]): 
 }
 
 function sanitizePathSegment(value: string): string {
-  return value.replace(/[^A-Za-z0-9._+=@/-]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
+  return value.replace(/[^A-Za-z0-9_+=@-]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
 }
 
 function defaultConnectionId(headers: Headers, payload: Record<string, unknown>): string {
