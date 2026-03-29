@@ -1,9 +1,9 @@
 import type { SchemaAdapter } from '@relayfile/adapter-core';
+import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import {
-  type ConnectionProvider,
   type FileSemantics,
   type GitHubAdapterConfig,
   type IngestResult,
@@ -39,7 +39,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     });
     super(provider, validatedConfig);
     this.schemaAdapter = createGitHubSchemaAdapter(provider, validatedConfig);
-    this.writebackHandler = new GitHubWritebackHandler(provider, {
+    this.writebackHandler = new GitHubWritebackHandler(provider as never, {
       defaultConnectionId: validatedConfig.connectionId,
       defaultProviderConfigKey: validatedConfig.providerConfigKey,
     });

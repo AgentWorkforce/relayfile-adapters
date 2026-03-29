@@ -212,10 +212,8 @@ export interface SyncResult {
   errors: Array<{ objectType?: string; error: string }>;
 }
 
-export interface ConnectionProvider extends GitHubProxyProvider {
-  healthCheck?(connectionId: string): Promise<boolean>;
-  handleWebhook?(rawPayload: unknown): Promise<NormalizedWebhook>;
-}
+export { type ConnectionProvider } from '@relayfile/sdk';
+import type { ConnectionProvider } from '@relayfile/sdk';
 
 export abstract class IntegrationAdapter {
   protected readonly provider: ConnectionProvider;

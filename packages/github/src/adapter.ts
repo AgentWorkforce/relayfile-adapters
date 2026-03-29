@@ -8,7 +8,8 @@ import {
 } from '@relayfile/adapter-core';
 import type { RelayFileClient } from '@relayfile/sdk';
 
-import type { ConnectionProvider, GitHubAdapterConfig } from './types.js';
+import type { ConnectionProvider } from '@relayfile/sdk';
+import type { GitHubAdapterConfig } from './types.js';
 
 const MAPPING_PATH = fileURLToPath(new URL('../github.mapping.yaml', import.meta.url));
 const NOOP_CLIENT = {
