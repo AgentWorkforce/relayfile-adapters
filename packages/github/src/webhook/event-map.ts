@@ -1,4 +1,5 @@
 import type { IngestResult } from '../types.js';
+export type { IngestResult };
 
 export interface WebhookAdapter {
   ingestPullRequest(payload: Record<string, unknown>): Promise<IngestResult>;

@@ -17,8 +17,7 @@
     ]
   },
   "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts"
+    "src/**/*.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }

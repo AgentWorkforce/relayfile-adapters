@@ -4,7 +4,7 @@
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/src/index.d.ts",
+  "types": "dist/index.d.ts",
   "bin": {
     "adapter-core": "./dist/src/cli.js"
   },

@@ -1,13 +1,40 @@
 import {
   computeCanonicalPath,
-  IntegrationAdapter,
   type ConnectionProvider,
-  type FileSemantics,
-  type IngestResult,
-  type NormalizedWebhook,
-  type ProxyResponse,
   type RelayFileClient,
 } from "@relayfile/sdk";
+
+/** Semantics metadata attached to VFS files. */
+export interface FileSemantics {
+  properties: Record<string, string>;
+}
+
+/** Normalized webhook event from any provider. */
+export interface NormalizedWebhook {
+  eventType: string;
+  objectType: string;
+  objectId?: string;
+  payload: Record<string, unknown>;
+  provider?: string;
+  connectionId?: string;
+  metadata?: Record<string, string>;
+}
+
+/** Result of ingesting a webhook into the VFS. */
+export interface IngestResult {
+  filesWritten: number;
+  filesUpdated: number;
+  filesDeleted: number;
+  paths: string[];
+  errors: string[];
+}
+
+/** Response from a provider proxy call. */
+export interface ProxyResponse {
+  status: number;
+  data: unknown;
+  headers?: Record<string, string>;
+}
 import { minimatch } from "minimatch";
 import { interpolateTemplate, pickFields } from "../spec/template.js";
 import type {
@@ -39,16 +66,19 @@ export interface SchemaAdapterOptions {
   }) => Promise<string> | string;
 }
 
-export class SchemaAdapter extends IntegrationAdapter {
+export class SchemaAdapter {
   readonly name: string;
   readonly version: string;
+  readonly client: RelayFileClient;
+  readonly provider: ConnectionProvider;
 
   private readonly spec: MappingSpec;
   private readonly defaultConnectionId?: string;
   private readonly resolveConnectionIdFn?: SchemaAdapterOptions["resolveConnectionId"];
 
   constructor(options: SchemaAdapterOptions) {
-    super(options.client, options.provider);
+    this.client = options.client;
+    this.provider = options.provider;
     this.spec = options.spec;
     this.name = options.spec.adapter.name;
     this.version = options.spec.adapter.version;

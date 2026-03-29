@@ -1,8 +1,8 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { IngestResult, VfsLike } from '../files/content-fetcher.ts';
-import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.ts';
-import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.ts';
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.ts';
+import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
+import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
+import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;

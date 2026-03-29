@@ -11,8 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "types": [
-      "node",
-      "vitest/globals"
+      "node"
     ]
   },
   "files": [
@@ -25,7 +24,10 @@
   ],
   "exclude": [
     "dist",
-    "node_modules"
+    "node_modules",
+    "src/__tests__",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ],
   "extends": "../../tsconfig.base.json",
   "include": [
