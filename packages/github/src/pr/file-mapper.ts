@@ -1,12 +1,12 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;
 
 const PR_FILE_STATUSES = ['added', 'modified', 'removed', 'renamed'] as const;
 
-type ConnectionAwareProvider = GitHubProxyProvider & {
+type ConnectionAwareProvider = GitHubRequestProvider & {
   connectionId?: string;
   defaultConnectionId?: string;
   resolveConnectionId?: () => Promise<string> | string;
@@ -31,7 +31,7 @@ export interface PullRequestFileMapping {
 }
 
 export async function mapPRFiles(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -108,7 +108,7 @@ function buildHeaders(): Record<string, string> {
   };
 }
 
-async function resolveConnectionId(provider: GitHubProxyProvider): Promise<string> {
+async function resolveConnectionId(provider: GitHubRequestProvider): Promise<string> {
   const connectionAwareProvider = provider as ConnectionAwareProvider;
   const candidateConnectionId =
     connectionAwareProvider.connectionId?.trim() ??

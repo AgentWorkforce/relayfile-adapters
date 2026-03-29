@@ -1,7 +1,7 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const CACHE_METADATA_PATH = '.cache/files.json';
 const CACHE_CONTENT_ROOT = '.cache/files';
@@ -205,7 +205,7 @@ export class FileContentCache {
 
 export async function fetchWithCache(
   cache: FileContentCache,
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   path: string,
@@ -261,7 +261,7 @@ function createEmptyManifest(): FileCacheManifest {
 }
 
 async function fetchFile(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   path: string,
@@ -393,8 +393,8 @@ function parseContentPayload(data: JsonValue | null, path: string): GitHubConten
   return payload as unknown as GitHubContentPayload;
 }
 
-function resolveConnectionId(provider: GitHubProxyProvider): string {
-  const defaults = provider as GitHubProxyProvider & ProviderDefaults;
+function resolveConnectionId(provider: GitHubRequestProvider): string {
+  const defaults = provider as GitHubRequestProvider & ProviderDefaults;
   const connectionId = defaults.connectionId ?? defaults.defaultConnectionId;
 
   if (!connectionId?.trim()) {
@@ -406,8 +406,8 @@ function resolveConnectionId(provider: GitHubProxyProvider): string {
   return connectionId.trim();
 }
 
-function resolveProviderConfigKey(provider: GitHubProxyProvider): string {
-  const defaults = provider as GitHubProxyProvider & ProviderDefaults;
+function resolveProviderConfigKey(provider: GitHubRequestProvider): string {
+  const defaults = provider as GitHubRequestProvider & ProviderDefaults;
   return (
     defaults.providerConfigKey ??
     defaults.defaultProviderConfigKey ??

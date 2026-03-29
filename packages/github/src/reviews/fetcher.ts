@@ -1,5 +1,5 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;
@@ -13,7 +13,7 @@ export interface GitHubFetchOptions {
   providerConfigKey?: string;
 }
 
-interface ConnectionAwareProvider extends GitHubProxyProvider {
+interface ConnectionAwareProvider extends GitHubRequestProvider {
   connectionId?: string;
   defaultConnectionId?: string;
   providerConfigKey?: string;
@@ -36,7 +36,7 @@ export class GitHubFetchError extends Error {
 }
 
 export async function fetchReviews(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -46,7 +46,7 @@ export async function fetchReviews(
 }
 
 export async function fetchReviewComments(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -56,7 +56,7 @@ export async function fetchReviewComments(
 }
 
 export async function fetchSingleReviewComments(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -71,7 +71,7 @@ export async function fetchSingleReviewComments(
 }
 
 async function fetchPaginatedObjects(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   endpoint: string,
   options: GitHubFetchOptions,
 ): Promise<JsonObject[]> {
@@ -98,7 +98,7 @@ async function fetchPaginatedObjects(
 }
 
 async function requestGitHubPage(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   endpoint: string,
   page: number,
   options: GitHubFetchOptions,
@@ -127,7 +127,7 @@ async function requestGitHubPage(
 }
 
 function buildHeaders(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options: GitHubFetchOptions,
 ): Record<string, string> {
   const providerConfigKey = resolveProviderConfigKey(provider, options);
@@ -141,7 +141,7 @@ function buildHeaders(
 }
 
 async function resolveConnectionId(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options: GitHubFetchOptions,
 ): Promise<string> {
   const explicitConnectionId = options.connectionId?.trim();
@@ -171,7 +171,7 @@ async function resolveConnectionId(
 }
 
 function resolveProviderConfigKey(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options: GitHubFetchOptions,
 ): string | undefined {
   const explicitProviderConfigKey = options.providerConfigKey?.trim();

@@ -2,13 +2,13 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
-import type { GitHubProxyProvider, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
 import { parsePullRequest, type PullRequestMetadata } from './parser.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 
-type ConnectionAwareProvider = GitHubProxyProvider & {
+type ConnectionAwareProvider = GitHubRequestProvider & {
   connectionId?: string;
   defaultConnectionId?: string;
   resolveConnectionId?: () => Promise<string> | string;
@@ -21,7 +21,7 @@ export interface DiffWriteResult {
 }
 
 export async function fetchAndWriteDiff(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -60,7 +60,7 @@ export async function fetchAndWriteDiff(
 }
 
 export async function ingestPullRequest(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -231,7 +231,7 @@ function requirePositiveInteger(value: number, fieldName: string): number {
   return value;
 }
 
-async function resolveConnectionId(provider: GitHubProxyProvider): Promise<string> {
+async function resolveConnectionId(provider: GitHubRequestProvider): Promise<string> {
   const connectionAwareProvider = provider as ConnectionAwareProvider;
   const candidateConnectionId =
     connectionAwareProvider.connectionId?.trim() ??

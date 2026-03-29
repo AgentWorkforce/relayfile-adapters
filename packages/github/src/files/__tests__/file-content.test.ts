@@ -11,7 +11,7 @@ import {
 } from '../content-fetcher.js';
 import { FileContentCache, fetchWithCache } from '../cache.js';
 import { mockBaseFileContents, mockFileContents, mockRepoContext } from '../../__tests__/fixtures/index.js';
-import type { GitHubProxyProvider, ProxyRequest, ProxyResponse } from '../../types.js';
+import type { GitHubRequestProvider, ProxyRequest, ProxyResponse } from '../../types.js';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com';
 
@@ -45,7 +45,7 @@ function decodeFixture(content: string): string {
 
 function createFixtureProvider(
   overrides: Record<string, ProxyResponse> = {},
-): GitHubProxyProvider & {
+): GitHubRequestProvider & {
   connectionId: string;
   providerConfigKey: string;
   proxy: ReturnType<typeof mock.fn>;

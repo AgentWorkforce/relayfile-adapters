@@ -1,5 +1,5 @@
 import type {
-  ConnectionProvider as SharedConnectionProvider,
+  ConnectionProvider,
   ProxyRequest as SharedProxyRequest,
   ProxyResponse as SharedProxyResponse,
 } from '@relayfile/sdk';
@@ -65,7 +65,13 @@ export interface GitHubCreateReviewInput {
 export type ProxyRequest = SharedProxyRequest;
 export type ProxyResponse<T = JsonValue | null> = SharedProxyResponse<T>;
 
-export interface GitHubProxyProvider extends Pick<SharedConnectionProvider, 'name'> {
+export interface GitHubRequestProvider extends Pick<ConnectionProvider, 'name'> {
+  connectionId?: string;
+  defaultConnectionId?: string;
+  providerConfigKey?: string;
+  defaultProviderConfigKey?: string;
+  resolveConnectionId?: () => Promise<string> | string;
+  getConnectionId?: () => Promise<string> | string;
   proxy(request: ProxyRequest): Promise<ProxyResponse>;
 }
 
@@ -205,8 +211,6 @@ export interface SyncResult {
   syncedObjectTypes: string[];
   errors: Array<{ objectType?: string; error: string }>;
 }
-
-import type { ConnectionProvider } from '@relayfile/sdk';
 
 export abstract class IntegrationAdapter {
   protected readonly provider: ConnectionProvider;

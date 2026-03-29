@@ -1,5 +1,5 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { GitHubProxyProvider, JsonObject, JsonValue } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
 const DEFAULT_CONCURRENCY = 5;
 const DEFAULT_MAX_FILE_SIZE = 1_000_000;
@@ -63,7 +63,7 @@ export interface RateLimitStatus {
 }
 
 export async function batchFetchFiles(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   files: PullRequestFileDescriptor[],
   headRef: string,
   baseRef: string,
@@ -178,7 +178,7 @@ interface NormalizedBatchOptions {
 }
 
 async function fetchVariant(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   file: PullRequestFileDescriptor,
   variant: FileVariant,
   path: string,

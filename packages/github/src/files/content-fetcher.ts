@@ -1,7 +1,7 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const DEFAULT_MAX_FILE_SIZE_BYTES = 1024 * 1024;
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
@@ -91,7 +91,7 @@ interface ProviderDefaults {
 }
 
 export async function fetchFileContent(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   path: string,
@@ -199,7 +199,7 @@ export async function fetchFileContent(
 }
 
 export async function fetchHeadAndBase(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   prNumber: number,
@@ -501,10 +501,10 @@ async function readCache(
 }
 
 function resolveConnectionId(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options: FileContentFetchOptions,
 ): string {
-  const defaults = provider as GitHubProxyProvider & ProviderDefaults;
+  const defaults = provider as GitHubRequestProvider & ProviderDefaults;
   const connectionId =
     options.connectionId ?? defaults.connectionId ?? defaults.defaultConnectionId;
 
@@ -518,10 +518,10 @@ function resolveConnectionId(
 }
 
 function resolveProviderConfigKey(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   options: FileContentFetchOptions,
 ): string {
-  const defaults = provider as GitHubProxyProvider & ProviderDefaults;
+  const defaults = provider as GitHubRequestProvider & ProviderDefaults;
   return (
     options.providerConfigKey ??
     defaults.providerConfigKey ??

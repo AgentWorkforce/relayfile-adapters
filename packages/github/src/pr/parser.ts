@@ -1,6 +1,6 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
-  GitHubProxyProvider,
+  GitHubRequestProvider,
   JsonObject,
   JsonValue,
   ProxyResponse,
@@ -8,7 +8,7 @@ import type {
 
 const GITHUB_API_VERSION = '2022-11-28';
 
-interface ProviderWithConnectionDefaults extends GitHubProxyProvider {
+interface ProviderWithConnectionDefaults extends GitHubRequestProvider {
   connectionId?: string;
   defaultConnectionId?: string;
 }
@@ -154,7 +154,7 @@ export class PullRequestParseError extends PullRequestError {
 }
 
 export async function parsePullRequest(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -341,7 +341,7 @@ function readLabels(value: JsonValue | null | undefined, context: string): GitHu
   });
 }
 
-function resolveConnectionId(provider: GitHubProxyProvider, configuredConnectionId?: string): string {
+function resolveConnectionId(provider: GitHubRequestProvider, configuredConnectionId?: string): string {
   const fromOptions = configuredConnectionId?.trim();
   if (fromOptions) {
     return fromOptions;

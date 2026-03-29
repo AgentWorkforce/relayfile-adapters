@@ -1,15 +1,15 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
-import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
-import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
-import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
-import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
+import type { IngestResult, VfsLike } from '../files/content-fetcher.ts';
+import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.ts';
+import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.ts';
+import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.ts';
 
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;
 
 type JsonRecord = Record<string, unknown>;
 
-interface ConnectionAwareProvider extends GitHubProxyProvider {
+interface ConnectionAwareProvider extends GitHubRequestProvider {
   connectionId?: string;
   defaultConnectionId?: string;
   providerConfigKey?: string;
@@ -107,7 +107,7 @@ export async function bulkWriteToVFS(
 }
 
 export async function bulkIngestPR(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -201,7 +201,7 @@ export function mergeIngestResults(...results: IngestResult[]): IngestResult {
 }
 
 async function fetchPullRequestFiles(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -247,7 +247,7 @@ async function fetchPullRequestFiles(
 }
 
 async function fetchPullRequestMetadata(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -271,7 +271,7 @@ async function fetchPullRequestMetadata(
 }
 
 async function fetchPullRequestDiff(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   owner: string,
   repo: string,
   number: number,
@@ -365,7 +365,7 @@ function toPullRequestMetadata(value: JsonValue | null, fallbackNumber: number):
 }
 
 function buildJsonHeaders(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   headers?: Record<string, string>,
 ): Record<string, string> {
   return {
@@ -375,7 +375,7 @@ function buildJsonHeaders(
   };
 }
 
-function buildProviderHeaders(provider: GitHubProxyProvider): Record<string, string> {
+function buildProviderHeaders(provider: GitHubRequestProvider): Record<string, string> {
   const connectionAwareProvider = provider as ConnectionAwareProvider;
   const providerConfigKey =
     connectionAwareProvider.providerConfigKey?.trim() ??
@@ -573,7 +573,7 @@ async function updateMetadataCache(
 }
 
 async function resolveConnectionId(
-  provider: GitHubProxyProvider,
+  provider: GitHubRequestProvider,
   connectionId?: string,
 ): Promise<string> {
   if (connectionId?.trim()) {
