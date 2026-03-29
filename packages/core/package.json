@@ -6,7 +6,7 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "adapter-core": "./dist/src/cli.js"
+    "adapter-core": "./dist/cli.js"
   },
   "files": [
     "dist",
