@@ -59,7 +59,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     explicitEventType?: string,
     headers?: Headers | Record<string, string | string[] | undefined>,
   ): Promise<IngestResult> {
-    if (headers) {
+    if (headers && !explicitEventType) {
       return createRouter(this).route(headers, payload);
     }
 
