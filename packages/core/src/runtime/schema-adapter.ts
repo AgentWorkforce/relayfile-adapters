@@ -20,13 +20,19 @@ export interface NormalizedWebhook {
   metadata?: Record<string, string>;
 }
 
+/** Structured error from an ingest operation. */
+export interface IngestError {
+  path: string;
+  error: string;
+}
+
 /** Result of ingesting a webhook into the VFS. */
 export interface IngestResult {
   filesWritten: number;
   filesUpdated: number;
   filesDeleted: number;
   paths: string[];
-  errors: string[];
+  errors: IngestError[];
 }
 
 /** Response from a provider proxy call. */
