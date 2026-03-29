@@ -25,7 +25,7 @@
     "@relayfile/sdk": "^0.1.5"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "0.1.0"
+    "@relayfile/adapter-core": "file:../core"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.1.5",
