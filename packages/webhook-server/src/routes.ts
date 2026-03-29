@@ -265,11 +265,13 @@ function convertProviderWebhook(
 ): WebhookEvent {
   const eventType = normalized.eventType;
   const objectType =
+    readString(normalized.objectType) ??
     readString(payload.objectType) ??
     readString(payload.object_type) ??
     readString(payload.type) ??
     provider;
   const objectId =
+    readString(normalized.objectId) ??
     readString(payload.objectId) ??
     readString(payload.object_id) ??
     readString(payload.id) ??

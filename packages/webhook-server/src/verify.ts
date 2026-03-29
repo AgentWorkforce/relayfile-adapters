@@ -139,6 +139,11 @@ export async function verifyWebhookSignature(
         context.now,
       );
     default:
-      return { ok: true };
+      return {
+        ok: false,
+        error: `no verifier for provider ${context.provider}`,
+        reason: "unsupported_provider",
+        status: 401,
+      };
   }
 }
