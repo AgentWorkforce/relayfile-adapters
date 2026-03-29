@@ -3,3 +3,9 @@ dist/
 .trajectories/
 .turbo/
 .agent-relay/
+
+# Compiled test artifacts
+packages/*/tests/**/*.js
+packages/*/tests/**/*.d.ts
+packages/*/tests/**/*.js.map
+packages/*/tests/**/*.d.ts.map
