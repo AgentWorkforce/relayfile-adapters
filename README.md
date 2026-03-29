@@ -20,9 +20,8 @@ import { RelayFileClient } from "@relayfile/sdk";
 import { GitHubAdapter } from "@relayfile/adapter-github";
 import { NangoProvider } from "@relayfile/provider-nango";
 
-// 1. Connect to your relayfile server
+// 1. Connect to relayfile (defaults to api.relayfile.dev)
 const relayfile = new RelayFileClient({
-  baseUrl: process.env.RELAYFILE_URL!,
   token: process.env.RELAYFILE_TOKEN!,
 });
 
