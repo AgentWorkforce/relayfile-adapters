@@ -165,7 +165,10 @@ function toSelectOption(value: JsonValue): NotionSelectOption | null {
     return { name: value };
   }
   if (isRecord(value) && typeof value.name === 'string') {
-    return { id: typeof value.id === 'string' ? value.id : undefined, name: value.name, color: asString(value.color) };
+    const option: NotionSelectOption = { name: value.name };
+    if (typeof value.id === 'string') option.id = value.id;
+    if (typeof value.color === 'string') option.color = value.color;
+    return option;
   }
   throw new Error('Expected null, string, or Notion select option');
 }
