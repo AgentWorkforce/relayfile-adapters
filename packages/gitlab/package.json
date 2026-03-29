@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -28,7 +28,6 @@
   "devDependencies": {
     "@agent-relay/sdk": "^3.2.22",
     "@types/node": "^24.6.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "typescript": "^5.9.3"
   }
 }

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { GitLabAdapter } from '../src/adapter.js';
 import { renderMergeRequestPatch } from '../src/mr/diff-parser.js';
@@ -101,15 +102,16 @@ describe('GitLabAdapter e2e ingestion', () => {
 
     const result = await adapter.routeWebhook(payload, 'merge_request.open');
 
-    expect(result.errors).toEqual([]);
-    expect(result.paths).toEqual([
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.paths, [
       '/gitlab/projects/acme/api/merge_requests/42/metadata.json',
       '/gitlab/projects/acme/api/merge_requests/42/diff.patch',
       '/gitlab/projects/acme/api/merge_requests/42/discussions/discussion-1.json',
       '/gitlab/projects/acme/api/merge_requests/42/approvals.json',
     ]);
-    expect(result.filesWritten).toBe(4);
-    expect(result.operations[1]?.content).toBe(
+    assert.strictEqual(result.filesWritten, 4);
+    assert.strictEqual(
+      result.operations[1]?.content,
       renderMergeRequestPatch([
         {
           old_path: 'src/app.ts',

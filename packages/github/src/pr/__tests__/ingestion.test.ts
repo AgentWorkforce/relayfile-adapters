@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   mockDiff,
@@ -64,7 +65,7 @@ function createPullRequestFixture(prPayload?: Record<string, unknown>) {
 }
 
 function createFixtureProvider(options: FixtureProviderOptions = {}) {
-  const proxy = vi.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
+  const proxy = mock.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
     if (
       request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
     ) {
@@ -111,10 +112,10 @@ function createFixtureProvider(options: FixtureProviderOptions = {}) {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
-  const writeFile = vi.fn(async (path: string, content: string) => {
+  const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
-  const exists = vi.fn((path: string) => writes.has(path));
+  const exists = mock.fn((path: string) => writes.has(path));
 
   const vfs: VfsLike = {
     exists,
@@ -135,7 +136,7 @@ describe('pull request ingestion', () => {
       42,
     );
 
-    expect(parsed).toEqual({
+    assert.deepStrictEqual(parsed, {
       number: 42,
       title: mockPRPayload.title,
       body: mockPRPayload.body,
@@ -188,8 +189,8 @@ describe('pull request ingestion', () => {
         },
       },
     });
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`,
@@ -198,7 +199,7 @@ describe('pull request ingestion', () => {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
       },
-    });
+    }]);
   });
 
   it('mapPRFiles maps file paths correctly', async () => {
@@ -206,7 +207,7 @@ describe('pull request ingestion', () => {
 
     const mapped = await mapPRFiles(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
 
-    expect(mapped).toEqual([
+    assert.deepStrictEqual(mapped, [
       {
         vfsPath: '/github/repos/octocat/hello-world/pulls/42/files/src/index.ts',
         githubPath: 'src/index.ts',
@@ -229,8 +230,8 @@ describe('pull request ingestion', () => {
         deletions: 1,
       },
     ]);
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`,
@@ -243,7 +244,7 @@ describe('pull request ingestion', () => {
         page: '1',
         per_page: '100',
       },
-    });
+    }]);
   });
 
   it('mapPRFiles handles renamed files', async () => {
@@ -261,7 +262,7 @@ describe('pull request ingestion', () => {
 
     const mapped = await mapPRFiles(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
 
-    expect(mapped).toEqual([
+    assert.deepStrictEqual(mapped, [
       {
         vfsPath: '/github/repos/octocat/hello-world/pulls/42/files/src/new-name.ts',
         githubPath: 'src/new-name.ts',
@@ -284,13 +285,13 @@ describe('pull request ingestion', () => {
       vfs,
     );
 
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       path: '/github/repos/octocat/hello-world/pulls/42/diff.patch',
       size: Buffer.byteLength(mockDiff, 'utf8'),
     });
-    expect(writeFile).toHaveBeenCalledWith(result.path, mockDiff);
-    expect(writes.get(result.path)).toBe(mockDiff);
-    expect(proxy).toHaveBeenCalledWith({
+    assert.deepStrictEqual(writeFile.mock.calls[0].arguments, [result.path, mockDiff]);
+    assert.strictEqual(writes.get(result.path), mockDiff);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`,
@@ -299,7 +300,7 @@ describe('pull request ingestion', () => {
         Accept: 'application/vnd.github.diff',
         'X-GitHub-Api-Version': '2022-11-28',
       },
-    });
+    }]);
   });
 
   it('ingestPullRequest returns complete IngestResult', async () => {
@@ -314,7 +315,7 @@ describe('pull request ingestion', () => {
       vfs,
     );
 
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       filesWritten: 5,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -327,27 +328,22 @@ describe('pull request ingestion', () => {
       ],
       errors: [],
     });
-    expect(JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? ''))
-      .toMatchObject({
-        number: 42,
-        title: mockPRPayload.title,
-        head: {
-          sha: mockRepoContext.headSha,
-        },
-        base: {
-          sha: mockRepoContext.baseSha,
-        },
-      });
-    expect(
+    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? '');
+    assert.strictEqual(meta.number, 42);
+    assert.strictEqual(meta.title, mockPRPayload.title);
+    assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
+    assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
+    assert.deepStrictEqual(
       JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts') ?? ''),
-    ).toEqual({
-      filename: 'src/index.ts',
-      path: 'src/index.ts',
-      status: 'modified',
-      additions: 1,
-      deletions: 1,
-    });
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch')).toBe(mockDiff);
+      {
+        filename: 'src/index.ts',
+        path: 'src/index.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 1,
+      },
+    );
+    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch'), mockDiff);
   });
 
   it('ingestPullRequest handles API errors gracefully', async () => {
@@ -380,7 +376,7 @@ describe('pull request ingestion', () => {
       vfs,
     );
 
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       filesWritten: 0,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -403,12 +399,13 @@ describe('pull request ingestion', () => {
         },
       ],
     });
-    expect(writeFile).not.toHaveBeenCalled();
-    expect(writes.size).toBe(0);
+    assert.strictEqual(writeFile.mock.calls.length, 0);
+    assert.strictEqual(writes.size, 0);
   });
 
   it('buildVFSPath constructs correct paths', () => {
-    expect(buildVFSPath(' acme org ', 'widgets', 7, '/files/src/my file.ts')).toBe(
+    assert.strictEqual(
+      buildVFSPath(' acme org ', 'widgets', 7, '/files/src/my file.ts'),
       '/github/repos/acme%20org/widgets/pulls/7/files/src/my%20file.ts',
     );
   });

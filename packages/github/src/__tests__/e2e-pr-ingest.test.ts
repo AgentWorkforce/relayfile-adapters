@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   GitHubAdapter,
@@ -202,51 +203,54 @@ class E2EGitHubAdapter extends GitHubAdapter {
   }
 }
 
-test('GitHubAdapter ingests a pull request into the expected VFS layout', async () => {
-  const provider = createFixtureProvider();
-  const vfs = new InMemoryVfs();
-  const adapter = new E2EGitHubAdapter(provider, vfs);
+describe('e2e PR ingest', () => {
+  it('GitHubAdapter ingests a pull request into the expected VFS layout', async () => {
+    const provider = createFixtureProvider();
+    const vfs = new InMemoryVfs();
+    const adapter = new E2EGitHubAdapter(provider, vfs);
 
-  const result = await adapter.ingestPullRequest('octocat', 'hello-world', 42);
-  const prRoot = '/github/repos/octocat/hello-world/pulls/42';
-  const metaPath = `${prRoot}/meta.json`;
-  const diffPath = `${prRoot}/diff.patch`;
-  const filePaths = vfs.list(`${prRoot}/files/`);
-  const basePaths = vfs.list(`${prRoot}/base/`);
-  const commitPaths = vfs.list(`${prRoot}/commits/`);
-  const reviewPaths = vfs.list(`${prRoot}/reviews/`);
-  const commentPaths = vfs.list(`${prRoot}/comments/`);
-  const checkPaths = vfs.list(`${prRoot}/checks/`);
+    const result = await adapter.ingestPullRequest('octocat', 'hello-world', 42);
+    const prRoot = '/github/repos/octocat/hello-world/pulls/42';
+    const metaPath = `${prRoot}/meta.json`;
+    const diffPath = `${prRoot}/diff.patch`;
+    const filePaths = vfs.list(`${prRoot}/files/`);
+    const basePaths = vfs.list(`${prRoot}/base/`);
+    const commitPaths = vfs.list(`${prRoot}/commits/`);
+    const reviewPaths = vfs.list(`${prRoot}/reviews/`);
+    const commentPaths = vfs.list(`${prRoot}/comments/`);
+    const checkPaths = vfs.list(`${prRoot}/checks/`);
 
-  expect(result.filesWritten).toBeGreaterThan(0);
-  expect(result.errors).toEqual([]);
+    assert.ok(result.filesWritten > 0);
+    assert.deepStrictEqual(result.errors, []);
 
-  const meta = JSON.parse(vfs.readFile(metaPath)) as Record<string, unknown>;
-  expect(meta.title).toBe(mockPRPayload.title);
-  expect(meta.state).toBe(mockPRPayload.state);
+    const meta = JSON.parse(vfs.readFile(metaPath)) as Record<string, unknown>;
+    assert.strictEqual(meta.title, mockPRPayload.title);
+    assert.strictEqual(meta.state, mockPRPayload.state);
 
-  expect(vfs.readFile(diffPath).trim().length).toBeGreaterThan(0);
-  expect(vfs.readFile(diffPath)).toContain('diff --git');
+    assert.ok(vfs.readFile(diffPath).trim().length > 0);
+    assert.ok(vfs.readFile(diffPath).includes('diff --git'));
 
-  expect(filePaths).toHaveLength(3);
-  expect(basePaths).toHaveLength(3);
-  expect(commitPaths).toHaveLength(2);
-  expect(reviewPaths).toHaveLength(1);
-  expect(commentPaths).toHaveLength(2);
-  expect(checkPaths).toHaveLength(3);
-  expect(checkPaths).toContain(`${prRoot}/checks/_summary.json`);
+    assert.strictEqual(filePaths.length, 3);
+    assert.strictEqual(basePaths.length, 3);
+    assert.strictEqual(commitPaths.length, 2);
+    assert.strictEqual(reviewPaths.length, 1);
+    assert.strictEqual(commentPaths.length, 2);
+    assert.strictEqual(checkPaths.length, 3);
+    assert.ok(checkPaths.includes(`${prRoot}/checks/_summary.json`));
 
-  for (const path of vfs.list(`${prRoot}/`)) {
-    if (!path.endsWith('.json')) {
-      continue;
+    for (const path of vfs.list(`${prRoot}/`)) {
+      if (!path.endsWith('.json')) {
+        continue;
+      }
+
+      // Should not throw
+      JSON.parse(vfs.readFile(path));
     }
 
-    expect(() => JSON.parse(vfs.readFile(path))).not.toThrow();
-  }
-
-  expect(vfs.getSemantics(metaPath)).toEqual({
-    properties: mapPRProperties(mockPRPayload) ?? {},
-    relations: mapPRRelations('octocat', 'hello-world', 42) ?? [],
+    assert.deepStrictEqual(vfs.getSemantics(metaPath), {
+      properties: mapPRProperties(mockPRPayload) ?? {},
+      relations: mapPRRelations('octocat', 'hello-world', 42) ?? [],
+    });
   });
 });
 

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { mockIssueComments, mockRepoContext } from '../__tests__/fixtures/index.js';
 import { createMockProvider } from '../__tests__/fixtures/mock-provider.js';
@@ -13,8 +14,8 @@ describe('issue comment mapper', () => {
       10,
     );
 
-    expect(mapped.vfsPath).toBe('issues/10/comments/7001.json');
-    expect(JSON.parse(mapped.content)).toEqual({
+    assert.strictEqual(mapped.vfsPath, 'issues/10/comments/7001.json');
+    assert.deepStrictEqual(JSON.parse(mapped.content), {
       id: 7001,
       body: 'I can pick this up after the PR ingestion flow lands.',
       author: {
@@ -44,7 +45,7 @@ describe('issue comment mapper', () => {
     };
     const writes = new Map<string, string>();
     const vfs = {
-      writeFile: vi.fn(async (path: string, content: string) => {
+      writeFile: mock.fn(async (path: string, content: string) => {
         writes.set(path, content);
       }),
     };
@@ -57,7 +58,7 @@ describe('issue comment mapper', () => {
       vfs,
     );
 
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       filesWritten: 2,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -67,16 +68,11 @@ describe('issue comment mapper', () => {
       ],
       errors: [],
     });
-    expect(Array.from(writes.keys())).toEqual(result.paths);
-    expect(JSON.parse(writes.get(result.paths[1]) ?? '')).toMatchObject({
-      id: 7002,
-      author: {
-        login: 'octocat',
-      },
-      reactions: {
-        total_count: 2,
-        hooray: 1,
-      },
-    });
+    assert.deepStrictEqual(Array.from(writes.keys()), result.paths);
+    const comment7002 = JSON.parse(writes.get(result.paths[1]) ?? '');
+    assert.strictEqual(comment7002.id, 7002);
+    assert.strictEqual(comment7002.author.login, 'octocat');
+    assert.strictEqual(comment7002.reactions.total_count, 2);
+    assert.strictEqual(comment7002.reactions.hooray, 1);
   });
 });

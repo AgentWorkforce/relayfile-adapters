@@ -1,3 +1,4 @@
+export const GITHUB_API_BASE_URL = "https://api.github.com";
 import type { GitHubAdapterConfig } from './types.js';
 
 const DEFAULT_SUPPORTED_EVENTS = [

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { GitLabWritebackHandler } from '../src/writeback.js';
 import { MockProvider, ok } from './helpers.js';
@@ -15,11 +16,9 @@ describe('GitLabWritebackHandler', () => {
       JSON.stringify({ title: 'Updated title' }),
     );
 
-    expect(result).toEqual({ success: true, externalId: '42' });
-    expect(provider.requests[0]).toMatchObject({
-      method: 'PUT',
-      endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42',
-    });
+    assert.deepStrictEqual(result, { success: true, externalId: '42' });
+    assert.strictEqual(provider.requests[0].method, 'PUT');
+    assert.strictEqual(provider.requests[0].endpoint, '/api/v4/projects/acme%2Fapi/merge_requests/42');
   });
 
   it('matches merge request discussion and issue note writebacks', async () => {
@@ -39,8 +38,8 @@ describe('GitLabWritebackHandler', () => {
       JSON.stringify({ body: 'Needs follow-up' }),
     );
 
-    expect(discussion).toEqual({ success: true, externalId: 'discussion-1' });
-    expect(issueNote).toEqual({ success: true, externalId: '11' });
+    assert.deepStrictEqual(discussion, { success: true, externalId: 'discussion-1' });
+    assert.deepStrictEqual(issueNote, { success: true, externalId: '11' });
   });
 
   it('matches issue metadata updates and rejects existing comment paths', async () => {
@@ -59,8 +58,8 @@ describe('GitLabWritebackHandler', () => {
       JSON.stringify({ body: 'edit existing note' }),
     );
 
-    expect(update).toEqual({ success: true, externalId: '7' });
-    expect(invalid).toEqual({
+    assert.deepStrictEqual(update, { success: true, externalId: '7' });
+    assert.deepStrictEqual(invalid, {
       success: false,
       error: 'Unsupported GitLab writeback path: /gitlab/projects/acme/api/issues/7/comments/11.json',
     });

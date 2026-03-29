@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { normalizeWebhook } from '../src/webhook/normalizer.js';
 import type {
@@ -40,12 +41,11 @@ describe('normalizeWebhook', () => {
       },
     } as GitLabMergeRequestWebhook;
 
-    expect(normalizeWebhook(payload, 'merge_request.open')).toMatchObject({
-      provider: 'gitlab',
-      objectType: 'merge_requests',
-      objectId: 'acme/api/merge_requests/42',
-      eventType: 'merge_request.open',
-    });
+    const result = normalizeWebhook(payload, 'merge_request.open');
+    assert.strictEqual(result.provider, 'gitlab');
+    assert.strictEqual(result.objectType, 'merge_requests');
+    assert.strictEqual(result.objectId, 'acme/api/merge_requests/42');
+    assert.strictEqual(result.eventType, 'merge_request.open');
   });
 
   it('normalizes note events for merge requests, issues, commits, and snippets', () => {
@@ -76,8 +76,8 @@ describe('normalizeWebhook', () => {
       },
     } as GitLabNoteWebhook;
 
-    expect(normalizeWebhook(base, 'note.MergeRequest').objectId).toContain('merge_requests/42/discussions/abc');
-    expect(
+    assert.ok(normalizeWebhook(base, 'note.MergeRequest').objectId.includes('merge_requests/42/discussions/abc'));
+    assert.ok(
       normalizeWebhook(
         {
           ...base,
@@ -95,9 +95,9 @@ describe('normalizeWebhook', () => {
           },
         },
         'note.Issue',
-      ).objectId,
-    ).toContain('issues/7/comments/99');
-    expect(
+      ).objectId.includes('issues/7/comments/99'),
+    );
+    assert.ok(
       normalizeWebhook(
         {
           ...base,
@@ -114,21 +114,21 @@ describe('normalizeWebhook', () => {
           },
         },
         'note.Commit',
-      ).objectId,
-    ).toContain('commits/abc123/comments/99');
-    expect(
+      ).objectId.includes('commits/abc123/comments/99'),
+    );
+    assert.ok(
       normalizeWebhook(
         {
           ...base,
           object_attributes: { ...base.object_attributes, noteable_type: 'Snippet', noteable_id: 55 },
         },
         'note.Snippet',
-      ).objectId,
-    ).toContain('snippets/55/comments/99');
+      ).objectId.includes('snippets/55/comments/99'),
+    );
   });
 
   it('normalizes push, pipeline, issue, deployment, build, and tag push events', () => {
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'push',
@@ -139,10 +139,10 @@ describe('normalizeWebhook', () => {
           ref: 'refs/heads/main',
         } as GitLabPushWebhook,
         'push',
-      ).objectId,
-    ).toContain('commits/deadbeef');
+      ).objectId.includes('commits/deadbeef'),
+    );
 
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'pipeline',
@@ -150,10 +150,10 @@ describe('normalizeWebhook', () => {
           object_attributes: { id: 4, ref: 'main', sha: 'sha', status: 'success' },
         } as GitLabPipelineWebhook,
         'pipeline.success',
-      ).objectId,
-    ).toContain('pipelines/4');
+      ).objectId.includes('pipelines/4'),
+    );
 
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'issue',
@@ -172,10 +172,10 @@ describe('normalizeWebhook', () => {
           },
         } as GitLabIssueWebhook,
         'issue.open',
-      ).objectId,
-    ).toContain('issues/5');
+      ).objectId.includes('issues/5'),
+    );
 
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'deployment',
@@ -185,10 +185,10 @@ describe('normalizeWebhook', () => {
           status: 'success',
         } as GitLabDeploymentWebhook,
         'deployment.success',
-      ).objectId,
-    ).toContain('deployments/7');
+      ).objectId.includes('deployments/7'),
+    );
 
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'build',
@@ -200,10 +200,10 @@ describe('normalizeWebhook', () => {
           pipeline_id: 88,
         } as GitLabBuildWebhook,
         'build.success',
-      ).objectId,
-    ).toContain('pipelines/88/jobs/12');
+      ).objectId.includes('pipelines/88/jobs/12'),
+    );
 
-    expect(
+    assert.ok(
       normalizeWebhook(
         {
           object_kind: 'tag_push',
@@ -214,7 +214,7 @@ describe('normalizeWebhook', () => {
           ref: 'refs/tags/v1.0.0',
         } as GitLabTagPushWebhook,
         'tag_push',
-      ).objectId,
-    ).toContain('tags/refs%2Ftags%2Fv1.0.0');
+      ).objectId.includes('tags/refs%2Ftags%2Fv1.0.0'),
+    );
   });
 });

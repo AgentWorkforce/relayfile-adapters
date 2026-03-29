@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { deserializePropertyValue, serializePropertyValue } from '../pages/properties.js';
 import type { NotionPageProperty } from '../types.js';
 
@@ -36,26 +37,26 @@ describe('property serialization', () => {
     ];
 
     const serialized = values.map(serializePropertyValue);
-    expect(serialized.map((entry) => entry.type)).toEqual(values.map((entry) => entry.type));
+    assert.deepStrictEqual(serialized.map((entry) => entry.type), values.map((entry) => entry.type));
 
-    expect(deserializePropertyValue(serialized[0])).toEqual({
+    assert.deepStrictEqual(deserializePropertyValue(serialized[0]), {
       title: [{ type: 'text', text: { content: 'Hello', link: null }, plain_text: 'Hello', href: null, annotations: defaults() }],
     });
-    expect(deserializePropertyValue(serialized[3])).toEqual({ select: { name: 'Open' } });
-    expect(deserializePropertyValue(serialized[4])).toEqual({ multi_select: [{ name: 'A' }, { name: 'B' }] });
-    expect(deserializePropertyValue(serialized[7])).toEqual({ people: [{ id: 'user-1' }] });
-    expect(deserializePropertyValue(serialized[8])).toEqual({
+    assert.deepStrictEqual(deserializePropertyValue(serialized[3]), { select: { name: 'Open' } });
+    assert.deepStrictEqual(deserializePropertyValue(serialized[4]), { multi_select: [{ name: 'A' }, { name: 'B' }] });
+    assert.deepStrictEqual(deserializePropertyValue(serialized[7]), { people: [{ id: 'user-1' }] });
+    assert.deepStrictEqual(deserializePropertyValue(serialized[8]), {
       files: [{ type: 'external', external: { url: 'https://example.com/file.png' } }],
     });
-    expect(serialized[5].displayValue).toBe('In Progress');
-    expect(serialized[6].displayValue).toBe('2026-03-28');
-    expect(serialized[14].value).toEqual({ type: 'number', number: 4 });
-    expect(serialized[15].value).toEqual({ type: 'array', array: [{ type: 'number', number: 2 }] });
+    assert.strictEqual(serialized[5].displayValue, 'In Progress');
+    assert.strictEqual(serialized[6].displayValue, '2026-03-28');
+    assert.deepStrictEqual(serialized[14].value, { type: 'number', number: 4 });
+    assert.deepStrictEqual(serialized[15].value, { type: 'array', array: [{ type: 'number', number: 2 }] });
   });
 
   it('rejects read-only properties on writeback', () => {
     const value = serializePropertyValue(property({ id: '17', type: 'formula', formula: { type: 'number', number: 4 } }));
-    expect(() => deserializePropertyValue(value)).toThrow(/read-only/);
+    assert.throws(() => deserializePropertyValue(value), /read-only/);
   });
 });
 

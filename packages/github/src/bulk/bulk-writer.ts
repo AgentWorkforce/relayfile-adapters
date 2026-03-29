@@ -1,9 +1,9 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import type { IngestResult, VfsLike } from '../files/content-fetcher.ts';
 import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.ts';
 import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.ts';
 import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.ts';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 const GITHUB_PAGE_SIZE = 100;
 

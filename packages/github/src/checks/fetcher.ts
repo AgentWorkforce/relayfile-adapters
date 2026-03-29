@@ -1,6 +1,6 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const CHECK_RUNS_PER_PAGE = 100;
 const GITHUB_API_HEADERS = {
   Accept: 'application/vnd.github+json',

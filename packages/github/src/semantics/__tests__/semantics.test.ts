@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   mapCommitProperties,
@@ -94,7 +95,7 @@ const issueFixture = {
 
 describe('property mappers', () => {
   it('mapPRProperties extracts all required fields', () => {
-    expect(mapPRProperties(pullRequestFixture)).toEqual({
+    assert.deepStrictEqual(mapPRProperties(pullRequestFixture), {
       title: 'Add semantics mapping coverage',
       state: 'open',
       'author.login': 'octocat',
@@ -108,7 +109,7 @@ describe('property mappers', () => {
   });
 
   it('mapPRProperties handles missing optional fields', () => {
-    expect(
+    assert.deepStrictEqual(
       mapPRProperties({
         title: 'Draft PR without metadata',
         state: 'draft',
@@ -118,15 +119,16 @@ describe('property mappers', () => {
         base: {},
         head: {},
       }),
-    ).toEqual({
-      title: 'Draft PR without metadata',
-      state: 'draft',
-      'author.login': 'ghost',
-    });
+      {
+        title: 'Draft PR without metadata',
+        state: 'draft',
+        'author.login': 'ghost',
+      },
+    );
   });
 
   it('mapCommitProperties formats author correctly', () => {
-    expect(mapCommitProperties(commitFixture)).toEqual({
+    assert.deepStrictEqual(mapCommitProperties(commitFixture), {
       sha: '9fceb02c1f7e4f0f4b3f934c5b191d9d5b7f5e25',
       message: 'Normalize semantic relation paths',
       'author.login': 'hubot',
@@ -138,7 +140,7 @@ describe('property mappers', () => {
   });
 
   it('mapReviewProperties maps state enum', () => {
-    expect(mapReviewProperties(reviewFixture)).toEqual({
+    assert.deepStrictEqual(mapReviewProperties(reviewFixture), {
       state: 'APPROVED',
       'author.login': 'review-bot',
       body: 'Looks good overall.',
@@ -147,7 +149,7 @@ describe('property mappers', () => {
   });
 
   it('mapIssueProperties handles multiple labels', () => {
-    expect(mapIssueProperties(issueFixture)).toEqual({
+    assert.deepStrictEqual(mapIssueProperties(issueFixture), {
       title: 'Sync issue semantics',
       state: 'open',
       'author.login': 'triager',
@@ -160,7 +162,7 @@ describe('property mappers', () => {
 
 describe('relation mappers', () => {
   it('mapPRRelations builds correct VFS paths', () => {
-    expect(mapPRRelations('acme', 'widgets', 42)).toEqual([
+    assert.deepStrictEqual(mapPRRelations('acme', 'widgets', 42), [
       '/github/repos/acme/widgets/',
       '/github/repos/acme/widgets/pulls/42/commits/',
       '/github/repos/acme/widgets/pulls/42/reviews/',
@@ -169,22 +171,23 @@ describe('relation mappers', () => {
   });
 
   it('mapCommitRelations links to parent commits', () => {
-    expect(
+    assert.deepStrictEqual(
       mapCommitRelations('acme', 'widgets', 42, commitFixture.sha, [
         ...commitFixture.parents,
         { sha: '1111111111111111111111111111111111111111' },
         { sha: '   ' },
         null,
       ]),
-    ).toEqual([
-      '/github/repos/acme/widgets/pulls/42/meta.json',
-      '/github/repos/acme/widgets/pulls/42/commits/1111111111111111111111111111111111111111.json',
-      '/github/repos/acme/widgets/pulls/42/commits/2222222222222222222222222222222222222222.json',
-    ]);
+      [
+        '/github/repos/acme/widgets/pulls/42/meta.json',
+        '/github/repos/acme/widgets/pulls/42/commits/1111111111111111111111111111111111111111.json',
+        '/github/repos/acme/widgets/pulls/42/commits/2222222222222222222222222222222222222222.json',
+      ],
+    );
   });
 
   it('mapReviewRelations links to PR and comments', () => {
-    expect(mapReviewRelations('acme', 'widgets', 42, reviewFixture.id)).toEqual([
+    assert.deepStrictEqual(mapReviewRelations('acme', 'widgets', 42, reviewFixture.id), [
       '/github/repos/acme/widgets/pulls/42/meta.json',
       '/github/repos/acme/widgets/pulls/42/reviews/77/comments/',
     ]);
@@ -198,12 +201,12 @@ describe('relation mappers', () => {
       ...mapIssueRelations('acme org', 'widgets/api', issueFixture.number),
     ];
 
-    expect(relations.length).toBeGreaterThan(0);
+    assert.ok(relations.length > 0);
 
     for (const relation of relations) {
-      expect(relation.startsWith('/')).toBe(true);
-      expect(relation).toMatch(/^\/github\/repos\//);
-      expect(relation).toContain('/acme%20org/widgets%2Fapi/');
+      assert.strictEqual(relation.startsWith('/'), true);
+      assert.ok(relation.match(/^\/github\/repos\//));
+      assert.ok(relation.includes('/acme%20org/widgets%2Fapi/'));
     }
   });
 });

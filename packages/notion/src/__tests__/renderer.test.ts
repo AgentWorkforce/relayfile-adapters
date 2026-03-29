@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { renderBlocksToMarkdown } from '../content/renderer.js';
 import type { NotionBlock } from '../types.js';
 
@@ -14,7 +15,7 @@ describe('blocks to markdown renderer', () => {
       block('code', { rich_text: [text('const done = true;')], language: 'ts' }),
     ];
 
-    expect(renderBlocksToMarkdown(blocks)).toBe(
+    assert.strictEqual(renderBlocksToMarkdown(blocks),
       [
         '# Roadmap',
         '',
@@ -46,7 +47,7 @@ describe('blocks to markdown renderer', () => {
       },
     ];
 
-    expect(renderBlocksToMarkdown(blocks)).toBe(
+    assert.strictEqual(renderBlocksToMarkdown(blocks),
       [
         '![Diagram](https://example.com/image.png)',
         '',

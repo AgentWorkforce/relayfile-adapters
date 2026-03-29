@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { EVENT_MAP, extractEventKey } from '../src/webhook/router.js';
 import type { GitLabBuildWebhook, GitLabIssueWebhook, GitLabPipelineWebhook } from '../src/types.js';
@@ -12,14 +13,15 @@ const project = {
 
 describe('webhook router', () => {
   it('extracts supported pipeline and job statuses', () => {
-    expect(
+    assert.strictEqual(
       extractEventKey({
         object_kind: 'pipeline',
         project,
         object_attributes: { id: 4, ref: 'main', sha: 'sha', status: 'waiting_for_resource' },
       } as GitLabPipelineWebhook),
-    ).toBe('pipeline.waiting_for_resource');
-    expect(
+      'pipeline.waiting_for_resource',
+    );
+    assert.strictEqual(
       extractEventKey({
         object_kind: 'build',
         project,
@@ -28,8 +30,9 @@ describe('webhook router', () => {
         build_stage: 'test',
         build_status: 'manual',
       } as GitLabBuildWebhook),
-    ).toBe('build.manual');
-    expect(
+      'build.manual',
+    );
+    assert.strictEqual(
       extractEventKey({
         object_kind: 'job',
         project,
@@ -38,7 +41,8 @@ describe('webhook router', () => {
         build_stage: 'deploy',
         build_status: 'skipped',
       } as GitLabBuildWebhook),
-    ).toBe('job.skipped');
+      'job.skipped',
+    );
   });
 
   it('routes issue.update through the update handler', async () => {
@@ -90,6 +94,6 @@ describe('webhook router', () => {
       } as GitLabIssueWebhook,
     );
 
-    expect(called).toBe('updateIssue');
+    assert.strictEqual(called, 'updateIssue');
   });
 });

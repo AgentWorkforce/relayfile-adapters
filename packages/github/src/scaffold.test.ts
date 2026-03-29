@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { DEFAULT_CONFIG, GitHubAdapter, githubMappingPath, validateConfig } from './index.js';
 import type { ConnectionProvider, ProxyRequest, ProxyResponse } from './types.js';
@@ -15,53 +16,55 @@ class MockProvider implements ConnectionProvider {
   }
 }
 
-test('validateConfig applies defaults', () => {
-  const config = validateConfig({ repo: 'relayfile' });
+describe('scaffold', () => {
+  it('validateConfig applies defaults', () => {
+    const config = validateConfig({ repo: 'relayfile' });
 
-  expect(config.baseUrl).toBe(DEFAULT_CONFIG.baseUrl);
-  expect(config.repo).toBe('relayfile');
-  expect(config.fetchFileContents).toBe(true);
-  expect(config.supportedEvents).toContain('pull_request.opened');
-});
-
-test('GitHubAdapter exposes the github adapter scaffold contract', async () => {
-  const adapter = new GitHubAdapter(new MockProvider(), {
-    owner: 'AgentWorkforce',
-    repo: 'relayfile',
+    assert.strictEqual(config.baseUrl, DEFAULT_CONFIG.baseUrl);
+    assert.strictEqual(config.repo, 'relayfile');
+    assert.strictEqual(config.fetchFileContents, true);
+    assert.ok(config.supportedEvents.includes('pull_request.opened'));
   });
 
-  expect(adapter.name).toBe('github');
-  expect(adapter.version).toBe('0.1.0');
-  expect(adapter.supportedEvents()).toContain('check_run.completed');
+  it('GitHubAdapter exposes the github adapter scaffold contract', async () => {
+    const adapter = new GitHubAdapter(new MockProvider(), {
+      owner: 'AgentWorkforce',
+      repo: 'relayfile',
+    });
 
-  const result = await adapter.ingestPullRequest({
-    number: 42,
-    repository: { full_name: 'AgentWorkforce/relayfile', name: 'relayfile' },
-    pull_request: { number: 42 },
+    assert.strictEqual(adapter.name, 'github');
+    assert.strictEqual(adapter.version, '0.1.0');
+    assert.ok(adapter.supportedEvents().includes('check_run.completed'));
+
+    const result = await adapter.ingestPullRequest({
+      number: 42,
+      repository: { full_name: 'AgentWorkforce/relayfile', name: 'relayfile' },
+      pull_request: { number: 42 },
+    });
+
+    assert.strictEqual(result.filesWritten, 1);
+    assert.strictEqual(result.paths[0], '/github/repos/AgentWorkforce/relayfile/pulls/42/metadata.json');
   });
 
-  expect(result.filesWritten).toBe(1);
-  expect(result.paths[0]).toBe('/github/repos/AgentWorkforce/relayfile/pulls/42/metadata.json');
-});
+  it('GitHubAdapter loads the copied schema mapping for webhook path computation', async () => {
+    const adapter = new GitHubAdapter(new MockProvider(), {
+      owner: 'AgentWorkforce',
+      repo: 'relayfile',
+    });
 
-test('GitHubAdapter loads the copied schema mapping for webhook path computation', async () => {
-  const adapter = new GitHubAdapter(new MockProvider(), {
-    owner: 'AgentWorkforce',
-    repo: 'relayfile',
+    assert.strictEqual(githubMappingPath.endsWith('/github.mapping.yaml'), true);
+
+    const result = await adapter.ingestReview({
+      action: 'submitted',
+      repository: {
+        full_name: 'AgentWorkforce/relayfile',
+        name: 'relayfile',
+        owner: { login: 'AgentWorkforce' },
+      },
+      pull_request: { number: 42 },
+      review: { id: 77 },
+    });
+
+    assert.strictEqual(result.paths[0], '/github/repos/AgentWorkforce/relayfile/pulls/42/reviews/77.json');
   });
-
-  expect(githubMappingPath.endsWith('/github.mapping.yaml')).toBe(true);
-
-  const result = await adapter.ingestReview({
-    action: 'submitted',
-    repository: {
-      full_name: 'AgentWorkforce/relayfile',
-      name: 'relayfile',
-      owner: { login: 'AgentWorkforce' },
-    },
-    pull_request: { number: 42 },
-    review: { id: 77 },
-  });
-
-  expect(result.paths[0]).toBe('/github/repos/AgentWorkforce/relayfile/pulls/42/reviews/77.json');
 });

@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   TeamsAdapter,
@@ -34,12 +35,12 @@ describe('validation helpers', () => {
   it('extracts validation tokens and builds the required plain-text response', () => {
     const validation = extractValidationToken({ validationToken: 'token-123' });
 
-    expect(validation).toEqual({
+    assert.deepStrictEqual(validation, {
       isValidation: true,
       validationToken: 'token-123',
     });
 
-    expect(createValidationResponse('token-123')).toEqual({
+    assert.deepStrictEqual(createValidationResponse('token-123'), {
       statusCode: 200,
       headers: { 'content-type': 'text/plain' },
       body: 'token-123',
@@ -47,10 +48,10 @@ describe('validation helpers', () => {
   });
 
   it('verifies clientState and drops mismatched notifications', async () => {
-    expect(validateClientState({ clientState: 'expected' }, 'expected')).toBe(true);
-    expect(validateClientState({ clientState: 'wrong' }, 'expected')).toBe(false);
+    assert.strictEqual(validateClientState({ clientState: 'expected' }, 'expected'), true);
+    assert.strictEqual(validateClientState({ clientState: 'wrong' }, 'expected'), false);
 
-    const fetchImpl = vi.fn();
+    const fetchImpl = mock.fn();
     const events = await processNotifications(
       {
         value: [
@@ -72,12 +73,12 @@ describe('validation helpers', () => {
       },
     );
 
-    expect(events).toEqual([]);
-    expect(fetchImpl).not.toHaveBeenCalled();
+    assert.deepStrictEqual(events, []);
+    assert.strictEqual(fetchImpl.mock.calls.length, 0);
   });
 
   it('fetches the full Graph resource when resourceData is only an id stub', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(
+    const fetchImpl = mock.fn(async () =>
       jsonResponse({
         id: 'message-1',
         body: { contentType: 'html', content: '<p>Hello Team</p>' },
@@ -106,38 +107,38 @@ describe('validation helpers', () => {
       },
     );
 
-    expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(events[0]?.objectType).toBe('message');
-    expect((events[0]?.payload.body as { content: string }).content).toBe('<p>Hello Team</p>');
+    assert.strictEqual(fetchImpl.mock.calls.length, 1);
+    assert.strictEqual(events[0]?.objectType, 'message');
+    assert.strictEqual((events[0]?.payload.body as { content: string }).content, '<p>Hello Team</p>');
   });
 });
 
 describe('path mapping', () => {
   it('maps and parses all supported VFS resource types', () => {
-    expect(computePath('team', 'team-1')).toBe('/teams/team-1/metadata.json');
-    expect(computePath('channel', 'team-1:channel-1')).toBe('/teams/team-1/channels/channel-1/metadata.json');
-    expect(computePath('message', 'team-1:channel-1:message-1')).toBe(
+    assert.strictEqual(computePath('team', 'team-1'), '/teams/team-1/metadata.json');
+    assert.strictEqual(computePath('channel', 'team-1:channel-1'), '/teams/team-1/channels/channel-1/metadata.json');
+    assert.strictEqual(computePath('message', 'team-1:channel-1:message-1'),
       '/teams/team-1/channels/channel-1/messages/message-1.json',
     );
-    expect(computePath('reply', 'team-1:channel-1:message-1:reply-1')).toBe(
+    assert.strictEqual(computePath('reply', 'team-1:channel-1:message-1:reply-1'),
       '/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json',
     );
-    expect(computePath('tab', 'team-1:channel-1:tab-1')).toBe(
+    assert.strictEqual(computePath('tab', 'team-1:channel-1:tab-1'),
       '/teams/team-1/channels/channel-1/tabs/tab-1.json',
     );
-    expect(computePath('member', 'team-1:user-1')).toBe('/teams/team-1/members/user-1.json');
-    expect(computePath('chat', 'chat-1')).toBe('/teams/chats/chat-1/metadata.json');
-    expect(computePath('chat_message', 'chat-1:message-1')).toBe('/teams/chats/chat-1/messages/message-1.json');
-    expect(computePath('reaction', 'team-1:channel-1:message-1:like:user-1')).toBe(
+    assert.strictEqual(computePath('member', 'team-1:user-1'), '/teams/team-1/members/user-1.json');
+    assert.strictEqual(computePath('chat', 'chat-1'), '/teams/chats/chat-1/metadata.json');
+    assert.strictEqual(computePath('chat_message', 'chat-1:message-1'), '/teams/chats/chat-1/messages/message-1.json');
+    assert.strictEqual(computePath('reaction', 'team-1:channel-1:message-1:like:user-1'),
       '/teams/team-1/channels/channel-1/messages/message-1/reactions/like--user-1.json',
     );
 
-    expect(parseTeamsPath('/teams/team-1/channels/channel-1/messages/message-1.json')).toEqual({
+    assert.deepStrictEqual(parseTeamsPath('/teams/team-1/channels/channel-1/messages/message-1.json'), {
       objectType: 'message',
       parts: { teamId: 'team-1', channelId: 'channel-1', messageId: 'message-1' },
     });
 
-    expect(parseResourceUrl('/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1')).toEqual({
+    assert.deepStrictEqual(parseResourceUrl('/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1'), {
       objectType: 'reply',
       parts: {
         teamId: 'team-1',
@@ -164,8 +165,8 @@ describe('message ingestion', () => {
       replyToId: 'message-1',
     });
 
-    expect(reply.objectType).toBe('reply');
-    expect(reply.path).toBe('/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json');
+    assert.strictEqual(reply.objectType, 'reply');
+    assert.strictEqual(reply.path, '/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json');
   });
 
   it('extracts message relations for sender, mentions, links, and parents', () => {
@@ -174,72 +175,65 @@ describe('message ingestion', () => {
       replyToId: 'message-1',
     });
 
-    expect(relations).toContain('team:team-1');
-    expect(relations).toContain('channel:team-1:channel-1');
-    expect(relations).toContain('user:user-1');
-    expect(relations).toContain('mentions:user:user-2');
-    expect(relations).toContain('reply_to:team-1:channel-1:message-1');
-    expect(relations).toContain('link:https://relay.dev');
+    assert.ok(relations.includes('team:team-1'));
+    assert.ok(relations.includes('channel:team-1:channel-1'));
+    assert.ok(relations.includes('user:user-1'));
+    assert.ok(relations.includes('mentions:user:user-2'));
+    assert.ok(relations.includes('reply_to:team-1:channel-1:message-1'));
+    assert.ok(relations.includes('link:https://relay.dev'));
   });
 });
 
 describe('writeback routing', () => {
   it('resolves channel messages, replies, and chat messages from VFS paths', () => {
-    expect(
+    assert.deepStrictEqual(
       resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1.json', {
         body: { content: '<p>Hello team</p>' },
       }),
-    ).toEqual({
-      objectType: 'message',
-      objectId: 'team-1:channel-1:message-1',
-      method: 'POST',
-      url: 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages',
-      body: { body: { contentType: 'html', content: '<p>Hello team</p>' } },
-    });
+      {
+        objectType: 'message',
+        objectId: 'team-1:channel-1:message-1',
+        method: 'POST',
+        url: 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages',
+        body: { body: { contentType: 'html', content: '<p>Hello team</p>' } },
+      },
+    );
 
-    expect(
-      resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json', {
-        text: '<p>Hello thread</p>',
-      }),
-    )?.toMatchObject({
-      objectType: 'reply',
-      objectId: 'team-1:channel-1:message-1:reply-1',
-      url: 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages/message-1/replies',
+    const replyResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json', {
+      text: '<p>Hello thread</p>',
     });
+    assert.strictEqual(replyResult?.objectType, 'reply');
+    assert.strictEqual(replyResult?.objectId, 'team-1:channel-1:message-1:reply-1');
+    assert.strictEqual(replyResult?.url, 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages/message-1/replies');
 
-    expect(
-      resolveWriteback('/teams/chats/chat-1/messages/message-1.json', '<p>Hello chat</p>'),
-    )?.toMatchObject({
-      objectType: 'chat_message',
-      objectId: 'chat-1:message-1',
-      url: 'https://graph.microsoft.com/v1.0/chats/chat-1/messages',
-    });
+    const chatResult = resolveWriteback('/teams/chats/chat-1/messages/message-1.json', '<p>Hello chat</p>');
+    assert.strictEqual(chatResult?.objectType, 'chat_message');
+    assert.strictEqual(chatResult?.objectId, 'chat-1:message-1');
+    assert.strictEqual(chatResult?.url, 'https://graph.microsoft.com/v1.0/chats/chat-1/messages');
   });
 });
 
 describe('subscription lifecycle', () => {
   it('creates, renews, and deletes subscriptions with Graph semantics', async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({
-          id: 'sub-1',
-          resource: '/teams/getAllMessages',
-          changeType: 'created,updated,deleted',
-          notificationUrl: 'https://example.com/teams',
-          expirationDateTime: '2026-01-01T00:55:00.000Z',
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          id: 'sub-1',
-          resource: '/teams/getAllMessages',
-          changeType: 'created,updated,deleted',
-          notificationUrl: 'https://example.com/teams',
-          expirationDateTime: '2026-01-01T00:59:00.000Z',
-        }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    let callCount = 0;
+    const responses = [
+      jsonResponse({
+        id: 'sub-1',
+        resource: '/teams/getAllMessages',
+        changeType: 'created,updated,deleted',
+        notificationUrl: 'https://example.com/teams',
+        expirationDateTime: '2026-01-01T00:55:00.000Z',
+      }),
+      jsonResponse({
+        id: 'sub-1',
+        resource: '/teams/getAllMessages',
+        changeType: 'created,updated,deleted',
+        notificationUrl: 'https://example.com/teams',
+        expirationDateTime: '2026-01-01T00:59:00.000Z',
+      }),
+      new Response(null, { status: 204 }),
+    ];
+    const fetchImpl = mock.fn(async () => responses[callCount++]!);
 
     const config = {
       accessToken: 'token',
@@ -256,23 +250,24 @@ describe('subscription lifecycle', () => {
       notificationUrl: 'https://example.com/teams',
       expirationDateTime: '2026-01-01T00:55:00.000Z',
     });
-    expect(created.id).toBe('sub-1');
+    assert.strictEqual(created.id, 'sub-1');
 
     const renewed = await renewSubscription(config, 'sub-1', '2026-01-01T00:59:00.000Z');
-    expect(renewed.expirationDateTime).toBe('2026-01-01T00:59:00.000Z');
+    assert.strictEqual(renewed.expirationDateTime, '2026-01-01T00:59:00.000Z');
 
-    await expect(deleteSubscription(config, 'sub-1')).resolves.toBeUndefined();
+    const deleteResult = await deleteSubscription(config, 'sub-1');
+    assert.strictEqual(deleteResult, undefined);
 
-    expect(defaultSubscriptionResources('tenant', {
+    assert.strictEqual(defaultSubscriptionResources('tenant', {
       notificationUrl: 'https://example.com/teams',
       clientState: 'client-state',
       includeResourceData: true,
-    })).toHaveLength(4);
+    }).length, 4);
 
-    expect(shouldRenewSubscription('2026-01-01T00:59:00.000Z', 5 * 60_000, Date.parse('2026-01-01T00:55:30.000Z')))
-      .toBe(true);
-    expect(shouldRenewSubscription('2026-01-01T00:59:00.000Z', 5 * 60_000, Date.parse('2026-01-01T00:50:00.000Z')))
-      .toBe(false);
+    assert.strictEqual(shouldRenewSubscription('2026-01-01T00:59:00.000Z', 5 * 60_000, Date.parse('2026-01-01T00:55:30.000Z')),
+      true);
+    assert.strictEqual(shouldRenewSubscription('2026-01-01T00:59:00.000Z', 5 * 60_000, Date.parse('2026-01-01T00:50:00.000Z')),
+      false);
   });
 });
 
@@ -293,7 +288,7 @@ describe('adapter ingest', () => {
       },
     };
 
-    const fetchImpl = vi.fn().mockResolvedValue(
+    const fetchImpl = mock.fn(async () =>
       jsonResponse({
         id: 'message-1',
         body: {
@@ -336,12 +331,12 @@ describe('adapter ingest', () => {
       },
     });
 
-    expect(response.status).toBe('queued');
-    expect(writes.map((entry) => entry.path)).toEqual([
+    assert.strictEqual(response.status, 'queued');
+    assert.deepStrictEqual(writes.map((entry) => entry.path), [
       '/teams/team-1/channels/channel-1/messages/message-1.json',
       '/teams/team-1/channels/channel-1/messages/message-1/reactions/like--user-2.json',
     ]);
-    expect(writes[0]?.baseRevision).toBe('0');
+    assert.strictEqual(writes[0]?.baseRevision, '0');
   });
 
   it('maps deleted replies from the Graph resource path when the payload is sparse', async () => {
@@ -359,7 +354,7 @@ describe('adapter ingest', () => {
     const adapter = new TeamsAdapter(client as never, {
       accessToken: 'token',
       clientState: 'client-state',
-      fetchImpl: vi.fn(),
+      fetchImpl: mock.fn(),
     });
 
     await adapter.ingestWebhook('ws-1', {
@@ -375,7 +370,7 @@ describe('adapter ingest', () => {
       },
     });
 
-    expect(writes.map((entry) => entry.path)).toEqual([
+    assert.deepStrictEqual(writes.map((entry) => entry.path), [
       '/teams/team-1/channels/channel-1/messages/message-1/replies/reply-1.json',
     ]);
   });
@@ -383,20 +378,22 @@ describe('adapter ingest', () => {
 
 describe('bulk ingest pagination', () => {
   it('follows @odata.nextLink for channel message pages', async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse({ id: 'team-1' }))
-      .mockResolvedValueOnce(jsonResponse({ value: [] }))
-      .mockResolvedValueOnce(jsonResponse({ value: [{ id: 'channel-1' }] }))
-      .mockResolvedValueOnce(jsonResponse({
+    let callCount = 0;
+    const responses = [
+      jsonResponse({ id: 'team-1' }),
+      jsonResponse({ value: [] }),
+      jsonResponse({ value: [{ id: 'channel-1' }] }),
+      jsonResponse({
         value: [{ id: 'message-1', body: { content: '<p>First</p>' } }],
         '@odata.nextLink': 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages?$skiptoken=abc',
-      }))
-      .mockResolvedValueOnce(jsonResponse({
+      }),
+      jsonResponse({
         value: [{ id: 'message-2', body: { content: '<p>Second</p>' } }],
-      }))
-      .mockResolvedValueOnce(jsonResponse({ value: [] }))
-      .mockResolvedValueOnce(jsonResponse({ value: [] }));
+      }),
+      jsonResponse({ value: [] }),
+      jsonResponse({ value: [] }),
+    ];
+    const fetchImpl = mock.fn(async () => responses[callCount++]!);
 
     const result = await bulkIngestTeam(
       { accessToken: 'token', fetchImpl },
@@ -404,13 +401,13 @@ describe('bulk ingest pagination', () => {
       { includeReplies: true },
     );
 
-    expect(result.files
+    assert.deepStrictEqual(result.files
       .filter((file) => file.objectType === 'message')
-      .map((file) => file.path)).toEqual([
+      .map((file) => file.path), [
         '/teams/team-1/channels/channel-1/messages/message-1.json',
         '/teams/team-1/channels/channel-1/messages/message-2.json',
       ]);
-    expect(fetchImpl.mock.calls[4]?.[0]).toBe(
+    assert.strictEqual(fetchImpl.mock.calls[4]?.arguments[0],
       'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages?$skiptoken=abc',
     );
   });

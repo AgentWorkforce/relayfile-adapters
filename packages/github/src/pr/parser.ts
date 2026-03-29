@@ -1,3 +1,4 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
   GitHubProxyProvider,
   JsonObject,
@@ -5,7 +6,6 @@ import type {
   ProxyResponse,
 } from '../types.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 
 interface ProviderWithConnectionDefaults extends GitHubProxyProvider {

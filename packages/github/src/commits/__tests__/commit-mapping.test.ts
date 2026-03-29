@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { mockCommits, mockPRFiles, mockRepoContext } from '../../__tests__/fixtures/index.js';
 import {
@@ -70,7 +71,7 @@ function createFixtureProvider(options?: {
   const pages = options?.pages ?? [mockCommits.map((commit) => cloneJson(commit))];
   const details = options?.details ?? buildCommitDetails();
 
-  const proxy = vi.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
+  const proxy = mock.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
     const basePullRequestEndpoint = `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits`;
 
     if (request.endpoint.startsWith(basePullRequestEndpoint)) {
@@ -130,7 +131,7 @@ function createFixtureProvider(options?: {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
-  const writeFile = vi.fn(async (path: string, content: string) => {
+  const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
 
@@ -155,22 +156,22 @@ describe('commit mapping', () => {
       PULL_REQUEST_NUMBER,
     );
 
-    expect(commits).toEqual([cloneJson(mockCommits[0]), cloneJson(mockCommits[1])]);
-    expect(proxy).toHaveBeenCalledTimes(2);
-    expect(proxy).toHaveBeenNthCalledWith(1, {
+    assert.deepStrictEqual(commits, [cloneJson(mockCommits[0]), cloneJson(mockCommits[1])]);
+    assert.strictEqual(proxy.mock.calls.length, 2);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=1&per_page=100`,
       connectionId: 'conn-fixture',
       headers: DEFAULT_HEADERS,
-    });
-    expect(proxy).toHaveBeenNthCalledWith(2, {
+    }]);
+    assert.deepStrictEqual(proxy.mock.calls[1].arguments, [{
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=2&per_page=100`,
       connectionId: 'conn-fixture',
       headers: DEFAULT_HEADERS,
-    });
+    }]);
   });
 
   it('fetchCommitDetail returns full commit data', async () => {
@@ -184,15 +185,15 @@ describe('commit mapping', () => {
       mockRepoContext.headSha,
     );
 
-    expect(detail).toEqual(details[mockRepoContext.headSha]);
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.deepStrictEqual(detail, details[mockRepoContext.headSha]);
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}`,
       connectionId: 'conn-fixture',
       headers: DEFAULT_HEADERS,
-    });
+    }]);
   });
 
   it('mapCommitToVFS produces correct JSON structure', () => {
@@ -205,7 +206,7 @@ describe('commit mapping', () => {
       PULL_REQUEST_NUMBER,
     );
 
-    expect(JSON.parse(mapped.content)).toEqual({
+    assert.deepStrictEqual(JSON.parse(mapped.content), {
       sha: mockRepoContext.headSha,
       message: 'test: add README and math fixture updates',
       author: {
@@ -254,7 +255,8 @@ describe('commit mapping', () => {
       PULL_REQUEST_NUMBER,
     );
 
-    expect(mapped.vfsPath).toBe(
+    assert.strictEqual(
+      mapped.vfsPath,
       `/pulls/${PULL_REQUEST_NUMBER}/commits/${mockRepoContext.headSha}.json`,
     );
   });
@@ -275,20 +277,18 @@ describe('commit mapping', () => {
       vfs,
     );
 
-    expect(writeFile).toHaveBeenCalledTimes(2);
-    expect(Array.from(writes.keys())).toEqual([
+    assert.strictEqual(writeFile.mock.calls.length, 2);
+    assert.deepStrictEqual(Array.from(writes.keys()), [
       `/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[0].sha}.json`,
       `/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[1].sha}.json`,
     ]);
-    expect(JSON.parse(writes.get(`/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[0].sha}.json`) ?? '')).toMatchObject({
-      sha: mockCommits[0].sha,
-      message: 'refactor: normalize greeting output',
-    });
-    expect(JSON.parse(writes.get(`/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[1].sha}.json`) ?? '')).toMatchObject({
-      sha: mockCommits[1].sha,
-      message: 'test: add README and math fixture updates',
-    });
-    expect(result).toEqual({
+    const commit0 = JSON.parse(writes.get(`/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[0].sha}.json`) ?? '');
+    assert.strictEqual(commit0.sha, mockCommits[0].sha);
+    assert.strictEqual(commit0.message, 'refactor: normalize greeting output');
+    const commit1 = JSON.parse(writes.get(`/pulls/${PULL_REQUEST_NUMBER}/commits/${mockCommits[1].sha}.json`) ?? '');
+    assert.strictEqual(commit1.sha, mockCommits[1].sha);
+    assert.strictEqual(commit1.message, 'test: add README and math fixture updates');
+    assert.deepStrictEqual(result, {
       filesWritten: 2,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -315,9 +315,9 @@ describe('commit mapping', () => {
       vfs,
     );
 
-    expect(writeFile).not.toHaveBeenCalled();
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(result).toEqual({
+    assert.strictEqual(writeFile.mock.calls.length, 0);
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(result, {
       filesWritten: 0,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -341,16 +341,18 @@ describe('commit mapping', () => {
       PULL_REQUEST_NUMBER,
     );
 
-    expect(commits.map((commit) => commit.sha)).toEqual([
-      mockCommits[0].sha,
-      mockCommits[1].sha,
-      mockCommits[0].sha,
-    ]);
-    expect(proxy).toHaveBeenCalledTimes(3);
-    expect(proxy.mock.calls.map(([request]) => request.endpoint)).toEqual([
-      `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=1&per_page=100`,
-      `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=2&per_page=100`,
-      `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=3&per_page=100`,
-    ]);
+    assert.deepStrictEqual(
+      commits.map((commit) => commit.sha),
+      [mockCommits[0].sha, mockCommits[1].sha, mockCommits[0].sha],
+    );
+    assert.strictEqual(proxy.mock.calls.length, 3);
+    assert.deepStrictEqual(
+      proxy.mock.calls.map(([request]: [ProxyRequest]) => request.endpoint),
+      [
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=1&per_page=100`,
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=2&per_page=100`,
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${PULL_REQUEST_NUMBER}/commits?page=3&per_page=100`,
+      ],
+    );
   });
 });

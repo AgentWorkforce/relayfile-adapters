@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { mockCheckRuns, mockRepoContext } from '../../__tests__/fixtures/index.js';
 import { fetchCheckRuns, type GitHubCheckRunProvider } from '../fetcher.js';
@@ -6,7 +7,7 @@ import { aggregateCheckStatus, ingestCheckRuns, mapCheckRun } from '../mapper.js
 import type { ProxyRequest, ProxyResponse } from '../../types.js';
 
 function createFixtureProvider(checkRuns = mockCheckRuns) {
-  const proxy = vi.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
+  const proxy = mock.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
     if (
       request.endpoint ===
       `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`
@@ -38,7 +39,7 @@ function createFixtureProvider(checkRuns = mockCheckRuns) {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
-  const writeFile = vi.fn(async (path: string, content: string) => {
+  const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
     return { created: true as const };
   });
@@ -63,15 +64,15 @@ describe('check runs', () => {
       mockRepoContext.headSha,
     );
 
-    expect(response).toEqual({
+    assert.deepStrictEqual(response, {
       total_count: mockCheckRuns.length,
       check_runs: mockCheckRuns.map((checkRun) => ({
         ...checkRun,
         output: { ...checkRun.output },
       })),
     });
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`,
@@ -84,7 +85,7 @@ describe('check runs', () => {
         page: '1',
         per_page: '100',
       },
-    });
+    }]);
   });
 
   it('mapCheckRun produces correct JSON shape', () => {
@@ -95,7 +96,7 @@ describe('check runs', () => {
       42,
     );
 
-    expect(JSON.parse(mapped.content)).toEqual({
+    assert.deepStrictEqual(JSON.parse(mapped.content), {
       id: 9201,
       name: 'Typecheck',
       status: 'completed',
@@ -122,7 +123,7 @@ describe('check runs', () => {
       42,
     );
 
-    expect(mapped.vfsPath).toBe('checks/9201.json');
+    assert.strictEqual(mapped.vfsPath, 'checks/9201.json');
   });
 
   it('aggregateCheckStatus counts correctly', () => {
@@ -137,7 +138,7 @@ describe('check runs', () => {
       },
     ]);
 
-    expect(aggregated).toEqual({
+    assert.deepStrictEqual(aggregated, {
       total: 3,
       passed: 1,
       failed: 1,
@@ -149,7 +150,7 @@ describe('check runs', () => {
   it("aggregateCheckStatus returns 'failure' if any failed", () => {
     const aggregated = aggregateCheckStatus(mockCheckRuns);
 
-    expect(aggregated.conclusion).toBe('failure');
+    assert.strictEqual(aggregated.conclusion, 'failure');
   });
 
   it("aggregateCheckStatus returns 'pending' if any in_progress", () => {
@@ -163,7 +164,7 @@ describe('check runs', () => {
       },
     ]);
 
-    expect(aggregated).toEqual({
+    assert.deepStrictEqual(aggregated, {
       total: 2,
       passed: 1,
       failed: 0,
@@ -185,21 +186,19 @@ describe('check runs', () => {
       vfs,
     );
 
-    expect(writeFile).toHaveBeenCalledTimes(3);
-    expect(Array.from(writes.keys())).toEqual([
+    assert.strictEqual(writeFile.mock.calls.length, 3);
+    assert.deepStrictEqual(Array.from(writes.keys()), [
       'checks/9201.json',
       'checks/9202.json',
       'checks/_summary.json',
     ]);
-    expect(JSON.parse(writes.get('checks/9201.json') ?? '')).toMatchObject({
-      id: 9201,
-      name: 'Typecheck',
-    });
-    expect(JSON.parse(writes.get('checks/9202.json') ?? '')).toMatchObject({
-      id: 9202,
-      name: 'Unit Tests',
-    });
-    expect(result).toEqual({
+    const check9201 = JSON.parse(writes.get('checks/9201.json') ?? '');
+    assert.strictEqual(check9201.id, 9201);
+    assert.strictEqual(check9201.name, 'Typecheck');
+    const check9202 = JSON.parse(writes.get('checks/9202.json') ?? '');
+    assert.strictEqual(check9202.id, 9202);
+    assert.strictEqual(check9202.name, 'Unit Tests');
+    assert.deepStrictEqual(result, {
       filesWritten: 3,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -221,7 +220,8 @@ describe('check runs', () => {
       vfs,
     );
 
-    expect(JSON.parse(writes.get('checks/_summary.json') ?? '')).toEqual(
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('checks/_summary.json') ?? ''),
       aggregateCheckStatus(mockCheckRuns),
     );
   });

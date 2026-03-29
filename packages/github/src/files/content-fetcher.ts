@@ -1,8 +1,8 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const DEFAULT_MAX_FILE_SIZE_BYTES = 1024 * 1024;
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 const GITHUB_ACCEPT_HEADER = 'application/vnd.github+json';

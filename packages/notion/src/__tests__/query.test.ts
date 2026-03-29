@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { buildDatabaseQuery } from '../databases/query.js';
 
 describe('database query builder', () => {
@@ -22,7 +23,7 @@ describe('database query builder', () => {
       pageSize: 50,
     });
 
-    expect(query).toEqual({
+    assert.deepStrictEqual(query, {
       filter: {
         and: [
           { property: 'Status', status: { equals: 'Done' } },

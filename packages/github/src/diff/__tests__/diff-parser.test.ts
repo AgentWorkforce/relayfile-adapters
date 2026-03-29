@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   buildPatches,
@@ -102,7 +103,7 @@ describe('diff parser', () => {
   it('tokenize identifies all token types', () => {
     const tokens = tokenize(TOKEN_FIXTURE);
 
-    expect(tokens.map((token) => token.type)).toEqual([
+    assert.deepStrictEqual(tokens.map((token) => token.type), [
       'diff_header',
       'rename',
       'rename',
@@ -123,21 +124,25 @@ describe('diff parser', () => {
       'binary',
     ]);
 
-    expect(tokens[0]).toMatchObject({ type: 'diff_header', line: 1 });
-    expect(tokens[1]).toMatchObject({ type: 'rename', line: 2 });
-    expect(tokens[11]).toMatchObject({ type: 'mode', line: 12 });
-    expect(tokens.at(-1)).toMatchObject({ type: 'binary', line: 18 });
+    assert.strictEqual(tokens[0].type, 'diff_header');
+    assert.strictEqual(tokens[0].line, 1);
+    assert.strictEqual(tokens[1].type, 'rename');
+    assert.strictEqual(tokens[1].line, 2);
+    assert.strictEqual(tokens[11].type, 'mode');
+    assert.strictEqual(tokens[11].line, 12);
+    assert.strictEqual(tokens.at(-1)!.type, 'binary');
+    assert.strictEqual(tokens.at(-1)!.line, 18);
   });
 
   it('parseHunkHeader extracts line numbers correctly', () => {
-    expect(parseHunkHeader('@@ -10,3 +20,4 @@')).toEqual({
+    assert.deepStrictEqual(parseHunkHeader('@@ -10,3 +20,4 @@'), {
       oldStart: 10,
       oldLines: 3,
       newStart: 20,
       newLines: 4,
     });
 
-    expect(parseHunkHeader('@@ -7 +11 @@ optional context')).toEqual({
+    assert.deepStrictEqual(parseHunkHeader('@@ -7 +11 @@ optional context'), {
       oldStart: 7,
       oldLines: 1,
       newStart: 11,
@@ -148,32 +153,26 @@ describe('diff parser', () => {
   it('buildPatches splits multi-file diff into patches', () => {
     const patches = buildPatches(tokenize(MULTI_FILE_FIXTURE));
 
-    expect(patches).toHaveLength(2);
-    expect(patches[0]).toMatchObject({
-      oldPath: 'src/alpha.ts',
-      newPath: 'src/alpha.ts',
-      status: 'modified',
-      isBinary: false,
-    });
-    expect(patches[1]).toMatchObject({
-      oldPath: null,
-      newPath: 'src/beta.ts',
-      status: 'added',
-      isBinary: false,
-    });
+    assert.strictEqual(patches.length, 2);
+    assert.strictEqual(patches[0].oldPath, 'src/alpha.ts');
+    assert.strictEqual(patches[0].newPath, 'src/alpha.ts');
+    assert.strictEqual(patches[0].status, 'modified');
+    assert.strictEqual(patches[0].isBinary, false);
+    assert.strictEqual(patches[1].oldPath, null);
+    assert.strictEqual(patches[1].newPath, 'src/beta.ts');
+    assert.strictEqual(patches[1].status, 'added');
+    assert.strictEqual(patches[1].isBinary, false);
   });
 
   it('buildPatches handles added file (new file mode)', () => {
     const [patch] = buildPatches(tokenize(ADDED_FILE_FIXTURE));
 
-    expect(patch).toMatchObject({
-      oldPath: null,
-      newPath: 'src/new-file.ts',
-      status: 'added',
-      isBinary: false,
-    });
-    expect(patch.hunks).toHaveLength(1);
-    expect(patch.hunks[0]?.lines).toEqual([
+    assert.strictEqual(patch.oldPath, null);
+    assert.strictEqual(patch.newPath, 'src/new-file.ts');
+    assert.strictEqual(patch.status, 'added');
+    assert.strictEqual(patch.isBinary, false);
+    assert.strictEqual(patch.hunks.length, 1);
+    assert.deepStrictEqual(patch.hunks[0]?.lines, [
       { type: 'add', content: 'export const created = true;', newLineNo: 1 },
       { type: 'add', content: 'export const lineCount = 2;', newLineNo: 2 },
     ]);
@@ -182,14 +181,12 @@ describe('diff parser', () => {
   it('buildPatches handles deleted file (deleted file mode)', () => {
     const [patch] = buildPatches(tokenize(DELETED_FILE_FIXTURE));
 
-    expect(patch).toMatchObject({
-      oldPath: 'src/old-file.ts',
-      newPath: null,
-      status: 'deleted',
-      isBinary: false,
-    });
-    expect(patch.hunks).toHaveLength(1);
-    expect(patch.hunks[0]?.lines).toEqual([
+    assert.strictEqual(patch.oldPath, 'src/old-file.ts');
+    assert.strictEqual(patch.newPath, null);
+    assert.strictEqual(patch.status, 'deleted');
+    assert.strictEqual(patch.isBinary, false);
+    assert.strictEqual(patch.hunks.length, 1);
+    assert.deepStrictEqual(patch.hunks[0]?.lines, [
       { type: 'remove', content: 'export const removed = true;', oldLineNo: 1 },
       { type: 'remove', content: 'export const lineCount = 2;', oldLineNo: 2 },
     ]);
@@ -198,14 +195,12 @@ describe('diff parser', () => {
   it('buildPatches handles renamed file (similarity index)', () => {
     const [patch] = buildPatches(tokenize(RENAMED_FILE_FIXTURE));
 
-    expect(patch).toMatchObject({
-      oldPath: 'src/old-name.ts',
-      newPath: 'src/new-name.ts',
-      status: 'renamed',
-      isBinary: false,
-    });
-    expect(patch.hunks).toHaveLength(1);
-    expect(patch.hunks[0]?.lines).toEqual([
+    assert.strictEqual(patch.oldPath, 'src/old-name.ts');
+    assert.strictEqual(patch.newPath, 'src/new-name.ts');
+    assert.strictEqual(patch.status, 'renamed');
+    assert.strictEqual(patch.isBinary, false);
+    assert.strictEqual(patch.hunks.length, 1);
+    assert.deepStrictEqual(patch.hunks[0]?.lines, [
       { type: 'remove', content: "export const name = 'old';", oldLineNo: 1 },
       { type: 'add', content: "export const name = 'new';", newLineNo: 1 },
       {
@@ -220,20 +215,18 @@ describe('diff parser', () => {
   it('buildPatches handles binary file', () => {
     const [patch] = buildPatches(tokenize(BINARY_FILE_FIXTURE));
 
-    expect(patch).toMatchObject({
-      oldPath: 'assets/logo.png',
-      newPath: 'assets/logo.png',
-      status: 'modified',
-      isBinary: true,
-      hunks: [],
-    });
+    assert.strictEqual(patch.oldPath, 'assets/logo.png');
+    assert.strictEqual(patch.newPath, 'assets/logo.png');
+    assert.strictEqual(patch.status, 'modified');
+    assert.strictEqual(patch.isBinary, true);
+    assert.deepStrictEqual(patch.hunks, []);
   });
 
   it('DiffLine has correct line numbers', () => {
     const [patch] = buildPatches(tokenize(LINE_NUMBER_FIXTURE));
     const lines = patch?.hunks[0]?.lines as DiffLine[];
 
-    expect(lines).toEqual([
+    assert.deepStrictEqual(lines, [
       {
         type: 'context',
         content: 'const keep = true;',
@@ -267,32 +260,26 @@ describe('diff parser', () => {
   it('parseDiff end-to-end with real-ish diff', () => {
     const patches = parseDiff(REALISH_DIFF_FIXTURE);
 
-    expect(patches).toHaveLength(1);
-    expect(patches[0]).toMatchObject({
-      oldPath: 'src/app.ts',
-      newPath: 'src/app.ts',
-      status: 'modified',
-      isBinary: false,
-    });
-    expect(patches[0]?.hunks).toHaveLength(2);
-    expect(patches[0]?.hunks[0]).toMatchObject({
-      oldStart: 1,
-      oldLines: 4,
-      newStart: 1,
-      newLines: 5,
-    });
-    expect(patches[0]?.hunks[1]).toMatchObject({
-      oldStart: 10,
-      oldLines: 3,
-      newStart: 11,
-      newLines: 4,
-    });
-    expect(patches[0]?.hunks[0]?.lines[2]).toEqual({
+    assert.strictEqual(patches.length, 1);
+    assert.strictEqual(patches[0].oldPath, 'src/app.ts');
+    assert.strictEqual(patches[0].newPath, 'src/app.ts');
+    assert.strictEqual(patches[0].status, 'modified');
+    assert.strictEqual(patches[0].isBinary, false);
+    assert.strictEqual(patches[0]?.hunks.length, 2);
+    assert.strictEqual(patches[0]?.hunks[0].oldStart, 1);
+    assert.strictEqual(patches[0]?.hunks[0].oldLines, 4);
+    assert.strictEqual(patches[0]?.hunks[0].newStart, 1);
+    assert.strictEqual(patches[0]?.hunks[0].newLines, 5);
+    assert.strictEqual(patches[0]?.hunks[1].oldStart, 10);
+    assert.strictEqual(patches[0]?.hunks[1].oldLines, 3);
+    assert.strictEqual(patches[0]?.hunks[1].newStart, 11);
+    assert.strictEqual(patches[0]?.hunks[1].newLines, 4);
+    assert.deepStrictEqual(patches[0]?.hunks[0]?.lines[2], {
       type: 'remove',
       content: 'console.log(oldThing(version));',
       oldLineNo: 3,
     });
-    expect(patches[0]?.hunks[0]?.lines[3]).toEqual({
+    assert.deepStrictEqual(patches[0]?.hunks[0]?.lines[3], {
       type: 'add',
       content: 'const nextVersion = version + 1;',
       newLineNo: 3,
@@ -302,20 +289,20 @@ describe('diff parser', () => {
   it('getPatchForFile finds by path', () => {
     const patches = parseDiff(`${RENAMED_FILE_FIXTURE}\n${ADDED_FILE_FIXTURE}`);
 
-    expect(getPatchForFile(patches, 'src/old-name.ts')).toMatchObject({
-      status: 'renamed',
-      oldPath: 'src/old-name.ts',
-      newPath: 'src/new-name.ts',
-    });
-    expect(getPatchForFile(patches, 'src/new-name.ts')).toMatchObject({
-      status: 'renamed',
-      oldPath: 'src/old-name.ts',
-      newPath: 'src/new-name.ts',
-    });
-    expect(getPatchForFile(patches, 'src/new-file.ts')).toMatchObject({
-      status: 'added',
-      newPath: 'src/new-file.ts',
-    });
-    expect(getPatchForFile(patches, 'src/missing.ts')).toBeNull();
+    const oldNamePatch = getPatchForFile(patches, 'src/old-name.ts');
+    assert.strictEqual(oldNamePatch!.status, 'renamed');
+    assert.strictEqual(oldNamePatch!.oldPath, 'src/old-name.ts');
+    assert.strictEqual(oldNamePatch!.newPath, 'src/new-name.ts');
+
+    const newNamePatch = getPatchForFile(patches, 'src/new-name.ts');
+    assert.strictEqual(newNamePatch!.status, 'renamed');
+    assert.strictEqual(newNamePatch!.oldPath, 'src/old-name.ts');
+    assert.strictEqual(newNamePatch!.newPath, 'src/new-name.ts');
+
+    const newFilePatch = getPatchForFile(patches, 'src/new-file.ts');
+    assert.strictEqual(newFilePatch!.status, 'added');
+    assert.strictEqual(newFilePatch!.newPath, 'src/new-file.ts');
+
+    assert.strictEqual(getPatchForFile(patches, 'src/missing.ts'), null);
   });
 });

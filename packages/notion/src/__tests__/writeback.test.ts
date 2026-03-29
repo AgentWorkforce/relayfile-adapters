@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { resolveWritebackRequest } from '../writeback.js';
 
 describe('writeback rule matching', () => {
@@ -16,7 +17,7 @@ describe('writeback rule matching', () => {
       }),
     );
 
-    expect(request).toEqual({
+    assert.deepStrictEqual(request, {
       action: 'update_page_properties',
       method: 'PATCH',
       endpoint: '/v1/pages/page-1',
@@ -52,9 +53,9 @@ describe('writeback rule matching', () => {
     const markdown = resolveWritebackRequest('/notion/pages/page-1/content.md', '# Updated');
     const comment = resolveWritebackRequest('/notion/pages/page-1/comments.json', '"Looks good"');
 
-    expect(markdown.endpoint).toBe('/v1/pages/page-1/markdown');
-    expect(comment.endpoint).toBe('/v1/comments');
-    expect(comment.body).toEqual({
+    assert.strictEqual(markdown.endpoint, '/v1/pages/page-1/markdown');
+    assert.strictEqual(comment.endpoint, '/v1/comments');
+    assert.deepStrictEqual(comment.body, {
       parent: { page_id: 'page-1' },
       rich_text: [{ type: 'text', text: { content: 'Looks good', link: null } }],
     });

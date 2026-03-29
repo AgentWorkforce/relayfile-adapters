@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import {
   computePath,
   notionDatabaseBlockPath,
@@ -13,20 +14,20 @@ import {
 
 describe('path mapping', () => {
   it('maps database metadata paths', () => {
-    expect(notionDatabaseMetadataPath('db-1')).toBe('/notion/databases/db-1/metadata.json');
-    expect(computePath({ objectType: 'database', objectId: 'db-1' })).toBe('/notion/databases/db-1/metadata.json');
+    assert.strictEqual(notionDatabaseMetadataPath('db-1'), '/notion/databases/db-1/metadata.json');
+    assert.strictEqual(computePath({ objectType: 'database', objectId: 'db-1' }), '/notion/databases/db-1/metadata.json');
   });
 
   it('maps database page paths', () => {
-    expect(notionDatabasePagePath('db-1', 'page-1')).toBe('/notion/databases/db-1/pages/page-1.json');
-    expect(notionDatabasePageContentPath('db-1', 'page-1')).toBe('/notion/databases/db-1/pages/page-1/content.md');
-    expect(notionDatabasePageCommentsPath('db-1', 'page-1')).toBe('/notion/databases/db-1/pages/page-1/comments.json');
-    expect(notionDatabaseBlockPath('db-1', 'page-1', 'block-1')).toBe('/notion/databases/db-1/pages/page-1/blocks/block-1.json');
+    assert.strictEqual(notionDatabasePagePath('db-1', 'page-1'), '/notion/databases/db-1/pages/page-1.json');
+    assert.strictEqual(notionDatabasePageContentPath('db-1', 'page-1'), '/notion/databases/db-1/pages/page-1/content.md');
+    assert.strictEqual(notionDatabasePageCommentsPath('db-1', 'page-1'), '/notion/databases/db-1/pages/page-1/comments.json');
+    assert.strictEqual(notionDatabaseBlockPath('db-1', 'page-1', 'block-1'), '/notion/databases/db-1/pages/page-1/blocks/block-1.json');
   });
 
   it('maps standalone page paths', () => {
-    expect(notionStandalonePagePath('page-1')).toBe('/notion/pages/page-1.json');
-    expect(notionStandalonePageContentPath('page-1')).toBe('/notion/pages/page-1/content.md');
-    expect(notionStandalonePageCommentsPath('page-1')).toBe('/notion/pages/page-1/comments.json');
+    assert.strictEqual(notionStandalonePagePath('page-1'), '/notion/pages/page-1.json');
+    assert.strictEqual(notionStandalonePageContentPath('page-1'), '/notion/pages/page-1/content.md');
+    assert.strictEqual(notionStandalonePageCommentsPath('page-1'), '/notion/pages/page-1/comments.json');
   });
 });

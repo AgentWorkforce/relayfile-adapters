@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   GitHubAdapter,
@@ -25,18 +26,14 @@ function createAdapter(): GitHubAdapter {
 }
 
 function expectIngestResultShape(result: IngestResult): void {
-  expect(result).toEqual(
-    expect.objectContaining({
-      filesWritten: expect.any(Number),
-      filesUpdated: expect.any(Number),
-      filesDeleted: expect.any(Number),
-      paths: expect.any(Array),
-      errors: expect.any(Array),
-    }),
-  );
+  assert.strictEqual(typeof result.filesWritten, 'number');
+  assert.strictEqual(typeof result.filesUpdated, 'number');
+  assert.strictEqual(typeof result.filesDeleted, 'number');
+  assert.ok(Array.isArray(result.paths));
+  assert.ok(Array.isArray(result.errors));
 
-  expect(result.paths.every((path) => typeof path === 'string')).toBe(true);
-  expect(
+  assert.strictEqual(result.paths.every((path) => typeof path === 'string'), true);
+  assert.strictEqual(
     result.errors.every(
       (error) =>
         typeof error === 'object' &&
@@ -44,27 +41,28 @@ function expectIngestResultShape(result: IngestResult): void {
         typeof error.path === 'string' &&
         typeof error.error === 'string',
     ),
-  ).toBe(true);
+    true,
+  );
 }
 
 describe('GitHubAdapter scaffold', () => {
   it('can be instantiated with a mock provider', () => {
     const adapter = createAdapter();
 
-    expect(adapter).toBeInstanceOf(GitHubAdapter);
-    expect(adapter.version).toBe('0.1.0');
+    assert.ok(adapter instanceof GitHubAdapter);
+    assert.strictEqual(adapter.version, '0.1.0');
   });
 
   it('extends IntegrationAdapter', () => {
     const adapter = createAdapter();
 
-    expect(adapter).toBeInstanceOf(IntegrationAdapter);
+    assert.ok(adapter instanceof IntegrationAdapter);
   });
 
   it("adapter.name returns 'github'", () => {
     const adapter = createAdapter();
 
-    expect(adapter.name).toBe('github');
+    assert.strictEqual(adapter.name, 'github');
   });
 
   it('validateConfig applies defaults correctly', () => {
@@ -73,31 +71,33 @@ describe('GitHubAdapter scaffold', () => {
       repo: 'hello-world',
     });
 
-    expect(config).toMatchObject({
-      owner: 'octocat',
-      repo: 'hello-world',
-      baseUrl: DEFAULT_CONFIG.baseUrl,
-      defaultBranch: DEFAULT_CONFIG.defaultBranch,
-      fetchFileContents: DEFAULT_CONFIG.fetchFileContents,
-      maxFileSizeBytes: DEFAULT_CONFIG.maxFileSizeBytes,
-      supportedEvents: DEFAULT_CONFIG.supportedEvents,
-    });
-    expect(config.supportedEvents).not.toBe(DEFAULT_CONFIG.supportedEvents);
+    assert.strictEqual(config.owner, 'octocat');
+    assert.strictEqual(config.repo, 'hello-world');
+    assert.strictEqual(config.baseUrl, DEFAULT_CONFIG.baseUrl);
+    assert.strictEqual(config.defaultBranch, DEFAULT_CONFIG.defaultBranch);
+    assert.strictEqual(config.fetchFileContents, DEFAULT_CONFIG.fetchFileContents);
+    assert.strictEqual(config.maxFileSizeBytes, DEFAULT_CONFIG.maxFileSizeBytes);
+    assert.deepStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
+    assert.notStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
   });
 
   it('validateConfig rejects invalid config', () => {
-    expect(() => validateConfig({ baseUrl: '   ' })).toThrow('baseUrl must be a non-empty string');
-    expect(() => validateConfig({ defaultBranch: '' })).toThrow(
-      'defaultBranch must be a non-empty string',
+    assert.throws(() => validateConfig({ baseUrl: '   ' }), /baseUrl must be a non-empty string/);
+    assert.throws(
+      () => validateConfig({ defaultBranch: '' }),
+      /defaultBranch must be a non-empty string/,
     );
-    expect(() => validateConfig({ fetchFileContents: 'yes' as never })).toThrow(
-      'fetchFileContents must be a boolean',
+    assert.throws(
+      () => validateConfig({ fetchFileContents: 'yes' as never }),
+      /fetchFileContents must be a boolean/,
     );
-    expect(() => validateConfig({ maxFileSizeBytes: 0 })).toThrow(
-      'maxFileSizeBytes must be a positive integer',
+    assert.throws(
+      () => validateConfig({ maxFileSizeBytes: 0 }),
+      /maxFileSizeBytes must be a positive integer/,
     );
-    expect(() => validateConfig({ supportedEvents: 'pull_request.opened' as never })).toThrow(
-      'supportedEvents must be an array of strings',
+    assert.throws(
+      () => validateConfig({ supportedEvents: 'pull_request.opened' as never }),
+      /supportedEvents must be an array of strings/,
     );
   });
 
@@ -198,7 +198,7 @@ describe('GitHubAdapter scaffold', () => {
 
     for (const [name, resultPromise] of cases) {
       expectIngestResultShape(await resultPromise);
-      expect(name).toBeTypeOf('string');
+      assert.strictEqual(typeof name, 'string');
     }
   });
 });

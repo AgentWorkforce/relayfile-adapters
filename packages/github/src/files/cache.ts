@@ -1,3 +1,4 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
@@ -5,7 +6,6 @@ import type { GitHubProxyProvider, JsonObject, JsonValue, ProxyResponse } from '
 const CACHE_METADATA_PATH = '.cache/files.json';
 const CACHE_CONTENT_ROOT = '.cache/files';
 const CACHE_VERSION = 1;
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const GITHUB_ACCEPT_HEADER = 'application/vnd.github+json';
 const GITHUB_API_VERSION = '2022-11-28';
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';

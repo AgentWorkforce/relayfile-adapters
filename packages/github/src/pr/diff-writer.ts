@@ -1,3 +1,4 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
@@ -5,7 +6,6 @@ import type { GitHubProxyProvider, JsonValue, ProxyResponse } from '../types.js'
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
 import { parsePullRequest, type PullRequestMetadata } from './parser.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 
 type ConnectionAwareProvider = GitHubProxyProvider & {

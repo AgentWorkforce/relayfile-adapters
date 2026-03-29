@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -31,7 +31,6 @@
   "devDependencies": {
     "@agent-relay/sdk": "^3.2.22",
     "@types/node": "^25.5.0",
-    "typescript": "^5.4.0",
-    "vitest": "^1.6.0"
+    "typescript": "^5.4.0"
   }
 }

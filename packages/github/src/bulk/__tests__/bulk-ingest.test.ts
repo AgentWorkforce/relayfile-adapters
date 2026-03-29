@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   mockBaseFileContents,
@@ -26,11 +27,6 @@ import {
 } from '../bulk-writer.js';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com';
-
-afterEach(() => {
-  vi.restoreAllMocks();
-  vi.useRealTimers();
-});
 
 function encodeContent(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64');
@@ -62,8 +58,8 @@ function createContentResponse(path: string, ref: string, content: string): Prox
 
 function createMemoryVfs(initialEntries: Record<string, string> = {}) {
   const writes = new Map(Object.entries(initialEntries));
-  const exists = vi.fn(async (path: string) => writes.has(path));
-  const writeFile = vi.fn(async (path: string, content: string) => {
+  const exists = mock.fn(async (path: string) => writes.has(path));
+  const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
 
@@ -77,8 +73,8 @@ function createMemoryVfs(initialEntries: Record<string, string> = {}) {
 
 function createProvider(
   handler: (request: ProxyRequest) => Promise<ProxyResponse> | ProxyResponse,
-): GitHubProxyProvider & { proxy: ReturnType<typeof vi.fn> } {
-  const proxy = vi.fn(handler);
+): GitHubProxyProvider & { proxy: ReturnType<typeof mock.fn> } {
+  const proxy = mock.fn(handler);
 
   return {
     name: 'mock-github',
@@ -135,10 +131,10 @@ describe('bulk ingest', () => {
       skipCached: false,
     });
 
-    expect(result.errors).toEqual([]);
-    expect(result.fetched).toHaveLength(8);
-    expect(maxActiveRequests).toBeLessThanOrEqual(2);
-    expect(maxActiveRequests).toBe(2);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.fetched.length, 8);
+    assert.ok(maxActiveRequests <= 2);
+    assert.strictEqual(maxActiveRequests, 2);
   });
 
   it('batchFetchFiles skips cached files', async () => {
@@ -146,7 +142,7 @@ describe('bulk ingest', () => {
       throw new Error('provider.proxy should not be called for cached files');
     });
     const cache = {
-      has: vi.fn(async () => true),
+      has: mock.fn(async () => true),
     };
 
     const result = await batchFetchFiles(
@@ -160,11 +156,11 @@ describe('bulk ingest', () => {
       },
     );
 
-    expect(cache.has).toHaveBeenCalledTimes(2);
-    expect(provider.proxy).not.toHaveBeenCalled();
-    expect(result.fetched).toEqual([]);
-    expect(result.errors).toEqual([]);
-    expect(result.skipped).toEqual([
+    assert.strictEqual(cache.has.mock.calls.length, 2);
+    assert.strictEqual(provider.proxy.mock.calls.length, 0);
+    assert.deepStrictEqual(result.fetched, []);
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.skipped, [
       `${mockRepoContext.owner}/${mockRepoContext.repo}:src/cached.ts@head-sha`,
       `${mockRepoContext.owner}/${mockRepoContext.repo}:src/cached.ts@base-sha`,
     ]);
@@ -196,8 +192,8 @@ describe('bulk ingest', () => {
       },
     );
 
-    expect(result.fetched).toHaveLength(3);
-    expect(result.errors).toEqual([
+    assert.strictEqual(result.fetched.length, 3);
+    assert.deepStrictEqual(result.errors, [
       {
         path: 'src/error.ts',
         ref: 'head-sha',
@@ -213,7 +209,7 @@ describe('bulk ingest', () => {
       'x-ratelimit-reset': '1893456789',
     });
 
-    expect(rateLimit).toEqual({
+    assert.deepStrictEqual(rateLimit, {
       remaining: 42,
       resetAt: new Date(1893456789 * 1000),
       shouldThrottle: true,
@@ -221,29 +217,27 @@ describe('bulk ingest', () => {
   });
 
   it('throttleIfNeeded delays when near limit', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-28T12:00:00.000Z'));
+    const originalWarn = console.warn;
+    const warnCalls: unknown[][] = [];
+    console.warn = (...args: unknown[]) => {
+      warnCalls.push(args);
+    };
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    let finished = false;
+    try {
+      const start = Date.now();
+      await throttleIfNeeded({
+        remaining: 5,
+        resetAt: new Date(Date.now() + 100),
+        shouldThrottle: true,
+      });
+      const elapsed = Date.now() - start;
 
-    const promise = throttleIfNeeded({
-      remaining: 5,
-      resetAt: new Date(Date.now() + 1_500),
-      shouldThrottle: true,
-    }).then(() => {
-      finished = true;
-    });
-
-    await vi.advanceTimersByTimeAsync(1_499);
-    expect(finished).toBe(false);
-
-    await vi.advanceTimersByTimeAsync(1);
-    await promise;
-
-    expect(finished).toBe(true);
-    expect(warnSpy).toHaveBeenCalledOnce();
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('GitHub rate limit is low (5 remaining)');
+      assert.ok(elapsed >= 90);
+      assert.strictEqual(warnCalls.length, 1);
+      assert.ok(String(warnCalls[0]?.[0]).includes('GitHub rate limit is low (5 remaining)'));
+    } finally {
+      console.warn = originalWarn;
+    }
   });
 
   it('bulkWriteToVFS writes head and base files', async () => {
@@ -281,19 +275,19 @@ describe('bulk ingest', () => {
       42,
     );
 
-    expect(writeFile).toHaveBeenCalledTimes(2);
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts')).toBe(
+    assert.strictEqual(writeFile.mock.calls.length, 2);
+    assert.strictEqual(
+      writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts'),
       'head version',
     );
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/base/src/index.ts')).toBe(
+    assert.strictEqual(
+      writes.get('/github/repos/octocat/hello-world/pulls/42/base/src/index.ts'),
       'base version',
     );
-    expect(result).toMatchObject({
-      filesWritten: 2,
-      filesUpdated: 0,
-      filesSkipped: 0,
-      errors: [],
-    });
+    assert.strictEqual(result.filesWritten, 2);
+    assert.strictEqual(result.filesUpdated, 0);
+    assert.strictEqual(result.filesSkipped, 0);
+    assert.deepStrictEqual(result.errors, []);
   });
 
   it('bulkWriteToVFS tracks written vs updated counts', async () => {
@@ -345,18 +339,16 @@ describe('bulk ingest', () => {
       42,
     );
 
-    expect(result).toMatchObject({
-      filesWritten: 1,
-      filesUpdated: 1,
-      filesSkipped: 1,
-      errors: [],
-    });
+    assert.strictEqual(result.filesWritten, 1);
+    assert.strictEqual(result.filesUpdated, 1);
+    assert.strictEqual(result.filesSkipped, 1);
+    assert.deepStrictEqual(result.errors, []);
   });
 
   it('bulkIngestPR orchestrates full flow', async () => {
     const { vfs, writes } = createMemoryVfs();
     const metadataCache = {
-      set: vi.fn(async () => undefined),
+      set: mock.fn(async () => undefined),
     };
 
     const provider = createProvider(async (request) => {
@@ -404,8 +396,8 @@ describe('bulk ingest', () => {
       vfs,
       {
         cache: {
-          has: vi.fn(async () => false),
-          set: vi.fn(async () => undefined),
+          has: mock.fn(async () => false),
+          set: mock.fn(async () => undefined),
         },
         metadataCache,
         skipCached: false,
@@ -413,35 +405,34 @@ describe('bulk ingest', () => {
       },
     );
 
-    expect(result.filesWritten).toBe(8);
-    expect(result.filesUpdated).toBe(0);
-    expect(result.errors).toEqual([]);
-    expect(result.paths).toHaveLength(8);
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch')).toBe(mockDiff);
-    expect(
-      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? '{}'),
-    ).toMatchObject({
-      number: 42,
-      title: mockPRPayload.title,
-      head: { sha: mockRepoContext.headSha },
-      base: { sha: mockRepoContext.baseSha },
-    });
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts')).toBe(
+    assert.strictEqual(result.filesWritten, 8);
+    assert.strictEqual(result.filesUpdated, 0);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.paths.length, 8);
+    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch'), mockDiff);
+    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? '{}');
+    assert.strictEqual(meta.number, 42);
+    assert.strictEqual(meta.title, mockPRPayload.title);
+    assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
+    assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
+    assert.strictEqual(
+      writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts'),
       decodeFixtureContent(mockFileContents, 'src/index.ts'),
     );
-    expect(writes.get('/github/repos/octocat/hello-world/pulls/42/base/src/index.ts')).toBe(
+    assert.strictEqual(
+      writes.get('/github/repos/octocat/hello-world/pulls/42/base/src/index.ts'),
       decodeFixtureContent(mockBaseFileContents, 'src/index.ts'),
     );
-    expect(metadataCache.set).toHaveBeenCalledTimes(4);
-    expect(metadataCache.set).toHaveBeenCalledWith(
+    assert.strictEqual(metadataCache.set.mock.calls.length, 4);
+    assert.deepStrictEqual(metadataCache.set.mock.calls[0].arguments, [
       'pull-request:octocat/hello-world#42:summary',
       {
         fetched: 6,
         skipped: 0,
         errors: 0,
       },
-    );
-    expect(provider.proxy).toHaveBeenCalledTimes(9);
+    ]);
+    assert.strictEqual(provider.proxy.mock.calls.length, 9);
   });
 
   it('mergeIngestResults combines stats correctly', () => {
@@ -462,7 +453,7 @@ describe('bulk ingest', () => {
       },
     );
 
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       filesWritten: 5,
       filesUpdated: 5,
       filesDeleted: 1,
@@ -525,11 +516,11 @@ describe('bulk ingest', () => {
       },
     );
 
-    expect(result.errors).toEqual([]);
-    expect(result.filesWritten).toBe(242);
-    expect(result.filesUpdated).toBe(0);
-    expect(result.paths).toHaveLength(242);
-    expect(writes.size).toBe(242);
-    expect(provider.proxy).toHaveBeenCalledTimes(244);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.filesWritten, 242);
+    assert.strictEqual(result.filesUpdated, 0);
+    assert.strictEqual(result.paths.length, 242);
+    assert.strictEqual(writes.size, 242);
+    assert.strictEqual(provider.proxy.mock.calls.length, 244);
   });
 });

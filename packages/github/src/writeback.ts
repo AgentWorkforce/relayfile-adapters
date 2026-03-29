@@ -1,3 +1,4 @@
+import { GITHUB_API_BASE_URL } from './config.js';
 import {
   GITHUB_REVIEW_EVENTS,
   GITHUB_REVIEW_SIDES,
@@ -12,7 +13,6 @@ import {
   type WritebackResult,
 } from './types.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 const REVIEW_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)\/reviews\/[^/]+(?:\.json)?$/;

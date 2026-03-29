@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 import { fetchBlockChildrenRecursively, flattenBlocks } from '../content/blocks.js';
 import type { NotionBlock } from '../types.js';
 
 describe('block tree ingestion', () => {
   it('recursively fetches nested block children', async () => {
-    const paginate = vi.fn(async (_method: string, endpoint: string) => {
+    const paginate = mock.fn(async (_method: string, endpoint: string) => {
       if (endpoint === '/v1/blocks/root/children') {
         return [block('toggle-1', 'toggle', true), block('paragraph-1', 'paragraph')];
       }
@@ -19,7 +20,7 @@ describe('block tree ingestion', () => {
 
     const tree = await fetchBlockChildrenRecursively({ paginate } as never, 'root');
 
-    expect(flattenBlocks(tree).map((entry) => entry.id)).toEqual([
+    assert.deepStrictEqual(flattenBlocks(tree).map((entry) => entry.id), [
       'toggle-1',
       'quote-1',
       'paragraph-2',

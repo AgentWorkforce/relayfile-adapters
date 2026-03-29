@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 
 import {
   mockRepoContext,
@@ -16,7 +17,7 @@ function createFixtureProvider(options?: {
 }) {
   const reviews = options?.reviews ?? mockReviews;
   const reviewComments = options?.reviewComments ?? mockReviewComments;
-  const proxy = vi.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
+  const proxy = mock.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
     if (
       request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/reviews`
     ) {
@@ -53,7 +54,7 @@ function createFixtureProvider(options?: {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
-  const writeFile = vi.fn(async (path: string, content: string) => {
+  const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
     return { created: true as const };
   });
@@ -84,14 +85,15 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(response).toEqual(
+    assert.deepStrictEqual(
+      response,
       mockReviews.map((review) => ({
         ...review,
         user: { ...review.user },
       })),
     );
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/reviews`,
@@ -104,7 +106,7 @@ describe('review mapping', () => {
         page: '1',
         per_page: '100',
       },
-    });
+    }]);
   });
 
   it('mapReview produces correct JSON shape', () => {
@@ -115,7 +117,7 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(JSON.parse(mapped.content)).toEqual({
+    assert.deepStrictEqual(JSON.parse(mapped.content), {
       id: 9001,
       state: 'APPROVED',
       body: 'Looks good. The fixture coverage is focused and realistic.',
@@ -137,7 +139,7 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(mapped.vfsPath).toBe('reviews/9001.json');
+    assert.strictEqual(mapped.vfsPath, 'reviews/9001.json');
   });
 
   it('fetchReviewComments returns comment list', async () => {
@@ -150,14 +152,15 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(response).toEqual(
+    assert.deepStrictEqual(
+      response,
       mockReviewComments.map((comment) => ({
         ...comment,
         user: { ...comment.user },
       })),
     );
-    expect(proxy).toHaveBeenCalledOnce();
-    expect(proxy).toHaveBeenCalledWith({
+    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
       endpoint: `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/comments`,
@@ -170,7 +173,7 @@ describe('review mapping', () => {
         page: '1',
         per_page: '100',
       },
-    });
+    }]);
   });
 
   it('mapReviewComment includes diff_hunk and line info', () => {
@@ -181,7 +184,7 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(JSON.parse(mapped.content)).toEqual({
+    assert.deepStrictEqual(JSON.parse(mapped.content), {
       id: 9101,
       body: 'Nice improvement. This wording is clearer.',
       path: 'src/index.ts',
@@ -208,8 +211,8 @@ describe('review mapping', () => {
       42,
     );
 
-    expect(JSON.parse(mapped.content).review_id).toBe(mockReviews[0].id);
-    expect(mapped.vfsPath).toBe('comments/9102.json');
+    assert.strictEqual(JSON.parse(mapped.content).review_id, mockReviews[0].id);
+    assert.strictEqual(mapped.vfsPath, 'comments/9102.json');
   });
 
   it('ingestReviews writes all review files', async () => {
@@ -224,16 +227,13 @@ describe('review mapping', () => {
       vfs,
     );
 
-    expect(writeFile).toHaveBeenCalledTimes(1);
-    expect(Array.from(writes.keys())).toEqual(['reviews/9001.json']);
-    expect(JSON.parse(writes.get('reviews/9001.json') ?? '')).toMatchObject({
-      id: 9001,
-      state: 'APPROVED',
-      author: {
-        login: 'monalisa',
-      },
-    });
-    expect(result).toEqual({
+    assert.strictEqual(writeFile.mock.calls.length, 1);
+    assert.deepStrictEqual(Array.from(writes.keys()), ['reviews/9001.json']);
+    const review9001 = JSON.parse(writes.get('reviews/9001.json') ?? '');
+    assert.strictEqual(review9001.id, 9001);
+    assert.strictEqual(review9001.state, 'APPROVED');
+    assert.strictEqual(review9001.author.login, 'monalisa');
+    assert.deepStrictEqual(result, {
       filesWritten: 1,
       filesUpdated: 0,
       filesDeleted: 0,
@@ -254,22 +254,20 @@ describe('review mapping', () => {
       vfs,
     );
 
-    expect(writeFile).toHaveBeenCalledTimes(2);
-    expect(Array.from(writes.keys())).toEqual([
+    assert.strictEqual(writeFile.mock.calls.length, 2);
+    assert.deepStrictEqual(Array.from(writes.keys()), [
       'comments/9101.json',
       'comments/9102.json',
     ]);
-    expect(JSON.parse(writes.get('comments/9101.json') ?? '')).toMatchObject({
-      id: 9101,
-      review_id: 9001,
-      path: 'src/index.ts',
-    });
-    expect(JSON.parse(writes.get('comments/9102.json') ?? '')).toMatchObject({
-      id: 9102,
-      review_id: 9001,
-      path: 'src/utils/math.ts',
-    });
-    expect(result).toEqual({
+    const comment9101 = JSON.parse(writes.get('comments/9101.json') ?? '');
+    assert.strictEqual(comment9101.id, 9101);
+    assert.strictEqual(comment9101.review_id, 9001);
+    assert.strictEqual(comment9101.path, 'src/index.ts');
+    const comment9102 = JSON.parse(writes.get('comments/9102.json') ?? '');
+    assert.strictEqual(comment9102.id, 9102);
+    assert.strictEqual(comment9102.review_id, 9001);
+    assert.strictEqual(comment9102.path, 'src/utils/math.ts');
+    assert.deepStrictEqual(result, {
       filesWritten: 2,
       filesUpdated: 0,
       filesDeleted: 0,

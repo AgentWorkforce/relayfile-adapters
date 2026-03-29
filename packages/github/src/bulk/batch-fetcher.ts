@@ -1,6 +1,6 @@
+import { GITHUB_API_BASE_URL } from '../config.js';
 import type { GitHubProxyProvider, JsonObject, JsonValue } from '../types.js';
 
-const GITHUB_API_BASE_URL = 'https://api.github.com';
 const DEFAULT_CONCURRENCY = 5;
 const DEFAULT_MAX_FILE_SIZE = 1_000_000;
 const RATE_LIMIT_THRESHOLD = 100;
