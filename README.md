@@ -58,13 +58,34 @@ app.post("/webhooks/github", async (req, res) => {
 });
 ```
 
-### Read back and writeback
+### What agents see
+
+Agents don't use adapters or providers directly. They just read and write files:
 
 ```ts
-// Read PR data from VFS
+// Agent reads a PR — it's just a file
 const pr = await relayfile.getFile(workspaceId, "/github/repos/acme/api/pulls/42/metadata.json");
 
-// Write a review comment back to GitHub via the adapter
+// Agent writes a review — it's just writing a file
+await relayfile.putFile(workspaceId, "/github/repos/acme/api/pulls/42/reviews/agent-review.json", {
+  content: JSON.stringify({
+    body: "LGTM! Ship it.",
+    event: "APPROVE",
+  }),
+});
+
+// That's it. The adapter handles posting the review to GitHub automatically.
+```
+
+**The agent doesn't know about GitHub, OAuth, or webhooks.** It reads files, reasons about them, and writes files back. The adapter watches for writes to review paths and posts them to the GitHub API via the provider.
+
+This is the entire value proposition: turn any API into a filesystem that agents can read and write without integration code.
+
+### Programmatic writeback (for app developers)
+
+If you need direct control over the writeback (e.g., in your backend), you can call the adapter explicitly:
+
+```ts
 await adapter.writeback({
   provider,
   connectionId: "conn_abc",
