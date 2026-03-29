@@ -428,7 +428,11 @@ describe('bulk ingest', () => {
       'pull-request:octocat/hello-world#42:meta',
       meta,
     ]);
-    assert.deepStrictEqual(metadataCache.set.mock.calls[3].arguments, [
+    const summaryCall = metadataCache.set.mock.calls.find(
+      ({ arguments: [cacheKey] }) => cacheKey === 'pull-request:octocat/hello-world#42:summary',
+    );
+    assert.ok(summaryCall);
+    assert.deepStrictEqual(summaryCall.arguments, [
       'pull-request:octocat/hello-world#42:summary',
       {
         fetched: 6,

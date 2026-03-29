@@ -5,6 +5,7 @@ import { GitHubAdapter } from '../index.js';
 import type { IngestResult } from './event-map.js';
 import { extractEventKey, extractRepoInfo } from './event-map.js';
 import { WebhookRouter } from './router.js';
+import type { ConnectionProvider } from '../types.js';
 
 function createResult(path: string): IngestResult {
   return {
@@ -18,6 +19,10 @@ function createResult(path: string): IngestResult {
 
 class RecordingAdapter extends GitHubAdapter {
   public calls: string[] = [];
+
+  constructor() {
+    super(unusedProvider, { connectionId: 'conn-fixture' });
+  }
 
   override async ingestPullRequest(payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push(`ingestPullRequest:${String(payload.action ?? '')}`);
@@ -64,6 +69,13 @@ class RecordingAdapter extends GitHubAdapter {
     return createResult('/github/repos/acme/widgets/pulls/7/checks/4.json');
   }
 }
+
+const unusedProvider: ConnectionProvider = {
+  name: 'recording-provider',
+  async proxy() {
+    throw new Error('proxy should not be called in webhook router tests');
+  },
+};
 
 test('extractEventKey combines the GitHub event header with payload action', () => {
   const eventKey = extractEventKey(

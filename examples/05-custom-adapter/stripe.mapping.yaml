@@ -1,0 +1,45 @@
+adapter:
+  name: stripe
+  version: 1.0.0
+  baseUrl: https://api.stripe.com/v1
+  source:
+    docs:
+      url: https://docs.stripe.com/api
+
+webhooks:
+  charge.succeeded:
+    path: /stripe/accounts/{{account}}/charges/{{data.object.id}}/metadata.json
+    extract:
+      - data.object.id
+      - data.object.amount
+      - data.object.currency
+      - data.object.status
+
+  invoice.payment_succeeded:
+    path: /stripe/accounts/{{account}}/invoices/{{data.object.id}}/metadata.json
+    extract:
+      - data.object.id
+      - data.object.customer
+      - data.object.amount_paid
+      - data.object.status
+
+  customer.subscription.created:
+    path: /stripe/accounts/{{account}}/subscriptions/{{data.object.id}}/metadata.json
+    extract:
+      - data.object.id
+      - data.object.customer
+      - data.object.status
+
+resources:
+  get-charge:
+    endpoint: GET /charges/{charge_id}
+    path: /stripe/charges/{{charge_id}}/metadata.json
+
+  get-customer:
+    endpoint: GET /customers/{customer_id}
+    path: /stripe/customers/{{customer_id}}/metadata.json
+
+writebacks:
+  refund:
+    match: /stripe/charges/*/refunds/*.json
+    endpoint: POST /charges/{charge_id}/refunds
