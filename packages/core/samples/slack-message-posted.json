@@ -1,0 +1,11 @@
+{
+  "type": "event_callback",
+  "team_id": "T123",
+  "event": {
+    "type": "message",
+    "channel": "C123",
+    "user": "U123",
+    "text": "hello relayfile",
+    "ts": "1711540277.000200"
+  }
+}

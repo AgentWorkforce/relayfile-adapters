@@ -1,0 +1,6 @@
+dist
+node_modules
+.adapter-core-state.json
+.agent-relay
+.trajectories
+DESIGN.md

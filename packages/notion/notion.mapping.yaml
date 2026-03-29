@@ -1,0 +1,73 @@
+provider: notion
+root: /notion
+paths:
+  - pattern: /notion/databases/{database_id}/metadata.json
+    object_type: database
+    source:
+      method: GET
+      endpoint: /v1/databases/{database_id}
+  - pattern: /notion/databases/{database_id}/pages/{page_id}.json
+    object_type: page
+    source:
+      method: GET
+      endpoint: /v1/pages/{page_id}
+    writeback:
+      method: PATCH
+      endpoint: /v1/pages/{page_id}
+  - pattern: /notion/databases/{database_id}/pages/{page_id}/content.md
+    object_type: page_content
+    source:
+      method: GET
+      endpoint: /v1/pages/{page_id}/markdown
+      notion_version: 2026-03-11
+    writeback:
+      method: PATCH
+      endpoint: /v1/pages/{page_id}/markdown
+      notion_version: 2026-03-11
+  - pattern: /notion/databases/{database_id}/pages/{page_id}/blocks/{block_id}.json
+    object_type: block
+    source:
+      method: GET
+      endpoint: /v1/blocks/{block_id}
+  - pattern: /notion/databases/{database_id}/pages/{page_id}/comments.json
+    object_type: comment
+    source:
+      method: GET
+      endpoint: /v1/comments?block_id={page_id}
+    writeback:
+      method: POST
+      endpoint: /v1/comments
+  - pattern: /notion/pages/{page_id}.json
+    object_type: page
+    source:
+      method: GET
+      endpoint: /v1/pages/{page_id}
+    writeback:
+      method: PATCH
+      endpoint: /v1/pages/{page_id}
+  - pattern: /notion/pages/{page_id}/content.md
+    object_type: page_content
+    source:
+      method: GET
+      endpoint: /v1/pages/{page_id}/markdown
+      notion_version: 2026-03-11
+    writeback:
+      method: PATCH
+      endpoint: /v1/pages/{page_id}/markdown
+      notion_version: 2026-03-11
+  - pattern: /notion/pages/{page_id}/comments.json
+    object_type: comment
+    source:
+      method: GET
+      endpoint: /v1/comments?block_id={page_id}
+    writeback:
+      method: POST
+      endpoint: /v1/comments
+collections:
+  - pattern: /notion/databases/{database_id}/pages
+    writeback:
+      method: POST
+      endpoint: /v1/pages
+      body:
+        parent:
+          database_id: '{database_id}'

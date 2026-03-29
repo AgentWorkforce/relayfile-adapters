@@ -1,0 +1,21 @@
+{
+  "type": "event_callback",
+  "event": {
+    "type": "reaction_added",
+    "user": "U123",
+    "item": {
+      "type": "message",
+      "channel": "C123",
+      "ts": "1711540277.000200"
+    },
+    "reaction": "thumbsup",
+    "item_user": "U456",
+    "event_ts": "1711540280.000500"
+  },
+  "item": {
+    "type": "message",
+    "channel": "C123",
+    "ts": "1711540277.000200"
+  },
+  "reaction": "thumbsup"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "relayfile-adapters",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Relayfile adapters — map external services to the relayfile VFS",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npx turbo build",
+    "test": "npx turbo test",
+    "typecheck": "npx turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.0"
+  }
+}

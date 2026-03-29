@@ -1,0 +1,38 @@
+{
+  "name": "@relayfile/adapter-slack",
+  "version": "0.1.0",
+  "description": "Slack adapter scaffolding for Relayfile",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "tsconfig.json"
+  ],
+  "scripts": {
+    "test": "node --import tsx --test src/__tests__/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "keywords": [
+    "relayfile",
+    "slack",
+    "adapter"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@agent-relay/sdk": "^3.2.22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

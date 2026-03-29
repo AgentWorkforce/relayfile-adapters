@@ -1,0 +1,18 @@
+adapter:
+  name: slack
+  version: "1.0.0"
+  baseUrl: https://slack.com/api
+  source:
+    samples:
+      - ../samples/slack-message-posted.json
+      - ../samples/slack-reaction-added.json
+webhooks:
+  message:
+    path: /slack/channels/{{event.channel}}/messages/{{event.ts}}.json
+    extract:
+      - team_id
+      - event.channel
+      - event.user
+      - event.text
+  reaction_added:
+    path: /slack/channels/{{item.channel}}/messages/{{item.ts}}/reactions/{{reaction}}.json

@@ -1,0 +1,35 @@
+adapter:
+  name: github
+  version: "1.0.0"
+  baseUrl: https://api.github.com
+  source:
+    openapi: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml
+webhooks:
+  pull_request:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{number}}/metadata.json
+    extract:
+      - action
+      - number
+      - pull_request.title
+      - pull_request.state
+  pull_request_review:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  push:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
+  issues:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/metadata.json
+resources:
+  pull_request:
+    endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}
+    path: /github/repos/{{owner}}/{{repo}}/pulls/{{number}}/metadata.json
+  pull_request_files:
+    endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}/files
+    path: /github/repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/files/{{filename}}
+    iterate: true
+writebacks:
+  review:
+    match: /github/repos/*/*/pulls/*/reviews/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+  comment:
+    match: /github/repos/*/*/pulls/*/comments/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments

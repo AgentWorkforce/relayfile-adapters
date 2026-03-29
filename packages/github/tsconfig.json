@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "files": [
+    "src/adapter.ts",
+    "src/index.ts",
+    "src/config.ts",
+    "src/types.ts",
+    "src/writeback.ts",
+    "src/webhook/event-map.ts"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

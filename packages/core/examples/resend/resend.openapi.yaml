@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: resend
+  version: 1.0.0
+  description: Email API extracted from Resend documentation.
+paths:
+  /emails:
+    post:
+      summary: Send an email
+      description: Trigger a single email through the Resend API.
+      operationId: postEmails
+      parameters: []
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostEmailsResponse"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostEmailsRequest"
+      security:
+        - DefaultAuth: []
+  /emails/{email_id}:
+    get:
+      summary: Retrieve an email
+      description: Retrieve a single email by ID.
+      operationId: getEmailsEmailId
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          description: The Resend email identifier.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetEmailsEmailIdResponse"
+      security:
+        - DefaultAuth: []
+  /emails/{email_id}/attachments/{attachment_id}:
+    get:
+      summary: Retrieve an email attachment
+      description: Retrieve a single attachment from a sent email.
+      operationId: getEmailsEmailIdAttachmentsAttachmentId
+      parameters:
+        - name: email_id
+          in: path
+          required: true
+          description: The Resend email identifier.
+          schema:
+            type: string
+        - name: attachment_id
+          in: path
+          required: true
+          description: The Resend attachment identifier.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetEmailsEmailIdAttachmentsAttachmentIdResponse"
+      security:
+        - DefaultAuth: []
+components:
+  schemas:
+    PostEmailsRequest:
+      type: object
+      properties:
+        from:
+          type: string
+          example: Acme <onboarding@resend.dev>
+        to:
+          type: array
+          items:
+            type: string
+            example: delivered@resend.dev
+        subject:
+          type: string
+          example: Hello from Resend
+        html:
+          type: string
+          example: <strong>It works.</strong>
+      required:
+        - from
+        - to
+        - subject
+        - html
+    PostEmailsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: email_123
+      required:
+        - id
+    GetEmailsEmailIdResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: email_123
+        from:
+          type: string
+          example: Acme <onboarding@resend.dev>
+        to:
+          type: array
+          items:
+            type: string
+            example: delivered@resend.dev
+        subject:
+          type: string
+          example: Hello from Resend
+        created_at:
+          type: string
+          example: 2024-01-01T00:00:00.000Z
+        last_event:
+          type: string
+          example: delivered
+      required:
+        - id
+        - from
+        - to
+        - subject
+        - created_at
+        - last_event
+    GetEmailsEmailIdAttachmentsAttachmentIdResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: attachment_123
+        filename:
+          type: string
+          example: invoice.pdf
+        content_type:
+          type: string
+          example: application/pdf
+      required:
+        - id
+        - filename
+        - content_type
+  securitySchemes:
+    DefaultAuth:
+      type: http
+      scheme: bearer
+x-webhooks: {}
+x-docs-source:
+  url: https://resend.com/docs/api-reference/introduction
+  crawlPaths:
+    - /docs/api-reference/emails/send-email
+    - /docs/api-reference/emails/retrieve-email
+  selectors: {}
+  llm:
+    provider: custom
+    endpoint: http://127.0.0.1:8787
+    model: resend-demo

@@ -1,0 +1,23 @@
+adapter:
+  name: resend
+  version: 1.0.0
+  source:
+    docs:
+      url: https://resend.com/docs/api-reference/introduction
+      crawlPaths:
+        - /docs/api-reference/emails/send-email
+        - /docs/api-reference/emails/retrieve-email
+      selectors: {}
+    llm:
+      provider: custom
+      endpoint: http://127.0.0.1:8787
+      model: resend-demo
+webhooks: {}
+resources:
+  get-emails:
+    endpoint: GET /emails/{email_id}
+    path: /resend/emails/{{email_id}}/metadata.json
+  get-emails-attachments:
+    endpoint: GET /emails/{email_id}/attachments/{attachment_id}
+    path: /resend/emails/{{email_id}}/attachments/{{attachment_id}}/metadata.json
+writebacks: {}
