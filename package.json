@@ -2,7 +2,7 @@
   "name": "relayfile-adapters",
   "version": "0.1.0",
   "private": true,
-  "description": "Relayfile adapters \u2014 map external services to the relayfile VFS",
+  "description": "Relayfile adapters — map external services to the relayfile VFS",
   "workspaces": [
     "packages/*"
   ],

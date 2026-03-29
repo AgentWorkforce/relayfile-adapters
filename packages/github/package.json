@@ -22,13 +22,13 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@relayfile/sdk": "^0.1.5"
+    "@relayfile/sdk": "^0.1.6"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "0.1.0"
+    "@relayfile/adapter-core": "file:../core"
   },
   "devDependencies": {
-    "@relayfile/sdk": "^0.1.5",
+    "@relayfile/sdk": "^0.1.6",
     "@types/node": "^24.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
