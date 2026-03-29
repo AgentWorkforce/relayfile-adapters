@@ -5,8 +5,7 @@
  * without writing a custom adapter class. Uses adapter-core's SchemaAdapter
  * to compute paths, normalize webhooks, and match writebacks.
  *
- * This mirrors the approach used in packages/core/examples/resend/ but
- * defines the spec inline so the example is fully self-contained.
+ * Mapping spec format: see docs/MAPPING_YAML_SPEC.md
  *
  * Run: npx tsx examples/02-schema-driven-adapter/index.ts
  */
@@ -16,7 +15,7 @@ import type { MappingSpec } from "@relayfile/adapter-core";
 
 // ---------------------------------------------------------------------------
 // 1. Define a mapping spec inline (equivalent to a .mapping.yaml file)
-//    This spec describes a fictional "Acme Tickets" API.
+//    Full spec reference: docs/MAPPING_YAML_SPEC.md
 // ---------------------------------------------------------------------------
 const spec: MappingSpec = {
   adapter: {
@@ -26,7 +25,6 @@ const spec: MappingSpec = {
     source: { docs: { url: "https://docs.acme-tickets.io" } },
   },
 
-  // Webhook events the adapter understands
   webhooks: {
     "ticket.created": {
       path: "/acme-tickets/orgs/{{organization.slug}}/tickets/{{ticket.id}}/metadata.json",
@@ -38,7 +36,6 @@ const spec: MappingSpec = {
     },
   },
 
-  // REST resources the adapter can fetch
   resources: {
     "get-ticket": {
       endpoint: "GET /orgs/{org}/tickets/{ticket_id}",
@@ -51,13 +48,10 @@ const spec: MappingSpec = {
     },
   },
 
-  // Writeback rules: VFS path glob → API endpoint
   writebacks: {
     "add-comment": {
-      match:
-        "/acme-tickets/orgs/*/tickets/*/comments/*.json",
-      endpoint:
-        "POST /orgs/{org}/tickets/{ticket_id}/comments",
+      match: "/acme-tickets/orgs/*/tickets/*/comments/*.json",
+      endpoint: "POST /orgs/{org}/tickets/{ticket_id}/comments",
     },
   },
 };
@@ -90,7 +84,6 @@ async function main() {
   console.log(`Adapter: ${adapter.name} v${adapter.version}`);
   console.log("Supported webhook events:", adapter.supportedEvents());
 
-  // --- Webhook path computation ---
   const webhookPath = adapter.computeWebhookPath({
     provider: "acme-tickets",
     connectionId: "conn_acme_demo",
@@ -104,42 +97,19 @@ async function main() {
     },
   });
   console.log("\nWebhook VFS path:", webhookPath);
-  // => /acme-tickets/orgs/widgetco/tickets/T-100/metadata.json
 
-  // --- Resource path computation ---
   const resourcePath = adapter.computeResourcePath("get-ticket", {
     org: "widgetco",
     ticket_id: "T-100",
   });
   console.log("Resource VFS path:", resourcePath);
-  // => /acme-tickets/orgs/widgetco/tickets/T-100/metadata.json
 
-  // --- Webhook ingest (writes to VFS via mock client) ---
-  const ingestResult = await adapter.ingestWebhook("ws_demo", {
-    provider: "acme-tickets",
-    connectionId: "conn_acme_demo",
-    eventType: "ticket.created",
-    objectType: "ticket",
-    objectId: "T-100",
-    payload: {
-      action: "created",
-      organization: { slug: "widgetco" },
-      ticket: { id: "T-100", title: "Login broken", priority: "high" },
-    },
-  });
-  console.log("\nIngest result:", JSON.stringify(ingestResult, null, 2));
-
-  // --- Writeback matching ---
   const commentPath =
     "/acme-tickets/orgs/widgetco/tickets/T-100/comments/agent-reply.json";
   const match = adapter.matchWriteback(commentPath);
   console.log("\nWriteback match for", commentPath);
-  console.log("  Matched rule:", match?.name);
-  console.log("  Method:", match?.method);
-  console.log("  Resolved endpoint:", match?.endpointPath);
-  console.log("  Extracted params:", match?.params);
+  console.log("  Rule:", match?.name, "→", match?.method, match?.endpointPath);
 
-  // --- Execute writeback (calls mock proxy) ---
   console.log("\nExecuting writeback...");
   await adapter.writeBack("ws_demo", commentPath, JSON.stringify({
     body: "Investigating — looks like a session token issue.",

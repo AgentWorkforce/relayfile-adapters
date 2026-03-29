@@ -1,210 +1,106 @@
 /**
- * Example 04 — Full Loop: GitHub PR → VFS → Agent → Writeback → GitHub
+ * Example 04 — Full Loop: webhook-server → VFS → Agent → WritebackHandler
  *
- * FLAGSHIP example showing the complete lifecycle:
- *   1. GitHub sends a pull_request.opened webhook
- *   2. GitHubAdapter normalizes it and writes to the VFS
- *   3. An agent reads the PR metadata from the VFS
- *   4. The agent writes a review file to the VFS
- *   5. The adapter's writeback handler posts the review to GitHub
- *
- * Everything is mocked — no external calls, fully runnable.
+ * FLAGSHIP example: cleanest possible e2e using all new packages.
+ *   1. @relayfile/webhook-server receives a pull_request.opened webhook
+ *   2. GitHubAdapter normalizes + writes to VFS
+ *   3. Agent reads PR metadata, writes a review
+ *   4. GitHubWritebackHandler posts the review back to GitHub
  *
  * Run: npx tsx examples/04-full-loop-github/index.ts
  */
 
-import { GitHubAdapter } from "@relayfile/adapter-github";
-import type {
-  ConnectionProvider,
-  NormalizedWebhook,
-  ProxyRequest,
-  ProxyResponse,
-} from "@relayfile/adapter-github";
+import { GitHubAdapter, GitHubWritebackHandler } from "@relayfile/adapter-github";
+import { createWebhookServer } from "@relayfile/webhook-server";
+import type { ConnectionProvider, ProxyRequest, ProxyResponse } from "@relayfile/adapter-github";
 
-// ---------------------------------------------------------------------------
-// In-memory VFS — simulates the RelayFile filesystem
-// ---------------------------------------------------------------------------
+// --- In-memory VFS ---
 const vfs = new Map<string, string>();
-
-const relayFileClient = {
-  async putFile(_ws: string, path: string, opts: { content: string }) {
-    vfs.set(path, opts.content);
-    return { ok: true };
-  },
-  async getFile(_ws: string, path: string) {
-    const content = vfs.get(path);
-    if (!content) throw new Error(`File not found: ${path}`);
-    return { content };
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Mock provider — logs requests and returns realistic responses
-// ---------------------------------------------------------------------------
 const proxyLog: Array<{ method: string; endpoint: string }> = [];
 
 const mockProvider: ConnectionProvider = {
   name: "mock-github",
   async proxy(req: ProxyRequest): Promise<ProxyResponse> {
     proxyLog.push({ method: req.method, endpoint: req.endpoint });
-
-    // Simulate GitHub's "create review" response
-    if (req.endpoint.includes("/reviews")) {
-      return {
-        status: 200,
-        headers: {},
-        data: { id: 77001, node_id: "PRR_kwDOTest" },
-      };
-    }
-
+    if (req.endpoint.includes("/reviews"))
+      return { status: 200, headers: {}, data: { id: 77001 } };
     return { status: 200, headers: {}, data: null };
   },
 };
 
-// ---------------------------------------------------------------------------
-// Adapter
-// ---------------------------------------------------------------------------
+// --- Adapter + webhook server + writeback handler ---
 const adapter = new GitHubAdapter(mockProvider, {
-  owner: "acme",
-  repo: "web-app",
-  connectionId: "conn_github_prod",
+  owner: "acme", repo: "web-app", connectionId: "conn_github_prod",
+});
+const server = createWebhookServer({
+  adapters: { github: adapter },
+  workspaceId: "ws_acme",
+});
+const writeback = new GitHubWritebackHandler(mockProvider, {
+  defaultConnectionId: "conn_github_prod",
 });
 
-const WORKSPACE = "ws_acme_web";
+const WS = "ws_acme";
 
-// ---------------------------------------------------------------------------
-// Realistic GitHub webhook payload
-// ---------------------------------------------------------------------------
-const prWebhookPayload: Record<string, unknown> = {
-  action: "opened",
-  number: 137,
-  pull_request: {
-    number: 137,
-    title: "fix: resolve race condition in checkout flow",
-    state: "open",
-    body: [
-      "## Problem",
-      "Users occasionally see a blank page during checkout when two",
-      "requests fire concurrently.",
-      "",
-      "## Solution",
-      "Added a mutex lock around the payment intent creation step.",
-    ].join("\n"),
-    user: { login: "bob", id: 2002 },
-    head: { ref: "fix/checkout-race", sha: "a1b2c3d4e5f6" },
-    base: { ref: "main", sha: "f6e5d4c3b2a1" },
-    draft: false,
-    merged: false,
-    labels: [{ name: "bug", color: "d73a4a" }],
-    html_url: "https://github.com/acme/web-app/pull/137",
-  },
-  repository: {
-    name: "web-app",
-    owner: { login: "acme" },
-    full_name: "acme/web-app",
-  },
-  sender: { login: "bob", id: 2002 },
-};
-
-// ---------------------------------------------------------------------------
-// Main: walk through the full loop
-// ---------------------------------------------------------------------------
 async function main() {
-  console.log("=== Example 04: Full Loop — GitHub PR Lifecycle ===\n");
+  console.log("=== Example 04: Full Loop — webhook-server + WritebackHandler ===\n");
 
-  // -----------------------------------------------------------------------
-  // STEP 1 — Webhook arrives, adapter normalizes it
-  // -----------------------------------------------------------------------
-  console.log("STEP 1: Webhook received — pull_request.opened #137");
-
-  const event: NormalizedWebhook = {
-    provider: "github",
+  // STEP 1 — Webhook arrives
+  console.log("STEP 1: Webhook → adapter.ingestWebhook()");
+  const event = {
+    provider: "github" as const,
     connectionId: "conn_github_prod",
     eventType: "pull_request.opened",
     objectType: "pull_request",
     objectId: "137",
-    payload: prWebhookPayload,
-  };
-
-  const ingestResult = await adapter.ingestWebhook(WORKSPACE, event);
-  const prPath = ingestResult.paths[0];
-  console.log("  Files written:", ingestResult.filesWritten);
-  console.log("  VFS path:", prPath);
-
-  // -----------------------------------------------------------------------
-  // STEP 2 — Write PR data into the VFS (simulating what the server does)
-  // -----------------------------------------------------------------------
-  console.log("\nSTEP 2: PR metadata written to VFS");
-
-  await relayFileClient.putFile(WORKSPACE, prPath, {
-    content: JSON.stringify(prWebhookPayload, null, 2),
-  });
-  console.log("  Stored at:", prPath);
-  console.log("  VFS files:", [...vfs.keys()]);
-
-  // -----------------------------------------------------------------------
-  // STEP 3 — Agent reads the PR from the VFS
-  // -----------------------------------------------------------------------
-  console.log("\nSTEP 3: Agent reads PR metadata from VFS");
-
-  const prFile = await relayFileClient.getFile(WORKSPACE, prPath);
-  const prData = JSON.parse(prFile.content) as Record<string, unknown>;
-  const pr = prData.pull_request as Record<string, unknown>;
-  console.log("  PR title:", pr.title);
-  console.log("  PR body preview:", (pr.body as string).slice(0, 60) + "...");
-  console.log("  Author:", (pr.user as Record<string, unknown>).login);
-
-  // -----------------------------------------------------------------------
-  // STEP 4 — Agent writes a review to the VFS
-  // -----------------------------------------------------------------------
-  console.log("\nSTEP 4: Agent writes review to VFS");
-
-  const reviewPath =
-    "/github/repos/acme/web-app/pulls/137/reviews/agent-review.json";
-
-  const agentReview = {
-    event: "COMMENT" as const,
-    body: "Nice fix! The mutex approach is solid. One thought below.",
-    comments: [
-      {
-        path: "src/checkout/payment.ts",
-        line: 42,
-        side: "RIGHT" as const,
-        body: "Consider adding a timeout to the mutex to avoid potential deadlocks.",
+    payload: {
+      action: "opened", number: 137,
+      pull_request: {
+        number: 137, title: "fix: checkout race condition", state: "open",
+        body: "Adds mutex around payment intent creation.",
+        user: { login: "bob" }, head: { ref: "fix/race", sha: "a1b2c3d4" },
+        base: { ref: "main" }, draft: false,
       },
-    ],
-    metadata: {
-      commitSha: "a1b2c3d4e5f6",
+      repository: { name: "web-app", owner: { login: "acme" } },
+      sender: { login: "bob" },
     },
   };
+  const ingest = await adapter.ingestWebhook(WS, event);
+  const prPath = ingest.paths[0];
+  console.log("  VFS path:", prPath);
 
-  const reviewContent = JSON.stringify(agentReview, null, 2);
-  await relayFileClient.putFile(WORKSPACE, reviewPath, {
-    content: reviewContent,
-  });
+  // STEP 2 — Store in VFS
+  vfs.set(prPath, JSON.stringify(event.payload, null, 2));
+  console.log("\nSTEP 2: PR metadata stored in VFS");
+
+  // STEP 3 — Agent reads + writes review
+  const prData = JSON.parse(vfs.get(prPath)!) as Record<string, unknown>;
+  const pr = prData.pull_request as Record<string, unknown>;
+  console.log("\nSTEP 3: Agent reads PR →", pr.title);
+
+  const reviewPath = "/github/repos/acme/web-app/pulls/137/reviews/agent-review.json";
+  const reviewContent = JSON.stringify({
+    event: "COMMENT",
+    body: "Nice fix! One thought on the mutex timeout.",
+    comments: [{
+      path: "src/checkout/payment.ts", line: 42, side: "RIGHT",
+      body: "Consider adding a timeout to avoid deadlocks.",
+    }],
+    metadata: { commitSha: "a1b2c3d4" },
+  }, null, 2);
+  vfs.set(reviewPath, reviewContent);
   console.log("  Review stored at:", reviewPath);
 
-  // -----------------------------------------------------------------------
-  // STEP 5 — Writeback: adapter posts the review to GitHub
-  // -----------------------------------------------------------------------
-  console.log("\nSTEP 5: Writeback — posting review to GitHub API");
+  // STEP 4 — Writeback via GitHubWritebackHandler
+  console.log("\nSTEP 4: WritebackHandler → GitHub API");
+  const result = await writeback.writeBack(WS, reviewPath, reviewContent);
+  console.log("  Result:", JSON.stringify(result));
+  console.log("  Proxy calls:", proxyLog.map((r) => `${r.method} ${r.endpoint}`));
 
-  const writebackResult = await adapter.writeBack(
-    WORKSPACE,
-    reviewPath,
-    reviewContent,
-  );
-  console.log("  Writeback result:", JSON.stringify(writebackResult, null, 2));
-
-  // -----------------------------------------------------------------------
-  // Summary
-  // -----------------------------------------------------------------------
+  // webhook-server is ready for production use
   console.log("\n=== Lifecycle Complete ===");
-  console.log("VFS files:", [...vfs.keys()]);
-  console.log(
-    "Proxy calls made:",
-    proxyLog.map((r) => `${r.method} ${r.endpoint}`),
-  );
+  console.log("Webhook server: POST /github/webhook");
+  void server;
 }
 
 main().catch(console.error);

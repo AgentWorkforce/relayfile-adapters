@@ -7,51 +7,47 @@ End-to-end examples showing the three things adapters do:
 
 | # | Example | What it covers |
 |-|-|-|
-| 01 | [GitHub Webhook Ingest](./01-github-webhook-ingest/) | `GitHubAdapter` normalizes a PR webhook → VFS path |
-| 02 | [Schema-Driven Adapter](./02-schema-driven-adapter/) | `SchemaAdapter` built from an inline mapping spec (no custom class) |
-| 03 | [Writeback](./03-writeback/) | Agent writes a review → adapter maps VFS path back to GitHub API |
-| 04 | [Full Loop: GitHub](./04-full-loop-github/) | **Flagship** — webhook → VFS → agent reads → agent writes → writeback |
-| 05 | [Custom Adapter: Stripe](./05-custom-adapter/) | Build a Stripe adapter with ~30 lines YAML + few lines TS |
+| 01 | [GitHub Webhook Ingest](./01-github-webhook-ingest/) | `webhook-server` + `GitHubAdapter` — webhook → VFS path |
+| 02 | [Schema-Driven Adapter](./02-schema-driven-adapter/) | `SchemaAdapter` from inline mapping spec ([YAML spec](../docs/MAPPING_YAML_SPEC.md)) |
+| 03 | [Writeback](./03-writeback/) | `GitHubWritebackHandler` — VFS review → GitHub API |
+| 04 | [Full Loop: GitHub](./04-full-loop-github/) | **Flagship** — webhook-server → VFS → agent → WritebackHandler |
+| 05 | [Custom Adapter: Stripe](./05-custom-adapter/) | 30-line YAML ([spec](../docs/MAPPING_YAML_SPEC.md)) + few lines TS |
 
 ## Running
 
-All examples are self-contained TypeScript files with mocked providers.
-No API keys or external services needed.
+All examples are self-contained with mocked providers. No API keys needed.
 
 ```bash
-# Run any example
 npx tsx examples/01-github-webhook-ingest/index.ts
 npx tsx examples/04-full-loop-github/index.ts
 ```
 
-## Adapter packages
+## Docker
 
-| Package | Adapts |
-|-|-|
-| `@relayfile/adapter-core` | Schema-driven adapter runtime (YAML + OpenAPI) |
-| `@relayfile/adapter-github` | GitHub (PRs, issues, reviews, commits) |
-| `@relayfile/adapter-gitlab` | GitLab |
-| `@relayfile/adapter-slack` | Slack |
-| `@relayfile/adapter-teams` | Microsoft Teams |
-| `@relayfile/adapter-linear` | Linear |
-| `@relayfile/adapter-notion` | Notion |
+Run the webhook-server with Docker for production deployments:
 
-## How adapters work
+```bash
+# Build
+docker build -t relayfile-webhook-server .
 
-```
-External Service                    VFS (Virtual Filesystem)
-┌──────────────┐                   ┌──────────────────────────────────┐
-│   Webhook    │──── normalize ───▶│ /github/repos/acme/api/pulls/42/ │
-│   payload    │     + path map    │   metadata.json                  │
-└──────────────┘                   └──────────┬───────────────────────┘
-                                              │
-                                     Agent reads & writes
-                                              │
-┌──────────────┐                   ┌──────────▼───────────────────────┐
-│  GitHub API  │◀─── writeback ────│ /github/repos/acme/api/pulls/42/ │
-│  POST review │     (path→API)    │   reviews/agent-review.json      │
-└──────────────┘                   └──────────────────────────────────┘
+# Run with secrets injected via environment
+docker run -p 3000:3000 \
+  -e GITHUB_WEBHOOK_SECRET=your_secret \
+  -e WORKSPACE_ID=ws_prod \
+  relayfile-webhook-server
 ```
 
-See also: `packages/core/examples/resend/` for a real-world schema-driven
-adapter built from an OpenAPI spec.
+The server exposes `POST /:provider/webhook` — point GitHub/Slack webhook
+URLs at `https://your-host:3000/github/webhook`.
+
+## How it fits together
+
+```
+Webhook → webhook-server → GitHubAdapter → VFS
+                                            ↕  Agent reads & writes
+GitHub API ← GitHubWritebackHandler ← VFS review file
+```
+
+Key packages: `@relayfile/webhook-server` (HTTP + sig verify),
+`@relayfile/adapter-github` (adapter + `GitHubWritebackHandler`),
+`@relayfile/adapter-core` (YAML-driven `SchemaAdapter`).

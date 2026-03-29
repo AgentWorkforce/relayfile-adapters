@@ -1,17 +1,17 @@
 /**
- * Example 03 — Writeback
+ * Example 03 — Writeback with GitHubWritebackHandler
  *
- * Demonstrates: an agent writes a PR review to the VFS, and the adapter
- * maps that file path back to a GitHub API call via the writeback handler.
+ * Demonstrates: an agent writes a PR review to the VFS, and the
+ * GitHubWritebackHandler maps that file path back to a GitHub API call.
  *
  * Run: npx tsx examples/03-writeback/index.ts
  */
 
-import { GitHubAdapter } from "@relayfile/adapter-github";
-import type {
-  ConnectionProvider,
-  ProxyRequest,
-  ProxyResponse,
+import {
+  GitHubWritebackHandler,
+  type GitHubProxyProvider,
+  type ProxyRequest,
+  type ProxyResponse,
 } from "@relayfile/adapter-github";
 
 // ---------------------------------------------------------------------------
@@ -19,26 +19,20 @@ import type {
 // ---------------------------------------------------------------------------
 const capturedRequests: ProxyRequest[] = [];
 
-const mockProvider: ConnectionProvider = {
+const mockProvider: GitHubProxyProvider = {
   name: "mock-github",
   async proxy(req: ProxyRequest): Promise<ProxyResponse> {
     capturedRequests.push(req);
     console.log("  [proxy →]", req.method, req.endpoint);
-    return {
-      status: 200,
-      headers: {},
-      data: { id: 98765 }, // Simulated review ID from GitHub
-    };
+    return { status: 200, headers: {}, data: { id: 98765 } };
   },
 };
 
 // ---------------------------------------------------------------------------
-// 2. Create the adapter with a default connection ID
+// 2. Create the writeback handler directly
 // ---------------------------------------------------------------------------
-const adapter = new GitHubAdapter(mockProvider, {
-  owner: "acme",
-  repo: "api",
-  connectionId: "conn_github_prod",
+const writeback = new GitHubWritebackHandler(mockProvider, {
+  defaultConnectionId: "conn_github_prod",
 });
 
 // ---------------------------------------------------------------------------
@@ -46,56 +40,42 @@ const adapter = new GitHubAdapter(mockProvider, {
 // ---------------------------------------------------------------------------
 const reviewPath = "/github/repos/acme/api/pulls/42/reviews/agent-review.json";
 
-const reviewContent = JSON.stringify(
-  {
-    event: "COMMENT",
-    body: "Looks good overall! A couple of suggestions below.",
-    comments: [
-      {
-        path: "src/cache.ts",
-        line: 14,
-        side: "RIGHT",
-        body: "Consider using a TTL here to avoid stale entries.",
-      },
-      {
-        path: "src/cache.ts",
-        line: 28,
-        side: "RIGHT",
-        body: "This could be simplified.",
-        suggestion: "return cache.get(key) ?? fallback();",
-      },
-    ],
-    metadata: {
-      commitSha: "abc1234def5678",
+const reviewContent = JSON.stringify({
+  event: "COMMENT",
+  body: "Looks good overall! A couple of suggestions below.",
+  comments: [
+    {
+      path: "src/cache.ts",
+      line: 14,
+      side: "RIGHT",
+      body: "Consider using a TTL here to avoid stale entries.",
     },
-  },
-  null,
-  2,
-);
+    {
+      path: "src/cache.ts",
+      line: 28,
+      side: "RIGHT",
+      body: "This could be simplified.",
+      suggestion: "return cache.get(key) ?? fallback();",
+    },
+  ],
+  metadata: { commitSha: "abc1234def5678" },
+}, null, 2);
 
 // ---------------------------------------------------------------------------
 // 4. Execute the writeback
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log("--- Example 03: Writeback ---\n");
+  console.log("--- Example 03: Writeback via GitHubWritebackHandler ---\n");
+  console.log("Review path:", reviewPath);
 
-  console.log("Agent review file path:");
-  console.log(" ", reviewPath);
-  console.log("\nReview payload:");
-  console.log(reviewContent);
-
-  console.log("\nExecuting writeback...");
-  const result = await adapter.writeBack("ws_demo", reviewPath, reviewContent);
+  const result = await writeback.writeBack("ws_demo", reviewPath, reviewContent);
   console.log("\nWriteback result:", JSON.stringify(result, null, 2));
 
-  // Inspect what the adapter sent to the provider
   if (capturedRequests.length > 0) {
     const req = capturedRequests[0];
     console.log("\n--- Captured proxy request ---");
-    console.log("Method:", req.method);
-    console.log("Base URL:", req.baseUrl);
-    console.log("Endpoint:", req.endpoint);
-    console.log("Connection ID:", req.connectionId);
+    console.log("Endpoint:", req.method, req.endpoint);
+    console.log("Connection:", req.connectionId);
     console.log("Body:", JSON.stringify(req.body, null, 2));
   }
 }
