@@ -2,7 +2,7 @@
   "name": "relayfile-adapters",
   "version": "0.1.0",
   "private": true,
-  "description": "Relayfile adapters — map external services to the relayfile VFS",
+  "description": "Relayfile adapters \u2014 map external services to the relayfile VFS",
   "workspaces": [
     "packages/*"
   ],
@@ -14,5 +14,6 @@
   "devDependencies": {
     "turbo": "^2.5.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "packageManager": "npm@10.9.4"
 }
