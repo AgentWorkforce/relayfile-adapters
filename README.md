@@ -60,26 +60,39 @@ app.post("/webhooks/github", async (req, res) => {
 
 ### What agents see
 
-Agents don't use adapters or providers directly. They just read and write files:
+Agents don't use adapters, providers, or even the SDK. They read and write files — that's it:
 
-```ts
-// Agent reads a PR — it's just a file
-const pr = await relayfile.getFile(workspaceId, "/github/repos/acme/api/pulls/42/metadata.json");
+```bash
+# Agent reads a PR — it's a file on disk
+cat /relayfile/github/repos/acme/api/pulls/42/metadata.json
 
-// Agent writes a review — it's just writing a file
-await relayfile.putFile(workspaceId, "/github/repos/acme/api/pulls/42/reviews/agent-review.json", {
-  content: JSON.stringify({
-    body: "LGTM! Ship it.",
-    event: "APPROVE",
-  }),
-});
+# Agent writes a review — it writes a file
+echo '{"body": "LGTM! Ship it.", "event": "APPROVE"}' \
+  > /relayfile/github/repos/acme/api/pulls/42/reviews/agent-review.json
 
-// That's it. The adapter handles posting the review to GitHub automatically.
+# Done. The review is now posted to GitHub.
+# The agent didn't import anything, call any API, or authenticate.
 ```
 
-**The agent doesn't know about GitHub, OAuth, or webhooks.** It reads files, reasons about them, and writes files back. The adapter watches for writes to review paths and posts them to the GitHub API via the provider.
+That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
 
-This is the entire value proposition: turn any API into a filesystem that agents can read and write without integration code.
+1. Relayfile detects the file write
+2. The adapter matches the path (`/github/.../reviews/`) to a writeback rule
+3. The provider authenticates and posts the review to GitHub's API
+
+**The agent doesn't even know GitHub exists.** It just sees files.
+
+For agents using the SDK programmatically (e.g., in a Node.js agent framework):
+
+```ts
+// Read
+const pr = await relayfile.getFile(workspaceId, "/github/repos/acme/api/pulls/42/metadata.json");
+
+// Write — triggers the review on GitHub automatically
+await relayfile.putFile(workspaceId, "/github/repos/acme/api/pulls/42/reviews/agent-review.json", {
+  content: JSON.stringify({ body: "LGTM!", event: "APPROVE" }),
+});
+```
 
 ### Programmatic writeback (for app developers)
 
