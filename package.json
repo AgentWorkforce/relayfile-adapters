@@ -2,12 +2,8 @@
   "name": "relayfile-adapters",
   "version": "0.1.0",
   "private": true,
-<<<<<<< HEAD
-  "description": "Relayfile adapters — map external services to the relayfile VFS",
-=======
   "packageManager": "npm@10.8.2",
-  "description": "Relayfile adapters \u2014 map external services to the relayfile VFS",
->>>>>>> d556363 (feat: use shared ConnectionProvider from @relayfile/sdk)
+  "description": "Relayfile adapters — map external services to the relayfile VFS",
   "workspaces": [
     "packages/*"
   ],
@@ -16,9 +12,7 @@
     "test": "npx turbo test",
     "typecheck": "npx turbo typecheck"
   },
-  "dependencies": {
-    "@relayfile/sdk": "file:../../AgentWorkforce-relayfile/packages/sdk/typescript"
-  },
+  "dependencies": {},
   "devDependencies": {
     "turbo": "^2.5.0",
     "typescript": "^5.7.0"
