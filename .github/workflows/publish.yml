@@ -1,0 +1,109 @@
+name: Publish Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to publish"
+        required: true
+        type: choice
+        options:
+          - all
+          - core
+          - github
+          - gitlab
+          - teams
+          - slack
+          - linear
+          - notion
+        default: "all"
+      version:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+        default: "patch"
+      tag:
+        description: "NPM dist-tag"
+        required: false
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+        default: "latest"
+      dry_run:
+        description: "Dry run (do not actually publish)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-package
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+
+      - name: Build all packages
+        run: npx turbo build
+
+      - name: Resolve packages to publish
+        id: resolve
+        run: |
+          if [ "${{ github.event.inputs.package }}" = "all" ]; then
+            echo "packages=core github gitlab teams slack linear notion" >> "$GITHUB_OUTPUT"
+          else
+            echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Version & Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for pkg in ${{ steps.resolve.outputs.packages }}; do
+            cd packages/$pkg
+            npm version ${{ github.event.inputs.version }} --no-git-tag-version
+
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              echo "DRY RUN: $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
+              npm publish --dry-run --access public --tag ${{ github.event.inputs.tag }}
+            else
+              npm publish --access public --provenance --tag ${{ github.event.inputs.tag }} --ignore-scripts
+              echo "Published $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
+            fi
+
+            cd ../..
+          done
+
+      - name: Commit version bumps
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add packages/*/package.json
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(release): bump ${{ github.event.inputs.package }} (${{ github.event.inputs.version }})"
+            git push
+          fi
