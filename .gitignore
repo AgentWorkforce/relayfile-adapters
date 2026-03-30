@@ -1,6 +1,5 @@
 node_modules/
 dist/
-.trajectories/
 .turbo/
 .agent-relay/
 
