@@ -10,7 +10,7 @@ pending queue, reads that file, delegates `/github/.../reviews/...` paths to
 - Optional local relayfile stack:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 

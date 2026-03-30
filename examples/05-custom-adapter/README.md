@@ -9,7 +9,7 @@ TypeScript. No custom class — just a mapping spec + `SchemaAdapter`.
 - Optional local relayfile stack:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 

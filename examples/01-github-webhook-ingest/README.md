@@ -10,7 +10,7 @@ VFS path plus semantics it produces.
 - Optional local relayfile stack:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 

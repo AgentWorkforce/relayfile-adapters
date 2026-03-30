@@ -15,7 +15,7 @@ GitHub webhook → webhook-server → GitHubAdapter → VFS path
 - Optional local relayfile stack:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 

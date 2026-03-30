@@ -9,7 +9,7 @@ Uses `SchemaAdapter` from `@relayfile/adapter-core`.
 - Optional local relayfile stack:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 

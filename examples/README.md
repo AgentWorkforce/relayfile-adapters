@@ -11,7 +11,7 @@ ingest with `@relayfile/webhook-server`, then write back with
 - For a real local relayfile backend, start the sibling stack first:
 
 ```bash
-cd ../AgentWorkforce-relayfile/docker
+cd ../AgentWorkforce/relayfile/docker
 docker compose up -d
 ```
 
