@@ -27,7 +27,15 @@
   "engines": {
     "node": ">=20"
   },
-  "license": "ISC",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/slack"
+  },
   "dependencies": {
     "@agent-relay/sdk": "^3.2.22",
     "@relayfile/sdk": "^0.1.6"
