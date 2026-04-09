@@ -41,7 +41,7 @@
  */
 
 import { workflow } from '@agent-relay/sdk/workflows';
-import { ClaudeModels } from '@agent-relay/config';
+import { CursorModels } from '@agent-relay/config';
 
 const WF_DIR = 'relayfile-adapters/workflows/schema-adapter-migration';
 const TEMPLATE_PATH = `${WF_DIR}/TEMPLATE.md`;
@@ -144,29 +144,30 @@ async function main() {
 
     // ─── Agents ─────────────────────────────────────────────
 
-    // Draft steps use claude-author instead of codex-author.
+    // Draft steps use cursor-author (Cursor CLI + Claude 4.6 Sonnet)
+    // instead of codex-author.
     //
     // Lesson from run 2026-04-09: codex-author drafted all 4 Phase 1
     // workflows with structural omissions that the batch review caught
     // (missing git diff gates, missing file_exists after writes, inline
     // vs separate verification, permission scopes too wide). Workflow 21
     // additionally omitted the required `cli` field on every agent so it
-    // failed to even load. Claude-lead produced a substantively correct
-    // workflow 20 on the first try with the same prompt style.
+    // failed to even load. Claude-class models produce a substantively
+    // correct workflow on the first try with the same prompt style.
     //
     // For the narrow "translate BACKLOG entry + TEMPLATE into a working
-    // workflow file from scratch" task, claude's template fidelity
+    // workflow file from scratch" task, Sonnet's template fidelity
     // outperforms codex. Codex is still great for bounded code edits —
-    // self-reflect and revise steps keep codex when we add those later.
+    // batch review and all subsequent phase workflow steps keep codex.
     //
     // This keeps the campaign "mostly codex" (batch-review + all other
-    // future workflow steps use codex) while using claude only for the
+    // future workflow steps use codex) while using Cursor+Sonnet for the
     // one step that genuinely needs its nuance.
-    .agent('claude-author', {
-      cli: 'claude',
-      role: 'Bounded non-interactive author — drafts a single workflow file from pre-injected TEMPLATE.md + BACKLOG.md. Worker preset enforces one-shot bounded execution. Used only for initial workflow drafting where template fidelity matters most.',
+    .agent('cursor-author', {
+      cli: 'cursor',
+      role: 'Bounded non-interactive author — drafts a single workflow file from pre-injected TEMPLATE.md + BACKLOG.md. Worker preset enforces one-shot bounded execution. Used only for initial workflow drafting where template fidelity matters most. Cursor CLI with Claude 4.6 Sonnet gives the template fidelity codex lacks.',
       preset: 'worker',
-      model: ClaudeModels.OPUS,
+      model: CursorModels.SONNET_4_6,
       retries: 1,
       permissions: {
         access: 'restricted',
@@ -227,7 +228,7 @@ async function main() {
     // ─── Phase 2: Draft 4 workflows in parallel ─────────────
 
     .step('draft-21', {
-      agent: 'claude-author',
+      agent: 'cursor-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_21}. Single deliverable, nothing else.
 
@@ -248,7 +249,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-22', {
-      agent: 'claude-author',
+      agent: 'cursor-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_22}. Single deliverable, nothing else.
 
@@ -269,7 +270,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-23', {
-      agent: 'claude-author',
+      agent: 'cursor-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_23}. Single deliverable, nothing else.
 
@@ -290,7 +291,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-24', {
-      agent: 'claude-author',
+      agent: 'cursor-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_24}. Single deliverable, nothing else.
 

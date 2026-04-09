@@ -41,7 +41,7 @@
  */
 
 import { workflow } from '@agent-relay/sdk/workflows';
-import { ClaudeModels } from '@agent-relay/config';
+import { CursorModels } from '@agent-relay/config';
 
 const SKILL_PATH =
   'skills/skills/writing-agent-relay-workflows/SKILL.md';
@@ -62,11 +62,11 @@ async function main() {
 
     // ─── Agents ─────────────────────────────────────────────
 
-    .agent('claude-lead', {
-      cli: 'claude',
-      role: 'Architect and author — reads the skill, designs the template, drafts the backlog, writes the reference workflow, and revises based on peer review findings. Self-reflection is delegated to claude-worker.',
+    .agent('cursor-lead', {
+      cli: 'cursor',
+      role: 'Architect and author — reads the skill, designs the template, drafts the backlog, writes the reference workflow, and revises based on peer review findings. Uses Cursor CLI with Claude 4.6 Sonnet for nuance on wide-file reads and template fidelity.',
       preset: 'lead',
-      model: ClaudeModels.OPUS,
+      model: CursorModels.SONNET_4_6,
       retries: 1,
       permissions: {
         access: 'restricted',
@@ -88,14 +88,15 @@ async function main() {
       },
     })
 
-    // Codex workers handle every bounded writing and critique step. Claude
-    // is kept ONLY for the `research` step (wide repo reads + architectural
-    // synthesis where tool fluency matters). Everything downstream of
-    // research — template authoring, backlog drafting, reference workflow
-    // writing, self-reflection, revision — uses codex via `preset: 'worker'`
-    // or `preset: 'reviewer'`, which runs one-shot via `codex exec`. This
-    // matches the user's "mostly done by codex" directive and keeps Claude's
-    // expensive Opus quota for the one step that genuinely benefits from it.
+    // Codex workers handle every bounded writing and critique step. Cursor
+    // (with Claude 4.6 Sonnet) is kept ONLY for the `research` step (wide
+    // repo reads + architectural synthesis where template fidelity matters).
+    // Everything downstream of research — template authoring, backlog
+    // drafting, reference workflow writing, self-reflection, revision —
+    // uses codex via `preset: 'worker'` or `preset: 'reviewer'`, which runs
+    // one-shot via `codex exec`. This matches the user's "mostly done by
+    // codex" directive while using Sonnet for the one step that benefits
+    // from its stronger template fidelity.
 
     .agent('codex-author', {
       cli: 'codex',
@@ -175,7 +176,7 @@ async function main() {
     // ─── Phase 1: Research + template + backlog ─────────────
 
     .step('research', {
-      agent: 'claude-lead',
+      agent: 'cursor-lead',
       task: `You are authoring a multi-workflow campaign to refactor the relayfile adapter architecture.
 
 Read these first:
