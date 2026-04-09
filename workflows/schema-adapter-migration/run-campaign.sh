@@ -131,15 +131,44 @@ for pattern in "${CAMPAIGN_SEQUENCE[@]}"; do
   echo "  → RUNNING: $wf_file"
   echo "  started: $(date '+%Y-%m-%d %H:%M:%S')"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  if agent-relay run "$wf_file"; then
-    echo "$wf_file" >> "$STATE_FILE"
-    echo "✓ DONE: $wf_file ($(date '+%Y-%m-%d %H:%M:%S'))"
-    completed=$((completed + 1))
-  else
-    echo "✗ FAILED: $wf_file ($(date '+%Y-%m-%d %H:%M:%S'))"
+
+  # `agent-relay run` has a known quirk: it exits 0 even when the internal
+  # workflow reports "Result: failed". We tee the output and parse the
+  # terminal summary line to reliably detect failures. The workflow runner
+  # emits exactly one of:
+  #   - "Result: completed"  — all steps passed
+  #   - "Result: failed"     — at least one step failed verification
+  # Anything else (no Result line) is treated as a hard error.
+  wf_log=$(mktemp)
+  set +e
+  agent-relay run "$wf_file" 2>&1 | tee "$wf_log"
+  raw_exit=$?
+  set -e
+
+  if [ $raw_exit -ne 0 ]; then
+    echo "✗ FAILED: agent-relay exited $raw_exit on $wf_file ($(date '+%Y-%m-%d %H:%M:%S'))"
+    rm -f "$wf_log"
     failed_step="$wf_file"
     break
   fi
+  if grep -Eq "^Result: (failed|error)" "$wf_log"; then
+    echo "✗ FAILED: workflow reported Result: failed on $wf_file ($(date '+%Y-%m-%d %H:%M:%S'))"
+    echo "  (agent-relay exited 0 but the internal workflow did not complete — see log above)"
+    rm -f "$wf_log"
+    failed_step="$wf_file"
+    break
+  fi
+  if ! grep -Eq "^Result: completed" "$wf_log"; then
+    echo "✗ FAILED: workflow did not emit a Result line on $wf_file"
+    echo "  (neither 'Result: completed' nor 'Result: failed' — treating as a hard error)"
+    rm -f "$wf_log"
+    failed_step="$wf_file"
+    break
+  fi
+  rm -f "$wf_log"
+  echo "$wf_file" >> "$STATE_FILE"
+  echo "✓ DONE: $wf_file ($(date '+%Y-%m-%d %H:%M:%S'))"
+  completed=$((completed + 1))
 done
 
 echo

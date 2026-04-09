@@ -41,6 +41,7 @@
  */
 
 import { workflow } from '@agent-relay/sdk/workflows';
+import { ClaudeModels } from '@agent-relay/config';
 
 const WF_DIR = 'relayfile-adapters/workflows/schema-adapter-migration';
 const TEMPLATE_PATH = `${WF_DIR}/TEMPLATE.md`;
@@ -57,9 +58,79 @@ IMPORTANT — violations cause step failure:
 - Do NOT run any shell command (no tsc, tsx, agent-relay, npm, git, node).
 - Do NOT spawn nested workflows. Do NOT run agent-relay.
 - Write the file FIRST, before any other action.
-- Preserve the TEMPLATE.md conventions exactly (ESM imports, async main() footer, .run({cwd: process.cwd()}), preset selection, permission scoping, common mistakes checklist).
-- Use codex as the primary implementer for bounded work; only use claude-lead when a step inherently needs wide file reads or channel coordination.
-- IMPORTANT: Write the file to disk. Do NOT output to stdout.`;
+- IMPORTANT: Write the file to disk. Do NOT output to stdout.
+
+MANDATORY TEMPLATE RULES (every violation below caused a prior workflow to be
+rejected at batch review — treat them as hard constraints):
+
+1. EVERY agent definition MUST have a \`cli\` field set to one of
+   'claude' | 'codex' | 'gemini' | 'aider' | 'goose' | 'opencode' | 'droid'.
+   Missing \`cli\` causes the workflow to fail at load time with
+   "each agent must have a string cli". Example:
+     .agent('codex-impl', {
+       cli: 'codex',            // <-- REQUIRED
+       preset: 'worker',
+       ...
+     })
+
+2. EVERY file-MUTATING step must be followed IMMEDIATELY by a separate
+   deterministic verify step that runs:
+     command: '! git diff --quiet <repo>/<file>'
+   The \`!\` is load-bearing — git diff --quiet exits 0 when the file is
+   UNMODIFIED, so we need the negation. Downstream steps must depend on
+   this verify step, not on the edit step directly.
+
+3. EVERY file-CREATING step must be followed IMMEDIATELY by a separate
+   deterministic verify step that runs:
+     command: 'test -f <expected-path>'
+   OR uses:
+     verification: { type: 'file_exists', value: '<expected-path>' }
+   Inline \`verification: { type: 'exit_code' }\` on an agent step is NOT
+   sufficient — the agent may exit 0 without writing the file.
+
+4. Permission scopes (\`permissions.files.read\` / \`write\`) must be
+   specific paths, not wildcards. NEVER use \`tests/**\`, \`src/**\`, or
+   similar broad scopes unless every file under that prefix is genuinely
+   needed by the agent. Pre-inject specific files via deterministic
+   \`cat\` steps instead of giving broad read permissions.
+
+5. ESM footer must be exactly:
+     async function main() {
+       const result = await workflow('<slug>')
+         ...
+         .run({ cwd: process.cwd() });
+       console.log('Result:', result.status);
+     }
+     main().catch((error) => { console.error(error); process.exitCode = 1; });
+   No top-level await. No createWorkflowRenderer. No .build().
+
+6. Import from package entry points only:
+     import { workflow } from '@agent-relay/sdk/workflows';
+     import { ClaudeModels, CodexModels } from '@agent-relay/config';
+   Never relative imports into SDK internals.
+
+7. Build commands use npm (never pnpm) wrapped in a subshell:
+     command: '(cd <pkg-path> && npm run build)'
+   Wherever the workflow touches relayfile/relayfile-adapters packages.
+
+8. Agent presets:
+   - preset: 'lead' ONLY for open-ended coordination needing a PTY + channel
+   - preset: 'worker' for all bounded file-writing / file-editing steps
+   - preset: 'reviewer' for verdict-producing steps
+   When in doubt, use 'worker'. Lead agents sprawl into tool chains.
+
+9. Task prompts must stay under 30 lines for bounded steps. Pre-inject
+   content via deterministic \`cat\` steps and reference via
+   \`{{steps.X.output}}\` — never ask a worker to read large files itself.
+
+10. Channel must be \`wf-<workflow-slug>\` where <slug> matches the
+    filename slug. Never use 'general'.
+
+When in doubt, model your new workflow after
+\`relayfile-adapters/workflows/schema-adapter-migration/20-canonical-integration-adapter-sdk.ts\`
+(the successful Phase 1 reference workflow). It has every pattern you need:
+read-then-edit with verify gates, build gates, regression-build step,
+pre-injected review bundle, deterministic verdict gate.`;
 
 async function main() {
   const result = await workflow('schema-adapter-gen-00b')
@@ -73,10 +144,29 @@ async function main() {
 
     // ─── Agents ─────────────────────────────────────────────
 
-    .agent('codex-author', {
-      cli: 'codex',
-      role: 'Bounded non-interactive author — drafts a single workflow file from pre-injected TEMPLATE.md + BACKLOG.md. Worker preset enforces one-shot bounded execution.',
+    // Draft steps use claude-author instead of codex-author.
+    //
+    // Lesson from run 2026-04-09: codex-author drafted all 4 Phase 1
+    // workflows with structural omissions that the batch review caught
+    // (missing git diff gates, missing file_exists after writes, inline
+    // vs separate verification, permission scopes too wide). Workflow 21
+    // additionally omitted the required `cli` field on every agent so it
+    // failed to even load. Claude-lead produced a substantively correct
+    // workflow 20 on the first try with the same prompt style.
+    //
+    // For the narrow "translate BACKLOG entry + TEMPLATE into a working
+    // workflow file from scratch" task, claude's template fidelity
+    // outperforms codex. Codex is still great for bounded code edits —
+    // self-reflect and revise steps keep codex when we add those later.
+    //
+    // This keeps the campaign "mostly codex" (batch-review + all other
+    // future workflow steps use codex) while using claude only for the
+    // one step that genuinely needs its nuance.
+    .agent('claude-author', {
+      cli: 'claude',
+      role: 'Bounded non-interactive author — drafts a single workflow file from pre-injected TEMPLATE.md + BACKLOG.md. Worker preset enforces one-shot bounded execution. Used only for initial workflow drafting where template fidelity matters most.',
       preset: 'worker',
+      model: ClaudeModels.OPUS,
       retries: 1,
       permissions: {
         access: 'restricted',
@@ -137,7 +227,7 @@ async function main() {
     // ─── Phase 2: Draft 4 workflows in parallel ─────────────
 
     .step('draft-21', {
-      agent: 'codex-author',
+      agent: 'claude-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_21}. Single deliverable, nothing else.
 
@@ -158,7 +248,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-22', {
-      agent: 'codex-author',
+      agent: 'claude-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_22}. Single deliverable, nothing else.
 
@@ -179,7 +269,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-23', {
-      agent: 'codex-author',
+      agent: 'claude-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_23}. Single deliverable, nothing else.
 
@@ -200,7 +290,7 @@ ${DRAFT_CONSTRAINTS}
     })
 
     .step('draft-24', {
-      agent: 'codex-author',
+      agent: 'claude-author',
       dependsOn: ['read-template', 'read-backlog'],
       task: `Draft ${WF_24}. Single deliverable, nothing else.
 
