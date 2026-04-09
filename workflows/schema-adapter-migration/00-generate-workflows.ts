@@ -88,20 +88,37 @@ async function main() {
       },
     })
 
-    .agent('claude-worker', {
-      cli: 'claude',
-      role: 'Bounded non-interactive worker — produces a single analysis file from pre-injected inputs. Cannot edit anything except its assigned deliverable and cannot run shell commands.',
+    // Codex workers handle every bounded writing and critique step. Claude
+    // is kept ONLY for the `research` step (wide repo reads + architectural
+    // synthesis where tool fluency matters). Everything downstream of
+    // research — template authoring, backlog drafting, reference workflow
+    // writing, self-reflection, revision — uses codex via `preset: 'worker'`
+    // or `preset: 'reviewer'`, which runs one-shot via `codex exec`. This
+    // matches the user's "mostly done by codex" directive and keeps Claude's
+    // expensive Opus quota for the one step that genuinely benefits from it.
+
+    .agent('codex-author', {
+      cli: 'codex',
+      role: 'Bounded non-interactive author — produces a single file from pre-injected inputs. Used for template authoring, backlog drafting, reference workflow writing, and self-critique. Cannot edit anything except its assigned deliverable and cannot run shell commands.',
       preset: 'worker',
-      model: ClaudeModels.OPUS,
       retries: 1,
       permissions: {
         access: 'restricted',
         files: {
           read: [
             'relayfile-adapters/workflows/schema-adapter-migration/**',
+            'skills/skills/writing-agent-relay-workflows/**',
+            'sage/workflows/**',
           ],
           write: [
+            'relayfile-adapters/workflows/schema-adapter-migration/TEMPLATE.md',
+            'relayfile-adapters/workflows/schema-adapter-migration/BACKLOG.md',
             'relayfile-adapters/workflows/schema-adapter-migration/SELF_REFLECT_*.md',
+            'relayfile-adapters/workflows/schema-adapter-migration/20-*.ts',
+            'relayfile-adapters/workflows/schema-adapter-migration/21-*.ts',
+            'relayfile-adapters/workflows/schema-adapter-migration/22-*.ts',
+            'relayfile-adapters/workflows/schema-adapter-migration/23-*.ts',
+            'relayfile-adapters/workflows/schema-adapter-migration/24-*.ts',
           ],
           deny: ['.env', '.env.*', '**/*.secret', '**/node_modules/**'],
         },
@@ -109,11 +126,10 @@ async function main() {
       },
     })
 
-    .agent('claude-revisor', {
-      cli: 'claude',
-      role: 'Bounded revisor — applies accepted review findings to a target workflow file and writes the decisions log. Worker preset enforces no-shell, no-sprawl behavior. Single deliverable is two files: DECISIONS_*.md and the target workflow file, both in the migration dir.',
+    .agent('codex-revisor', {
+      cli: 'codex',
+      role: 'Bounded revisor — applies accepted review findings to a target workflow file and writes the decisions log. Worker preset enforces no-shell, no-sprawl behavior. Two deliverables: DECISIONS_*.md and the target workflow file.',
       preset: 'worker',
-      model: ClaudeModels.OPUS,
       retries: 1,
       permissions: {
         access: 'restricted',
@@ -195,7 +211,7 @@ Keep RESEARCH.md under 300 lines. Output RESEARCH_COMPLETE when done.`,
     })
 
     .step('write-template', {
-      agent: 'claude-lead',
+      agent: 'codex-author',
       dependsOn: ['research'],
       task: `Read ${WF_DIR}/RESEARCH.md. Write ${WF_DIR}/TEMPLATE.md — the authoring template every schema-adapter migration workflow (20-49) must follow.
 
@@ -224,7 +240,7 @@ Keep TEMPLATE.md focused — it is reference material, not tutorial. Output TEMP
     })
 
     .step('write-backlog', {
-      agent: 'claude-lead',
+      agent: 'codex-author',
       dependsOn: ['research'],
       task: `Write ${WF_DIR}/BACKLOG.md — detailed specs for workflows 20-49 grouped into 6 phases. This is the plan the rest of the campaign executes against.
 
@@ -287,7 +303,7 @@ Target ~40-60 lines per workflow entry. Output BACKLOG_COMPLETE when done.`,
     // ─── Phase 2: Reference workflow 20 ─────────────────────
 
     .step('write-workflow-20', {
-      agent: 'claude-lead',
+      agent: 'codex-author',
       dependsOn: ['write-template', 'write-backlog'],
       task: `Write the reference workflow: ${REFERENCE_WF}.
 
@@ -344,7 +360,7 @@ Output WORKFLOW_20_COMPLETE when done.`,
     // ─── Phase 4: Bounded self-reflection + peer review ─────
 
     .step('self-reflect-20', {
-      agent: 'claude-worker',
+      agent: 'codex-author',
       dependsOn: ['read-skill-file', 'read-workflow-20-file'],
       task: `Produce a critique document. Single deliverable: ${WF_DIR}/SELF_REFLECT_20.md.
 
@@ -429,7 +445,7 @@ End PEER_REVIEW_20.md with a single-line verdict: APPROVED or CHANGES_REQUESTED.
     })
 
     .step('revise-workflow-20', {
-      agent: 'claude-revisor',
+      agent: 'codex-revisor',
       dependsOn: ['read-reviews', 'read-workflow-20-file'],
       task: `Two deliverables, in order:
 1. FIRST write ${WF_DIR}/DECISIONS_20.md with one section per finding and its disposition (ACCEPTED / REJECTED / DEFERRED with reasoning)
