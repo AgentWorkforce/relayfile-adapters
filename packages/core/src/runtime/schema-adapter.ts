@@ -1,9 +1,16 @@
 import {
   computeCanonicalPath,
+  IntegrationAdapter,
   type ConnectionProvider,
   type FileSemantics,
   type ProxyResponse,
   type RelayFileClient,
+} from "@relayfile/sdk";
+import type {
+  AdapterWebhook,
+  AdapterWebhookMetadata,
+  IngestError,
+  IngestResult,
 } from "@relayfile/sdk";
 import { minimatch } from "minimatch";
 import { interpolateTemplate, pickFields } from "../spec/template.js";
@@ -36,58 +43,13 @@ export interface SchemaAdapterOptions {
   }) => Promise<string> | string;
 }
 
-export interface AdapterWebhookMetadata {
-  deliveryId?: string;
-  delivery_id?: string;
-  timestamp?: string;
-  [key: string]: unknown;
-}
-
-export interface AdapterWebhook {
-  provider: string;
-  connectionId?: string;
-  eventType: string;
-  objectType: string;
-  objectId: string;
-  payload: Record<string, unknown>;
-  metadata?: AdapterWebhookMetadata;
-  raw?: unknown;
-}
-
-export interface IngestError {
-  path: string;
-  error: string;
-}
-
-export interface IngestResult {
-  filesWritten: number;
-  filesUpdated: number;
-  filesDeleted: number;
-  paths: string[];
-  errors: IngestError[];
-}
-
-abstract class IntegrationAdapter {
-  protected readonly client: RelayFileClient;
-  protected readonly provider: ConnectionProvider;
-
-  abstract readonly name: string;
-  abstract readonly version: string;
-
-  constructor(client: RelayFileClient, provider: ConnectionProvider) {
-    this.client = client;
-    this.provider = provider;
-  }
-
-  abstract ingestWebhook(workspaceId: string, event: AdapterWebhook): Promise<IngestResult>;
-  abstract computePath(objectType: string, objectId: string): string;
-  abstract computeSemantics(
-    objectType: string,
-    objectId: string,
-    payload: Record<string, unknown>,
-  ): FileSemantics;
-  supportedEvents?(): string[];
-}
+export { IntegrationAdapter } from "@relayfile/sdk";
+export type {
+  AdapterWebhook,
+  AdapterWebhookMetadata,
+  IngestError,
+  IngestResult,
+} from "@relayfile/sdk";
 
 export class SchemaAdapter extends IntegrationAdapter {
   readonly name: string;
