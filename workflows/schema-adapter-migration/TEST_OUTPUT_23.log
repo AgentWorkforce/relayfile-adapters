@@ -1,0 +1,14 @@
+
+> @relayfile/adapter-core@0.1.0 test:round-trip
+> vitest run tests/round-trip
+
+
+ RUN  v3.2.4 /Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/packages/core
+
+ ✓ tests/round-trip/github-pulls.test.ts (1 test) 17ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  17:11:59
+   Duration  444ms (transform 122ms, setup 0ms, collect 269ms, tests 17ms, environment 0ms, prepare 31ms)
+

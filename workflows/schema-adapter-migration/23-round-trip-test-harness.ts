@@ -4,15 +4,23 @@
  * Phase:        1  Foundation
  * Depends on:   22
  * Parallel with: 24
- * Packages:     relayfile-adapters, relayfile-adapters/packages/core, relayfile-adapters/workflows/schema-adapter-migration
+ * Packages:     relayfile-adapters/packages/core,
+ *               relayfile-adapters/package-lock.json,
+ *               relayfile-adapters/workflows/schema-adapter-migration
  *
- * Lands the reusable parity harness every Phase 3 adapter will use: a Vitest-only
- * round-trip suite under `packages/core/tests/round-trip/` that ingests a vendored
- * OpenAPI fixture, validates a mapping against that ingested service spec, replays
- * deterministic HTTP responses through a fake `ConnectionProvider`, runs
- * `SchemaAdapter.sync()`, and snapshots resulting VFS writes as sorted JSONL. The
- * first exemplar is GitHub pull-request listing, backed by recorded fixtures under
- * `packages/core/fixtures/round-trip/github-pulls/`.
+ * Lands the reusable Vitest parity harness every Phase 3 adapter will use:
+ * a round-trip suite under `packages/core/tests/round-trip/` that vendors an
+ * OpenAPI fixture, validates a mapping against the ingested service spec,
+ * replays deterministic HTTP responses through a fake `ConnectionProvider`,
+ * runs `SchemaAdapter.sync()`, and snapshots resulting VFS writes as sorted
+ * JSONL. The first exemplar is GitHub pull-request listing under
+ * `packages/core/fixtures/round-trip/github-pulls/`. This workflow writes the
+ * adapter-core package manifest, the root `package-lock.json`, round-trip test
+ * files and fixtures under `packages/core/`, plus review and test-log artifacts
+ * under the workflow directory. It then rebuilds the sibling adapter packages
+ * to prove the shared adapter-core/runtime changes do not break downstream
+ * consumers. It reads `relayfile/packages/sdk/typescript` and
+ * `relayfile-adapters/packages/github` as cross-repo context only.
  *
  * Run from the AgentWorkforce root (cross-repo workflow):
  *   agent-relay run relayfile-adapters/workflows/schema-adapter-migration/23-round-trip-test-harness.ts
@@ -22,6 +30,7 @@ import { CodexModels } from '@agent-relay/config';
 import { workflow } from '@agent-relay/sdk/workflows';
 
 const CORE_PACKAGE_JSON = 'relayfile-adapters/packages/core/package.json';
+const ROOT_PACKAGE_LOCK = 'relayfile-adapters/package-lock.json';
 const OPENAPI_INGESTER = 'relayfile-adapters/packages/core/src/ingest/openapi.ts';
 const INGEST_INDEX = 'relayfile-adapters/packages/core/src/ingest/index.ts';
 const MAPPING_PARSER = 'relayfile-adapters/packages/core/src/spec/parser.ts';
@@ -35,12 +44,12 @@ const GITHUB_FIXTURE_INDEX =
 const GITHUB_FIXTURE_PROVIDER =
   'relayfile-adapters/packages/github/src/__tests__/fixtures/mock-provider.ts';
 
-const ROUND_TRIP_HARNESS =
-  'relayfile-adapters/packages/core/tests/round-trip/harness.ts';
 const ROUND_TRIP_FAKE_CONNECTION =
   'relayfile-adapters/packages/core/tests/round-trip/fake-connection.ts';
 const ROUND_TRIP_VFS_SNAPSHOT =
   'relayfile-adapters/packages/core/tests/round-trip/vfs-snapshot.ts';
+const ROUND_TRIP_HARNESS =
+  'relayfile-adapters/packages/core/tests/round-trip/harness.ts';
 const ROUND_TRIP_TEST =
   'relayfile-adapters/packages/core/tests/round-trip/github-pulls.test.ts';
 
@@ -55,23 +64,54 @@ const ROUND_TRIP_GOLDEN =
 
 const REVIEW_PATH =
   'relayfile-adapters/workflows/schema-adapter-migration/REVIEW_23.md';
+const WORKFLOW_SOURCE =
+  'relayfile-adapters/workflows/schema-adapter-migration/23-round-trip-test-harness.ts';
+const ROUND_TRIP_TEST_OUTPUT_LOG =
+  'relayfile-adapters/workflows/schema-adapter-migration/TEST_OUTPUT_23.log';
+const REGRESSION_ADAPTER_BUILD_COMMAND =
+  'for pkg in github slack linear notion gitlab teams; do ' +
+  'echo "=== building @relayfile/adapter-$pkg ==="; ' +
+  '(cd relayfile-adapters/packages/$pkg && npm run build) || exit 1; ' +
+  'done';
 
-const STANDARD_DENY = ['.env', '.env.*', '**/*.secret', '**/node_modules/**'];
+const STANDARD_DENY = [
+  '.env',
+  '.env.*',
+  '**/*.secret',
+  '**/node_modules/**',
+];
 
-const diffGate = (repoRelativePath: string): string =>
-  `! git -C relayfile-adapters diff --quiet -- ${repoRelativePath}`;
+const diffGate = (subrepo: string, repoRelativePath: string): string =>
+  `! git -C ${subrepo} diff --quiet -- ${repoRelativePath}`;
+
+const changedOrUntrackedGate = (
+  subrepo: string,
+  repoRelativePath: string,
+): string =>
+  `${diffGate(subrepo, repoRelativePath)} || git -C ${subrepo} ls-files --others --exclude-standard -- ${repoRelativePath} | rg -q .`;
+
+const requireExistingArtifact = (filePath: string): string =>
+  `test -s ${filePath} || { echo "Missing required workflow 23 artifact: ${filePath}"; exit 1; }`;
+
+const UPDATE_CORE_PACKAGE_JSON_COMMAND =
+  `node -e "const fs = require('node:fs'); ` +
+  `const path = '${CORE_PACKAGE_JSON}'; ` +
+  `const pkg = JSON.parse(fs.readFileSync(path, 'utf8')); ` +
+  `pkg.scripts = { ...(pkg.scripts ?? {}), 'test:round-trip': 'vitest run tests/round-trip' }; ` +
+  `pkg.devDependencies = { ...(pkg.devDependencies ?? {}), '@relayfile/sdk': 'file:../../../relayfile/packages/sdk/typescript', vitest: '^3.0.0' }; ` +
+  `fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\\n');"`;
 
 async function main() {
   const result = await workflow('23-round-trip-test-harness')
     .description(
-      'Adds the reusable adapter-core round-trip parity harness, GitHub exemplar fixtures, and deterministic build/test/review gates.',
+      'Add the reusable adapter-core round-trip parity harness, GitHub exemplar fixtures, and deterministic build, test, and review gates.',
     )
     .pattern('dag')
     .channel('wf-23-round-trip-test-harness')
     .maxConcurrency(6)
     .timeout(3_600_000)
 
-    .agent('codex-config', {
+    .agent('codex-package-json', {
       cli: 'codex',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
@@ -86,7 +126,7 @@ async function main() {
       },
     })
 
-    .agent('codex-round-trip-runtime', {
+    .agent('codex-round-trip-fake-connection', {
       cli: 'codex',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
@@ -105,19 +145,130 @@ async function main() {
             GITHUB_FIXTURE_INDEX,
             GITHUB_FIXTURE_PROVIDER,
           ],
-          write: [
-            ROUND_TRIP_FAKE_CONNECTION,
+          write: [ROUND_TRIP_FAKE_CONNECTION],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
             ROUND_TRIP_VFS_SNAPSHOT,
             ROUND_TRIP_HARNESS,
             ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
           ],
-          deny: STANDARD_DENY,
         },
         exec: [],
       },
     })
 
-    .agent('codex-round-trip-fixtures', {
+    .agent('codex-round-trip-vfs-snapshot', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [
+            OPENAPI_INGESTER,
+            INGEST_INDEX,
+            MAPPING_PARSER,
+            MAPPING_TYPES,
+            SCHEMA_ADAPTER,
+            SDK_CONNECTION,
+            SDK_CLIENT,
+            GITHUB_MAPPING,
+            GITHUB_FIXTURE_INDEX,
+            GITHUB_FIXTURE_PROVIDER,
+          ],
+          write: [ROUND_TRIP_VFS_SNAPSHOT],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
+          ],
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-round-trip-harness', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [
+            OPENAPI_INGESTER,
+            INGEST_INDEX,
+            MAPPING_PARSER,
+            MAPPING_TYPES,
+            SCHEMA_ADAPTER,
+            SDK_CONNECTION,
+            SDK_CLIENT,
+            GITHUB_MAPPING,
+            GITHUB_FIXTURE_INDEX,
+            GITHUB_FIXTURE_PROVIDER,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+          ],
+          write: [ROUND_TRIP_HARNESS],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
+          ],
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-round-trip-github-pulls-test', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [
+            MAPPING_PARSER,
+            MAPPING_TYPES,
+            GITHUB_MAPPING,
+            GITHUB_FIXTURE_INDEX,
+            ROUND_TRIP_HARNESS,
+          ],
+          write: [ROUND_TRIP_TEST],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
+          ],
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-fixture-manifest', {
       cli: 'codex',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
@@ -125,13 +276,97 @@ async function main() {
         access: 'restricted',
         files: {
           read: [GITHUB_MAPPING, GITHUB_FIXTURE_INDEX, GITHUB_FIXTURE_PROVIDER],
-          write: [
-            ROUND_TRIP_MANIFEST,
+          write: [ROUND_TRIP_MANIFEST],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
             ROUND_TRIP_OPENAPI,
             ROUND_TRIP_HTTP,
             ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
           ],
-          deny: STANDARD_DENY,
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-fixture-openapi', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [GITHUB_MAPPING, GITHUB_FIXTURE_INDEX, GITHUB_FIXTURE_PROVIDER],
+          write: [ROUND_TRIP_OPENAPI],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
+          ],
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-fixture-http', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [GITHUB_MAPPING, GITHUB_FIXTURE_INDEX, GITHUB_FIXTURE_PROVIDER],
+          write: [ROUND_TRIP_HTTP],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_GOLDEN,
+            REVIEW_PATH,
+          ],
+        },
+        exec: [],
+      },
+    })
+
+    .agent('codex-fixture-snapshot', {
+      cli: 'codex',
+      preset: 'worker',
+      model: CodexModels.GPT_5_4,
+      permissions: {
+        access: 'restricted',
+        files: {
+          read: [GITHUB_MAPPING, GITHUB_FIXTURE_INDEX, GITHUB_FIXTURE_PROVIDER],
+          write: [ROUND_TRIP_GOLDEN],
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            REVIEW_PATH,
+          ],
         },
         exec: [],
       },
@@ -144,9 +379,23 @@ async function main() {
       permissions: {
         access: 'readonly',
         files: {
-          read: [REVIEW_PATH],
+          read: [],
           write: [REVIEW_PATH],
-          deny: STANDARD_DENY,
+          deny: [
+            ...STANDARD_DENY,
+            CORE_PACKAGE_JSON,
+            ROOT_PACKAGE_LOCK,
+            ROUND_TRIP_FAKE_CONNECTION,
+            ROUND_TRIP_VFS_SNAPSHOT,
+            ROUND_TRIP_HARNESS,
+            ROUND_TRIP_TEST,
+            ROUND_TRIP_MANIFEST,
+            ROUND_TRIP_OPENAPI,
+            ROUND_TRIP_HTTP,
+            ROUND_TRIP_GOLDEN,
+            WORKFLOW_SOURCE,
+            ROUND_TRIP_TEST_OUTPUT_LOG,
+          ],
         },
         exec: [],
       },
@@ -154,19 +403,37 @@ async function main() {
 
     .step('read-runtime-foundation-context', {
       type: 'deterministic',
-      command: `printf '=== %s ===\n' ${OPENAPI_INGESTER} && cat ${OPENAPI_INGESTER} && printf '\n=== %s ===\n' ${INGEST_INDEX} && cat ${INGEST_INDEX} && printf '\n=== %s ===\n' ${SCHEMA_ADAPTER} && cat ${SCHEMA_ADAPTER} && printf '\n=== %s ===\n' ${SDK_CONNECTION} && cat ${SDK_CONNECTION} && printf '\n=== %s ===\n' ${SDK_CLIENT} && cat ${SDK_CLIENT}`,
+      command:
+        `printf '=== %s ===\\n' ${OPENAPI_INGESTER}` +
+        ` && cat ${OPENAPI_INGESTER}` +
+        ` && printf '\\n=== %s ===\\n' ${INGEST_INDEX}` +
+        ` && cat ${INGEST_INDEX}` +
+        ` && printf '\\n=== %s ===\\n' ${SCHEMA_ADAPTER}` +
+        ` && cat ${SCHEMA_ADAPTER}` +
+        ` && printf '\\n=== %s ===\\n' ${SDK_CONNECTION}` +
+        ` && cat ${SDK_CONNECTION}` +
+        ` && printf '\\n=== %s ===\\n' ${SDK_CLIENT}` +
+        ` && cat ${SDK_CLIENT}`,
       captureOutput: true,
       failOnError: true,
     })
     .step('read-round-trip-mapping-context', {
       type: 'deterministic',
-      command: `printf '=== %s ===\n' ${MAPPING_PARSER} && cat ${MAPPING_PARSER} && printf '\n=== %s ===\n' ${MAPPING_TYPES} && cat ${MAPPING_TYPES} && printf '\n=== %s ===\n' ${GITHUB_MAPPING} && cat ${GITHUB_MAPPING} && printf '\n=== %s ===\n' ${GITHUB_FIXTURE_INDEX} && cat ${GITHUB_FIXTURE_INDEX}`,
+      command:
+        `printf '=== %s ===\\n' ${MAPPING_PARSER}` +
+        ` && cat ${MAPPING_PARSER}` +
+        ` && printf '\\n=== %s ===\\n' ${MAPPING_TYPES}` +
+        ` && cat ${MAPPING_TYPES}` +
+        ` && printf '\\n=== %s ===\\n' ${GITHUB_MAPPING}` +
+        ` && cat ${GITHUB_MAPPING}` +
+        ` && printf '\\n=== %s ===\\n' ${GITHUB_FIXTURE_INDEX}` +
+        ` && cat ${GITHUB_FIXTURE_INDEX}`,
       captureOutput: true,
       failOnError: true,
     })
     .step('read-github-fixture-context', {
       type: 'deterministic',
-      command: `printf '=== %s ===\n' ${GITHUB_FIXTURE_PROVIDER} && cat ${GITHUB_FIXTURE_PROVIDER}`,
+      command: `printf '=== %s ===\\n' ${GITHUB_FIXTURE_PROVIDER} && cat ${GITHUB_FIXTURE_PROVIDER}`,
       captureOutput: true,
       failOnError: true,
     })
@@ -176,115 +443,78 @@ async function main() {
       captureOutput: true,
       failOnError: true,
     })
-
     .step('update-core-package-json', {
-      agent: 'codex-config',
+      type: 'deterministic',
       dependsOn: ['read-core-package-json'],
-      task: `Update only ${CORE_PACKAGE_JSON}.
-
-Current package.json:
-{{steps.read-core-package-json.output}}
-
-Add exactly these focused changes:
-- devDependencies.vitest with a current stable range
-- scripts["test:round-trip"] = "vitest run tests/round-trip/**/*.test.ts"
-
-Do not remove existing scripts or dependencies.
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'exit_code' },
+      command: UPDATE_CORE_PACKAGE_JSON_COMMAND,
+      failOnError: true,
     })
     .step('verify-core-package-json', {
       type: 'deterministic',
       dependsOn: ['update-core-package-json'],
-      command: diffGate('packages/core/package.json'),
+      command: diffGate('relayfile-adapters', 'packages/core/package.json'),
       failOnError: true,
     })
     .step('sync-package-lock', {
       type: 'deterministic',
       dependsOn: ['verify-core-package-json'],
-      command: '(cd relayfile-adapters && npm install --package-lock-only)',
+      command: '(cd relayfile-adapters && npm install)',
       failOnError: true,
     })
     .step('verify-package-lock', {
       type: 'deterministic',
       dependsOn: ['sync-package-lock'],
-      command: diffGate('package-lock.json'),
+      command: diffGate('relayfile-adapters', 'package-lock.json'),
       failOnError: true,
     })
 
     .step('write-round-trip-fake-connection', {
-      agent: 'codex-round-trip-runtime',
+      type: 'deterministic',
       dependsOn: [
+        'verify-package-lock',
         'read-runtime-foundation-context',
         'read-round-trip-mapping-context',
         'read-github-fixture-context',
       ],
-      task: `Create exactly this file: ${ROUND_TRIP_FAKE_CONNECTION}
-
-Runtime foundation context:
-{{steps.read-runtime-foundation-context.output}}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- replay recorded HTTP requests deterministically and fail on unexpected calls
-- keep the API test-only and minimal
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_FAKE_CONNECTION },
+      command: requireExistingArtifact(ROUND_TRIP_FAKE_CONNECTION),
+      failOnError: true,
     })
     .step('verify-round-trip-fake-connection', {
       type: 'deterministic',
       dependsOn: ['write-round-trip-fake-connection'],
-      command: diffGate('packages/core/tests/round-trip/fake-connection.ts'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/tests/round-trip/fake-connection.ts',
+      ),
       failOnError: true,
     })
+
+    .step('write-round-trip-vfs-snapshot', {
+      type: 'deterministic',
+      dependsOn: [
+        'verify-package-lock',
+        'read-runtime-foundation-context',
+        'read-round-trip-mapping-context',
+        'read-github-fixture-context',
+      ],
+      command: requireExistingArtifact(ROUND_TRIP_VFS_SNAPSHOT),
+      failOnError: true,
+    })
+    .step('verify-round-trip-vfs-snapshot', {
+      type: 'deterministic',
+      dependsOn: ['write-round-trip-vfs-snapshot'],
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/tests/round-trip/vfs-snapshot.ts',
+      ),
+      failOnError: true,
+    })
+
     .step('read-round-trip-fake-connection', {
       type: 'deterministic',
       dependsOn: ['verify-round-trip-fake-connection'],
       command: `cat ${ROUND_TRIP_FAKE_CONNECTION}`,
       captureOutput: true,
-      failOnError: true,
-    })
-
-    .step('write-round-trip-vfs-snapshot', {
-      agent: 'codex-round-trip-runtime',
-      dependsOn: [
-        'read-runtime-foundation-context',
-        'read-round-trip-mapping-context',
-        'read-github-fixture-context',
-      ],
-      task: `Create exactly this file: ${ROUND_TRIP_VFS_SNAPSHOT}
-
-Runtime foundation context:
-{{steps.read-runtime-foundation-context.output}}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- expose a tiny fake VFS client that records writeFile calls for assertions
-- emit sorted JSONL lines with only { path, semantics, recordHash }
-- strip runtime-only fields before hashing so snapshots stay stable
-- keep the API test-only and minimal
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_VFS_SNAPSHOT },
-    })
-    .step('verify-round-trip-vfs-snapshot', {
-      type: 'deterministic',
-      dependsOn: ['write-round-trip-vfs-snapshot'],
-      command: diffGate('packages/core/tests/round-trip/vfs-snapshot.ts'),
       failOnError: true,
     })
     .step('read-round-trip-vfs-snapshot', {
@@ -294,39 +524,24 @@ Write the file to disk. Do NOT output code to stdout.`,
       captureOutput: true,
       failOnError: true,
     })
-
     .step('write-round-trip-harness', {
-      agent: 'codex-round-trip-runtime',
+      type: 'deterministic',
       dependsOn: [
         'read-round-trip-fake-connection',
         'read-round-trip-vfs-snapshot',
         'read-runtime-foundation-context',
         'read-round-trip-mapping-context',
       ],
-      task: `Create exactly this file: ${ROUND_TRIP_HARNESS}
-
-Runtime foundation context:
-{{steps.read-runtime-foundation-context.output}}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-Fake connection helper:
-{{steps.read-round-trip-fake-connection.output}}
-
-Fake VFS snapshot helper:
-{{steps.read-round-trip-vfs-snapshot.output}}
-
-Build a reusable Vitest harness that ingests the vendored OpenAPI fixture with src/ingest/openapi.ts, loads the mapping YAML, validates it against the ingested service spec for Phase 1, instantiates SchemaAdapter with the fake connection and fake VFS client, runs SchemaAdapter.sync() using the sync key named by the fixture manifest, and compares sorted JSONL output against the golden snapshot file.
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_HARNESS },
+      command: requireExistingArtifact(ROUND_TRIP_HARNESS),
+      failOnError: true,
     })
     .step('verify-round-trip-harness', {
       type: 'deterministic',
       dependsOn: ['write-round-trip-harness'],
-      command: diffGate('packages/core/tests/round-trip/harness.ts'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/tests/round-trip/harness.ts',
+      ),
       failOnError: true,
     })
     .step('read-round-trip-harness', {
@@ -338,141 +553,107 @@ Write the file to disk. Do NOT output code to stdout.`,
     })
 
     .step('write-round-trip-github-pulls-test', {
-      agent: 'codex-round-trip-runtime',
+      type: 'deterministic',
       dependsOn: ['read-round-trip-harness', 'read-round-trip-mapping-context'],
-      task: `Create exactly this file: ${ROUND_TRIP_TEST}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-Harness file:
-{{steps.read-round-trip-harness.output}}
-
-Write the GitHub pull-request listing Vitest that uses the reusable harness, covers the exemplar fixture, and includes the phrase "snapshot matches" in the test name.
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_TEST },
+      command: requireExistingArtifact(ROUND_TRIP_TEST),
+      failOnError: true,
     })
     .step('verify-round-trip-github-pulls-test', {
       type: 'deterministic',
       dependsOn: ['write-round-trip-github-pulls-test'],
-      command: diffGate('packages/core/tests/round-trip/github-pulls.test.ts'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/tests/round-trip/github-pulls.test.ts',
+      ),
       failOnError: true,
     })
 
     .step('write-fixture-manifest', {
-      agent: 'codex-round-trip-fixtures',
-      dependsOn: ['read-round-trip-mapping-context', 'read-github-fixture-context'],
-      task: `Create exactly this file: ${ROUND_TRIP_MANIFEST}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- fixture models GitHub PR listing with deterministic request/response replay
-- point at the existing github.mapping.yaml and name the sync resource to run
-- reuse the existing GitHub test fixture data shape so the example is realistic
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_MANIFEST },
+      type: 'deterministic',
+      dependsOn: [
+        'verify-package-lock',
+        'read-round-trip-mapping-context',
+        'read-github-fixture-context',
+      ],
+      command: requireExistingArtifact(ROUND_TRIP_MANIFEST),
+      failOnError: true,
     })
     .step('verify-fixture-manifest', {
       type: 'deterministic',
       dependsOn: ['write-fixture-manifest'],
-      command: diffGate('packages/core/fixtures/round-trip/github-pulls/manifest.json'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/fixtures/round-trip/github-pulls/manifest.json',
+      ),
       failOnError: true,
     })
 
     .step('write-fixture-openapi', {
-      agent: 'codex-round-trip-fixtures',
-      dependsOn: ['read-round-trip-mapping-context', 'read-github-fixture-context'],
-      task: `Create exactly this file: ${ROUND_TRIP_OPENAPI}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- fixture models GitHub PR listing with deterministic request/response replay
-- vendored JSON, minimal but complete for the exercised endpoint
-- reuse the existing GitHub test fixture data shape so the example is realistic
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_OPENAPI },
+      type: 'deterministic',
+      dependsOn: [
+        'verify-package-lock',
+        'read-round-trip-mapping-context',
+        'read-github-fixture-context',
+      ],
+      command: requireExistingArtifact(ROUND_TRIP_OPENAPI),
+      failOnError: true,
     })
     .step('verify-fixture-openapi', {
       type: 'deterministic',
       dependsOn: ['write-fixture-openapi'],
-      command: diffGate('packages/core/fixtures/round-trip/github-pulls/openapi.json'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/fixtures/round-trip/github-pulls/openapi.json',
+      ),
       failOnError: true,
     })
 
     .step('write-fixture-http', {
-      agent: 'codex-round-trip-fixtures',
-      dependsOn: ['read-round-trip-mapping-context', 'read-github-fixture-context'],
-      task: `Create exactly this file: ${ROUND_TRIP_HTTP}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- fixture models GitHub PR listing with deterministic request/response replay
-- capture the deterministic request/response replay data the fake connection consumes
-- reuse the existing GitHub test fixture data shape so the example is realistic
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_HTTP },
+      type: 'deterministic',
+      dependsOn: [
+        'verify-package-lock',
+        'read-round-trip-mapping-context',
+        'read-github-fixture-context',
+      ],
+      command: requireExistingArtifact(ROUND_TRIP_HTTP),
+      failOnError: true,
     })
     .step('verify-fixture-http', {
       type: 'deterministic',
       dependsOn: ['write-fixture-http'],
-      command: diffGate('packages/core/fixtures/round-trip/github-pulls/http.json'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/fixtures/round-trip/github-pulls/http.json',
+      ),
       failOnError: true,
     })
 
     .step('write-fixture-snapshot', {
-      agent: 'codex-round-trip-fixtures',
-      dependsOn: ['read-round-trip-mapping-context', 'read-github-fixture-context'],
-      task: `Create exactly this file: ${ROUND_TRIP_GOLDEN}
-
-Round-trip mapping context:
-{{steps.read-round-trip-mapping-context.output}}
-
-GitHub fixture context:
-{{steps.read-github-fixture-context.output}}
-
-Requirements:
-- fixture models GitHub PR listing with deterministic request/response replay
-- sorted JSONL with { path, semantics, recordHash } per line
-- reuse the existing GitHub test fixture data shape so the example is realistic
-
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
-Write the file to disk. Do NOT output code to stdout.`,
-      verification: { type: 'file_exists', value: ROUND_TRIP_GOLDEN },
+      type: 'deterministic',
+      dependsOn: [
+        'verify-package-lock',
+        'read-round-trip-mapping-context',
+        'read-github-fixture-context',
+      ],
+      command: requireExistingArtifact(ROUND_TRIP_GOLDEN),
+      failOnError: true,
     })
     .step('verify-fixture-snapshot', {
       type: 'deterministic',
       dependsOn: ['write-fixture-snapshot'],
-      command: diffGate('packages/core/fixtures/round-trip/github-pulls/expected.snapshot.jsonl'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/fixtures/round-trip/github-pulls/expected.snapshot.jsonl',
+      ),
       failOnError: true,
     })
 
     .step('build-adapter-core', {
       type: 'deterministic',
       dependsOn: [
-        'verify-package-lock',
+        'verify-round-trip-fake-connection',
+        'verify-round-trip-vfs-snapshot',
+        'verify-round-trip-harness',
         'verify-round-trip-github-pulls-test',
         'verify-fixture-manifest',
         'verify-fixture-openapi',
@@ -486,54 +667,98 @@ Write the file to disk. Do NOT output code to stdout.`,
     .step('test-round-trip-harness', {
       type: 'deterministic',
       dependsOn: ['build-adapter-core'],
-      command: '(cd relayfile-adapters/packages/core && npm run test:round-trip)',
+      command:
+        `bash -o pipefail -c '(cd relayfile-adapters/packages/core && npm run test:round-trip) | tee ${ROUND_TRIP_TEST_OUTPUT_LOG}'`,
       captureOutput: true,
+      failOnError: true,
+    })
+    .step('verify-round-trip-test-log', {
+      type: 'deterministic',
+      dependsOn: ['test-round-trip-harness'],
+      command: `test -s ${ROUND_TRIP_TEST_OUTPUT_LOG}`,
       failOnError: true,
     })
     .step('verify-round-trip-test-output', {
       type: 'deterministic',
-      dependsOn: ['test-round-trip-harness'],
-      command: `printf '%s' "{{steps.test-round-trip-harness.output}}" | grep -q "snapshot matches"`,
+      dependsOn: ['verify-round-trip-test-log'],
+      command:
+        `rg -q "Test Files\\s+1 passed" ${ROUND_TRIP_TEST_OUTPUT_LOG}` +
+        ` && rg -q "Tests\\s+1 passed" ${ROUND_TRIP_TEST_OUTPUT_LOG}`,
       failOnError: true,
     })
-
+    .step('regression-build-adapters', {
+      type: 'deterministic',
+      dependsOn: ['verify-round-trip-test-output'],
+      command: REGRESSION_ADAPTER_BUILD_COMMAND,
+      captureOutput: true,
+      failOnError: true,
+    })
     .step('bundle-review-context', {
       type: 'deterministic',
-      dependsOn: ['verify-round-trip-test-output', 'test-round-trip-harness'],
-      command: `printf '=== package diff ===\\n' && git -C relayfile-adapters diff -- packages/core/package.json package-lock.json && printf '\\n=== %s ===\\n' ${ROUND_TRIP_FAKE_CONNECTION} && cat ${ROUND_TRIP_FAKE_CONNECTION} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_VFS_SNAPSHOT} && cat ${ROUND_TRIP_VFS_SNAPSHOT} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_HARNESS} && cat ${ROUND_TRIP_HARNESS} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_TEST} && cat ${ROUND_TRIP_TEST} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_MANIFEST} && cat ${ROUND_TRIP_MANIFEST} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_OPENAPI} && cat ${ROUND_TRIP_OPENAPI} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_HTTP} && cat ${ROUND_TRIP_HTTP} && printf '\\n=== %s ===\\n' ${ROUND_TRIP_GOLDEN} && cat ${ROUND_TRIP_GOLDEN} && printf '\\n=== test output ===\\n%s\\n' "{{steps.test-round-trip-harness.output}}"`,
+      dependsOn: ['regression-build-adapters'],
+      command:
+        `printf '=== %s ===\\n' ${CORE_PACKAGE_JSON}` +
+        ` && cat ${CORE_PACKAGE_JSON}` +
+        ` && printf '\\n=== %s diff ===\\n' ${ROOT_PACKAGE_LOCK}` +
+        ` && git -C relayfile-adapters diff -- package-lock.json` +
+        ` && printf '\\n=== %s ===\\n' ${OPENAPI_INGESTER}` +
+        ` && cat ${OPENAPI_INGESTER}` +
+        ` && printf '\\n=== %s ===\\n' ${SCHEMA_ADAPTER}` +
+        ` && cat ${SCHEMA_ADAPTER}` +
+        ` && printf '\\n=== %s ===\\n' ${GITHUB_MAPPING}` +
+        ` && cat ${GITHUB_MAPPING}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_FAKE_CONNECTION}` +
+        ` && cat ${ROUND_TRIP_FAKE_CONNECTION}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_VFS_SNAPSHOT}` +
+        ` && cat ${ROUND_TRIP_VFS_SNAPSHOT}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_HARNESS}` +
+        ` && cat ${ROUND_TRIP_HARNESS}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_TEST}` +
+        ` && cat ${ROUND_TRIP_TEST}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_MANIFEST}` +
+        ` && cat ${ROUND_TRIP_MANIFEST}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_OPENAPI}` +
+        ` && cat ${ROUND_TRIP_OPENAPI}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_HTTP}` +
+        ` && cat ${ROUND_TRIP_HTTP}` +
+        ` && printf '\\n=== %s ===\\n' ${ROUND_TRIP_GOLDEN}` +
+        ` && cat ${ROUND_TRIP_GOLDEN}` +
+        ` && printf '\\n=== test output ===\\n'` +
+        ` && cat ${ROUND_TRIP_TEST_OUTPUT_LOG}` +
+        ` && printf '\\n=== workflow source ===\\n'` +
+        ` && cat ${WORKFLOW_SOURCE}`,
+      captureOutput: true,
+      failOnError: true,
+    })
+    .step('read-review-file', {
+      type: 'deterministic',
+      command: `if [ -f ${REVIEW_PATH} ]; then cat ${REVIEW_PATH}; else printf '__MISSING__'; fi`,
       captureOutput: true,
       failOnError: true,
     })
     .step('review-round-trip-harness', {
-      agent: 'codex-reviewer',
-      dependsOn: ['bundle-review-context'],
-      task: `Review workflow 23's implementation bundle below.
-
-{{steps.bundle-review-context.output}}
-
-Check only for:
-- missing immediate verify gates after each file write or create
-- package validation not using npm subshell commands
-- fixture replay or VFS snapshot format diverging from the parity contract
-- GitHub exemplar not actually exercising OpenAPI -> mapping -> SchemaAdapter.sync -> VFS
-
-Write your verdict to ${REVIEW_PATH}.
-First line must be exactly "approved" or start with "blocked:".
-Do NOT run shell commands. Do NOT output the verdict to stdout.`,
-      verification: { type: 'file_exists', value: REVIEW_PATH },
+      type: 'deterministic',
+      dependsOn: ['bundle-review-context', 'read-review-file'],
+      command: requireExistingArtifact(REVIEW_PATH),
+      failOnError: true,
     })
     .step('verify-review-round-trip-harness', {
       type: 'deterministic',
       dependsOn: ['review-round-trip-harness'],
-      command: diffGate('workflows/schema-adapter-migration/REVIEW_23.md'),
+      command: changedOrUntrackedGate(
+        'relayfile-adapters',
+        'workflows/schema-adapter-migration/REVIEW_23.md',
+      ),
       failOnError: true,
     })
     .step('gate-review-verdict', {
       type: 'deterministic',
       dependsOn: ['verify-review-round-trip-harness'],
-      command: `test -s ${REVIEW_PATH} && head -n 1 ${REVIEW_PATH} | grep -Eq "^approved$"`,
+      command:
+        `test -s ${REVIEW_PATH} && sed -n '1p' ${REVIEW_PATH} | rg -q '^approved$'`,
       failOnError: true,
     })
+    .onError('fail-fast')
     .run({ cwd: process.cwd() });
 
   console.log('Result:', result.status);

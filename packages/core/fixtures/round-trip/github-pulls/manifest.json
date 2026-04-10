@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "name": "github-pulls",
+  "description": "GitHub pull request listing round-trip replay fixture.",
+  "adapter": "github",
+  "mapping": "../../../../github/github.mapping.yaml",
+  "openapi": "openapi.json",
+  "fixture": "http.json",
+  "expectedSnapshot": "expected.snapshot.jsonl",
+  "sync": {
+    "resourceName": "pull_request",
+    "workspaceId": "round-trip-github-pulls",
+    "connectionId": "conn-fixture",
+    "input": {
+      "owner": "octocat",
+      "repo": "hello-world",
+      "pull_number": 42
+    },
+    "options": {
+      "resume": false,
+      "maxPages": 1
+    }
+  },
+  "replay": {
+    "baseUrl": "https://api.github.com",
+    "requests": [
+      {
+        "method": "GET",
+        "endpoint": "/repos/octocat/hello-world/pulls/42",
+        "sourceFixture": "mockPRPayload"
+      }
+    ]
+  },
+  "githubFixtureShape": {
+    "data": "../../../../github/src/__tests__/fixtures/index.ts",
+    "provider": "../../../../github/src/__tests__/fixtures/mock-provider.ts",
+    "exports": [
+      "mockRepoContext",
+      "mockPRPayload"
+    ]
+  },
+  "expectedWrites": [
+    {
+      "path": "/github/repos/octocat/hello-world/pulls/42/metadata.json",
+      "sourceFixture": "mockPRPayload"
+    }
+  ]
+}

@@ -13,6 +13,9 @@
  * Pattern: Claude writes, Codex peer-reviews, Claude self-reflects, both
  * sides discuss on the channel, Claude revises, final dry-run + sign-off.
  *
+ * Direction being encoded (see previous conversation for full design):
+ * Packages:     relayfile-adapters/workflows/schema-adapter-migration
+ *
  * Future meta-workflows (00b, 00c, ...) will use TEMPLATE.md + BACKLOG.md
  * as input to generate workflows 21-49 in phased batches.
  *
@@ -66,7 +69,7 @@ async function main() {
       cli: 'cursor',
       role: 'Architect and author — reads the skill, designs the template, drafts the backlog, writes the reference workflow, and revises based on peer review findings. Uses Cursor CLI with Claude 4.6 Sonnet for nuance on wide-file reads and template fidelity.',
       preset: 'lead',
-      model: CursorModels.SONNET_4_6,
+      model: CursorModels.GPT_5_4_MEDIUM,
       retries: 1,
       permissions: {
         access: 'restricted',

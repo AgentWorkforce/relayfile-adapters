@@ -3,7 +3,9 @@
 # run-campaign.sh — sequentially execute the schema-adapter migration
 # campaign from the AgentWorkforce root. Each step is one workflow file;
 # meta-workflows draft target workflows, target workflows apply the actual
-# refactor. Halts on first failure. Resumable via the state file.
+# refactor. Halts on first failure. Resumable via the state file. On a fully
+# successful fresh run, a repo-aware finalizer can open one draft PR per dirty
+# nested repo touched by the completed workflows.
 #
 # Usage:
 #   ./relayfile-adapters/workflows/schema-adapter-migration/run-campaign.sh
@@ -28,8 +30,20 @@ set -euo pipefail
 CAMPAIGN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WF_DIR="relayfile-adapters/workflows/schema-adapter-migration"
 STATE_FILE="$CAMPAIGN_ROOT/$WF_DIR/.campaign-state"
+PR_BASELINE_DIR="$CAMPAIGN_ROOT/$WF_DIR/.campaign-pr-baseline"
+PR_REPORT_FILE="$CAMPAIGN_ROOT/$WF_DIR/.campaign-pr-report.tsv"
+FINALIZE_SCRIPT="$CAMPAIGN_ROOT/$WF_DIR/finalize-campaign-prs.sh"
 
 cd "$CAMPAIGN_ROOT"
+
+if command -v agent-relay >/dev/null 2>&1; then
+  AGENT_RELAY_CMD=(agent-relay)
+elif [ -f "$CAMPAIGN_ROOT/relay/dist/src/cli/index.js" ]; then
+  AGENT_RELAY_CMD=(node "$CAMPAIGN_ROOT/relay/dist/src/cli/index.js")
+else
+  echo "Missing agent-relay executable and fallback relay/dist/src/cli/index.js" >&2
+  exit 1
+fi
 
 # Ordered sequence of glob patterns to run, one per line.
 # Meta-workflows (00, 00b, 00c, ...) produce target workflows (20, 21, 22, ...)
@@ -86,6 +100,22 @@ CAMPAIGN_SEQUENCE=(
 mkdir -p "$(dirname "$STATE_FILE")"
 touch "$STATE_FILE"
 
+PR_BASELINE_READY=0
+if [ -x "$FINALIZE_SCRIPT" ]; then
+  if [ -d "$PR_BASELINE_DIR" ]; then
+    PR_BASELINE_READY=1
+  elif [ -s "$STATE_FILE" ]; then
+    echo "⚠ PR baseline not initialized: the campaign is already mid-run."
+    echo "  Auto-opened PRs are skipped for resumed campaigns unless you finalize"
+    echo "  manually with $WF_DIR/finalize-campaign-prs.sh."
+  else
+    "$FINALIZE_SCRIPT" --init-baseline >/dev/null
+    PR_BASELINE_READY=1
+  fi
+else
+  echo "⚠ Missing PR finalizer: $FINALIZE_SCRIPT"
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  schema-adapter migration campaign"
 echo "  root:  $CAMPAIGN_ROOT"
@@ -141,7 +171,7 @@ for pattern in "${CAMPAIGN_SEQUENCE[@]}"; do
   # Anything else (no Result line) is treated as a hard error.
   wf_log=$(mktemp)
   set +e
-  agent-relay run "$wf_file" 2>&1 | tee "$wf_log"
+  "${AGENT_RELAY_CMD[@]}" run "$wf_file" 2>&1 | tee "$wf_log"
   raw_exit=$?
   set -e
 
@@ -186,3 +216,25 @@ if [ -n "$failed_step" ]; then
 fi
 echo "  status:             all workflows complete"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+if [ "${CAMPAIGN_SKIP_PRS:-0}" = "1" ]; then
+  echo
+  echo "PR finalization skipped because CAMPAIGN_SKIP_PRS=1."
+  exit 0
+fi
+
+if [ "$PR_BASELINE_READY" -ne 1 ]; then
+  echo
+  echo "PR finalization skipped: no trusted baseline was captured at campaign start."
+  echo "Run $WF_DIR/finalize-campaign-prs.sh manually once you're ready to branch,"
+  echo "commit, and open repo-scoped PRs."
+  exit 0
+fi
+
+echo
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  FINALIZING REPO-SCOPED PRS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+"$FINALIZE_SCRIPT"
+echo
+echo "PR report: $PR_REPORT_FILE"

@@ -8,11 +8,12 @@
  *               relayfile-adapters/workflows/schema-adapter-migration
  *
  * Adds the Phase 1 `SchemaAdapter.sync(resourceName, options)` foundation in
- * adapter-core, driven by the declarative sync + pagination metadata landed in
- * workflow 21. The workflow keeps scope intentionally narrow: edit
- * `schema-adapter.ts`, add one focused runtime test under `packages/core/tests/`,
- * validate the adapter-core build, run the targeted sync test, and gate the
- * bundle with a reviewer verdict file.
+ * adapter-core, driven by the declarative sync and pagination metadata landed
+ * in workflow 21. The workflow edits `schema-adapter.ts`, adds one focused
+ * runtime test under `packages/core/tests/`, validates the adapter-core build,
+ * runs the targeted sync test, and gates the bundle with a reviewer verdict
+ * file. It reads `relayfile/packages/sdk/typescript` as read-only context and
+ * writes no files in the SDK repo.
  *
  * Run from the AgentWorkforce root (cross-repo workflow):
  *   agent-relay run relayfile-adapters/workflows/schema-adapter-migration/22-schema-adapter-sync.ts
@@ -32,11 +33,26 @@ const SCHEMA_ADAPTER_SYNC_TEST =
   'relayfile-adapters/packages/core/tests/runtime/schema-adapter.sync.test.ts';
 const REVIEW_FILE =
   'relayfile-adapters/workflows/schema-adapter-migration/REVIEW_22.md';
+const TEST_OUTPUT_LOG =
+  'relayfile-adapters/workflows/schema-adapter-migration/TEST_OUTPUT_22.log';
 
-const STANDARD_DENY = ['.env', '.env.*', '**/*.secret', '**/node_modules/**'];
+const STANDARD_DENY = [
+  '.env',
+  '.env.*',
+  '**/*.secret',
+  '**/node_modules/**',
+];
 
-const diffGate = (repoRelativePath: string): string =>
-  `! git -C relayfile-adapters diff --quiet -- ${repoRelativePath}`;
+const diffGate = (subrepo: string, repoRelativePath: string): string =>
+  `! git -C ${subrepo} diff --quiet -- ${repoRelativePath}`;
+
+const modifiedOrUntrackedGate = (
+  subrepo: string,
+  repoRelativePath: string,
+): string =>
+  `if git -C ${subrepo} diff --quiet -- ${repoRelativePath}; then ` +
+  `git -C ${subrepo} ls-files --others --exclude-standard -- ${repoRelativePath} | grep -q .; ` +
+  'else true; fi';
 
 async function main() {
   const result = await workflow('22-schema-adapter-sync')
@@ -45,7 +61,7 @@ async function main() {
     )
     .pattern('dag')
     .channel('wf-22-schema-adapter-sync')
-    .maxConcurrency(4)
+    .maxConcurrency(5)
     .timeout(3_600_000)
 
     .agent('codex-impl', {
@@ -96,9 +112,14 @@ async function main() {
         access: 'readonly',
         exec: [],
         files: {
-          read: [REVIEW_FILE],
+          read: [],
           write: [REVIEW_FILE],
-          deny: STANDARD_DENY,
+          deny: [
+            ...STANDARD_DENY,
+            SCHEMA_ADAPTER_SRC,
+            SCHEMA_ADAPTER_SYNC_TEST,
+            TEST_OUTPUT_LOG,
+          ],
         },
       },
     })
@@ -126,12 +147,14 @@ async function main() {
 
     .step('read-schema-adapter-for-edit', {
       type: 'deterministic',
-      dependsOn: [
-        'read-mapping-spec-types',
-        'read-sdk-integration-adapter',
-        'read-existing-runtime-test',
-      ],
       command: `cat ${SCHEMA_ADAPTER_SRC}`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('read-existing-sync-test', {
+      type: 'deterministic',
+      command: `if [ -f ${SCHEMA_ADAPTER_SYNC_TEST} ]; then cat ${SCHEMA_ADAPTER_SYNC_TEST}; else printf '__MISSING__'; fi`,
       captureOutput: true,
       failOnError: true,
     })
@@ -143,30 +166,24 @@ async function main() {
         'read-mapping-spec-types',
         'read-sdk-integration-adapter',
         'read-existing-runtime-test',
+        'read-review-file',
       ],
-      task: `Update only ${SCHEMA_ADAPTER_SRC}.
-
+      task: `Update only ${SCHEMA_ADAPTER_SRC}. Inputs are pre-injected below.
 Current schema-adapter.ts:
 {{steps.read-schema-adapter-for-edit.output}}
-
 MappingSpec types:
 {{steps.read-mapping-spec-types.output}}
-
 SDK integration-adapter.ts:
 {{steps.read-sdk-integration-adapter.output}}
-
 Existing runtime test style:
 {{steps.read-existing-runtime-test.output}}
+Current review file:
+{{steps.read-review-file.output}}
 
-Implement Workflow 22 Phase 1:
-- add SchemaAdapter.sync(resourceName, options) using SyncOptions / SyncResult
-- resolve resourceName through spec sync metadata from workflow 21
-- paginate generically over this.provider.proxy()
-- compute path + semantics per record, then write via this.client.writeFile
-- persist checkpoints at .sync-state/<adapterName>/<resourceName>.json
-- support resume, maxPages, since/watermark, and AbortSignal safely
-
-Keep the implementation self-contained and minimize unrelated edits.
+Implement SchemaAdapter.sync(resourceName, options): use SyncOptions/SyncResult, resolve spec sync metadata, paginate provider.proxy(), compute path/semantics, write via client.writeFile, persist checkpoints at .sync-state/<adapterName>/<resourceName>.json, and support resume, maxPages, since/watermark, and AbortSignal.
+If the review is blocked, address its concrete findings without weakening already-passing behavior.
+Do not regress the link-header fix: a repeated rel="next" target must be detected before stale page records are written or checkpointed.
+Keep self-contained; minimize unrelated edits.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'exit_code' },
@@ -175,7 +192,10 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
     .step('verify-schema-adapter', {
       type: 'deterministic',
       dependsOn: ['edit-schema-adapter'],
-      command: diffGate('packages/core/src/runtime/schema-adapter.ts'),
+      command: diffGate(
+        'relayfile-adapters',
+        'packages/core/src/runtime/schema-adapter.ts',
+      ),
       failOnError: true,
     })
 
@@ -194,37 +214,45 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
         'read-mapping-spec-types',
         'read-sdk-integration-adapter',
         'read-existing-runtime-test',
+        'read-existing-sync-test',
+        'read-review-file',
       ],
-      task: `Create exactly one file: ${SCHEMA_ADAPTER_SYNC_TEST}
-
+      task: `Create exactly one file: ${SCHEMA_ADAPTER_SYNC_TEST}.
 Implemented schema-adapter.ts:
 {{steps.read-schema-adapter-final.output}}
-
 MappingSpec types:
 {{steps.read-mapping-spec-types.output}}
-
 SDK integration-adapter.ts:
 {{steps.read-sdk-integration-adapter.output}}
-
 Existing runtime test style:
 {{steps.read-existing-runtime-test.output}}
+Current schema-adapter.sync.test.ts, if present:
+{{steps.read-existing-sync-test.output}}
+Current review file:
+{{steps.read-review-file.output}}
 
-Add focused node:test coverage proving:
-- mock provider.proxy() paginates across multiple pages
-- records land in a test workspace through client.writeFile
-- checkpoint state is written and used on resume
-- maxPages stops deterministically
-- AbortSignal stops sync before a later checkpoint is written
-
+Add focused node:test coverage for multi-page provider.proxy(), workspace writes via client.writeFile, checkpoint write/resume, deterministic maxPages stop, and AbortSignal stopping before a later checkpoint.
+If the review is blocked, preserve or add coverage for each concrete blocked finding.
+The repeated link-header test must assert the repeated target page is not written and no second checkpoint is created.
 Use inline deterministic fixtures only. Do NOT edit any other file.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'file_exists', value: SCHEMA_ADAPTER_SYNC_TEST },
     })
 
-    .step('read-schema-adapter-sync-test', {
+    .step('verify-schema-adapter-sync-test', {
       type: 'deterministic',
       dependsOn: ['write-schema-adapter-sync-test'],
+      command: modifiedOrUntrackedGate(
+        'relayfile-adapters',
+        'packages/core/tests/runtime/schema-adapter.sync.test.ts',
+      ),
+      failOnError: true,
+    })
+
+    .step('read-schema-adapter-sync-test', {
+      type: 'deterministic',
+      dependsOn: ['verify-schema-adapter-sync-test'],
       command: `cat ${SCHEMA_ADAPTER_SYNC_TEST}`,
       captureOutput: true,
       failOnError: true,
@@ -232,7 +260,7 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
 
     .step('build-adapter-core', {
       type: 'deterministic',
-      dependsOn: ['verify-schema-adapter', 'write-schema-adapter-sync-test'],
+      dependsOn: ['verify-schema-adapter', 'verify-schema-adapter-sync-test'],
       command: '(cd relayfile-adapters/packages/core && npm run build)',
       failOnError: true,
     })
@@ -241,43 +269,72 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       type: 'deterministic',
       dependsOn: ['build-adapter-core'],
       command:
-        '(cd relayfile-adapters/packages/core && node --test dist/tests/runtime/schema-adapter.sync.test.js)',
+        `bash -o pipefail -c '(cd relayfile-adapters/packages/core && node --test dist/tests/runtime/schema-adapter.sync.test.js) | tee ${TEST_OUTPUT_LOG}'`,
       captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('verify-sync-test-log', {
+      type: 'deterministic',
+      dependsOn: ['test-schema-adapter-sync'],
+      command: `test -s ${TEST_OUTPUT_LOG}`,
+      failOnError: true,
+    })
+
+    .step('regression-build-adapters', {
+      type: 'deterministic',
+      dependsOn: ['verify-sync-test-log'],
+      command:
+        '(cd relayfile-adapters/packages/github && npm run build)' +
+        ' && (cd relayfile-adapters/packages/gitlab && npm run build)' +
+        ' && (cd relayfile-adapters/packages/linear && npm run build)' +
+        ' && (cd relayfile-adapters/packages/notion && npm run build)' +
+        ' && (cd relayfile-adapters/packages/slack && npm run build)' +
+        ' && (cd relayfile-adapters/packages/teams && npm run build)',
       failOnError: true,
     })
 
     .step('verify-sync-test-output', {
       type: 'deterministic',
-      dependsOn: ['test-schema-adapter-sync'],
-      command:
-        `printf '%s' "{{steps.test-schema-adapter-sync.output}}" | rg -q "checkpoint state"` +
-        ` && printf '%s' "{{steps.test-schema-adapter-sync.output}}" | rg -q "test workspace"`,
+      dependsOn: ['regression-build-adapters'],
+      command: `test -s ${TEST_OUTPUT_LOG}`,
       failOnError: true,
     })
 
     .step('bundle-review-context', {
       type: 'deterministic',
       dependsOn: [
-        'read-schema-adapter-final',
-        'read-schema-adapter-sync-test',
-        'test-schema-adapter-sync',
+        'verify-schema-adapter',
+        'verify-schema-adapter-sync-test',
         'verify-sync-test-output',
       ],
       command:
-        `printf '=== schema-adapter.ts ===\\n%s\\n' "{{steps.read-schema-adapter-final.output}}"` +
-        ` && printf '\\n=== schema-adapter.sync.test.ts ===\\n%s\\n' "{{steps.read-schema-adapter-sync-test.output}}"` +
-        ` && printf '\\n=== sync test output ===\\n%s\\n' "{{steps.test-schema-adapter-sync.output}}"`,
+        `printf '=== schema-adapter.ts ===\\n' && cat ${SCHEMA_ADAPTER_SRC}` +
+        ` && printf '\\n=== schema-adapter.sync.test.ts ===\\n' && cat ${SCHEMA_ADAPTER_SYNC_TEST}` +
+        ` && printf '\\n=== sync test output ===\\n' && cat ${TEST_OUTPUT_LOG}`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('read-review-file', {
+      type: 'deterministic',
+      command: `if [ -f ${REVIEW_FILE} ]; then cat ${REVIEW_FILE}; else printf '__MISSING__'; fi`,
       captureOutput: true,
       failOnError: true,
     })
 
     .step('review-schema-adapter-sync', {
       agent: 'codex-reviewer',
-      dependsOn: ['bundle-review-context'],
+      dependsOn: ['bundle-review-context', 'read-review-file'],
       task: `Review workflow 22's implementation bundle.
 
 Bundle:
 {{steps.bundle-review-context.output}}
+
+Current review file:
+{{steps.read-review-file.output}}
+
+Write ${REVIEW_FILE} first. The first line must be exactly approved or start with blocked:.
 
 Check only for:
 - pagination edge cases or unbounded loop risk
@@ -285,17 +342,26 @@ Check only for:
 - AbortSignal behavior
 - missing test coverage for the required scenarios
 
-Write your verdict to ${REVIEW_FILE}.
-The first line must be exactly "approved" or start with "blocked:".
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
+Do NOT run npm, git, node, tsc, tsx, or agent-relay.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'file_exists', value: REVIEW_FILE },
     })
 
-    .step('gate-review-verdict', {
+    .step('verify-review-file', {
       type: 'deterministic',
       dependsOn: ['review-schema-adapter-sync'],
-      command: `test -s ${REVIEW_FILE} && head -n 1 ${REVIEW_FILE} | grep -Eq '^approved$'`,
+      command: modifiedOrUntrackedGate(
+        'relayfile-adapters',
+        'workflows/schema-adapter-migration/REVIEW_22.md',
+      ),
+      failOnError: true,
+    })
+
+    .step('gate-review-verdict', {
+      type: 'deterministic',
+      dependsOn: ['verify-review-file'],
+      command:
+        `test -s ${REVIEW_FILE} && printf '%s' "$(sed -n '1p' ${REVIEW_FILE})" | grep -q '^approved$'`,
       failOnError: true,
     })
 

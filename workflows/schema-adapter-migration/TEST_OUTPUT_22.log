@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: SchemaAdapter sync paginates provider.proxy responses into workspace files and checkpoints
+ok 1 - SchemaAdapter sync paginates provider.proxy responses into workspace files and checkpoints
+  ---
+  duration_ms: 2.422709
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync resumes from a stored checkpoint and rewrites it with the stored revision
+ok 2 - SchemaAdapter sync resumes from a stored checkpoint and rewrites it with the stored revision
+  ---
+  duration_ms: 0.288375
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync stops deterministically at maxPages while preserving the next cursor
+ok 3 - SchemaAdapter sync stops deterministically at maxPages while preserving the next cursor
+  ---
+  duration_ms: 0.309042
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync scopes checkpoints by resource input
+ok 4 - SchemaAdapter sync scopes checkpoints by resource input
+  ---
+  duration_ms: 0.377875
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync withholds checkpoint advancement when a record write fails
+ok 5 - SchemaAdapter sync withholds checkpoint advancement when a record write fails
+  ---
+  duration_ms: 0.171167
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync stops link-header pagination on repeated next links
+ok 6 - SchemaAdapter sync stops link-header pagination on repeated next links
+  ---
+  duration_ms: 0.441708
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync stops page pagination without an effective page size
+ok 7 - SchemaAdapter sync stops page pagination without an effective page size
+  ---
+  duration_ms: 0.176291
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync rejects before provider calls when already aborted
+ok 8 - SchemaAdapter sync rejects before provider calls when already aborted
+  ---
+  duration_ms: 0.253583
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync passes AbortSignal to provider.proxy and propagates provider aborts
+ok 9 - SchemaAdapter sync passes AbortSignal to provider.proxy and propagates provider aborts
+  ---
+  duration_ms: 0.495375
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync propagates AbortSignal during checkpoint writes
+ok 10 - SchemaAdapter sync propagates AbortSignal during checkpoint writes
+  ---
+  duration_ms: 0.344334
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync honors AbortSignal before writing a later checkpoint
+ok 11 - SchemaAdapter sync honors AbortSignal before writing a later checkpoint
+  ---
+  duration_ms: 0.231958
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync stops offset pagination when provider repeats full page data
+ok 12 - SchemaAdapter sync stops offset pagination when provider repeats full page data
+  ---
+  duration_ms: 0.1445
+  type: 'test'
+  ...
+# Subtest: SchemaAdapter sync stops page pagination when provider repeats full page data
+ok 13 - SchemaAdapter sync stops page pagination when provider repeats full page data
+  ---
+  duration_ms: 0.120583
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 45.392042

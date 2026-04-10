@@ -10,9 +10,19 @@ import type { ServiceSpec } from "../ingest/types.js";
 import { extractTemplateFields, pathExists } from "./template.js";
 import type {
   MappingSpec,
+  PaginationConfig,
+  ResourceSyncConfig,
   ValidationIssue,
   ValidationResult,
 } from "./types.js";
+
+const SUPPORTED_STRATEGIES = new Set([
+  "cursor",
+  "offset",
+  "page",
+  "link-header",
+  "next-token",
+]);
 
 export async function loadMappingSpec(
   location: string,
@@ -212,6 +222,87 @@ function parseResourceMapping(input: Record<string, unknown>) {
     path: readRequiredString(input.path, "path"),
     iterate: input.iterate === true,
     extract: readOptionalStringArray(input.extract),
+    pagination: input.pagination !== undefined
+      ? parsePaginationConfig(asRecord(input.pagination, "pagination"))
+      : undefined,
+    sync: input.sync !== undefined
+      ? parseResourceSyncConfig(asRecord(input.sync, "sync"))
+      : undefined,
+  };
+}
+
+function parsePaginationConfig(
+  input: Record<string, unknown>
+): PaginationConfig {
+  const strategy = readRequiredString(input.strategy, "pagination.strategy");
+
+  if (!SUPPORTED_STRATEGIES.has(strategy)) {
+    throw new Error(
+      `pagination.strategy "${strategy}" is not supported. ` +
+        `Must be one of: ${[...SUPPORTED_STRATEGIES].join(", ")}`
+    );
+  }
+
+  switch (strategy) {
+    case "cursor": {
+      const cursorPath = readRequiredString(
+        input.cursorPath,
+        "pagination.cursorPath"
+      );
+      return {
+        strategy: "cursor",
+        cursorPath,
+        paramName: readOptionalString(input.paramName),
+      };
+    }
+    case "offset":
+      return {
+        strategy: "offset",
+        paramName: readOptionalString(input.paramName),
+        limitParamName: readOptionalString(
+          input.limitParamName ?? input.limit_param_name
+        ),
+        pageSize: readOptionalNumber(input.pageSize ?? input.page_size),
+      };
+    case "page":
+      return {
+        strategy: "page",
+        paramName: readOptionalString(input.paramName),
+        limitParamName: readOptionalString(
+          input.limitParamName ?? input.limit_param_name
+        ),
+        pageSize: readOptionalNumber(input.pageSize ?? input.page_size),
+      };
+    case "link-header":
+      return { strategy: "link-header" };
+    case "next-token": {
+      const tokenPath = readRequiredString(
+        input.tokenPath,
+        "pagination.tokenPath"
+      );
+      return {
+        strategy: "next-token",
+        tokenPath,
+        paramName: readOptionalString(input.paramName),
+      };
+    }
+    default:
+      throw new Error(`Unhandled pagination strategy: ${strategy}`);
+  }
+}
+
+function parseResourceSyncConfig(
+  input: Record<string, unknown>
+): ResourceSyncConfig {
+  return {
+    modelName: readRequiredString(
+      input.modelName ?? input.model_name,
+      "sync.modelName"
+    ),
+    cursorField: readOptionalString(input.cursorField ?? input.cursor_field),
+    checkpointKey: readOptionalString(
+      input.checkpointKey ?? input.checkpoint_key
+    ),
   };
 }
 

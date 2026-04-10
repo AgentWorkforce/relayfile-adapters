@@ -7,15 +7,17 @@
  * Packages:     relayfile-adapters/packages/core,
  *               relayfile-adapters/workflows/schema-adapter-migration
  *
- * Extends `ResourceMapping` so adapter-core can describe sync-ready resources
- * declaratively: a `pagination` block for the supported REST pagination
- * strategies (`cursor`, `offset`, `page`, `link-header`, `next-token`) plus a
- * `sync` block that opt-ins a resource to `SchemaAdapter.sync()` and carries
- * the model/checkpoint metadata that workflow 22 will consume. The workflow
- * updates the MappingSpec types, teaches the parser to accept and reject the
- * new fields correctly, adds focused parser tests under `packages/core/tests/`,
- * and gates the change with deterministic diff checks, `npm run build`, and
- * `npm test` for `@relayfile/adapter-core`.
+ * Extends `ResourceMapping` so adapter-core can declare sync-ready resources
+ * with a `pagination` block for the supported REST strategies (`cursor`,
+ * `offset`, `page`, `link-header`, `next-token`) plus a `sync` block that
+ * opts a resource into `SchemaAdapter.sync()` and carries the
+ * `modelName`/`cursorField`/`checkpointKey` metadata workflow 22 consumes.
+ * The workflow updates the MappingSpec types, teaches the parser to accept and
+ * reject the new fields correctly, adds focused parser coverage under
+ * `packages/core/tests/`, and gates the change with deterministic diff checks,
+ * `npm run build`, and `npm test` for `@relayfile/adapter-core`. It also
+ * writes `ANALYSIS_21.md` and `REVIEW_21.md` under the migration workflow
+ * directory.
  *
  * Run from the AgentWorkforce root (cross-repo workflow):
  *   agent-relay run relayfile-adapters/workflows/schema-adapter-migration/21-mapping-spec-pagination.ts
@@ -24,11 +26,13 @@
 import { workflow } from '@agent-relay/sdk/workflows';
 import { ClaudeModels, CodexModels } from '@agent-relay/config';
 
+const WORKFLOW_SLUG = '21-mapping-spec-pagination';
+const WORKFLOW_CHANNEL = 'wf-21-mapping-spec-pagination';
+
 const TYPES_FILE = 'relayfile-adapters/packages/core/src/spec/types.ts';
 const PARSER_FILE = 'relayfile-adapters/packages/core/src/spec/parser.ts';
 const PARSER_TEST_FILE =
   'relayfile-adapters/packages/core/tests/spec/parser.test.ts';
-const PACKAGE_JSON = 'relayfile-adapters/packages/core/package.json';
 const ANALYSIS_FILE =
   'relayfile-adapters/workflows/schema-adapter-migration/ANALYSIS_21.md';
 const REVIEW_FILE =
@@ -41,28 +45,34 @@ const STANDARD_DENY = [
   '**/node_modules/**',
 ];
 
-const diffGate = (path: string): string => `! git diff --quiet ${path}`;
+const modifiedGate = (path: string): string =>
+  `! git -C relayfile-adapters diff --quiet -- ${path.replace('relayfile-adapters/', '')}`;
+
+const modifiedOrUntrackedGate = (path: string): string =>
+  `if git -C relayfile-adapters diff --quiet -- ${path.replace('relayfile-adapters/', '')}; then ` +
+  `git -C relayfile-adapters ls-files --others --exclude-standard -- ${path.replace('relayfile-adapters/', '')} | rg -q .; ` +
+  'else true; fi';
 
 async function main() {
-  const result = await workflow('21-mapping-spec-pagination')
+  const result = await workflow(WORKFLOW_SLUG)
     .description(
-      'Add MappingSpec pagination and sync metadata, validate the parser surface, and prove adapter-core still builds and tests cleanly.',
+      'Add ResourceMapping pagination and sync metadata, validate the parser surface, and prove adapter-core still builds and tests cleanly.',
     )
     .pattern('dag')
-    .channel('wf-21-mapping-spec-pagination')
-    .maxConcurrency(4)
+    .channel(WORKFLOW_CHANNEL)
+    .maxConcurrency(6)
     .timeout(3_600_000)
 
     .agent('claude-analyst', {
       cli: 'claude',
-      role: 'Summarizes the exact type, parser, and parser-test deltas for workflow 21 into a short implementation brief.',
-      preset: 'analyst',
+      role: 'Writes the workflow 21 implementation brief for types, parser, and tests.',
+      preset: 'worker',
       model: ClaudeModels.SONNET,
       retries: 1,
       permissions: {
-        access: 'readonly',
+        access: 'restricted',
         files: {
-          read: [TYPES_FILE, PARSER_FILE, PARSER_TEST_FILE, PACKAGE_JSON],
+          read: [TYPES_FILE, PARSER_FILE, PARSER_TEST_FILE],
           write: [ANALYSIS_FILE],
           deny: [...STANDARD_DENY, REVIEW_FILE],
         },
@@ -72,7 +82,7 @@ async function main() {
 
     .agent('codex-types-author', {
       cli: 'codex',
-      role: 'Applies the bounded ResourceMapping type changes for workflow 21.',
+      role: 'Adds the bounded ResourceMapping pagination and sync type surface.',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
       retries: 1,
@@ -89,7 +99,7 @@ async function main() {
 
     .agent('codex-parser-author', {
       cli: 'codex',
-      role: 'Updates parser support for pagination and sync configuration.',
+      role: 'Extends parser support for pagination and sync configuration.',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
       retries: 1,
@@ -106,7 +116,7 @@ async function main() {
 
     .agent('codex-tests-author', {
       cli: 'codex',
-      role: 'Adds focused parser coverage for pagination and sync parsing.',
+      role: 'Adds focused parser tests for pagination and sync parsing.',
       preset: 'worker',
       model: CodexModels.GPT_5_4,
       retries: 1,
@@ -123,16 +133,16 @@ async function main() {
 
     .agent('codex-reviewer', {
       cli: 'codex',
-      role: 'Reviews the three-file diff and confirms the new pagination and sync shapes are coherent and covered by tests.',
+      role: 'Reviews the adapter-core diff for pagination and sync coherence.',
       preset: 'reviewer',
       model: CodexModels.GPT_5_4,
       retries: 1,
       permissions: {
         access: 'readonly',
         files: {
-          read: [ANALYSIS_FILE],
+          read: [],
           write: [REVIEW_FILE],
-          deny: STANDARD_DENY,
+          deny: [...STANDARD_DENY, TYPES_FILE, PARSER_FILE, PARSER_TEST_FILE],
         },
         exec: [],
       },
@@ -159,21 +169,9 @@ async function main() {
       failOnError: true,
     })
 
-    .step('read-package-json', {
-      type: 'deterministic',
-      command: `cat ${PACKAGE_JSON}`,
-      captureOutput: true,
-      failOnError: true,
-    })
-
     .step('analyze-workflow-21-scope', {
       agent: 'claude-analyst',
-      dependsOn: [
-        'read-types-file',
-        'read-parser-file',
-        'read-parser-test-file',
-        'read-package-json',
-      ],
+      dependsOn: ['read-types-file', 'read-parser-file', 'read-parser-test-file'],
       task: `Prepare a concise implementation brief for workflow 21.
 
 types.ts:
@@ -185,14 +183,9 @@ parser.ts:
 parser.test.ts:
 {{steps.read-parser-test-file.output}}
 
-package.json:
-{{steps.read-package-json.output}}
-
-Write ${ANALYSIS_FILE} with:
-1. The exact pagination and sync fields to add to ResourceMapping.
-2. Parser rules for accepted strategies and required fields.
-3. The focused parser tests to add.
-
+Write ${ANALYSIS_FILE} with the exact ResourceMapping fields, parser rules for
+cursor/offset/page/link-header/next-token, rejection cases for missing or
+unsupported pagination config, and the focused parser tests to add.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'file_exists', value: ANALYSIS_FILE },
@@ -208,7 +201,6 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
 
     .step('read-types-file-for-edit', {
       type: 'deterministic',
-      dependsOn: ['read-analysis-file'],
       command: `cat ${TYPES_FILE}`,
       captureOutput: true,
       failOnError: true,
@@ -225,12 +217,10 @@ Current file:
 Implementation brief:
 {{steps.read-analysis-file.output}}
 
-Add ResourceMapping support for:
-- pagination strategies: cursor, offset, page, link-header, next-token
-- pagination config fields needed by workflow 21
-- sync config with modelName, cursorField, checkpointKey
-
-Keep the change minimal and type-level only in this file.
+Add the minimal ResourceMapping type support for pagination strategies
+cursor, offset, page, link-header, and next-token, plus a sync block with
+modelName, cursorField, and checkpointKey.
+Keep the change type-level only in this file.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'exit_code' },
@@ -239,13 +229,12 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
     .step('verify-types-file', {
       type: 'deterministic',
       dependsOn: ['edit-types-file'],
-      command: diffGate(TYPES_FILE),
+      command: modifiedGate(TYPES_FILE),
       failOnError: true,
     })
 
     .step('read-parser-file-for-edit', {
       type: 'deterministic',
-      dependsOn: ['read-analysis-file'],
       command: `cat ${PARSER_FILE}`,
       captureOutput: true,
       failOnError: true,
@@ -262,11 +251,9 @@ Current file:
 Implementation brief:
 {{steps.read-analysis-file.output}}
 
-Teach the parser to read the new ResourceMapping.pagination and
-ResourceMapping.sync fields and validate them. The parser must accept the
-five supported strategies and reject invalid or underspecified configs,
-including cursor pagination without a cursorPath.
-
+Teach the parser to read ResourceMapping.pagination and ResourceMapping.sync,
+accept exactly the five supported pagination strategies, and reject invalid or
+underspecified configs including cursor pagination without a cursorPath.
 Keep existing parser behavior unchanged outside this feature.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
@@ -276,13 +263,12 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
     .step('verify-parser-file', {
       type: 'deterministic',
       dependsOn: ['edit-parser-file'],
-      command: diffGate(PARSER_FILE),
+      command: modifiedGate(PARSER_FILE),
       failOnError: true,
     })
 
     .step('read-parser-test-file-for-edit', {
       type: 'deterministic',
-      dependsOn: ['read-analysis-file'],
       command: `cat ${PARSER_TEST_FILE}`,
       captureOutput: true,
       failOnError: true,
@@ -299,11 +285,9 @@ Current file:
 Implementation brief:
 {{steps.read-analysis-file.output}}
 
-Add focused tests that prove:
-1. parseMappingSpecText accepts pagination and sync blocks.
-2. validation rejects cursor pagination without cursorPath.
-3. validation rejects unsupported pagination strategies.
-
+Add focused tests proving parseMappingSpecText accepts pagination and sync
+blocks, rejects cursor pagination without cursorPath, and rejects unsupported
+pagination strategies.
 Stay consistent with the existing node:test style in this file.
 Do NOT run tsc, tsx, agent-relay, npm, git, or node.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
@@ -313,7 +297,7 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
     .step('verify-parser-tests', {
       type: 'deterministic',
       dependsOn: ['edit-parser-tests'],
-      command: diffGate(PARSER_TEST_FILE),
+      command: modifiedGate(PARSER_TEST_FILE),
       failOnError: true,
     })
 
@@ -328,17 +312,29 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       type: 'deterministic',
       dependsOn: ['build-adapter-core'],
       command: '(cd relayfile-adapters/packages/core && npm test)',
-      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('regression-build-adapters', {
+      type: 'deterministic',
+      dependsOn: ['test-adapter-core'],
+      command:
+        '(cd relayfile-adapters/packages/github && npm run build)' +
+        ' && (cd relayfile-adapters/packages/gitlab && npm run build)' +
+        ' && (cd relayfile-adapters/packages/linear && npm run build)' +
+        ' && (cd relayfile-adapters/packages/notion && npm run build)' +
+        ' && (cd relayfile-adapters/packages/slack && npm run build)' +
+        ' && (cd relayfile-adapters/packages/teams && npm run build)',
       failOnError: true,
     })
 
     .step('bundle-review-context', {
       type: 'deterministic',
-      dependsOn: ['test-adapter-core'],
+      dependsOn: ['regression-build-adapters'],
       command:
         `printf '=== IMPLEMENTATION BRIEF ===\n' && cat ${ANALYSIS_FILE}` +
         ` && printf '\n=== relayfile-adapters diff ===\n'` +
-        ` && git diff -- ${TYPES_FILE} ${PARSER_FILE} ${PARSER_TEST_FILE}`,
+        ` && git -C relayfile-adapters diff -- ${TYPES_FILE.replace('relayfile-adapters/', '')} ${PARSER_FILE.replace('relayfile-adapters/', '')} ${PARSER_TEST_FILE.replace('relayfile-adapters/', '')}`,
       captureOutput: true,
       failOnError: true,
     })
@@ -351,24 +347,26 @@ IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
 Review bundle:
 {{steps.bundle-review-context.output}}
 
-Confirm:
-1. ResourceMapping gained pagination and sync config without unrelated drift.
-2. Supported pagination strategies are exactly cursor, offset, page,
-   link-header, and next-token.
-3. sync carries modelName, cursorField, checkpointKey.
-4. Parser validation rejects cursor pagination without cursorPath.
-5. Tests cover the new surface meaningfully.
-
-Write your verdict to ${REVIEW_FILE}. The first line must be exactly
-"approved" or start with "blocked:".
-Do NOT run tsc, tsx, agent-relay, npm, git, or node.
+Write ${REVIEW_FILE} first. The first line must be exactly approved or start with blocked:.
+Confirm the diff only adds ResourceMapping pagination and sync support, limits
+pagination strategies to cursor/offset/page/link-header/next-token, carries
+modelName/cursorField/checkpointKey in sync, rejects cursor pagination without
+cursorPath, and adds meaningful parser coverage for the new surface.
+Do NOT run npm, git, node, tsc, tsx, or agent-relay.
 IMPORTANT: Write the file to disk. Do NOT output to stdout.`,
       verification: { type: 'file_exists', value: REVIEW_FILE },
     })
 
-    .step('gate-review-verdict', {
+    .step('verify-review-file', {
       type: 'deterministic',
       dependsOn: ['review-workflow-21'],
+      command: modifiedOrUntrackedGate(REVIEW_FILE),
+      failOnError: true,
+    })
+
+    .step('gate-review-verdict', {
+      type: 'deterministic',
+      dependsOn: ['verify-review-file'],
       command: `test -s ${REVIEW_FILE} && head -n 1 ${REVIEW_FILE} | grep -Eq "^approved$"`,
       failOnError: true,
     })

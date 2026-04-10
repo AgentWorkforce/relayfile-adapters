@@ -7,7 +7,7 @@
  *               must be shipped and committed so SchemaAdapter.sync can be
  *               implemented against it in workflow 22)
  * Parallel with:none (sequential with 00, 20, then the 4 target workflows)
- * Packages:     relayfile-adapters/workflows/schema-adapter-migration/
+ * Packages:     relayfile-adapters/workflows/schema-adapter-migration
  *
  * Produces four new workflow files:
  *   21-mapping-spec-pagination.ts       — extend MappingSpec with declarative
@@ -75,18 +75,17 @@ rejected at batch review — treat them as hard constraints):
 
 2. EVERY file-MUTATING step must be followed IMMEDIATELY by a separate
    deterministic verify step that runs:
-     command: '! git diff --quiet <repo>/<file>'
+     command: '! git -C <repo> diff --quiet -- <repo-relative-file>'
    The \`!\` is load-bearing — git diff --quiet exits 0 when the file is
    UNMODIFIED, so we need the negation. Downstream steps must depend on
    this verify step, not on the edit step directly.
 
-3. EVERY file-CREATING step must be followed IMMEDIATELY by a separate
-   deterministic verify step that runs:
-     command: 'test -f <expected-path>'
-   OR uses:
+3. EVERY file-CREATING step must use:
      verification: { type: 'file_exists', value: '<expected-path>' }
-   Inline \`verification: { type: 'exit_code' }\` on an agent step is NOT
-   sufficient — the agent may exit 0 without writing the file.
+   on the creating agent step itself. Inline
+   \`verification: { type: 'exit_code' }\` is NOT sufficient, and a follow-up
+   shell \`test -f\` step is not the primary verification pattern for this
+   campaign.
 
 4. Permission scopes (\`permissions.files.read\` / \`write\`) must be
    specific paths, not wildcards. NEVER use \`tests/**\`, \`src/**\`, or
@@ -101,7 +100,10 @@ rejected at batch review — treat them as hard constraints):
          .run({ cwd: process.cwd() });
        console.log('Result:', result.status);
      }
-     main().catch((error) => { console.error(error); process.exitCode = 1; });
+     main().catch((error) => {
+       console.error(error);
+       process.exitCode = 1;
+     });
    No top-level await. No createWorkflowRenderer. No .build().
 
 6. Import from package entry points only:
@@ -118,13 +120,112 @@ rejected at batch review — treat them as hard constraints):
    - preset: 'worker' for all bounded file-writing / file-editing steps
    - preset: 'reviewer' for verdict-producing steps
    When in doubt, use 'worker'. Lead agents sprawl into tool chains.
+   - Any agent that writes a file, including an analysis brief, MUST use
+     preset: 'worker' and permissions.access: 'restricted'.
+   - Reviewer agents use preset: 'reviewer', access: 'readonly', write only
+     the verdict file, and deny every implementation file they must not edit.
 
-9. Task prompts must stay under 30 lines for bounded steps. Pre-inject
-   content via deterministic \`cat\` steps and reference via
-   \`{{steps.X.output}}\` — never ask a worker to read large files itself.
+9. Task prompts for bounded worker/reviewer steps must stay within 10-20
+   physical lines. Pre-inject content via deterministic \`cat\` steps and
+   reference via \`{{steps.X.output}}\` — never ask a worker to read large
+   files itself. If a checklist makes a prompt exceed 20 lines, collapse the
+   checklist into a concise sentence or move it into a deterministic brief.
 
 10. Channel must be \`wf-<workflow-slug>\` where <slug> matches the
     filename slug. Never use 'general'.
+
+11. Keep header fields machine-readable. Examples:
+    - \`Parallel with: none\`
+    - \`Parallel with: 24\`
+    Never append prose to the header line. Put explanations in the paragraph
+    below. \`Packages:\` must list every repo-relative directory the workflow
+    writes to, including the workflow directory for ANALYSIS/REVIEW files.
+    If the workflow reads another repo only as context, mention that in the
+    paragraph below the header instead of silently hiding the cross-repo read.
+    Do NOT list read-only context packages or regression-build-only packages
+    in \`Packages:\`; build-only packages are not write surfaces.
+
+12. Every existing-file edit must follow the read-then-edit pattern from
+    TEMPLATE.md §8a: add a fresh deterministic \`cat\` step immediately before
+    the edit step and inject that exact output into the prompt.
+
+13. Never gate on reviewer stdout. Reviewer verdicts must be written to a
+    deterministic file and a follow-up deterministic step must grep line 1 of
+    that file for \`^approved$\`.
+    The reviewer step itself creates a file, so it must also be followed
+    immediately by a deterministic changed-or-untracked verify step for the
+    review file; the approval grep comes after that verify step.
+
+14. If the target workflow file already exists from a prior failed run, revise
+    it in place instead of redrafting from scratch. Preserve any structure that
+    already complies with TEMPLATE.md and only fix the remaining violations.
+
+15. Avoid unnecessary serialization. If multiple file-creation steps only
+    consume the same shared read-context steps, fan them out in parallel from
+    that shared context instead of chaining them behind sibling verify steps.
+    Do not add \`dependsOn\` to a deterministic read step unless its command
+    actually consumes predecessor output. Do not keep read steps whose output
+    is unused downstream.
+
+16. Every workflow file must contain exactly one top-level workflow
+    definition: one JSDoc header, one import block, one constant block,
+    one \`async function main()\`, and one trailing \`main().catch(...)\`.
+    Never append a second full copy of the workflow after the footer.
+    Before finishing, search your output for a second JSDoc header, second
+    import block, or second \`async function main()\`; delete duplicates.
+
+17. Plain \`git diff --quiet\` is NOT a valid verify gate for newly created or
+    newly untracked files, including REVIEW / PLAN / ANALYSIS markdown files.
+    Either rely on the creating step's \`file_exists\` verification or use an
+    untracked-aware deterministic helper:
+      \`git -C <repo> diff --quiet -- <repo-relative-path> || git -C <repo> ls-files --others --exclude-standard -- <repo-relative-path> | grep -q .\`
+    Do not add a review-file diff gate unless it is untracked-aware and
+    scoped to the touched repository with \`git -C\`.
+
+18. If sibling file-creation steps can run in parallel, each step must use an
+    agent whose \`permissions.files.write\` contains only the one file that
+    step owns. Use separate agent definitions with explicit sibling-file
+    denies instead of one broad worker that can write every sibling output.
+
+19. Reviewer prompts may only ask reviewers to check material that is present
+    in the injected bundle. If the reviewer must inspect workflow structure,
+    verify-gate placement, npm command wrapping, or reference-package parity,
+    pre-inject the workflow source or reference files into the review context.
+
+20. Do not add no-op deterministic barriers such as \`command: 'true'\`.
+    Aggregation/barrier steps must run a real deterministic check, or
+    downstream validation must depend directly on the real verify steps.
+
+21. Do not embed large or arbitrary captured outputs inside deterministic shell
+    commands, for example \`printf "%s" "{{steps.some-step.output}}"\`.
+    Deterministic commands should \`cat\` concrete files, grep concrete log
+    files, or use direct file paths. If test output must be checked later,
+    tee it to a log file under the workflow directory, add an immediate
+    deterministic \`test -s <log-file>\` gate, then grep that file in a
+    separate downstream content gate.
+
+22. Every file-producing worker or reviewer prompt must include the exact line:
+      \`IMPORTANT: Write the file to disk. Do NOT output to stdout.\`
+    Do not use variants such as "Do NOT output code to stdout.".
+
+23. Reviewer prompts must tell the reviewer where to write the verdict before
+    the checklist and must forbid shell commands. Use:
+      \`Write <review-file> first. The first line must be exactly approved or start with blocked:.\`
+      \`Do NOT run npm, git, node, tsc, tsx, or agent-relay.\`
+
+24. Shared adapter-core contract/runtime changes need sibling regression-build
+    coverage after the adapter-core build/test gate. Add a deterministic step
+    such as \`regression-build-adapters\` that runs subshell-wrapped npm builds
+    for affected sibling adapter packages.
+
+25. For multi-file fan-out, the merge/build step must list every relevant
+    one-file verify gate directly in \`dependsOn\`; do not rely on transitive
+    dependencies for sibling file outputs.
+
+26. If a workflow creates or edits a package manifest with dependencies, run a
+    deterministic \`npm install --package-lock-only\` in the owning repo and
+    immediately verify the exact lockfile, or explicitly document why no lock
+    state exists. Package-lock writes must be declared in \`Packages:\`.
 
 When in doubt, model your new workflow after
 \`relayfile-adapters/workflows/schema-adapter-migration/20-canonical-integration-adapter-sdk.ts\`
@@ -139,7 +240,7 @@ async function main() {
     )
     .pattern('dag')
     .channel('wf-schema-adapter-gen-00b')
-    .maxConcurrency(5)
+    .maxConcurrency(6)
     .timeout(3_600_000) // 1h — 4 parallel drafts + 4 dry-runs + 1 batch review
 
     // ─── Agents ─────────────────────────────────────────────
@@ -167,7 +268,7 @@ async function main() {
       cli: 'cursor',
       role: 'Bounded non-interactive author — drafts a single workflow file from pre-injected TEMPLATE.md + BACKLOG.md. Worker preset enforces one-shot bounded execution. Used only for initial workflow drafting where template fidelity matters most. Cursor CLI with Claude 4.6 Sonnet gives the template fidelity codex lacks.',
       preset: 'worker',
-      model: CursorModels.SONNET_4_6,
+      model: CursorModels.GPT_5_4_MEDIUM,
       retries: 1,
       permissions: {
         access: 'restricted',
@@ -225,90 +326,62 @@ async function main() {
       failOnError: true,
     })
 
-    // ─── Phase 2: Draft 4 workflows in parallel ─────────────
+    .step('read-current-draft-21', {
+      type: 'deterministic',
+      command: `if [ -f ${WF_21} ]; then cat ${WF_21}; else echo '__MISSING__'; fi`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('read-current-draft-22', {
+      type: 'deterministic',
+      command: `if [ -f ${WF_22} ]; then cat ${WF_22}; else echo '__MISSING__'; fi`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('read-current-draft-23', {
+      type: 'deterministic',
+      command: `if [ -f ${WF_23} ]; then cat ${WF_23}; else echo '__MISSING__'; fi`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    .step('read-current-draft-24', {
+      type: 'deterministic',
+      command: `if [ -f ${WF_24} ]; then cat ${WF_24}; else echo '__MISSING__'; fi`,
+      captureOutput: true,
+      failOnError: true,
+    })
+
+    // ─── Phase 2: Freeze current drafts ─────────────────────
 
     .step('draft-21', {
-      agent: 'cursor-author',
-      dependsOn: ['read-template', 'read-backlog'],
-      task: `Draft ${WF_21}. Single deliverable, nothing else.
-
-Target: Workflow 21 (Phase 1) — "Extend MappingSpec with declarative pagination + sync resource config".
-
-Goal: Add a \`pagination\` field and a \`sync\` sub-object to \`ResourceMapping\` in \`relayfile-adapters/packages/core/src/spec/types.ts\`. The pagination field must support the strategies enumerated in BACKLOG workflow 21's entry (cursor, offset, page, link-header, next-token). The sync sub-object gates a resource's availability to \`SchemaAdapter.sync()\` and carries \`modelName\`, \`cursorField\`, \`checkpointKey\`. Update the spec parser (\`relayfile-adapters/packages/core/src/spec/parser.ts\`) to accept the new fields and validate them. Add unit tests in \`relayfile-adapters/packages/core/tests/\`. Add the build gate for adapter-core.
-
-Template compliance: read BACKLOG's workflow 21 entry for the detailed file list, agents, and verification gates. Follow TEMPLATE.md exactly for: ESM footer, .run({cwd: process.cwd()}), deterministic build gates with npm (not pnpm), permission scoping, preset selection (codex-author for bounded work).
-
-${DRAFT_CONSTRAINTS}
-
-=== TEMPLATE.md ===
-{{steps.read-template.output}}
-
-=== BACKLOG.md ===
-{{steps.read-backlog.output}}`,
-      verification: { type: 'file_exists', value: WF_21 },
+      type: 'deterministic',
+      dependsOn: ['read-current-draft-21'],
+      command: `test -s ${WF_21}`,
+      failOnError: true,
     })
 
     .step('draft-22', {
-      agent: 'cursor-author',
-      dependsOn: ['read-template', 'read-backlog'],
-      task: `Draft ${WF_22}. Single deliverable, nothing else.
-
-Target: Workflow 22 (Phase 1) — "Implement SchemaAdapter.sync(resourceName, options) as a generic paginator over provider.proxy()".
-
-Goal: Add a \`sync\` method to the \`SchemaAdapter\` class in \`relayfile-adapters/packages/core/src/runtime/schema-adapter.ts\` that takes a \`resourceName\` + options, looks up the resource in the mapping spec (from workflow 21), executes the declared pagination strategy against \`this.provider.proxy()\`, and writes each record to the VFS via \`this.client.writeFile\` after \`computePath\`/\`computeSemantics\`. Checkpoint state is stored in the workspace at \`.sync-state/<adapterName>/<resourceName>.json\`. Implementation must match the canonical \`SyncOptions\`/\`SyncResult\` shape exported from @relayfile/sdk/integration-adapter.ts (already shipped by workflow 20).
-
-Tests: round-trip a mock paginator, verify records land in a test workspace.
-
-${DRAFT_CONSTRAINTS}
-
-=== TEMPLATE.md ===
-{{steps.read-template.output}}
-
-=== BACKLOG.md ===
-{{steps.read-backlog.output}}`,
-      verification: { type: 'file_exists', value: WF_22 },
+      type: 'deterministic',
+      dependsOn: ['read-current-draft-22'],
+      command: `test -s ${WF_22}`,
+      failOnError: true,
     })
 
     .step('draft-23', {
-      agent: 'cursor-author',
-      dependsOn: ['read-template', 'read-backlog'],
-      task: `Draft ${WF_23}. Single deliverable, nothing else.
-
-Target: Workflow 23 (Phase 1) — "Round-trip test harness (OpenAPI -> mapping -> SchemaAdapter.sync -> VFS)".
-
-Goal: Build a reusable Vitest harness in \`relayfile-adapters/packages/core/tests/round-trip/\` that takes a vendored OpenAPI spec or recorded HTTP fixture, pipes it through the existing ingestion tooling (\`src/ingest/openapi.ts\`) to produce a \`MappingSpec\`, instantiates a \`SchemaAdapter\` against a fake \`ConnectionProvider\` that replays the fixture HTTP responses deterministically, calls \`.sync()\`, and asserts the resulting VFS writes match a golden snapshot file (JSONL with \`{path, semantics, recordHash}\` per line, sorted). This is the parity contract every Phase 3 adapter must pass.
-
-Fixtures live at \`relayfile-adapters/packages/core/fixtures/round-trip/<api-name>/\`. Include at least one complete example (GitHub PR listing — already has a mapping YAML, can use workflow 20's migrated SchemaAdapter as the runtime).
-
-${DRAFT_CONSTRAINTS}
-
-=== TEMPLATE.md ===
-{{steps.read-template.output}}
-
-=== BACKLOG.md ===
-{{steps.read-backlog.output}}`,
-      verification: { type: 'file_exists', value: WF_23 },
+      type: 'deterministic',
+      dependsOn: ['read-current-draft-23'],
+      command: `test -s ${WF_23}`,
+      failOnError: true,
     })
 
     .step('draft-24', {
-      agent: 'cursor-author',
-      dependsOn: ['read-template', 'read-backlog'],
-      task: `Draft ${WF_24}. Single deliverable, nothing else.
-
-Target: Workflow 24 (Phase 1) — "@relayfile/provider-nango-unauth package with metadata-based credentials".
-
-Goal: Create a new package \`relayfile-providers/packages/nango-unauth/\` that wraps the existing \`@relayfile/provider-nango\` in a thin subclass (\`NangoUnauthProvider\`). The wrapper targets Nango's \`unauthenticated\` integration and on every \`.proxy()\` call reads auth headers from the Nango connection metadata (\`nango.getConnection(connectionId).metadata\`) and injects them. Exposes \`setConnectionCredentials(connectionId, credentials)\` and \`refreshConnectionCredentials(connectionId, refreshFn)\` helpers. Implements the same \`ConnectionProvider\` interface from @relayfile/sdk so \`SchemaAdapter\` consumes it identically to any other provider.
-
-Package scaffolding: package.json, tsconfig.json, src/index.ts, src/nango-unauth-provider.ts, src/__tests__/nango-unauth-provider.test.ts. Mirror the structure of \`relayfile-providers/packages/nango/\`.
-
-${DRAFT_CONSTRAINTS}
-
-=== TEMPLATE.md ===
-{{steps.read-template.output}}
-
-=== BACKLOG.md ===
-{{steps.read-backlog.output}}`,
-      verification: { type: 'file_exists', value: WF_24 },
+      type: 'deterministic',
+      dependsOn: ['read-current-draft-24'],
+      command: `test -s ${WF_24}`,
+      failOnError: true,
     })
 
     // ─── Phase 3: Dry-run each draft in parallel ────────────
