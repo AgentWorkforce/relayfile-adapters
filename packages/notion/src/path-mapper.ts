@@ -5,6 +5,7 @@ export type NotionPathObjectType =
   | 'comment'
   | 'database'
   | 'database_page'
+  | 'discovery_manifest'
   | 'page'
   | 'page_content';
 
@@ -63,6 +64,10 @@ export function notionDatabasePagesCollectionPath(databaseId: string): string {
   return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages`;
 }
 
+export function notionDiscoveryManifestPath(): string {
+  return `${NOTION_PATH_ROOT}/discovery/manifest.json`;
+}
+
 export function computePath(input: ComputePathInput): string {
   switch (input.objectType) {
     case 'database':
@@ -72,6 +77,8 @@ export function computePath(input: ComputePathInput): string {
         throw new Error('database_page paths require databaseId');
       }
       return notionDatabasePagePath(input.databaseId, input.objectId);
+    case 'discovery_manifest':
+      return notionDiscoveryManifestPath();
     case 'page':
       return notionStandalonePagePath(input.objectId);
     case 'page_content':

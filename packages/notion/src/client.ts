@@ -29,7 +29,7 @@ export class NotionApiClient {
   readonly config: Required<
     Pick<NotionAdapterConfig, 'apiBaseUrl' | 'apiVersion' | 'defaultPageSize' | 'enableMarkdown' | 'fetchBlockJson' | 'fetchComments'>
   > &
-    Pick<NotionAdapterConfig, 'connectionId' | 'databaseIds' | 'markdownApiVersion' | 'pageIds' | 'token'>;
+    Pick<NotionAdapterConfig, 'connectionId' | 'databaseIds' | 'discoveryConcurrency' | 'markdownApiVersion' | 'pageIds' | 'token'>;
 
   constructor(
     private readonly provider?: NotionConnectionProvider,
@@ -43,6 +43,7 @@ export class NotionApiClient {
       connectionId: config.connectionId,
       databaseIds: config.databaseIds,
       pageIds: config.pageIds,
+      discoveryConcurrency: config.discoveryConcurrency,
       defaultPageSize: config.defaultPageSize ?? DEFAULT_NOTION_PAGE_SIZE,
       fetchComments: config.fetchComments ?? true,
       fetchBlockJson: config.fetchBlockJson ?? true,

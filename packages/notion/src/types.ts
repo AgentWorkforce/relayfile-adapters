@@ -30,6 +30,7 @@ export interface NotionAdapterConfig {
   connectionId?: string;
   databaseIds?: string[];
   pageIds?: string[];
+  discoveryConcurrency?: number;
   defaultPageSize?: number;
   fetchComments?: boolean;
   fetchBlockJson?: boolean;
