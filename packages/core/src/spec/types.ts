@@ -34,6 +34,62 @@ export interface ResourceMapping extends DataProjection {
   endpoint: string;
   path: string;
   iterate?: boolean;
+  pagination?: PaginationConfig;
+  sync?: ResourceSyncConfig;
+}
+
+export type PaginationStrategy =
+  | "cursor"
+  | "offset"
+  | "page"
+  | "link-header"
+  | "next-token";
+
+interface PaginationBase {
+  strategy: PaginationStrategy;
+}
+
+export interface CursorPagination extends PaginationBase {
+  strategy: "cursor";
+  cursorPath: string;
+  paramName?: string;
+}
+
+export interface OffsetPagination extends PaginationBase {
+  strategy: "offset";
+  paramName?: string;
+  limitParamName?: string;
+  pageSize?: number;
+}
+
+export interface PagePagination extends PaginationBase {
+  strategy: "page";
+  paramName?: string;
+  limitParamName?: string;
+  pageSize?: number;
+}
+
+export interface LinkHeaderPagination extends PaginationBase {
+  strategy: "link-header";
+}
+
+export interface NextTokenPagination extends PaginationBase {
+  strategy: "next-token";
+  tokenPath: string;
+  paramName?: string;
+}
+
+export type PaginationConfig =
+  | CursorPagination
+  | OffsetPagination
+  | PagePagination
+  | LinkHeaderPagination
+  | NextTokenPagination;
+
+export interface ResourceSyncConfig {
+  modelName: string;
+  cursorField?: string;
+  checkpointKey?: string;
 }
 
 export interface WritebackMapping {

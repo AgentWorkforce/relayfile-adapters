@@ -34,7 +34,7 @@
     "directory": "packages/teams"
   },
   "dependencies": {
-    "@relayfile/sdk": "^0.1.6"
+    "@relayfile/sdk": "^0.1.7"
   },
   "devDependencies": {
     "@agent-relay/sdk": "^3.2.22",
