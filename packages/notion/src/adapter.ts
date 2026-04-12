@@ -2,10 +2,12 @@ import type { FileSemantics, RelayFileClient, WebhookInput } from '@relayfile/sd
 import { NotionApiClient } from './client.js';
 import { collectWorkspaceFiles, writeWorkspaceFiles } from './bulk-ingest.js';
 import { ingestDatabaseArtifacts } from './databases/ingestion.js';
-import { computePath as computeMappedPath } from './path-mapper.js';
+import { discoverContentMetadata } from './discovery/discover.js';
+import { computePath as computeMappedPath, notionDiscoveryManifestPath } from './path-mapper.js';
 import { ingestPageArtifacts, retrievePage } from './pages/ingestion.js';
 import { detectDatabaseChanges, detectStandalonePageChanges } from './sync.js';
 import { resolveWritebackRequest } from './writeback.js';
+import type { DiscoverOptions, DiscoverResult } from './discovery/types.js';
 import type { NotionAdapterConfig, NotionConnectionProvider, NotionVfsFile } from './types.js';
 
 export interface IngestError {
@@ -156,6 +158,25 @@ export class NotionAdapter extends IntegrationAdapter {
     const files = await collectWorkspaceFiles(this.api);
     await writeWorkspaceFiles(this.client, workspaceId, files);
     return summarizeFiles(files);
+  }
+
+  async discover(workspaceId: string, options: DiscoverOptions = {}): Promise<DiscoverResult> {
+    const concurrency = options.concurrency ?? this.api.config.discoveryConcurrency ?? 8;
+    const result = await discoverContentMetadata(this.api, { ...options, concurrency });
+    const manifestFile: NotionVfsFile = {
+      path: notionDiscoveryManifestPath(),
+      contentType: 'application/json; charset=utf-8',
+      content: `${JSON.stringify(result.manifest, null, 2)}\n`,
+      semantics: {
+        properties: {
+          provider: 'notion',
+          'provider.object_type': 'discovery_manifest',
+        },
+      },
+    };
+    const allFiles = [manifestFile, ...result.ingestedFiles];
+    await writeWorkspaceFiles(this.client, workspaceId, allFiles);
+    return result;
   }
 
   override async sync(workspaceId: string, options: SyncOptions = {}): Promise<SyncResult> {

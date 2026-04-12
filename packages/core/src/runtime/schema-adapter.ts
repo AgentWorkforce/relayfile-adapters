@@ -1,18 +1,11 @@
 import {
   computeCanonicalPath,
-  IntegrationAdapter,
   type ConnectionProvider,
   type FileSemantics,
   type ProxyResponse,
   type RelayFileClient,
-} from "@relayfile/sdk";
-import type {
-  AdapterWebhook,
-  AdapterWebhookMetadata,
-  IngestError,
-  IngestResult,
-  SyncOptions,
-  SyncResult,
+  type WebhookInput,
+  type QueuedResponse,
 } from "@relayfile/sdk";
 import { minimatch } from "minimatch";
 import {
@@ -50,6 +43,25 @@ export interface SchemaAdapterOptions {
   }) => Promise<string> | string;
 }
 
+export type AdapterWebhookMetadata = Record<string, string>;
+
+export interface SyncOptions {
+  cursor?: string;
+  limit?: number;
+  signal?: AbortSignal;
+}
+
+export interface SyncResult {
+  filesWritten: number;
+  filesUpdated: number;
+  filesDeleted: number;
+  paths: string[];
+  cursor?: string;
+  nextCursor?: string | null;
+  syncedObjectTypes: string[];
+  errors: Array<{ path?: string; objectType?: string; error: string }>;
+}
+
 export interface SchemaSyncOptions extends SyncOptions {
   workspaceId?: string;
   resourceName?: string;
@@ -69,24 +81,38 @@ export interface SchemaResourceSyncOptions extends SchemaSyncOptions {
   workspaceId: string;
 }
 
-export { IntegrationAdapter } from "@relayfile/sdk";
-export type {
-  AdapterWebhook,
-  AdapterWebhookMetadata,
-  IngestError,
-  IngestResult,
-} from "@relayfile/sdk";
+export interface AdapterWebhook extends WebhookInput {
+  connectionId: string;
+  metadata?: AdapterWebhookMetadata;
+}
 
-export class SchemaAdapter extends IntegrationAdapter {
+export interface IngestError {
+  path?: string;
+  code?: string;
+  message: string;
+}
+
+export interface IngestResult {
+  filesWritten: number;
+  filesUpdated: number;
+  filesDeleted: number;
+  paths: string[];
+  errors: IngestError[];
+}
+
+export class SchemaAdapter {
   readonly name: string;
   readonly version: string;
 
+  private readonly client: RelayFileClient;
+  private readonly provider: ConnectionProvider;
   private readonly spec: MappingSpec;
   private readonly defaultConnectionId?: string;
   private readonly resolveConnectionIdFn?: SchemaAdapterOptions["resolveConnectionId"];
 
   constructor(options: SchemaAdapterOptions) {
-    super(options.client, options.provider);
+    this.client = options.client;
+    this.provider = options.provider;
     this.spec = options.spec;
     this.name = options.spec.adapter.name;
     this.version = options.spec.adapter.version;
