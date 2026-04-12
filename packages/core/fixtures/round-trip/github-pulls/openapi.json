@@ -1,0 +1,1156 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GitHub Pull Requests Fixture API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.github.com"
+    }
+  ],
+  "paths": {
+    "/repos/{owner}/{repo}/pulls": {
+      "get": {
+        "operationId": "pulls/list",
+        "summary": "List pull requests",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "default": "open"
+            }
+          },
+          {
+            "name": "head",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created",
+                "updated",
+                "popularity",
+                "long-running"
+              ],
+              "default": "created"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pull requests for the repository.",
+            "headers": {
+              "Link": {
+                "description": "Pagination links.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PullRequest"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/pulls/{pull_number}": {
+      "get": {
+        "operationId": "pulls/get",
+        "summary": "Get a pull request",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pull_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A pull request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/pulls/{pull_number}/files": {
+      "get": {
+        "operationId": "pulls/list-files",
+        "summary": "List pull request files",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pull_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Files changed by the pull request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PullRequestFile"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/pulls/{pull_number}/reviews": {
+      "post": {
+        "operationId": "pulls/create-review",
+        "summary": "Create a pull request review",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pull_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePullRequestReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequestReview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repos/{owner}/{repo}/pulls/{pull_number}/comments": {
+      "post": {
+        "operationId": "pulls/create-review-comment",
+        "summary": "Create a pull request review comment",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pull_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePullRequestReviewCommentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created review comment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequestReviewComment"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-webhooks": {
+    "pull_request": {
+      "post": {
+        "operationId": "webhooks/pull-request",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequestWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted."
+          }
+        }
+      }
+    },
+    "pull_request_review": {
+      "post": {
+        "operationId": "webhooks/pull-request-review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequestReviewWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted."
+          }
+        }
+      }
+    },
+    "push": {
+      "post": {
+        "operationId": "webhooks/push",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted."
+          }
+        }
+      }
+    },
+    "issues": {
+      "post": {
+        "operationId": "webhooks/issues",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssuesWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook accepted."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GitHubUser": {
+        "type": "object",
+        "required": [
+          "login",
+          "id",
+          "node_id",
+          "avatar_url",
+          "html_url",
+          "type",
+          "site_admin"
+        ],
+        "properties": {
+          "login": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "avatar_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string"
+          },
+          "site_admin": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Repository": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "name",
+          "full_name",
+          "private",
+          "owner",
+          "default_branch"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          },
+          "private": {
+            "type": "boolean"
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "default_branch": {
+            "type": "string"
+          }
+        }
+      },
+      "Label": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "url",
+          "name",
+          "color",
+          "default"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "default": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PullRequestBranch": {
+        "type": "object",
+        "required": [
+          "label",
+          "ref",
+          "sha",
+          "user",
+          "repo"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "repo": {
+            "$ref": "#/components/schemas/Repository"
+          }
+        }
+      },
+      "PullRequest": {
+        "type": "object",
+        "required": [
+          "url",
+          "id",
+          "node_id",
+          "html_url",
+          "diff_url",
+          "patch_url",
+          "issue_url",
+          "number",
+          "state",
+          "locked",
+          "title",
+          "user",
+          "body",
+          "created_at",
+          "updated_at",
+          "assignees",
+          "requested_reviewers",
+          "labels",
+          "draft",
+          "commits",
+          "additions",
+          "deletions",
+          "changed_files",
+          "review_comments",
+          "comments",
+          "maintainer_can_modify",
+          "head",
+          "base"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "diff_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "patch_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "issue_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "title": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "merged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "merge_commit_sha": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubUser"
+            }
+          },
+          "requested_reviewers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GitHubUser"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          },
+          "draft": {
+            "type": "boolean"
+          },
+          "commits": {
+            "type": "integer"
+          },
+          "additions": {
+            "type": "integer"
+          },
+          "deletions": {
+            "type": "integer"
+          },
+          "changed_files": {
+            "type": "integer"
+          },
+          "review_comments": {
+            "type": "integer"
+          },
+          "comments": {
+            "type": "integer"
+          },
+          "maintainer_can_modify": {
+            "type": "boolean"
+          },
+          "head": {
+            "$ref": "#/components/schemas/PullRequestBranch"
+          },
+          "base": {
+            "$ref": "#/components/schemas/PullRequestBranch"
+          }
+        }
+      },
+      "PullRequestFile": {
+        "type": "object",
+        "required": [
+          "sha",
+          "filename",
+          "status",
+          "additions",
+          "deletions",
+          "changes",
+          "blob_url",
+          "raw_url",
+          "contents_url",
+          "patch"
+        ],
+        "properties": {
+          "sha": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "additions": {
+            "type": "integer"
+          },
+          "deletions": {
+            "type": "integer"
+          },
+          "changes": {
+            "type": "integer"
+          },
+          "blob_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "raw_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contents_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "patch": {
+            "type": "string"
+          }
+        }
+      },
+      "PullRequestReview": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "user",
+          "body",
+          "state",
+          "html_url",
+          "pull_request_url",
+          "submitted_at",
+          "commit_id",
+          "author_association"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "body": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "pull_request_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "commit_id": {
+            "type": "string"
+          },
+          "author_association": {
+            "type": "string"
+          }
+        }
+      },
+      "PullRequestReviewComment": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "pull_request_review_id",
+          "path",
+          "commit_id",
+          "user",
+          "body",
+          "created_at",
+          "updated_at",
+          "html_url",
+          "pull_request_url",
+          "author_association"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "pull_request_review_id": {
+            "type": "integer"
+          },
+          "diff_hunk": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "nullable": true
+          },
+          "original_position": {
+            "type": "integer",
+            "nullable": true
+          },
+          "line": {
+            "type": "integer",
+            "nullable": true
+          },
+          "original_line": {
+            "type": "integer",
+            "nullable": true
+          },
+          "side": {
+            "type": "string",
+            "nullable": true
+          },
+          "commit_id": {
+            "type": "string"
+          },
+          "original_commit_id": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "html_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "pull_request_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "author_association": {
+            "type": "string"
+          }
+        }
+      },
+      "Issue": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id",
+          "number",
+          "title",
+          "user",
+          "labels",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          },
+          "state": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommitSummary": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Installation": {
+        "type": "object",
+        "required": [
+          "id",
+          "node_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "node_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PullRequestWebhook": {
+        "type": "object",
+        "required": [
+          "action",
+          "number",
+          "pull_request",
+          "repository",
+          "sender"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "pull_request": {
+            "$ref": "#/components/schemas/PullRequest"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/Repository"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/Installation"
+          }
+        }
+      },
+      "PullRequestReviewWebhook": {
+        "type": "object",
+        "required": [
+          "action",
+          "review",
+          "pull_request",
+          "repository",
+          "sender"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "review": {
+            "$ref": "#/components/schemas/PullRequestReview"
+          },
+          "pull_request": {
+            "$ref": "#/components/schemas/PullRequest"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/Repository"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/Installation"
+          }
+        }
+      },
+      "PushWebhook": {
+        "type": "object",
+        "required": [
+          "ref",
+          "head_commit",
+          "repository",
+          "sender"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "head_commit": {
+            "$ref": "#/components/schemas/CommitSummary"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/Repository"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/GitHubUser"
+          }
+        }
+      },
+      "IssuesWebhook": {
+        "type": "object",
+        "required": [
+          "action",
+          "issue",
+          "repository",
+          "sender"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "issue": {
+            "$ref": "#/components/schemas/Issue"
+          },
+          "repository": {
+            "$ref": "#/components/schemas/Repository"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/GitHubUser"
+          },
+          "installation": {
+            "$ref": "#/components/schemas/Installation"
+          }
+        }
+      },
+      "CreatePullRequestReviewRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REQUEST_CHANGES",
+              "COMMENT"
+            ]
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePullRequestReviewCommentRequest"
+            }
+          }
+        }
+      },
+      "CreatePullRequestReviewCommentRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "commit_id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "LEFT",
+              "RIGHT"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
