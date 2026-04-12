@@ -104,7 +104,7 @@ async function discoverSubPages(
             if (block.has_children) {
               nextTargets.push({
                 id: block.id,
-                parentId: target.parentId,
+                parentId: block.type === 'child_page' ? block.id : target.parentId,
               });
             }
           }

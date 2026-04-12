@@ -1,16 +1,11 @@
 import {
   computeCanonicalPath,
-  IntegrationAdapter,
   type ConnectionProvider,
   type FileSemantics,
   type ProxyResponse,
   type RelayFileClient,
-} from "@relayfile/sdk";
-import type {
-  AdapterWebhook,
-  AdapterWebhookMetadata,
-  IngestError,
-  IngestResult,
+  type WebhookInput,
+  type QueuedResponse,
 } from "@relayfile/sdk";
 import { minimatch } from "minimatch";
 import { interpolateTemplate, pickFields } from "../spec/template.js";
@@ -43,24 +38,40 @@ export interface SchemaAdapterOptions {
   }) => Promise<string> | string;
 }
 
-export { IntegrationAdapter } from "@relayfile/sdk";
-export type {
-  AdapterWebhook,
-  AdapterWebhookMetadata,
-  IngestError,
-  IngestResult,
-} from "@relayfile/sdk";
+export type AdapterWebhookMetadata = Record<string, string>;
 
-export class SchemaAdapter extends IntegrationAdapter {
+export interface AdapterWebhook extends WebhookInput {
+  connectionId: string;
+  metadata?: AdapterWebhookMetadata;
+}
+
+export interface IngestError {
+  path?: string;
+  code?: string;
+  message: string;
+}
+
+export interface IngestResult {
+  filesWritten: number;
+  filesUpdated: number;
+  filesDeleted: number;
+  paths: string[];
+  errors: IngestError[];
+}
+
+export class SchemaAdapter {
   readonly name: string;
   readonly version: string;
 
+  private readonly client: RelayFileClient;
+  private readonly provider: ConnectionProvider;
   private readonly spec: MappingSpec;
   private readonly defaultConnectionId?: string;
   private readonly resolveConnectionIdFn?: SchemaAdapterOptions["resolveConnectionId"];
 
   constructor(options: SchemaAdapterOptions) {
-    super(options.client, options.provider);
+    this.client = options.client;
+    this.provider = options.provider;
     this.spec = options.spec;
     this.name = options.spec.adapter.name;
     this.version = options.spec.adapter.version;
