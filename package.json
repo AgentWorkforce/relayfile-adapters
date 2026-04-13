@@ -13,7 +13,7 @@
     "typecheck": "npx turbo typecheck"
   },
   "devDependencies": {
-    "@agentworkforce/workload-router": "^0.1.2",
+    "@agentworkforce/workload-router": "^0.1.3",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0"
   }
