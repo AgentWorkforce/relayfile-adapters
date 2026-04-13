@@ -1,0 +1,196 @@
+{
+  "version": "1.0.0",
+  "lockfileVersion": 1,
+  "packages": {
+    "@agent-relay/choosing-swarm-patterns#codex": {
+      "version": "1.0.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fchoosing-swarm-patterns/1.0.0.tar.gz",
+      "integrity": "sha256-2b28661abb540c56b46ad980b238589c6dcf59faaa3e66c80c72f72c01407f38",
+      "format": "codex",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".agents/skills/choosing-swarm-patterns/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-relay/writing-agent-relay-workflows#codex": {
+      "version": "1.4.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fwriting-agent-relay-workflows/1.4.0.tar.gz",
+      "integrity": "sha256-9bbb0861f470beedde502569c7e8d665808a82bc3ca40029d864eb7f0420419d",
+      "format": "codex",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".agents/skills/writing-agent-relay-workflows/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-workforce/trail-snippet#codex:AGENTS.md": {
+      "version": "1.1.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-workforce%2Ftrail-snippet/1.1.0.tar.gz",
+      "integrity": "sha256-8d8824b5236660e18c780b3574ee756737401d9a77e843411cdd509ceb9e0668",
+      "format": "codex",
+      "subtype": "snippet",
+      "sourceFormat": "generic",
+      "sourceSubtype": "snippet",
+      "installedPath": "AGENTS.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      },
+      "snippetMetadata": {
+        "targetPath": "AGENTS.md",
+        "config": {
+          "target": "AGENTS.md",
+          "position": "append"
+        }
+      }
+    },
+    "@agent-relay/relay-80-100-workflow#codex": {
+      "version": "1.0.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Frelay-80-100-workflow/1.0.0.tar.gz",
+      "integrity": "sha256-b0e70fc43fa009f6cd9d8ae965f6e318b6b4724fb34c6378233ef3a4bd09cfb9",
+      "format": "codex",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".agents/skills/relay-80-100-workflow/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-relay/choosing-swarm-patterns#claude": {
+      "version": "1.0.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fchoosing-swarm-patterns/1.0.0.tar.gz",
+      "integrity": "sha256-2b28661abb540c56b46ad980b238589c6dcf59faaa3e66c80c72f72c01407f38",
+      "format": "claude",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".claude/skills/choosing-swarm-patterns/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-relay/writing-agent-relay-workflows#claude": {
+      "version": "1.4.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fwriting-agent-relay-workflows/1.4.0.tar.gz",
+      "integrity": "sha256-9bbb0861f470beedde502569c7e8d665808a82bc3ca40029d864eb7f0420419d",
+      "format": "claude",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".claude/skills/writing-agent-relay-workflows/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-workforce/trail-snippet#claude:AGENTS.md": {
+      "version": "1.1.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-workforce%2Ftrail-snippet/1.1.0.tar.gz",
+      "integrity": "sha256-8d8824b5236660e18c780b3574ee756737401d9a77e843411cdd509ceb9e0668",
+      "format": "claude",
+      "subtype": "snippet",
+      "sourceFormat": "generic",
+      "sourceSubtype": "snippet",
+      "installedPath": "AGENTS.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      },
+      "snippetMetadata": {
+        "targetPath": "AGENTS.md",
+        "config": {
+          "target": "AGENTS.md",
+          "position": "append"
+        }
+      }
+    },
+    "@agent-relay/relay-80-100-workflow#claude": {
+      "version": "1.0.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Frelay-80-100-workflow/1.0.0.tar.gz",
+      "integrity": "sha256-b0e70fc43fa009f6cd9d8ae965f6e318b6b4724fb34c6378233ef3a4bd09cfb9",
+      "format": "claude",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".claude/skills/relay-80-100-workflow/SKILL.md",
+      "fromCollection": {
+        "name_slug": "agent-relay-starter",
+        "version": "1.0.3"
+      }
+    },
+    "@agent-relay/running-headless-orchestrator#agents.md": {
+      "version": "1.0.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Frunning-headless-orchestrator/1.0.2.tar.gz",
+      "integrity": "sha256-ee99ab71023fd2168143acc6c6bb4b1032181bbf16458d6537ad68d779ec0e7e",
+      "format": "agents.md",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".openskills/running-headless-orchestrator/SKILL.md",
+      "progressiveDisclosure": {
+        "mode": "progressive",
+        "resourceDir": ".openskills/running-headless-orchestrator",
+        "manifestPath": "AGENTS.md",
+        "resourceName": "running-headless-orchestrator",
+        "resourceType": "skill",
+        "skillsDir": ".openskills/running-headless-orchestrator",
+        "skillName": "running-headless-orchestrator",
+        "eager": false
+      }
+    },
+    "@agent-relay/running-headless-orchestrator#codex": {
+      "version": "1.0.2",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Frunning-headless-orchestrator/1.0.2.tar.gz",
+      "integrity": "sha256-ee99ab71023fd2168143acc6c6bb4b1032181bbf16458d6537ad68d779ec0e7e",
+      "format": "codex",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".agents/skills/running-headless-orchestrator/SKILL.md"
+    },
+    "@agent-relay/writing-agent-relay-workflows#agents.md": {
+      "version": "1.4.0",
+      "resolved": "https://registry.prpm.dev/api/v1/packages/%40agent-relay%2Fwriting-agent-relay-workflows/1.4.0.tar.gz",
+      "integrity": "sha256-9bbb0861f470beedde502569c7e8d665808a82bc3ca40029d864eb7f0420419d",
+      "format": "agents.md",
+      "subtype": "skill",
+      "sourceFormat": "claude",
+      "sourceSubtype": "skill",
+      "installedPath": ".openskills/writing-agent-relay-workflows/SKILL.md",
+      "progressiveDisclosure": {
+        "mode": "progressive",
+        "resourceDir": ".openskills/writing-agent-relay-workflows",
+        "manifestPath": "AGENTS.md",
+        "resourceName": "writing-agent-relay-workflows",
+        "resourceType": "skill",
+        "skillsDir": ".openskills/writing-agent-relay-workflows",
+        "skillName": "writing-agent-relay-workflows",
+        "eager": false
+      }
+    }
+  },
+  "generated": "2026-04-13T08:11:21.632Z",
+  "collections": {
+    "agent-relay-starter": {
+      "name_slug": "agent-relay-starter",
+      "version": "1.0.3",
+      "installedAt": "2026-04-13T06:54:57.788Z",
+      "packages": [
+        "@agent-relay/choosing-swarm-patterns",
+        "@agent-relay/writing-agent-relay-workflows",
+        "@agent-workforce/trail-snippet",
+        "@agent-relay/relay-80-100-workflow"
+      ]
+    }
+  }
+}

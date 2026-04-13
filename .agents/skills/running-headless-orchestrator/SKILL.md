@@ -1,0 +1,219 @@
+---
+name: running-headless-orchestrator
+description: Use when an agent needs to self-bootstrap agent-relay and autonomously manage a team of workers - covers infrastructure startup, agent spawning, lifecycle monitoring, and team coordination without human intervention
+---
+
+### Overview
+
+A headless orchestrator is an agent that:
+1. Starts the relay infrastructure itself (`agent-relay up`)
+2. Spawns and manages worker agents
+3. Monitors agent lifecycle events
+4. Coordinates work without human intervention
+
+### When to Use
+
+- Agent needs full control over its worker team
+- No human available to run `agent-relay up` manually
+- Agent should manage agent lifecycle autonomously
+- Building self-contained multi-agent systems
+
+### Quick Reference
+
+| Step | Command/Tool |
+|------|--------------|
+| Verify installation | `command -v agent-relay` or `npx agent-relay --version` |
+| Verify Node runtime if shim fails | `node --version` or fix mise/asdf first |
+| Start infrastructure | `agent-relay up --no-dashboard --verbose` |
+| Check status | `agent-relay status` |
+| Spawn worker | `agent-relay spawn Worker1 claude "task"` |
+| List workers | `agent-relay who` |
+| View worker logs | `agent-relay agents:logs Worker1` |
+| Send message | `agent-relay send Worker1 "message"` |
+| Release worker | `agent-relay release Worker1` |
+| Stop infrastructure | `agent-relay down` |
+
+### Bootstrap Flow
+
+#### Step 0: Verify Installation
+
+```bash
+# Check if agent-relay is available
+command -v agent-relay || npx agent-relay --version
+
+# If your shell reports a mise/asdf shim error, fix Node first
+node --version
+# e.g. for mise: mise use -g node@22.22.1
+
+# If not installed, install globally
+npm install -g agent-relay
+
+# Or use npx (no global install)
+npx agent-relay --version
+```
+
+#### Step 1: Start Infrastructure
+
+```bash
+# Preferred: run broker in foreground/stdin mode and keep the session open
+agent-relay up --no-dashboard --verbose
+```
+
+#### Step 2: Spawn Workers via MCP
+
+```
+mcp__relaycast__agent_add(
+  name: "Worker1",
+  cli: "claude",
+  task: "Implement the authentication module following the existing patterns"
+)
+```
+
+#### Step 3: Monitor and Coordinate
+
+```
+# Check for worker messages
+mcp__relaycast__message_inbox_check()
+
+# Send follow-up instructions
+mcp__relaycast__message_dm_send(to: "Worker1", text: "Also add unit tests")
+
+# List active workers
+mcp__relaycast__agent_list()
+```
+
+#### Step 4: Release Workers
+
+```
+mcp__relaycast__agent_remove(name: "Worker1")
+```
+
+#### Step 5: Shutdown (optional)
+
+```bash
+agent-relay down
+```
+
+
+### CLI Commands for Orchestration
+
+#### Spawning and Messaging
+
+```bash
+# Spawn a worker
+agent-relay spawn Worker1 claude "Implement auth module"
+
+# Send message to worker
+agent-relay send Worker1 "Add unit tests too"
+
+# Release when done
+agent-relay release Worker1
+```
+
+#### Monitoring Workers (Essential)
+
+```bash
+# Show currently active agents
+agent-relay who
+
+# View real-time output from a worker (critical for debugging)
+agent-relay agents:logs Worker1
+
+# View recent message history
+agent-relay history
+
+# Check overall system status
+agent-relay status
+```
+
+#### Troubleshooting
+
+```bash
+# Kill unresponsive worker
+agent-relay agents:kill Worker1
+
+# Re-check broker status
+agent-relay status
+
+# If a worker looks stuck, inspect its logs first
+agent-relay agents:logs Worker1
+```
+
+
+### Orchestrator Instructions Template
+
+#### Give your lead agent these instructions:
+
+```
+You are an autonomous orchestrator. Bootstrap the relay infrastructure and manage a team of workers.
+
+## Step 1: Verify Installation
+Run: command -v agent-relay || npx agent-relay --version
+If you hit a mise/asdf shim error: verify Node first with `node --version`, then fix the runtime manager
+If not found: npm install -g agent-relay
+
+## Step 2: Start Infrastructure
+Run: agent-relay up --no-dashboard --verbose
+Verify: agent-relay status (should show "running")
+
+## Step 3: Manage Your Team
+
+Spawn workers:
+  agent-relay spawn Worker1 claude "Task description"
+
+Monitor workers (do this frequently):
+  agent-relay who              # List active workers
+  agent-relay agents:logs Worker1  # View worker output/progress
+
+Send instructions:
+  agent-relay send Worker1 "Additional instructions"
+
+Release when done:
+  agent-relay release Worker1
+
+## Protocol
+- Workers will ACK when they receive tasks
+- Workers will send DONE when complete
+- Use `agent-relay agents:logs <name>` to monitor progress
+- Use `agent-relay history` to see message flow
+```
+
+
+### Lifecycle Events
+
+The broker emits these events (available via SDK subscriptions):
+
+| Event | When |
+|-------|------|
+| `agent_spawned` | Worker process started |
+| `worker_ready` | Worker connected to relay |
+| `agent_idle` | Worker waiting for messages |
+| `agent_exited` | Worker process ended |
+| `agent_permanently_dead` | Worker failed after retries |
+
+### Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| `agent-relay: command not found` or mise/asdf shim error | Ensure Node is available first (`node --version`); if a shim is broken, fix the runtime manager, then install/use `agent-relay` |
+| "Nested session" error | Broker handles this automatically; if running manually, unset `CLAUDECODE` env var |
+| Broker not starting | Try `agent-relay down` first, then use foreground `agent-relay up --no-dashboard --verbose` to see readiness logs |
+| Background broker says started but status is STOPPED | Prefer foreground mode for that project/session; background mode may have detached incorrectly |
+| Spawn fails with `internal reply dropped` | Broker likely is not fully ready yet; wait for readiness, then spawn one worker first |
+| Workers not connecting | Ensure broker started; check `agent-relay who` and worker logs |
+| Not monitoring workers | Use `agent-relay agents:logs <name>` frequently to track progress |
+| Workers seem stuck | Check logs with `agent-relay agents:logs <name>` for errors |
+| Messages not delivered | Check `agent-relay history` to verify message flow |
+
+### Overview
+
+Self-bootstrap agent-relay infrastructure and manage a team of agents autonomously.
+
+### Prerequisites
+
+#### 1. **agent-relay CLI installed** (required)
+
+```bash
+npm install -g agent-relay
+   # Or use npx without installing: npx agent-relay <command>
+```
