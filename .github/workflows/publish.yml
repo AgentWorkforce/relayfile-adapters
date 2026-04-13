@@ -67,6 +67,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Upgrade npm to latest
+        run: npm install -g npm@latest
+
       - name: Build all packages
         run: npx turbo build
 
@@ -80,8 +83,6 @@ jobs:
           fi
 
       - name: Version & Publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for pkg in ${{ steps.resolve.outputs.packages }}; do
             cd packages/$pkg
