@@ -9,7 +9,7 @@ import {
   normalizeLinearWebhook,
   validateLinearWebhookSignature,
   validateLinearWebhookTimestamp,
-} from '../index.ts';
+} from '../index.js';
 
 const issuePayload = {
   action: 'create',

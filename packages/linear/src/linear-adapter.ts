@@ -7,7 +7,7 @@ import {
   linearIssuePath,
   linearProjectPath,
   normalizeLinearObjectType,
-} from './path-mapper.ts';
+} from './path-mapper.js';
 import type {
   LinearAdapterConfig,
   LinearComment,
@@ -19,7 +19,7 @@ import type {
   LinearState,
   LinearUser,
   LinearWebhookPayload,
-} from './types.ts';
+} from './types.js';
 
 export interface FileSemantics {
   properties?: Record<string, string>;

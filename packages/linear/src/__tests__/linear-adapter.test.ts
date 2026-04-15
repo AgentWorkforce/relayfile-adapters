@@ -18,7 +18,7 @@ import {
   type ProxyRequest,
   type ProxyResponse,
   type RelayFileClientLike,
-} from '../index.ts';
+} from '../index.js';
 
 function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
   const client: RelayFileClientLike = {
@@ -327,7 +327,7 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
 });
 
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {
-  const barrel = await import('../index.ts');
+  const barrel = await import('../index.js');
 
   assert.equal(barrel.LinearAdapter, LinearAdapter);
   assert.equal(barrel.computeLinearPath, computeLinearPath);
