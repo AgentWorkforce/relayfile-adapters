@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import type { NormalizedWebhook } from './linear-adapter.ts';
+import type { NormalizedWebhook } from './linear-adapter.js';
 
 export const LINEAR_PROVIDER = 'linear';
 export const LINEAR_SIGNATURE_HEADER = 'linear-signature';

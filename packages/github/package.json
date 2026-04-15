@@ -19,7 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --import tsx --test 'src/**/*.test.ts'",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "@relayfile/sdk": "^0.1.7"

@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test 'src/__tests__/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@agent-relay/sdk": "^3.2.22",

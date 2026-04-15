@@ -1,5 +1,5 @@
 // Public barrel for runtime helpers, normalizers, and exported types.
-export * from './linear-adapter.ts';
-export * from './path-mapper.ts';
-export * from './webhook-normalizer.ts';
-export * from './types.ts';
+export * from './linear-adapter.js';
+export * from './path-mapper.js';
+export * from './webhook-normalizer.js';
+export * from './types.js';
