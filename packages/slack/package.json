@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-slack",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Slack adapter scaffolding for Relayfile",
   "type": "module",
   "sideEffects": false,
