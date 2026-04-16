@@ -8,6 +8,7 @@ import {
   githubCommitPath,
   githubIssuePath,
   githubPullRequestPath,
+  tryNormalizeGitHubObjectType,
   githubRepoPrefix,
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
@@ -219,6 +220,40 @@ describe('path-mapper', () => {
 
     it('uses GITHUB_PATH_ROOT constant', () => {
       assert.equal(GITHUB_PATH_ROOT, '/github');
+    });
+
+    it('returns fallback path for unknown object types instead of throwing', () => {
+      assert.equal(
+        computeGitHubPath('events', 'star.created', { owner: 'o', repo: 'r' }),
+        '/github/events/star.created.json',
+      );
+    });
+
+    it('returns fallback path for unknown type without context', () => {
+      assert.equal(
+        computeGitHubPath('deployments', 'dep-123'),
+        '/github/deployments/dep-123.json',
+      );
+    });
+
+    it('sanitizes unknown type names', () => {
+      assert.equal(
+        computeGitHubPath('some weird/type', 'id-1'),
+        '/github/some_weird_type/id-1.json',
+      );
+    });
+  });
+
+  describe('tryNormalizeGitHubObjectType', () => {
+    it('returns the normalized type for known types', () => {
+      assert.equal(tryNormalizeGitHubObjectType('pull_request'), 'pull_request');
+      assert.equal(tryNormalizeGitHubObjectType('pr'), 'pull_request');
+      assert.equal(tryNormalizeGitHubObjectType('issue'), 'issue');
+    });
+
+    it('returns undefined for unknown types', () => {
+      assert.equal(tryNormalizeGitHubObjectType('events'), undefined);
+      assert.equal(tryNormalizeGitHubObjectType('deployments'), undefined);
     });
   });
 });

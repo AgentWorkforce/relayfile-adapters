@@ -65,6 +65,15 @@ export function normalizeGitHubObjectType(objectType: string): GitHubPathObjectT
 }
 
 /**
+ * Like normalizeGitHubObjectType but returns undefined for unknown types
+ * instead of throwing. Used by computeGitHubPath to produce fallback paths.
+ */
+export function tryNormalizeGitHubObjectType(objectType: string): GitHubPathObjectType | undefined {
+  const normalized = objectType.trim().toLowerCase();
+  return OBJECT_TYPE_ALIASES[normalized];
+}
+
+/**
  * Normalize a Nango sync model name to a canonical GitHub object type.
  *
  * Nango models use PascalCase names like "Repo", "PullRequest", "Issue".
@@ -125,19 +134,28 @@ export function githubCommitPath(owner: string, repo: string, sha: string): stri
  * Compute a GitHub VFS path from an object type, object ID, and repo context.
  *
  * If owner/repo are not provided, falls back to a generic path.
+ * Unknown object types produce a fallback path instead of throwing,
+ * preserving graceful handling for unsupported webhook events.
  */
 export function computeGitHubPath(
   objectType: string,
   objectId: string,
   context?: { owner?: string; repo?: string },
 ): string {
-  const normalizedType = normalizeGitHubObjectType(objectType);
+  const normalizedType = tryNormalizeGitHubObjectType(objectType);
   const owner = context?.owner?.trim();
   const repo = context?.repo?.trim();
+  const safeObjectId = objectId.trim() || 'unknown';
+
+  // Unknown object type — return a generic fallback path
+  if (!normalizedType) {
+    const safeType = objectType.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'unknown';
+    return `${GITHUB_PATH_ROOT}/${safeType}/${encodeURIComponent(safeObjectId)}.json`;
+  }
 
   if (!owner || !repo) {
     // Fallback: no repo context — use a generic path
-    return `${GITHUB_PATH_ROOT}/${normalizedType}/${encodeGitHubPathSegment(objectId)}.json`;
+    return `${GITHUB_PATH_ROOT}/${normalizedType}/${encodeGitHubPathSegment(safeObjectId)}.json`;
   }
 
   switch (normalizedType) {
