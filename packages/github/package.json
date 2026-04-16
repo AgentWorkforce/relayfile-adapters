@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter.d.ts",
+      "import": "./dist/adapter.js"
     }
   },
   "files": [
@@ -26,7 +34,7 @@
     "@relayfile/sdk": "^0.1.7"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "file:../core"
+    "@relayfile/adapter-core": "^0.1.1"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.1.7",

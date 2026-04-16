@@ -1,8 +1,7 @@
-import type { SchemaAdapter } from '@relayfile/adapter-core';
 import type { ConnectionProvider } from '@relayfile/sdk';
 
-import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
+import { computeGitHubPath } from './path-mapper.js';
 import {
   type FileSemantics,
   type GitHubAdapterConfig,
@@ -27,10 +26,30 @@ const EMPTY_RESULT: IngestResult = {
 export const adapterName = 'github' as const;
 export const GITHUB_ADAPTER_NAME = adapterName;
 
+// Lazy-loaded SchemaAdapter to avoid eager import of @relayfile/adapter-core.
+// Only callers that invoke createIngestResult with schema-based path routing
+// pay the cost; pure path/semantics consumers never trigger this import.
+type SchemaAdapterLike = { computeWebhookPath(opts: Record<string, unknown>): string };
+let lazySchemaAdapter: Promise<{
+  create: (provider: ConnectionProvider, config: Pick<GitHubAdapterConfig, 'connectionId'>) => SchemaAdapterLike;
+}> | undefined;
+
+function getSchemaAdapterFactory(): Promise<{
+  create: (provider: ConnectionProvider, config: Pick<GitHubAdapterConfig, 'connectionId'>) => SchemaAdapterLike;
+}> {
+  if (!lazySchemaAdapter) {
+    lazySchemaAdapter = import('./adapter.js').then((mod) => ({
+      create: (provider: ConnectionProvider, config: Pick<GitHubAdapterConfig, 'connectionId'>) =>
+        mod.createGitHubSchemaAdapter(provider, config) as unknown as SchemaAdapterLike,
+    }));
+  }
+  return lazySchemaAdapter;
+}
+
 export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAdapter {
   readonly name = GITHUB_ADAPTER_NAME;
   readonly version = '0.1.0';
-  private readonly schemaAdapter: SchemaAdapter;
+  private schemaAdapterInstance: SchemaAdapterLike | undefined;
   private readonly writebackHandler: GitHubWritebackHandler;
 
   constructor(provider: ConnectionProvider, config: Partial<GitHubAdapterConfig> = {}) {
@@ -39,11 +58,18 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       ...config,
     });
     super(provider, validatedConfig);
-    this.schemaAdapter = createGitHubSchemaAdapter(provider, validatedConfig);
     this.writebackHandler = new GitHubWritebackHandler(provider as never, {
       defaultConnectionId: validatedConfig.connectionId,
       defaultProviderConfigKey: validatedConfig.providerConfigKey,
     });
+  }
+
+  private async getSchemaAdapter(): Promise<SchemaAdapterLike> {
+    if (!this.schemaAdapterInstance) {
+      const factory = await getSchemaAdapterFactory();
+      this.schemaAdapterInstance = factory.create(this.provider, this.config);
+    }
+    return this.schemaAdapterInstance;
   }
 
   supportedEvents(): string[] {
@@ -77,22 +103,10 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   computePath(objectType: string, objectId: string): string {
-    const repoPrefix = this.getRepoPrefix();
-
-    switch (objectType) {
-      case 'pull_request':
-        return `${repoPrefix}/pulls/${objectId}/metadata.json`;
-      case 'issue':
-        return `${repoPrefix}/issues/${objectId}/metadata.json`;
-      case 'review':
-        return `${repoPrefix}/reviews/${objectId}.json`;
-      case 'check_run':
-        return `${repoPrefix}/checks/${objectId}.json`;
-      case 'commit':
-        return `${repoPrefix}/commits/${objectId}/metadata.json`;
-      default:
-        return `/github/${objectType}/${objectId}.json`;
-    }
+    return computeGitHubPath(objectType, objectId, {
+      owner: this.config.owner,
+      repo: this.config.repo,
+    });
   }
 
   computeSemantics(
@@ -197,7 +211,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   ): Promise<IngestResult> {
     const objectId = this.resolveObjectId(objectType, payload);
     const path =
-      this.computeSchemaScopedPath(eventType, objectType, objectId, payload) ??
+      (await this.computeSchemaScopedPath(eventType, objectType, objectId, payload)) ??
       this.computeScopedPath(objectType, objectId, payload);
 
     return {
@@ -218,36 +232,18 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     const owner = repoInfo.owner || this.config.owner;
     const repo = repoInfo.repo || this.config.repo;
 
-    if (!owner || !repo) {
-      return this.computePath(objectType, objectId);
-    }
-
-    switch (objectType) {
-      case 'pull_request':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${objectId}/metadata.json`;
-      case 'issue':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${objectId}/metadata.json`;
-      case 'review':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/reviews/${objectId}.json`;
-      case 'review_comment':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/comments/${objectId}.json`;
-      case 'check_run':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/checks/${objectId}.json`;
-      case 'commit':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${objectId}/metadata.json`;
-      default:
-        return this.computePath(objectType, objectId);
-    }
+    return computeGitHubPath(objectType, objectId, { owner, repo });
   }
 
-  private computeSchemaScopedPath(
+  private async computeSchemaScopedPath(
     eventType: string,
     objectType: string,
     objectId: string,
     payload: Record<string, unknown>,
-  ): string | undefined {
+  ): Promise<string | undefined> {
     try {
-      return this.schemaAdapter.computeWebhookPath({
+      const schemaAdapter = await this.getSchemaAdapter();
+      return schemaAdapter.computeWebhookPath({
         provider: this.name,
         connectionId: this.config.connectionId ?? 'schema-adapter',
         eventType,
@@ -258,12 +254,6 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     } catch {
       return undefined;
     }
-  }
-
-  private getRepoPrefix(): string {
-    const owner = this.config.owner ? encodeURIComponent(this.config.owner) : '_owner';
-    const repo = this.config.repo ? encodeURIComponent(this.config.repo) : '_repo';
-    return `/github/repos/${owner}/${repo}`;
   }
 
   private resolveObjectId(objectType: string, payload: Record<string, unknown>): string {
@@ -320,7 +310,12 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
 }
 
 export * from './config.js';
-export * from './adapter.js';
+export * from './path-mapper.js';
 export * from './types.js';
 export * from './webhook/event-map.js';
 export * from './writeback.js';
+
+// NOTE: adapter.ts (SchemaAdapter, mapping spec) is NOT re-exported from
+// the barrel to avoid eagerly pulling in @relayfile/adapter-core.
+// Consumers who need schema-based path routing should:
+//   import { createGitHubSchemaAdapter } from '@relayfile/adapter-github/adapter';
