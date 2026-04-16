@@ -4,12 +4,19 @@
   "description": "Linear adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
-  "types": "./src/index.ts",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
