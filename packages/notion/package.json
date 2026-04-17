@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-notion",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Notion adapter for relayfile — maps Notion databases, pages, blocks, and comments to relayfile VFS paths",
   "type": "module",
   "main": "dist/index.js",
