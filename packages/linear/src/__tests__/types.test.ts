@@ -8,7 +8,14 @@ import {
 } from '../index.js';
 
 test('exports supported Linear webhook object types', () => {
-  assert.deepEqual(LINEAR_WEBHOOK_OBJECT_TYPES, ['comment', 'cycle', 'issue', 'project']);
+  assert.deepEqual(LINEAR_WEBHOOK_OBJECT_TYPES, [
+    'comment',
+    'cycle',
+    'issue',
+    'milestone',
+    'project',
+    'roadmap',
+  ]);
 });
 
 test('exports supported Linear webhook actions', () => {
