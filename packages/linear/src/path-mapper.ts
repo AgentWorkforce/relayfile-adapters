@@ -1,6 +1,15 @@
 export const LINEAR_PATH_ROOT = '/linear';
 
-export const LINEAR_OBJECT_TYPES = ['comment', 'cycle', 'issue', 'project'] as const;
+export const LINEAR_OBJECT_TYPES = [
+  'comment',
+  'cycle',
+  'issue',
+  'milestone',
+  'project',
+  'roadmap',
+  'team',
+  'user',
+] as const;
 
 export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
 
@@ -11,8 +20,26 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   cycles: 'cycle',
   issue: 'issue',
   issues: 'issue',
+  linearcomment: 'comment',
+  linearcycle: 'cycle',
+  linearissue: 'issue',
+  linearmilestone: 'milestone',
+  linearproject: 'project',
+  linearroadmap: 'roadmap',
+  linearteam: 'team',
+  linearuser: 'user',
+  milestone: 'milestone',
+  milestones: 'milestone',
   project: 'project',
+  projectmilestone: 'milestone',
+  projectmilestones: 'milestone',
   projects: 'project',
+  roadmap: 'roadmap',
+  roadmaps: 'roadmap',
+  team: 'team',
+  teams: 'team',
+  user: 'user',
+  users: 'user',
 };
 
 function assertNonEmptySegment(value: string, label: string): string {
@@ -52,6 +79,22 @@ export function linearCyclePath(cycleId: string): string {
   return `${LINEAR_PATH_ROOT}/cycles/${encodeLinearPathSegment(cycleId)}.json`;
 }
 
+export function linearTeamPath(teamId: string): string {
+  return `${LINEAR_PATH_ROOT}/teams/${encodeLinearPathSegment(teamId)}.json`;
+}
+
+export function linearUserPath(userId: string): string {
+  return `${LINEAR_PATH_ROOT}/users/${encodeLinearPathSegment(userId)}.json`;
+}
+
+export function linearMilestonePath(milestoneId: string): string {
+  return `${LINEAR_PATH_ROOT}/milestones/${encodeLinearPathSegment(milestoneId)}.json`;
+}
+
+export function linearRoadmapPath(roadmapId: string): string {
+  return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
+}
+
 export function computeLinearPath(objectType: string, objectId: string): string {
   const normalizedType = normalizeLinearObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');
@@ -65,5 +108,13 @@ export function computeLinearPath(objectType: string, objectId: string): string 
       return linearProjectPath(normalizedId);
     case 'cycle':
       return linearCyclePath(normalizedId);
+    case 'team':
+      return linearTeamPath(normalizedId);
+    case 'user':
+      return linearUserPath(normalizedId);
+    case 'milestone':
+      return linearMilestonePath(normalizedId);
+    case 'roadmap':
+      return linearRoadmapPath(normalizedId);
   }
 }

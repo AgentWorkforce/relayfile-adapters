@@ -1,4 +1,11 @@
-export const LINEAR_WEBHOOK_OBJECT_TYPES = ['comment', 'cycle', 'issue', 'project'] as const;
+export const LINEAR_WEBHOOK_OBJECT_TYPES = [
+  'comment',
+  'cycle',
+  'issue',
+  'milestone',
+  'project',
+  'roadmap',
+] as const;
 export const LINEAR_WEBHOOK_ACTIONS = ['create', 'remove', 'update'] as const;
 
 export type LinearWebhookObjectType = (typeof LINEAR_WEBHOOK_OBJECT_TYPES)[number];
@@ -22,8 +29,16 @@ export interface LinearUser {
   id: string;
   name?: string;
   displayName?: string;
+  firstName?: string;
+  first_name?: string;
+  lastName?: string;
+  last_name?: string;
   email?: string;
+  admin?: boolean;
   avatarUrl?: string;
+  avatar_url?: string;
+  updatedAt?: string;
+  updated_at?: string;
   url?: string;
 }
 
@@ -31,6 +46,11 @@ export interface LinearTeam {
   id: string;
   key?: string;
   name?: string;
+  description?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface LinearState {
@@ -79,9 +99,47 @@ export interface LinearProject {
   state?: string;
   progress?: number | null;
   targetDate?: string | null;
+  target_date?: string | null;
   startedAt?: string | null;
+  started_at?: string | null;
   completedAt?: string | null;
+  completed_at?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  team_ids?: string[];
+  teams?: LinearTeam[];
   url?: string;
+}
+
+export interface LinearMilestone {
+  id: string;
+  name?: string;
+  description?: string | null;
+  status?: string;
+  progress?: number | null;
+  project?: LinearProjectReference | null;
+  project_id?: string | null;
+  project_name?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
+export interface LinearRoadmap {
+  id: string;
+  name?: string;
+  description?: string | null;
+  project_ids?: string[];
+  projects?: LinearProjectReference[];
+  team_ids?: string[];
+  teams?: LinearTeam[];
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface LinearCycle {
@@ -155,10 +213,14 @@ export type LinearIssueWebhookPayload = LinearWebhookBase<LinearIssue>;
 export type LinearCommentWebhookPayload = LinearWebhookBase<LinearComment>;
 export type LinearProjectWebhookPayload = LinearWebhookBase<LinearProject>;
 export type LinearCycleWebhookPayload = LinearWebhookBase<LinearCycle>;
+export type LinearMilestoneWebhookPayload = LinearWebhookBase<LinearMilestone>;
+export type LinearRoadmapWebhookPayload = LinearWebhookBase<LinearRoadmap>;
 
 export type LinearWebhookPayload =
   | LinearCommentWebhookPayload
   | LinearCycleWebhookPayload
   | LinearIssueWebhookPayload
+  | LinearMilestoneWebhookPayload
   | LinearProjectWebhookPayload
+  | LinearRoadmapWebhookPayload
   | LinearWebhookBase<LinearPayloadRecord>;
