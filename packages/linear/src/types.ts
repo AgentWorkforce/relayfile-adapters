@@ -29,6 +29,7 @@ export interface LinearUser {
   id: string;
   name?: string;
   displayName?: string;
+  display_name?: string;
   firstName?: string;
   first_name?: string;
   lastName?: string;

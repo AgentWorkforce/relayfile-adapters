@@ -459,8 +459,11 @@ function applyCommentSemantics(
 
   const author = comment.user as LinearUser | null | undefined;
   if (author) {
-    relations.add(linearUserPath(author.id));
-    addStringProperty(properties, 'linear.author_id', author.id);
+    const authorUserId = asString(author.id);
+    if (authorUserId) {
+      relations.add(linearUserPath(authorUserId));
+      addStringProperty(properties, 'linear.author_id', authorUserId);
+    }
     addStringProperty(properties, 'linear.author_name', author.displayName ?? author.name);
     addStringProperty(properties, 'linear.author_email', author.email);
     addStringProperty(properties, 'linear.author_url', author.url);
