@@ -8,11 +8,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
-      "import": "./dist/path-mapper.js"
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
     }
   },
   "files": [
