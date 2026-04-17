@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-core",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/src/index.js",
