@@ -8,15 +8,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
-      "import": "./dist/path-mapper.js"
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
     },
     "./adapter": {
       "types": "./dist/adapter.d.ts",
-      "import": "./dist/adapter.js"
+      "import": "./dist/adapter.js",
+      "default": "./dist/adapter.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
     }
   },
   "files": [
