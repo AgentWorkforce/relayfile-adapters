@@ -8,4 +8,4 @@ packages/*/tests/**/*.js
 packages/*/tests/**/*.d.ts
 packages/*/tests/**/*.js.map
 packages/*/tests/**/*.d.ts.map
-.claude/
+.claude/settings.json
