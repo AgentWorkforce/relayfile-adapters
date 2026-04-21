@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-core",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/src/index.js",
@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@relayfile/sdk": "^0.1.7"
+    "@relayfile/sdk": ">=0.1.7 <1"
   },
   "dependencies": {
     "@scalar/postman-to-openapi": "^0.6.0",
@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.1.7",
+    "@relayfile/sdk": "^0.3.1",
     "@types/node": "^24.5.2",
     "typescript": "^5.9.2",
     "vitest": "^3.0.0"
