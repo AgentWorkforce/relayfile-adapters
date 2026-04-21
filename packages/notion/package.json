@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-notion",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Notion adapter for relayfile — maps Notion databases, pages, blocks, and comments to relayfile VFS paths",
   "type": "module",
   "main": "dist/index.js",
@@ -33,11 +33,14 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.1.7 <1"
+  },
   "dependencies": {
-    "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.1.7"
+    "@agent-relay/sdk": "^3.2.22"
   },
   "devDependencies": {
+    "@relayfile/sdk": "^0.3.1",
     "typescript": "^5.4.0"
   },
   "engines": {
