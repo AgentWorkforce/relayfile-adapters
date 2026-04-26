@@ -2,6 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  getPull,
+  getPullDiff,
   getRepository,
   listComments,
   listIssues,
@@ -9,6 +11,8 @@ import {
   listPullRequests,
   listReleases,
   listRepos,
+  searchIssues,
+  searchRepos,
   type GitHubOperation,
   type GitHubRepoRef,
 } from './operations.js';
@@ -168,6 +172,97 @@ describe('operations', () => {
     assert.strictEqual('sort' in (orgOperation.query ?? {}), false);
     assert.strictEqual('direction' in (orgOperation.query ?? {}), false);
     assert.strictEqual('page' in (orgOperation.query ?? {}), false);
+  });
+
+  it('getPull targets the pull request endpoint', () => {
+    const operation = getPull({
+      owner: 'AgentWorkforce',
+      repo: 'cloud',
+      number: 42,
+    });
+
+    assert.strictEqual(operation.method, 'GET');
+    assert.strictEqual(operation.path, '/repos/AgentWorkforce/cloud/pulls/42');
+    assert.strictEqual(operation.query, undefined);
+  });
+
+  it('getPullDiff reuses the same pure pull request operation', () => {
+    const input = {
+      owner: 'AgentWorkforce',
+      repo: 'cloud',
+      number: 42,
+    } as const;
+
+    assert.deepStrictEqual(getPullDiff(input), getPull(input));
+  });
+
+  it('searchIssues builds the search issues endpoint and optional repo scope', () => {
+    const operation = searchIssues({
+      query: 'is:open label:bug',
+      repoSlug: 'AgentWorkforce/cloud',
+      sort: 'updated',
+      order: 'desc',
+      per_page: 20,
+      page: 3,
+    });
+
+    assert.strictEqual(operation.method, 'GET');
+    assert.strictEqual(operation.path, '/search/issues');
+    assert.deepStrictEqual(operation.query, {
+      q: 'is:open label:bug repo:AgentWorkforce/cloud',
+      sort: 'updated',
+      order: 'desc',
+      per_page: 20,
+      page: 3,
+    });
+  });
+
+  it('searchRepos builds the repositories search endpoint', () => {
+    const operation = searchRepos({
+      query: 'cloud',
+      sort: 'stars',
+      order: 'desc',
+      per_page: 10,
+      page: 2,
+    });
+
+    assert.strictEqual(operation.method, 'GET');
+    assert.strictEqual(operation.path, '/search/repositories');
+    assert.deepStrictEqual(operation.query, {
+      q: 'cloud in:name',
+      sort: 'stars',
+      order: 'desc',
+      per_page: 10,
+      page: 2,
+    });
+  });
+
+  it('throws for invalid pagination inputs, including non-integers', () => {
+    const invalidValues = [0, -1, 0.5, 1.5, Number.POSITIVE_INFINITY, Number.NaN];
+
+    for (const per_page of invalidValues) {
+      assert.throws(
+        () =>
+          listIssues({
+            owner: 'AgentWorkforce',
+            repo: 'cloud',
+            per_page,
+          }),
+        /GitHub per_page must be a positive integer/,
+      );
+    }
+
+    for (const page of invalidValues) {
+      assert.throws(
+        () =>
+          listIssues({
+            owner: 'AgentWorkforce',
+            repo: 'cloud',
+            page,
+          }),
+        /GitHub page must be a positive integer/,
+      );
+    }
   });
 
   it('provides compile-time coverage for GitHubOperation and GitHubRepoRef', () => {

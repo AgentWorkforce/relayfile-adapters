@@ -247,11 +247,11 @@ function normalizePositiveInteger(value: number | undefined, fieldName: string):
     return undefined;
   }
 
-  if (!Number.isFinite(value) || value <= 0) {
+  if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`GitHub ${fieldName} must be a positive integer`);
   }
 
-  return Math.floor(value);
+  return value;
 }
 
 function formatPositiveInteger(value: number, fieldName: string): string {
