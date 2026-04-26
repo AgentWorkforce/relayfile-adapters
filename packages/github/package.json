@@ -32,7 +32,7 @@
     "github.mapping.yaml"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build --workspace @relayfile/adapter-core && tsc -p tsconfig.json",
     "test": "npm run build && node --import tsx --test 'src/**/*.test.ts'",
     "lint": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit",
