@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx --test src/__tests__/*.test.ts",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
