@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-github",
-  "version": "0.1.4",
+  "version": "0.1.8",
   "description": "GitHub adapter scaffold for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -8,15 +8,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
-      "import": "./dist/path-mapper.js"
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
     },
     "./adapter": {
       "types": "./dist/adapter.d.ts",
-      "import": "./dist/adapter.js"
+      "import": "./dist/adapter.js",
+      "default": "./dist/adapter.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
     }
   },
   "files": [
@@ -31,13 +39,13 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@relayfile/sdk": "^0.1.7"
+    "@relayfile/sdk": ">=0.1.7 <1"
   },
   "dependencies": {
     "@relayfile/adapter-core": "^0.1.1"
   },
   "devDependencies": {
-    "@relayfile/sdk": "^0.1.7",
+    "@relayfile/sdk": "^0.3.1",
     "@types/node": "^24.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
