@@ -5,18 +5,26 @@ import {
   computeLinearPath,
   linearCyclePath,
   linearIssuePath,
+  linearMilestonePath,
   linearProjectPath,
+  linearRoadmapPath,
+  linearTeamPath,
+  linearUserPath,
   normalizeLinearObjectType,
 } from './path-mapper.js';
+import { LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   LinearAdapterConfig,
   LinearComment,
   LinearCycle,
   LinearIssue,
   LinearLabel,
+  LinearMilestone,
   LinearProject,
   LinearRelation,
+  LinearRoadmap,
   LinearState,
+  LinearTeam,
   LinearUser,
   LinearWebhookPayload,
 } from './types.js';
@@ -103,7 +111,7 @@ type LinearRecord = Record<string, unknown>;
 type LinearWebhookEnvelope = Record<string, unknown>;
 
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
-const SUPPORTED_EVENTS = ['comment', 'cycle', 'issue', 'project'] as const;
+const SUPPORTED_EVENTS = LINEAR_WEBHOOK_OBJECT_TYPES;
 const LINEAR_PROVIDER_NAME = 'linear';
 
 export class LinearAdapter extends IntegrationAdapter {
@@ -238,10 +246,22 @@ export class LinearAdapter extends IntegrationAdapter {
         applyCommentSemantics(properties, relations, comments, payload as LinearRecord);
         break;
       case 'project':
-        applyProjectSemantics(properties, payload as LinearRecord);
+        applyProjectSemantics(properties, relations, payload as LinearRecord);
         break;
       case 'cycle':
         applyCycleSemantics(properties, payload as LinearRecord);
+        break;
+      case 'team':
+        applyTeamSemantics(properties, payload as LinearRecord);
+        break;
+      case 'user':
+        applyUserSemantics(properties, payload as LinearRecord);
+        break;
+      case 'milestone':
+        applyMilestoneSemantics(properties, relations, payload as LinearRecord);
+        break;
+      case 'roadmap':
+        applyRoadmapSemantics(properties, relations, payload as LinearRecord);
         break;
     }
 
@@ -320,12 +340,12 @@ function applyIssueSemantics(
 
   addStringProperty(properties, 'linear.identifier', issue.identifier);
   addStringProperty(properties, 'linear.title', issue.title);
-  addStringProperty(properties, 'linear.branch_name', issue.branchName);
-  addStringProperty(properties, 'linear.due_date', issue.dueDate);
-  addStringProperty(properties, 'linear.created_at', issue.createdAt);
-  addStringProperty(properties, 'linear.updated_at', issue.updatedAt);
-  addStringProperty(properties, 'linear.completed_at', issue.completedAt);
-  addStringProperty(properties, 'linear.canceled_at', issue.canceledAt);
+  addFirstStringProperty(properties, 'linear.branch_name', issue.branchName, issue.branch_name);
+  addFirstStringProperty(properties, 'linear.due_date', issue.dueDate, issue.due_date);
+  addFirstStringProperty(properties, 'linear.created_at', issue.createdAt, issue.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', issue.updatedAt, issue.updated_at);
+  addFirstStringProperty(properties, 'linear.completed_at', issue.completedAt, issue.completed_at);
+  addFirstStringProperty(properties, 'linear.canceled_at', issue.canceledAt, issue.canceled_at);
   addNumberProperty(properties, 'linear.estimate', issue.estimate);
 
   const priority = asNumber(issue.priority);
@@ -341,6 +361,8 @@ function applyIssueSemantics(
     addStringProperty(properties, 'linear.state_type', state.type);
     addStringProperty(properties, 'linear.state_color', state.color);
   }
+  addFirstStringProperty(properties, 'linear.state_name', properties['linear.state_name'], issue.state_name);
+  addFirstStringProperty(properties, 'linear.state_type', properties['linear.state_type'], issue.state_type);
 
   const assignee = issue.assignee as LinearUser | null | undefined;
   if (assignee) {
@@ -349,6 +371,9 @@ function applyIssueSemantics(
     addStringProperty(properties, 'linear.assignee_email', assignee.email);
     addStringProperty(properties, 'linear.assignee_url', assignee.url);
   }
+  addFirstStringProperty(properties, 'linear.assignee_id', properties['linear.assignee_id'], issue.assignee_id);
+  addFirstStringProperty(properties, 'linear.assignee_name', properties['linear.assignee_name'], issue.assignee_name);
+  addFirstStringProperty(properties, 'linear.assignee_email', properties['linear.assignee_email'], issue.assignee_email);
 
   const creator = issue.creator as LinearUser | null | undefined;
   if (creator) {
@@ -375,6 +400,12 @@ function applyIssueSemantics(
     addStringProperty(properties, 'linear.project_state', issue.project.state);
     addStringProperty(properties, 'linear.project_url', issue.project.url);
   }
+  const projectId = asString(issue.project_id);
+  if (projectId) {
+    relations.add(linearProjectPath(projectId));
+    addStringProperty(properties, 'linear.project_id', projectId);
+  }
+  addFirstStringProperty(properties, 'linear.project_name', properties['linear.project_name'], issue.project_name);
 
   if (issue.cycle?.id) {
     relations.add(linearCyclePath(issue.cycle.id));
@@ -401,10 +432,18 @@ function applyIssueSemantics(
   }
 
   if (issue.team?.id) {
+    relations.add(linearTeamPath(issue.team.id));
     addStringProperty(properties, 'linear.team_id', issue.team.id);
     addStringProperty(properties, 'linear.team_key', issue.team.key);
     addStringProperty(properties, 'linear.team_name', issue.team.name);
   }
+  const teamId = asString(issue.team_id);
+  if (teamId) {
+    relations.add(linearTeamPath(teamId));
+    addStringProperty(properties, 'linear.team_id', teamId);
+  }
+  addFirstStringProperty(properties, 'linear.team_key', properties['linear.team_key'], issue.team_key);
+  addFirstStringProperty(properties, 'linear.team_name', properties['linear.team_name'], issue.team_name);
 }
 
 function applyCommentSemantics(
@@ -415,16 +454,27 @@ function applyCommentSemantics(
 ): void {
   const comment = payload as Partial<LinearComment> & LinearRecord;
 
-  addStringProperty(properties, 'linear.created_at', comment.createdAt);
-  addStringProperty(properties, 'linear.updated_at', comment.updatedAt);
+  addFirstStringProperty(properties, 'linear.created_at', comment.createdAt, comment.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', comment.updatedAt, comment.updated_at);
 
   const author = comment.user as LinearUser | null | undefined;
   if (author) {
-    addStringProperty(properties, 'linear.author_id', author.id);
+    const authorUserId = asString(author.id);
+    if (authorUserId) {
+      relations.add(linearUserPath(authorUserId));
+      addStringProperty(properties, 'linear.author_id', authorUserId);
+    }
     addStringProperty(properties, 'linear.author_name', author.displayName ?? author.name);
     addStringProperty(properties, 'linear.author_email', author.email);
     addStringProperty(properties, 'linear.author_url', author.url);
   }
+  const authorId = asString(comment.user_id) ?? asString(comment.author_id);
+  if (authorId) {
+    relations.add(linearUserPath(authorId));
+  }
+  addFirstStringProperty(properties, 'linear.author_id', properties['linear.author_id'], comment.user_id, comment.author_id);
+  addFirstStringProperty(properties, 'linear.author_name', properties['linear.author_name'], comment.user_name, comment.author_name);
+  addFirstStringProperty(properties, 'linear.author_email', properties['linear.author_email'], comment.user_email, comment.author_email);
 
   if (comment.issue?.id) {
     relations.add(linearIssuePath(comment.issue.id));
@@ -433,6 +483,14 @@ function applyCommentSemantics(
     addStringProperty(properties, 'linear.issue_title', comment.issue.title);
     addStringProperty(properties, 'linear.issue_url', comment.issue.url);
   }
+  const issueId = asString(comment.issue_id);
+  if (issueId) {
+    relations.add(linearIssuePath(issueId));
+    addStringProperty(properties, 'linear.issue_id', issueId);
+  }
+  addFirstStringProperty(properties, 'linear.issue_identifier', properties['linear.issue_identifier'], comment.issue_identifier);
+  addFirstStringProperty(properties, 'linear.issue_title', properties['linear.issue_title'], comment.issue_title);
+  addFirstStringProperty(properties, 'linear.issue_url', properties['linear.issue_url'], comment.issue_url);
 
   const body = asString(comment.body);
   if (body) {
@@ -441,18 +499,37 @@ function applyCommentSemantics(
   }
 }
 
-function applyProjectSemantics(properties: Record<string, string>, payload: LinearRecord): void {
+function applyProjectSemantics(
+  properties: Record<string, string>,
+  relations: Set<string>,
+  payload: LinearRecord
+): void {
   const project = payload as Partial<LinearProject> & LinearRecord;
 
   addStringProperty(properties, 'linear.name', project.name);
   addStringProperty(properties, 'linear.state', project.state);
-  addStringProperty(properties, 'linear.target_date', project.targetDate);
-  addStringProperty(properties, 'linear.started_at', project.startedAt);
-  addStringProperty(properties, 'linear.completed_at', project.completedAt);
+  addFirstStringProperty(properties, 'linear.description', project.description);
+  addFirstStringProperty(properties, 'linear.target_date', project.targetDate, project.target_date);
+  addFirstStringProperty(properties, 'linear.started_at', project.startedAt, project.started_at);
+  addFirstStringProperty(properties, 'linear.completed_at', project.completedAt, project.completed_at);
+  addFirstStringProperty(properties, 'linear.created_at', project.createdAt, project.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', project.updatedAt, project.updated_at);
 
   const progress = asNumber(project.progress);
   if (progress !== undefined) {
     properties['linear.progress'] = String(progress);
+  }
+
+  const teamIds = uniqueStrings([
+    ...asStringArray(project.team_ids),
+    ...asLinearReferenceIds(project.teams),
+  ]);
+  if (teamIds.length > 0) {
+    properties['linear.team_ids'] = teamIds.join(', ');
+    properties['linear.team_count'] = String(teamIds.length);
+    for (const teamId of teamIds) {
+      relations.add(linearTeamPath(teamId));
+    }
   }
 }
 
@@ -464,6 +541,92 @@ function applyCycleSemantics(properties: Record<string, string>, payload: Linear
   addStringProperty(properties, 'linear.starts_at', cycle.startsAt);
   addStringProperty(properties, 'linear.ends_at', cycle.endsAt);
   addStringProperty(properties, 'linear.completed_at', cycle.completedAt);
+}
+
+function applyTeamSemantics(properties: Record<string, string>, payload: LinearRecord): void {
+  const team = payload as Partial<LinearTeam> & LinearRecord;
+
+  addStringProperty(properties, 'linear.name', team.name);
+  addStringProperty(properties, 'linear.key', team.key);
+  addFirstStringProperty(properties, 'linear.description', team.description);
+  addFirstStringProperty(properties, 'linear.created_at', team.createdAt, team.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', team.updatedAt, team.updated_at);
+}
+
+function applyUserSemantics(properties: Record<string, string>, payload: LinearRecord): void {
+  const user = payload as Partial<LinearUser> & LinearRecord;
+
+  addStringProperty(properties, 'linear.name', user.name);
+  addFirstStringProperty(properties, 'linear.display_name', user.displayName, user.display_name);
+  addFirstStringProperty(properties, 'linear.first_name', user.firstName, user.first_name);
+  addFirstStringProperty(properties, 'linear.last_name', user.lastName, user.last_name);
+  addStringProperty(properties, 'linear.email', user.email);
+  addBooleanProperty(properties, 'linear.admin', user.admin);
+  addFirstStringProperty(properties, 'linear.avatar_url', user.avatarUrl, user.avatar_url);
+  addFirstStringProperty(properties, 'linear.updated_at', user.updatedAt, user.updated_at);
+}
+
+function applyMilestoneSemantics(
+  properties: Record<string, string>,
+  relations: Set<string>,
+  payload: LinearRecord
+): void {
+  const milestone = payload as Partial<LinearMilestone> & LinearRecord;
+
+  addStringProperty(properties, 'linear.name', milestone.name);
+  addStringProperty(properties, 'linear.status', milestone.status);
+  addFirstStringProperty(properties, 'linear.description', milestone.description);
+  addFirstStringProperty(properties, 'linear.created_at', milestone.createdAt, milestone.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', milestone.updatedAt, milestone.updated_at);
+
+  const progress = asNumber(milestone.progress);
+  if (progress !== undefined) {
+    properties['linear.progress'] = String(progress);
+  }
+
+  const projectId = asString(milestone.project?.id) ?? asString(milestone.project_id);
+  if (projectId) {
+    relations.add(linearProjectPath(projectId));
+    addStringProperty(properties, 'linear.project_id', projectId);
+  }
+  addFirstStringProperty(properties, 'linear.project_name', milestone.project?.name, milestone.project_name);
+}
+
+function applyRoadmapSemantics(
+  properties: Record<string, string>,
+  relations: Set<string>,
+  payload: LinearRecord
+): void {
+  const roadmap = payload as Partial<LinearRoadmap> & LinearRecord;
+
+  addStringProperty(properties, 'linear.name', roadmap.name);
+  addFirstStringProperty(properties, 'linear.description', roadmap.description);
+  addFirstStringProperty(properties, 'linear.created_at', roadmap.createdAt, roadmap.created_at);
+  addFirstStringProperty(properties, 'linear.updated_at', roadmap.updatedAt, roadmap.updated_at);
+
+  const projectIds = uniqueStrings([
+    ...asStringArray(roadmap.project_ids),
+    ...asLinearReferenceIds(roadmap.projects),
+  ]);
+  if (projectIds.length > 0) {
+    properties['linear.project_ids'] = projectIds.join(', ');
+    properties['linear.project_count'] = String(projectIds.length);
+    for (const projectId of projectIds) {
+      relations.add(linearProjectPath(projectId));
+    }
+  }
+
+  const teamIds = uniqueStrings([
+    ...asStringArray(roadmap.team_ids),
+    ...asLinearReferenceIds(roadmap.teams),
+  ]);
+  if (teamIds.length > 0) {
+    properties['linear.team_ids'] = teamIds.join(', ');
+    properties['linear.team_count'] = String(teamIds.length);
+    for (const teamId of teamIds) {
+      relations.add(linearTeamPath(teamId));
+    }
+  }
 }
 
 function asLabels(labels: LinearIssue['labels']): LinearLabel[] {
@@ -571,10 +734,30 @@ function addStringProperty(properties: Record<string, string>, key: string, valu
   }
 }
 
+function addFirstStringProperty(
+  properties: Record<string, string>,
+  key: string,
+  ...values: unknown[]
+): void {
+  for (const value of values) {
+    const normalized = asString(value);
+    if (normalized) {
+      properties[key] = normalized;
+      return;
+    }
+  }
+}
+
 function addNumberProperty(properties: Record<string, string>, key: string, value: unknown): void {
   const normalized = asNumber(value);
   if (normalized !== undefined) {
     properties[key] = String(normalized);
+  }
+}
+
+function addBooleanProperty(properties: Record<string, string>, key: string, value: unknown): void {
+  if (typeof value === 'boolean') {
+    properties[key] = String(value);
   }
 }
 
@@ -653,6 +836,31 @@ function asNumber(value: unknown): number | undefined {
   }
 
   return undefined;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => asString(entry))
+    .filter((entry): entry is string => entry !== undefined);
+}
+
+function asLinearReferenceIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => getRecord(entry))
+    .map((entry) => asString(entry?.id))
+    .filter((entry): entry is string => entry !== undefined);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
 }
 
 function mapPriorityLabel(priority: number): string {
