@@ -15,4 +15,22 @@ export * from './path-mapper.js';
 export * from './search.js';
 export * from './sync.js';
 export * from './types.js';
+export {
+  buildDatabaseFilter,
+  getBlockChildren,
+  getPage,
+  queryDatabase,
+  searchDatabases,
+  searchPages,
+} from './queries.js';
+export type {
+  NotionDatabaseFilter,
+  NotionDatabaseFilterInput,
+  NotionDatabaseFilterType,
+  NotionObject,
+  NotionPaginationOptions,
+  NotionProxyOperation,
+  NotionQueryDatabaseOptions,
+  NotionSearchOptions,
+} from './queries.js';
 export * from './writeback.js';
