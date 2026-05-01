@@ -49,7 +49,7 @@
     "@relayfile/sdk": ">=0.6.0 <1"
   },
   "dependencies": {
-    "@agent-relay/sdk": "^6.0.6"
+    "@agent-relay/sdk": "^6.0.7"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.6.0",

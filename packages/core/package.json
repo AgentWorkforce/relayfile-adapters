@@ -31,7 +31,7 @@
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@agent-relay/sdk": "^6.0.6",
+    "@agent-relay/sdk": "^6.0.7",
     "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.5.2",
     "typescript": "^5.9.2",
