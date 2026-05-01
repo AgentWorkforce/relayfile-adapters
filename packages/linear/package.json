@@ -46,10 +46,8 @@
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
   },
-  "dependencies": {
-    "@agent-relay/sdk": "^6.0.7"
-  },
   "devDependencies": {
+    "@agent-relay/sdk": "^6.0.7",
     "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
     "tsx": "^4.20.6",
