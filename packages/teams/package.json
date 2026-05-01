@@ -35,11 +35,11 @@
     "directory": "packages/teams"
   },
   "peerDependencies": {
-    "@relayfile/sdk": ">=0.1.7 <1"
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
-    "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.3.1",
+    "@agent-relay/sdk": "^6.0.6",
+    "@relayfile/sdk": "^0.6.0",
     "@types/node": "^25.5.0",
     "typescript": "^5.4.0"
   }
