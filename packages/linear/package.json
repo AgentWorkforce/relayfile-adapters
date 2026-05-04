@@ -1,20 +1,30 @@
 {
   "name": "@relayfile/adapter-linear",
-  "version": "0.1.0",
+  "version": "0.1.12",
   "description": "Linear adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
-  "types": "./src/index.ts",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test src/__tests__/*.test.ts",
-    "build": "tsc"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "relayfile",
@@ -33,11 +43,12 @@
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
     "directory": "packages/linear"
   },
-  "dependencies": {
-    "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.1.7"
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
+    "@agent-relay/sdk": "^6.0.7",
+    "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

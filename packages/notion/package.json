@@ -1,14 +1,25 @@
 {
   "name": "@relayfile/adapter-notion",
-  "version": "0.1.0",
-  "description": "Notion adapter for relayfile \u2014 maps Notion databases, pages, blocks, and comments to relayfile VFS paths",
+  "version": "0.1.10",
+  "description": "Notion adapter for relayfile — maps Notion databases, pages, blocks, and comments to relayfile VFS paths",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
     }
   },
   "files": [
@@ -19,13 +30,15 @@
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test 'src/__tests__/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
-  "dependencies": {
-    "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.1.7"
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
+    "@agent-relay/sdk": "^6.0.7",
+    "@relayfile/sdk": "^0.6.0",
     "typescript": "^5.4.0"
   },
   "engines": {

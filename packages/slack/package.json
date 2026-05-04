@@ -1,23 +1,32 @@
 {
   "name": "@relayfile/adapter-slack",
-  "version": "0.1.0",
+  "version": "0.1.11",
   "description": "Slack adapter scaffolding for Relayfile",
   "type": "module",
   "sideEffects": false,
   "main": "dist/index.js",
-  "types": "./src/index.ts",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    }
   },
   "files": [
-    "src",
-    "tsconfig.json"
+    "dist"
   ],
   "scripts": {
     "test": "node --import tsx --test src/__tests__/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "relayfile",
@@ -36,11 +45,12 @@
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
     "directory": "packages/slack"
   },
-  "dependencies": {
-    "@agent-relay/sdk": "^3.2.22",
-    "@relayfile/sdk": "^0.1.7"
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
+    "@agent-relay/sdk": "^6.0.7",
+    "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

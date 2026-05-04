@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import type { NormalizedWebhook } from './linear-adapter.ts';
+import type { NormalizedWebhook } from './linear-adapter.js';
 
 export const LINEAR_PROVIDER = 'linear';
 export const LINEAR_SIGNATURE_HEADER = 'linear-signature';
@@ -45,10 +45,18 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, string>> = {
   issues: 'issue',
   label: 'label',
   labels: 'label',
+  milestone: 'milestone',
+  milestones: 'milestone',
   project: 'project',
+  projectmilestone: 'milestone',
+  projectmilestones: 'milestone',
   projects: 'project',
   reaction: 'reaction',
   reactions: 'reaction',
+  roadmap: 'roadmap',
+  roadmaps: 'roadmap',
+  team: 'team',
+  teams: 'team',
   user: 'user',
   users: 'user',
 };

@@ -1,7 +1,7 @@
 {
   "name": "@relayfile/adapter-gitlab",
-  "version": "0.1.0",
-  "description": "GitLab adapter for relayfile \u2014 maps GitLab merge requests, issues, pipelines, jobs, commits, and webhooks to relayfile VFS paths",
+  "version": "0.1.10",
+  "description": "GitLab adapter for relayfile — maps GitLab merge requests, issues, pipelines, jobs, commits, and webhooks to relayfile VFS paths",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,13 +20,15 @@
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test 'test/**/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
-  "dependencies": {
-    "@relayfile/sdk": "^0.1.7"
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
-    "@agent-relay/sdk": "^3.2.22",
+    "@agent-relay/sdk": "^6.0.7",
+    "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
     "typescript": "^5.9.3"
   },

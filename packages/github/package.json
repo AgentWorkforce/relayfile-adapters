@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-github",
-  "version": "0.1.0",
+  "version": "0.1.10",
   "description": "GitHub adapter scaffold for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -8,7 +8,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    },
+    "./adapter": {
+      "types": "./dist/adapter.d.ts",
+      "import": "./dist/adapter.js",
+      "default": "./dist/adapter.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
     }
   },
   "files": [
@@ -16,19 +32,20 @@
     "github.mapping.yaml"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build --workspace @relayfile/adapter-core && tsc -p tsconfig.json",
     "test": "npm run build && node --import tsx --test 'src/**/*.test.ts'",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@relayfile/sdk": "^0.1.7"
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "file:../core"
+    "@relayfile/adapter-core": "^0.1.1"
   },
   "devDependencies": {
-    "@relayfile/sdk": "^0.1.7",
+    "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

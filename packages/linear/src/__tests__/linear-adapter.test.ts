@@ -10,7 +10,11 @@ import {
   linearCommentPath,
   linearCyclePath,
   linearIssuePath,
+  linearMilestonePath,
   linearProjectPath,
+  linearRoadmapPath,
+  linearTeamPath,
+  linearUserPath,
   normalizeLinearWebhook,
   validateLinearWebhookSignature,
   type ConnectionProvider,
@@ -18,7 +22,7 @@ import {
   type ProxyRequest,
   type ProxyResponse,
   type RelayFileClientLike,
-} from '../index.ts';
+} from '../index.js';
 
 function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
   const client: RelayFileClientLike = {
@@ -60,9 +64,15 @@ test('LinearAdapter exposes the provider name and supported Linear webhook event
     'issue.create',
     'issue.update',
     'issue.remove',
+    'milestone.create',
+    'milestone.update',
+    'milestone.remove',
     'project.create',
     'project.update',
     'project.remove',
+    'roadmap.create',
+    'roadmap.update',
+    'roadmap.remove',
   ]);
 });
 
@@ -207,23 +217,35 @@ test('signature rejection handling is deterministic for result and throwing help
   assert.deepEqual(missingSecret, { ok: false, reason: 'missing-secret' });
 });
 
-test('path mapping stays deterministic for issue, comment, project, and cycle objects', () => {
+test('path mapping stays deterministic for supported Linear VFS objects', () => {
   const adapter = createAdapter();
 
   assert.equal(linearIssuePath('issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(linearCommentPath('comment:42'), '/linear/comments/comment%3A42.json');
   assert.equal(linearProjectPath('project#7'), '/linear/projects/project%237.json');
   assert.equal(linearCyclePath('cycle Q2'), '/linear/cycles/cycle%20Q2.json');
+  assert.equal(linearTeamPath('team eng'), '/linear/teams/team%20eng.json');
+  assert.equal(linearUserPath('user@example.com'), '/linear/users/user%40example.com.json');
+  assert.equal(linearMilestonePath('milestone/1'), '/linear/milestones/milestone%2F1.json');
+  assert.equal(linearRoadmapPath('roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
 
   assert.equal(computeLinearPath('Issue', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42.json');
   assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(computeLinearPath('Cycles', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
+  assert.equal(computeLinearPath('teams', 'team eng'), '/linear/teams/team%20eng.json');
+  assert.equal(computeLinearPath('users', 'user@example.com'), '/linear/users/user%40example.com.json');
+  assert.equal(computeLinearPath('ProjectMilestone', 'milestone/1'), '/linear/milestones/milestone%2F1.json');
+  assert.equal(computeLinearPath('roadmaps', 'roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
 
   assert.equal(adapter.computePath('issues', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(adapter.computePath('comment', 'comment:42'), '/linear/comments/comment%3A42.json');
   assert.equal(adapter.computePath('projects', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(adapter.computePath('cycle', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
+  assert.equal(adapter.computePath('team', 'team eng'), '/linear/teams/team%20eng.json');
+  assert.equal(adapter.computePath('user', 'user@example.com'), '/linear/users/user%40example.com.json');
+  assert.equal(adapter.computePath('milestone', 'milestone/1'), '/linear/milestones/milestone%2F1.json');
+  assert.equal(adapter.computePath('roadmap', 'roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
 });
 
 test('computeSemantics extracts issue priority, state, labels, and relations deterministically', () => {
@@ -322,12 +344,92 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
     '/linear/issues/issue_parent.json',
     '/linear/issues/issue_related_z.json',
     '/linear/projects/project_alpha.json',
+    '/linear/teams/team_eng.json',
   ]);
   assert.equal(semantics.comments, undefined);
 });
 
+test('computeSemantics extracts synced Linear project, milestone, and roadmap relations', () => {
+  const adapter = createAdapter();
+
+  const projectSemantics = adapter.computeSemantics('LinearProject', 'project_alpha', {
+    id: 'project_alpha',
+    name: 'Alpha',
+    description: 'Top priority work',
+    team_ids: ['team_eng', 'team_platform'],
+    created_at: '2026-04-01T00:00:00.000Z',
+    updated_at: '2026-04-02T00:00:00.000Z',
+  });
+
+  assert.deepEqual(projectSemantics.properties, {
+    provider: 'linear',
+    'provider.object_id': 'project_alpha',
+    'provider.object_type': 'project',
+    'linear.id': 'project_alpha',
+    'linear.object_type': 'project',
+    'linear.name': 'Alpha',
+    'linear.description': 'Top priority work',
+    'linear.created_at': '2026-04-01T00:00:00.000Z',
+    'linear.updated_at': '2026-04-02T00:00:00.000Z',
+    'linear.team_ids': 'team_eng, team_platform',
+    'linear.team_count': '2',
+  });
+  assert.deepEqual(projectSemantics.relations, [
+    '/linear/teams/team_eng.json',
+    '/linear/teams/team_platform.json',
+  ]);
+
+  const milestoneSemantics = adapter.computeSemantics('ProjectMilestone', 'milestone_beta', {
+    id: 'milestone_beta',
+    name: 'Beta',
+    status: 'planned',
+    progress: 0.4,
+    project_id: 'project_alpha',
+    project_name: 'Alpha',
+  });
+
+  assert.deepEqual(milestoneSemantics.properties, {
+    provider: 'linear',
+    'provider.object_id': 'milestone_beta',
+    'provider.object_type': 'milestone',
+    'linear.id': 'milestone_beta',
+    'linear.object_type': 'milestone',
+    'linear.name': 'Beta',
+    'linear.status': 'planned',
+    'linear.progress': '0.4',
+    'linear.project_id': 'project_alpha',
+    'linear.project_name': 'Alpha',
+  });
+  assert.deepEqual(milestoneSemantics.relations, ['/linear/projects/project_alpha.json']);
+
+  const roadmapSemantics = adapter.computeSemantics('roadmap', 'roadmap_2026', {
+    id: 'roadmap_2026',
+    name: '2026 Roadmap',
+    project_ids: ['project_alpha', 'project_beta'],
+    team_ids: ['team_eng'],
+  });
+
+  assert.deepEqual(roadmapSemantics.properties, {
+    provider: 'linear',
+    'provider.object_id': 'roadmap_2026',
+    'provider.object_type': 'roadmap',
+    'linear.id': 'roadmap_2026',
+    'linear.object_type': 'roadmap',
+    'linear.name': '2026 Roadmap',
+    'linear.project_ids': 'project_alpha, project_beta',
+    'linear.project_count': '2',
+    'linear.team_ids': 'team_eng',
+    'linear.team_count': '1',
+  });
+  assert.deepEqual(roadmapSemantics.relations, [
+    '/linear/projects/project_alpha.json',
+    '/linear/projects/project_beta.json',
+    '/linear/teams/team_eng.json',
+  ]);
+});
+
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {
-  const barrel = await import('../index.ts');
+  const barrel = await import('../index.js');
 
   assert.equal(barrel.LinearAdapter, LinearAdapter);
   assert.equal(barrel.computeLinearPath, computeLinearPath);

@@ -1,7 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DEFAULT_CONFIG, GitHubAdapter, githubMappingPath, validateConfig } from './index.js';
+import { DEFAULT_CONFIG, GitHubAdapter, validateConfig } from './index.js';
+import { githubMappingPath } from './adapter.js';
 import type { ConnectionProvider, ProxyRequest, ProxyResponse } from './types.js';
 
 class MockProvider implements ConnectionProvider {
