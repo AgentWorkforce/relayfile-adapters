@@ -27,11 +27,11 @@ export function normalizeComment(comment: NotionComment): NotionNormalizedCommen
 
 export function buildCommentsFile(
   comments: NotionComment[],
-  context: { databaseId?: string; pageId: string },
+  context: { databaseId?: string; databaseTitle?: string; pageId: string; pageTitle?: string },
 ): NotionVfsFile {
   const path = context.databaseId
-    ? notionDatabasePageCommentsPath(context.databaseId, context.pageId)
-    : notionStandalonePageCommentsPath(context.pageId);
+    ? notionDatabasePageCommentsPath(context.databaseId, context.pageId, context.pageTitle, context.databaseTitle)
+    : notionStandalonePageCommentsPath(context.pageId, context.pageTitle);
   return {
     path,
     contentType: 'application/json; charset=utf-8',

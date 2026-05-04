@@ -38,12 +38,12 @@ export function normalizeBlock(block: NotionBlock): NotionNormalizedBlock {
 
 export function buildBlockFiles(
   blocks: NotionBlock[],
-  context: { databaseId?: string; pageId: string },
+  context: { databaseId?: string; databaseTitle?: string; pageId: string; pageTitle?: string },
 ): NotionVfsFile[] {
   return flattenBlocks(blocks).map((block) => {
     const path = context.databaseId
-      ? notionDatabaseBlockPath(context.databaseId, context.pageId, block.id)
-      : notionStandaloneBlockPath(context.pageId, block.id);
+      ? notionDatabaseBlockPath(context.databaseId, context.pageId, block.id, context.pageTitle, context.databaseTitle)
+      : notionStandaloneBlockPath(context.pageId, block.id, context.pageTitle);
     return {
       path,
       contentType: 'application/json; charset=utf-8',

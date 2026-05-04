@@ -47,6 +47,25 @@ function normalizeSegment(value: string, fallback = 'unknown'): string {
   return trimmed.replace(/[^A-Za-z0-9._+=@-]+/g, '_').replace(/^_+|_+$/g, '') || fallback;
 }
 
+function slugify(value: string): string {
+  return value
+    .replace(/[{}]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
+function namedSegment(name: string | undefined, id: string): string {
+  const slug = name ? slugify(name) : '';
+  return slug || normalizeSegment(id);
+}
+
+function messageSegment(messageTs: string, subject?: string): string {
+  const tsToken = slackTimestampToPathToken(messageTs);
+  const subjectSlug = subject ? slugify(subject) : '';
+  return subjectSlug ? `${subjectSlug}--${tsToken}` : tsToken;
+}
+
 function joinPath(...segments: string[]): string {
   return segments
     .filter((segment) => segment.length > 0)
@@ -187,18 +206,23 @@ export function parseSlackReactionObjectId(objectId: string): SlackReactionObjec
   }
 }
 
-export function channelMetadataPath(channelId: string): string {
-  return joinPath(SLACK_ROOT, 'channels', normalizeSegment(channelId), 'meta.json');
+export function channelMetadataPath(channelId: string, channelName?: string): string {
+  return joinPath(SLACK_ROOT, 'channels', namedSegment(channelName, channelId), 'meta.json');
 }
 
-export function channelMessagesDirectory(channelId: string): string {
-  return joinPath(SLACK_ROOT, 'channels', normalizeSegment(channelId), 'messages');
+export function channelMessagesDirectory(channelId: string, channelName?: string): string {
+  return joinPath(SLACK_ROOT, 'channels', namedSegment(channelName, channelId), 'messages');
 }
 
-export function messagePath(channelId: string, messageTs: string): string {
+export function messagePath(
+  channelId: string,
+  messageTs: string,
+  threadSubject?: string,
+  channelName?: string,
+): string {
   return joinPath(
-    channelMessagesDirectory(channelId),
-    slackTimestampToPathToken(messageTs),
+    channelMessagesDirectory(channelId, channelName),
+    messageSegment(messageTs, threadSubject),
     'message.json',
   );
 }
@@ -224,12 +248,12 @@ export function threadReplyPath(channelId: string, threadTs: string, replyTs: st
   );
 }
 
-export function userMetadataPath(userId: string): string {
-  return joinPath(SLACK_ROOT, 'users', normalizeSegment(userId), 'meta.json');
+export function userMetadataPath(userId: string, userName?: string): string {
+  return joinPath(SLACK_ROOT, 'users', namedSegment(userName, userId), 'meta.json');
 }
 
-export function fileMetadataPath(fileId: string): string {
-  return joinPath(SLACK_ROOT, 'files', normalizeSegment(fileId), 'meta.json');
+export function fileMetadataPath(fileId: string, fileName?: string): string {
+  return joinPath(SLACK_ROOT, 'files', namedSegment(fileName, fileId), 'meta.json');
 }
 
 export function fileCommentPath(fileCommentId: string): string {

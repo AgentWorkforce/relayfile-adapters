@@ -3,6 +3,7 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
+import { githubIssuePath, githubPullRequestPath } from './path-mapper.js';
 import {
   type FileSemantics,
   type GitHubAdapterConfig,
@@ -196,7 +197,9 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     mode: 'update' | 'write',
   ): Promise<IngestResult> {
     const objectId = this.resolveObjectId(objectType, payload);
+    const title = this.resolveTitle(objectType, payload);
     const path =
+      (title ? this.computeScopedPath(objectType, objectId, payload, title) : undefined) ??
       this.computeSchemaScopedPath(eventType, objectType, objectId, payload) ??
       this.computeScopedPath(objectType, objectId, payload);
 
@@ -213,6 +216,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     objectType: string,
     objectId: string,
     payload: Record<string, unknown>,
+    title?: string,
   ): string {
     const repoInfo = extractRepoInfo(payload);
     const owner = repoInfo.owner || this.config.owner;
@@ -224,9 +228,9 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
     switch (objectType) {
       case 'pull_request':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${objectId}/metadata.json`;
+        return githubPullRequestPath(owner, repo, objectId, title);
       case 'issue':
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${objectId}/metadata.json`;
+        return githubIssuePath(owner, repo, objectId, title);
       case 'review':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/reviews/${objectId}.json`;
       case 'review_comment':
@@ -280,6 +284,16 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     const matched = candidates.find((value) => value !== undefined);
     return matched ?? `${objectType}-unknown`;
   }
+
+  private resolveTitle(objectType: string, payload: Record<string, unknown>): string | undefined {
+    if (objectType === 'pull_request') {
+      return readNestedString(payload, 'pull_request', 'title') ?? readString(payload.title);
+    }
+    if (objectType === 'issue') {
+      return readNestedString(payload, 'issue', 'title') ?? readString(payload.title);
+    }
+    return undefined;
+  }
 }
 
 function readString(value: unknown): string | undefined {
@@ -321,6 +335,7 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
 
 export * from './config.js';
 export * from './adapter.js';
+export * from './path-mapper.js';
 export * from './types.js';
 export * from './webhook/event-map.js';
 export * from './writeback.js';

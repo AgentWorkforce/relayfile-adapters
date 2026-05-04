@@ -50,18 +50,19 @@ export async function ingestDatabaseArtifacts(
   query: NotionDatabaseQueryInput = {},
 ): Promise<NotionVfsFile[]> {
   const database = await retrieveDatabase(client, databaseId);
+  const normalizedDatabase = normalizeDatabase(database);
   const pages = await queryDatabasePages(client, databaseId, query);
   const files: NotionVfsFile[] = [
     {
-      path: notionDatabaseMetadataPath(databaseId),
+      path: notionDatabaseMetadataPath(databaseId, normalizedDatabase.title),
       contentType: 'application/json; charset=utf-8',
-      content: `${JSON.stringify(normalizeDatabase(database), null, 2)}\n`,
+      content: `${JSON.stringify(normalizedDatabase, null, 2)}\n`,
       semantics: buildDatabaseSemantics(database),
     },
   ];
 
   for (const page of pages) {
-    files.push(...(await ingestPageArtifacts(client, page, { databaseId })));
+    files.push(...(await ingestPageArtifacts(client, page, { databaseId, databaseTitle: normalizedDatabase.title })));
   }
 
   return files;

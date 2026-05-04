@@ -1,4 +1,5 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
+import { githubPullRequestRoot } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
@@ -35,6 +36,7 @@ export async function mapPRFiles(
   owner: string,
   repo: string,
   number: number,
+  title?: string,
 ): Promise<PullRequestFileMapping[]> {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
@@ -65,7 +67,7 @@ export async function mapPRFiles(
     const pageFiles = parseGitHubPullRequestFiles(response.data);
     files.push(
       ...pageFiles.map((file) => ({
-        vfsPath: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, `files/${file.filename}`),
+        vfsPath: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, `files/${file.filename}`, title),
         githubPath: file.filename,
         status: normalizeStatus(file.status),
         additions: file.additions,
@@ -92,13 +94,14 @@ export function buildVFSPath(
   repo: string,
   number: number,
   subpath: string,
+  title?: string,
 ): string {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
   const prNumber = requirePositiveInteger(number, 'number');
   const normalizedSubpath = normalizeSubpath(subpath);
 
-  return `/github/repos/${encodeURIComponent(trimmedOwner)}/${encodeURIComponent(trimmedRepo)}/pulls/${prNumber}/${normalizedSubpath}`;
+  return `${githubPullRequestRoot(trimmedOwner, trimmedRepo, prNumber, title)}/${normalizedSubpath}`;
 }
 
 function buildHeaders(): Record<string, string> {

@@ -31,14 +31,16 @@ export function normalizePage(page: NotionPage): NotionNormalizedPage {
 export async function ingestPageArtifacts(
   client: NotionApiClient,
   page: NotionPage,
-  context: { databaseId?: string } = {},
+  context: { databaseId?: string; databaseTitle?: string } = {},
 ): Promise<NotionVfsFile[]> {
   const normalized = normalizePage(page);
   const pageId = page.id;
-  const path = context.databaseId ? notionDatabasePagePath(context.databaseId, pageId) : notionStandalonePagePath(pageId);
+  const path = context.databaseId
+    ? notionDatabasePagePath(context.databaseId, pageId, normalized.title, context.databaseTitle)
+    : notionStandalonePagePath(pageId, normalized.title);
   const contentPath = context.databaseId
-    ? notionDatabasePageContentPath(context.databaseId, pageId)
-    : notionStandalonePageContentPath(pageId);
+    ? notionDatabasePageContentPath(context.databaseId, pageId, normalized.title, context.databaseTitle)
+    : notionStandalonePageContentPath(pageId, normalized.title);
 
   const blocks = client.config.fetchBlockJson ? await fetchBlockChildrenRecursively(client, pageId) : [];
   const markdown = await resolvePageMarkdown(client, pageId, blocks);
@@ -58,12 +60,22 @@ export async function ingestPageArtifacts(
   ];
 
   if (blocks.length > 0) {
-    files.push(...buildBlockFiles(blocks, { databaseId: context.databaseId, pageId }));
+    files.push(...buildBlockFiles(blocks, {
+      databaseId: context.databaseId,
+      databaseTitle: context.databaseTitle,
+      pageId,
+      pageTitle: normalized.title,
+    }));
   }
 
   if (client.config.fetchComments) {
     const comments = await listComments(client, pageId);
-    files.push(buildCommentsFile(comments, { databaseId: context.databaseId, pageId }));
+    files.push(buildCommentsFile(comments, {
+      databaseId: context.databaseId,
+      databaseTitle: context.databaseTitle,
+      pageId,
+      pageTitle: normalized.title,
+    }));
   }
 
   return files;

@@ -135,7 +135,11 @@ export class LinearAdapter extends IntegrationAdapter {
   ): Promise<IngestResult> {
     try {
       const normalized = this.normalizeEvent(event);
-      const path = this.computePath(normalized.objectType, normalized.objectId);
+      const path = computeLinearPath(
+        normalized.objectType,
+        normalized.objectId,
+        readIssueTitle(normalized.objectType, normalized.payload),
+      );
 
       if (this.isRemoveEvent(normalized)) {
         if (this.client.deleteFile) {
@@ -200,8 +204,8 @@ export class LinearAdapter extends IntegrationAdapter {
     }
   }
 
-  override computePath(objectType: string, objectId: string): string {
-    return computeLinearPath(objectType, objectId);
+  override computePath(objectType: string, objectId: string, title?: string): string {
+    return computeLinearPath(objectType, objectId, title);
   }
 
   override computeSemantics(
@@ -405,6 +409,14 @@ function applyIssueSemantics(
     addStringProperty(properties, 'linear.team_key', issue.team.key);
     addStringProperty(properties, 'linear.team_name', issue.team.name);
   }
+}
+
+function readIssueTitle(objectType: string, payload: Record<string, unknown>): string | undefined {
+  if (normalizeLinearObjectType(objectType) !== 'issue') {
+    return undefined;
+  }
+
+  return asString(payload.title);
 }
 
 function applyCommentSemantics(
