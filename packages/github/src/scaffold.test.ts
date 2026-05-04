@@ -57,7 +57,7 @@ describe('scaffold', () => {
       repo: 'relayfile',
     });
 
-    assert.strictEqual(githubMappingPath.endsWith('/github.mapping.yaml'), true);
+    assert.strictEqual(githubMappingPath().endsWith('/github.mapping.yaml'), true);
 
     const result = await adapter.ingestReview({
       action: 'submitted',

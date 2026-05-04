@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-github",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "GitHub adapter scaffold for Relayfile",
   "type": "module",
   "main": "dist/index.js",
