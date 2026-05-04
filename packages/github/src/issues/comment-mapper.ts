@@ -1,4 +1,5 @@
 import { fetchIssueComments } from './fetcher.js';
+import { githubNumberSlug } from '../path-mapper.js';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
@@ -51,6 +52,7 @@ export function mapIssueComment(
   owner: string,
   repo: string,
   issueNumber: number,
+  issueTitle?: string,
 ): IssueCommentMapping {
   const commentId = readPositiveInteger(comment, 'id');
   const author = asRecord(comment.user);
@@ -70,7 +72,7 @@ export function mapIssueComment(
   void repo;
 
   return {
-    vfsPath: `issues/${issueNumber}/comments/${commentId}.json`,
+    vfsPath: `issues/${githubNumberSlug(issueNumber, issueTitle)}/comments/${commentId}.json`,
     content: `${JSON.stringify(mapped, null, 2)}\n`,
   };
 }
@@ -81,6 +83,7 @@ export async function ingestIssueComments(
   repo: string,
   number: number,
   vfs: VfsLike,
+  issueTitle?: string,
 ): Promise<IngestResult> {
   const comments = await fetchIssueComments(provider, owner, repo, number);
   const result = createEmptyIngestResult();
@@ -89,7 +92,7 @@ export async function ingestIssueComments(
     let mapped: IssueCommentMapping;
 
     try {
-      mapped = mapIssueComment(comment, owner, repo, number);
+      mapped = mapIssueComment(comment, owner, repo, number, issueTitle);
     } catch (error) {
       result.errors.push({
         path: buildFallbackPath(comment, number),

@@ -26,6 +26,7 @@ export async function fetchAndWriteDiff(
   repo: string,
   number: number,
   vfs: VfsLike,
+  title?: string,
 ): Promise<DiffWriteResult> {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
@@ -49,7 +50,7 @@ export async function fetchAndWriteDiff(
   );
 
   const diff = parseDiffPayload(response.data);
-  const path = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'diff.patch');
+  const path = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'diff.patch', title);
 
   await runVfsWrite(vfs, path, diff);
 
@@ -84,7 +85,7 @@ export async function ingestPullRequest(
   if (parsedPullRequest) {
     await writeTrackedFile(
       vfs,
-      buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json'),
+      buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title),
       serializeJson(parsedPullRequest),
       result,
     );
@@ -92,10 +93,10 @@ export async function ingestPullRequest(
 
   let mappedFiles: PullRequestFileMapping[] = [];
   try {
-    mappedFiles = await mapPRFiles(provider, trimmedOwner, trimmedRepo, prNumber);
+    mappedFiles = await mapPRFiles(provider, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest?.title);
   } catch (error) {
     result.errors.push({
-      path: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'files'),
+      path: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'files', parsedPullRequest?.title),
       error: formatError(error),
     });
   }
@@ -104,11 +105,18 @@ export async function ingestPullRequest(
     await writeTrackedFile(vfs, mappedFile.vfsPath, serializeMappedFile(mappedFile), result);
   }
 
-  const diffPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'diff.patch');
+  const diffPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'diff.patch', parsedPullRequest?.title);
   const diffExisted = await pathExists(vfs, diffPath);
 
   try {
-    const diffResult = await fetchAndWriteDiff(provider, trimmedOwner, trimmedRepo, prNumber, vfs);
+    const diffResult = await fetchAndWriteDiff(
+      provider,
+      trimmedOwner,
+      trimmedRepo,
+      prNumber,
+      vfs,
+      parsedPullRequest?.title,
+    );
     result.paths.push(diffResult.path);
 
     if (diffExisted) {

@@ -1,5 +1,6 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
+import { githubNumberSlug } from '../path-mapper.js';
 
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
@@ -23,6 +24,7 @@ interface IssueMeta {
 
 interface IssueMapping {
   content: string;
+  title: string | null;
   vfsPath: string;
 }
 
@@ -32,6 +34,7 @@ type IssueCommentIngestor = (
   repo: string,
   number: number,
   vfs: VfsLike,
+  issueTitle?: string,
 ) => Promise<IngestResult>;
 
 export function mapIssue(issue: JsonObject, owner: string, repo: string): IssueMapping {
@@ -56,7 +59,8 @@ export function mapIssue(issue: JsonObject, owner: string, repo: string): IssueM
   };
 
   return {
-    vfsPath: `issues/${issueNumber}/meta.json`,
+    vfsPath: `issues/${githubNumberSlug(issueNumber, mapped.title ?? undefined)}/meta.json`,
+    title: mapped.title,
     content: `${JSON.stringify(mapped, null, 2)}\n`,
   };
 }
@@ -81,7 +85,14 @@ export async function ingestIssue(
     buildAbsoluteVfsPath(owner, repo, mapped.vfsPath),
     mapped.content,
   );
-  const commentResult = await resolveIssueCommentIngestor()(provider, owner, repo, number, vfs);
+  const commentResult = await resolveIssueCommentIngestor()(
+    provider,
+    owner,
+    repo,
+    number,
+    vfs,
+    mapped.title ?? undefined,
+  );
 
   return mergeIngestResults(metaResult, commentResult);
 }
@@ -211,7 +222,7 @@ function resolveIssueCommentIngestor(): IssueCommentIngestor {
     'return import("./comment-mapper.js").then((module) => module.ingestIssueComments);',
   ) as () => Promise<unknown>;
 
-  return async (provider, owner, repo, number, vfs) => {
+  return async (provider, owner, repo, number, vfs, issueTitle) => {
     const loaded = await loader();
     if (typeof loaded !== 'function') {
       throw new Error(
@@ -219,7 +230,7 @@ function resolveIssueCommentIngestor(): IssueCommentIngestor {
       );
     }
 
-    return loaded(provider, owner, repo, number, vfs) as Promise<IngestResult>;
+    return loaded(provider, owner, repo, number, vfs, issueTitle) as Promise<IngestResult>;
   };
 }
 

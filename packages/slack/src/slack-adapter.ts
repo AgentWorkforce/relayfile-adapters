@@ -373,7 +373,7 @@ export class SlackAdapter extends IntegrationAdapter {
       const channelId = readString(payload.channel);
       const messageTs = readString(payload.ts);
       if (channelId && messageTs) {
-        return messagePath(channelId, messageTs);
+        return messagePath(channelId, messageTs, readMessageSubject(payload), readChannelName(payload));
       }
     }
 
@@ -397,21 +397,21 @@ export class SlackAdapter extends IntegrationAdapter {
     if (objectType === 'channel') {
       const channelId = readString(payload.channel) ?? readString(asRecord(payload.channel)?.id);
       if (channelId) {
-        return channelMetadataPath(channelId);
+        return channelMetadataPath(channelId, readChannelName(payload));
       }
     }
 
     if (objectType === 'user') {
       const userId = readString(payload.user);
       if (userId) {
-        return userMetadataPath(userId);
+        return userMetadataPath(userId, readUserName(payload));
       }
     }
 
     if (objectType === 'file') {
       const fileId = readString(payload.file);
       if (fileId) {
-        return fileMetadataPath(fileId);
+        return fileMetadataPath(fileId, readFileName(payload));
       }
     }
 
@@ -696,6 +696,42 @@ function addIfString(target: Set<string>, value: unknown): void {
   if (typeof value === 'string' && value.trim()) {
     target.add(value);
   }
+}
+
+function readChannelName(payload: Record<string, unknown>): string | undefined {
+  const channel = asRecord(payload.channel);
+  return readString(channel?.name)
+    ?? readString(payload.channel_name)
+    ?? readString(payload.channelName)
+    ?? undefined;
+}
+
+function readFileName(payload: Record<string, unknown>): string | undefined {
+  const file = asRecord(payload.file);
+  return readString(file?.name)
+    ?? readString(file?.title)
+    ?? readString(payload.file_name)
+    ?? readString(payload.fileName)
+    ?? undefined;
+}
+
+function readMessageSubject(payload: Record<string, unknown>): string | undefined {
+  return readString(payload.threadSubject)
+    ?? readString(payload.thread_subject)
+    ?? readString(payload.subject)
+    ?? undefined;
+}
+
+function readUserName(payload: Record<string, unknown>): string | undefined {
+  const user = asRecord(payload.user);
+  const profile = asRecord(payload.profile) ?? asRecord(user?.profile);
+  return readString(user?.name)
+    ?? readString(user?.real_name)
+    ?? readString(profile?.display_name)
+    ?? readString(profile?.real_name)
+    ?? readString(payload.user_name)
+    ?? readString(payload.userName)
+    ?? undefined;
 }
 
 function asArray(value: unknown): unknown[] {

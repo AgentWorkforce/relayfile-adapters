@@ -24,44 +24,87 @@ function assertSegment(value: string, label: string): string {
   return encodeURIComponent(trimmed);
 }
 
-export function notionDatabaseMetadataPath(databaseId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/metadata.json`;
+function slugify(value: string): string {
+  return value
+    .replace(/[{}]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
 }
 
-export function notionDatabasePagePath(databaseId: string, pageId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages/${assertSegment(pageId, 'page id')}.json`;
+function shortId(id: string): string {
+  return id.replace(/-/g, '').slice(0, 8);
 }
 
-export function notionDatabasePageContentPath(databaseId: string, pageId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages/${assertSegment(pageId, 'page id')}/content.md`;
+function titleSegment(title: string | undefined, id: string, label: string): string {
+  const slug = title ? slugify(title) : '';
+  return slug ? slug : assertSegment(id, label);
 }
 
-export function notionDatabasePageCommentsPath(databaseId: string, pageId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages/${assertSegment(pageId, 'page id')}/comments.json`;
+function titleSegmentWithId(title: string | undefined, id: string, label: string): string {
+  const slug = title ? slugify(title) : '';
+  return slug ? `${slug}--${shortId(id)}` : assertSegment(id, label);
 }
 
-export function notionDatabaseBlockPath(databaseId: string, pageId: string, blockId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages/${assertSegment(pageId, 'page id')}/blocks/${assertSegment(blockId, 'block id')}.json`;
+export function notionDatabaseMetadataPath(databaseId: string, title?: string): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(title, databaseId, 'database id')}/metadata.json`;
 }
 
-export function notionStandalonePagePath(pageId: string): string {
-  return `${NOTION_PATH_ROOT}/pages/${assertSegment(pageId, 'page id')}.json`;
+export function notionDatabasePagePath(
+  databaseId: string,
+  pageId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(databaseTitle, databaseId, 'database id')}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}.json`;
 }
 
-export function notionStandalonePageContentPath(pageId: string): string {
-  return `${NOTION_PATH_ROOT}/pages/${assertSegment(pageId, 'page id')}/content.md`;
+export function notionDatabasePageContentPath(
+  databaseId: string,
+  pageId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(databaseTitle, databaseId, 'database id')}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/content.md`;
 }
 
-export function notionStandalonePageCommentsPath(pageId: string): string {
-  return `${NOTION_PATH_ROOT}/pages/${assertSegment(pageId, 'page id')}/comments.json`;
+export function notionDatabasePageCommentsPath(
+  databaseId: string,
+  pageId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(databaseTitle, databaseId, 'database id')}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/comments.json`;
 }
 
-export function notionStandaloneBlockPath(pageId: string, blockId: string): string {
-  return `${NOTION_PATH_ROOT}/pages/${assertSegment(pageId, 'page id')}/blocks/${assertSegment(blockId, 'block id')}.json`;
+export function notionDatabaseBlockPath(
+  databaseId: string,
+  pageId: string,
+  blockId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(databaseTitle, databaseId, 'database id')}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/blocks/${assertSegment(blockId, 'block id')}.json`;
 }
 
-export function notionDatabasePagesCollectionPath(databaseId: string): string {
-  return `${NOTION_PATH_ROOT}/databases/${assertSegment(databaseId, 'database id')}/pages`;
+export function notionStandalonePagePath(pageId: string, pageTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}.json`;
+}
+
+export function notionStandalonePageContentPath(pageId: string, pageTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/content.md`;
+}
+
+export function notionStandalonePageCommentsPath(pageId: string, pageTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/comments.json`;
+}
+
+export function notionStandaloneBlockPath(pageId: string, blockId: string, pageTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/pages/${titleSegmentWithId(pageTitle, pageId, 'page id')}/blocks/${assertSegment(blockId, 'block id')}.json`;
+}
+
+export function notionDatabasePagesCollectionPath(databaseId: string, databaseTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/databases/${titleSegment(databaseTitle, databaseId, 'database id')}/pages`;
 }
 
 export function notionDiscoveryManifestPath(): string {

@@ -20,20 +20,13 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   cycles: 'cycle',
   issue: 'issue',
   issues: 'issue',
-  linearcomment: 'comment',
-  linearcycle: 'cycle',
-  linearissue: 'issue',
-  linearmilestone: 'milestone',
-  linearproject: 'project',
-  linearroadmap: 'roadmap',
-  linearteam: 'team',
-  linearuser: 'user',
   milestone: 'milestone',
   milestones: 'milestone',
-  project: 'project',
   projectmilestone: 'milestone',
   projectmilestones: 'milestone',
+  project: 'project',
   projects: 'project',
+  linearproject: 'project',
   roadmap: 'roadmap',
   roadmaps: 'roadmap',
   team: 'team',
@@ -54,6 +47,23 @@ export function encodeLinearPathSegment(value: string): string {
   return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
 }
 
+function slugify(value: string): string {
+  return value
+    .replace(/[{}]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
+
+function shortId(id: string): string {
+  return id.replace(/-/g, '').slice(0, 8);
+}
+
+function titleSegmentWithId(title: string | undefined, id: string): string {
+  const slug = title ? slugify(title) : '';
+  return slug ? `${slug}--${shortId(id)}` : encodeLinearPathSegment(id);
+}
+
 export function normalizeLinearObjectType(objectType: string): LinearPathObjectType {
   const normalized = objectType.trim().toLowerCase();
   const mapped = OBJECT_TYPE_ALIASES[normalized];
@@ -63,8 +73,8 @@ export function normalizeLinearObjectType(objectType: string): LinearPathObjectT
   return mapped;
 }
 
-export function linearIssuePath(issueId: string): string {
-  return `${LINEAR_PATH_ROOT}/issues/${encodeLinearPathSegment(issueId)}.json`;
+export function linearIssuePath(issueId: string, title?: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/${titleSegmentWithId(title, issueId)}.json`;
 }
 
 export function linearCommentPath(commentId: string): string {
@@ -95,13 +105,13 @@ export function linearRoadmapPath(roadmapId: string): string {
   return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
 }
 
-export function computeLinearPath(objectType: string, objectId: string): string {
+export function computeLinearPath(objectType: string, objectId: string, title?: string): string {
   const normalizedType = normalizeLinearObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');
 
   switch (normalizedType) {
     case 'issue':
-      return linearIssuePath(normalizedId);
+      return linearIssuePath(normalizedId, title);
     case 'comment':
       return linearCommentPath(normalizedId);
     case 'project':

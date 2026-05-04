@@ -1,85 +1,118 @@
-/**
- * Pure path computation for GitHub VFS layout.
- *
- * Zero external dependencies — safe to import in any environment
- * (Next.js bundle, edge runtime, tests) without pulling in
- * adapter-core, @relayfile/sdk, or any other heavy dependency.
- *
- * Follows the same pattern as @relayfile/adapter-linear/path-mapper
- * and @relayfile/adapter-slack/path-mapper.
- */
-
 export const GITHUB_PATH_ROOT = '/github';
+const GITHUB_ROOT = '/github/repos';
 
-export const GITHUB_OBJECT_TYPES = [
-  'check_run',
-  'commit',
-  'issue',
-  'pull_request',
-  'repository',
-  'review',
-  'review_comment',
-] as const;
+function slugify(value: string): string {
+  return value
+    .replace(/[{}]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+}
 
-export type GitHubPathObjectType = (typeof GITHUB_OBJECT_TYPES)[number];
-
-const OBJECT_TYPE_ALIASES: Readonly<Record<string, GitHubPathObjectType>> = {
-  check_run: 'check_run',
-  checkrun: 'check_run',
-  checks: 'check_run',
-  commit: 'commit',
-  commits: 'commit',
-  issue: 'issue',
-  issues: 'issue',
-  pr: 'pull_request',
-  pull: 'pull_request',
-  pull_request: 'pull_request',
-  pullrequest: 'pull_request',
-  pulls: 'pull_request',
-  repo: 'repository',
-  repository: 'repository',
-  review: 'review',
-  review_comment: 'review_comment',
-  reviews: 'review',
-};
-
-function assertNonEmptySegment(value: string, label: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`GitHub ${label} must be a non-empty string`);
-  }
-  return trimmed;
+function encodeRepoSegment(value: string): string {
+  return encodeURIComponent(value);
 }
 
 export function encodeGitHubPathSegment(value: string): string {
-  return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('Path segment must be non-empty');
+  }
+  return encodeURIComponent(trimmed);
 }
 
-export function normalizeGitHubObjectType(objectType: string): GitHubPathObjectType {
-  const normalized = objectType.trim().toLowerCase();
+export function githubNumberSlug(number: number | string, title?: string): string {
+  const numberSegment = String(number).trim();
+  const slug = title ? slugify(title) : '';
+  return slug ? `${numberSegment}--${slug}` : numberSegment;
+}
+
+export function githubRepoPrefix(owner: string, repo: string): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}`;
+}
+
+export function githubRepositoryMetadataPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/metadata.json`;
+}
+
+export function githubIssuePath(
+  owner: string,
+  repo: string,
+  issueNumber: number | string,
+  title?: string,
+): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/issues/${githubNumberSlug(issueNumber, title)}/metadata.json`;
+}
+
+export function githubPullRequestPath(
+  owner: string,
+  repo: string,
+  prNumber: number | string,
+  title?: string,
+): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/pulls/${githubNumberSlug(prNumber, title)}/metadata.json`;
+}
+
+export function githubPullRequestRoot(
+  owner: string,
+  repo: string,
+  prNumber: number | string,
+  title?: string,
+): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/pulls/${githubNumberSlug(prNumber, title)}`;
+}
+
+export function githubReviewPath(owner: string, repo: string, reviewId: number | string): string {
+  return `${githubRepoPrefix(owner, repo)}/reviews/${reviewId}.json`;
+}
+
+export function githubReviewCommentPath(owner: string, repo: string, commentId: number | string): string {
+  return `${githubRepoPrefix(owner, repo)}/comments/${commentId}.json`;
+}
+
+export function githubCheckRunPath(owner: string, repo: string, checkRunId: number | string): string {
+  return `${githubRepoPrefix(owner, repo)}/checks/${checkRunId}.json`;
+}
+
+export function githubCommitPath(owner: string, repo: string, sha: string): string {
+  return `${githubRepoPrefix(owner, repo)}/commits/${sha}/metadata.json`;
+}
+
+const OBJECT_TYPE_ALIASES: Record<string, string> = {
+  pr: 'pull_request',
+  pulls: 'pull_request',
+  pull: 'pull_request',
+  pullrequest: 'pull_request',
+  pull_request: 'pull_request',
+  issue: 'issue',
+  issues: 'issue',
+  repository: 'repository',
+  repo: 'repository',
+  review: 'review',
+  review_comment: 'review_comment',
+  check_run: 'check_run',
+  checkrun: 'check_run',
+  commit: 'commit',
+};
+
+export function normalizeGitHubObjectType(type: string): string {
+  const normalized = type.toLowerCase().trim();
   const mapped = OBJECT_TYPE_ALIASES[normalized];
   if (!mapped) {
-    throw new Error(`Unsupported GitHub object type: ${objectType}`);
+    throw new Error(`Unsupported GitHub object type: ${type}`);
   }
   return mapped;
 }
 
-/**
- * Like normalizeGitHubObjectType but returns undefined for unknown types
- * instead of throwing. Used by computeGitHubPath to produce fallback paths.
- */
-export function tryNormalizeGitHubObjectType(objectType: string): GitHubPathObjectType | undefined {
-  const normalized = objectType.trim().toLowerCase();
-  return OBJECT_TYPE_ALIASES[normalized];
+export function tryNormalizeGitHubObjectType(type: string): string | undefined {
+  try {
+    return normalizeGitHubObjectType(type);
+  } catch {
+    return undefined;
+  }
 }
 
-/**
- * Normalize a Nango sync model name to a canonical GitHub object type.
- *
- * Nango models use PascalCase names like "Repo", "PullRequest", "Issue".
- * This maps them to the snake_case types used by the adapter.
- */
-const NANGO_MODEL_ALIASES: Readonly<Record<string, GitHubPathObjectType>> = {
+const NANGO_MODEL_MAP: Record<string, string> = {
   Repo: 'repository',
   Repository: 'repository',
   PullRequest: 'pull_request',
@@ -90,81 +123,42 @@ const NANGO_MODEL_ALIASES: Readonly<Record<string, GitHubPathObjectType>> = {
   Commit: 'commit',
 };
 
-export function normalizeNangoGitHubModel(model: string): GitHubPathObjectType {
-  const fromNango = NANGO_MODEL_ALIASES[model];
-  if (fromNango) {
-    return fromNango;
-  }
+export function normalizeNangoGitHubModel(model: string): string {
+  const mapped = NANGO_MODEL_MAP[model];
+  if (mapped) return mapped;
   return normalizeGitHubObjectType(model);
 }
 
-export function githubRepoPrefix(owner: string, repo: string): string {
-  return `${GITHUB_PATH_ROOT}/repos/${encodeGitHubPathSegment(owner)}/${encodeGitHubPathSegment(repo)}`;
+export interface GitHubPathContext {
+  owner?: string;
+  repo?: string;
 }
 
-export function githubRepositoryMetadataPath(owner: string, repo: string): string {
-  return `${githubRepoPrefix(owner, repo)}/metadata.json`;
-}
-
-export function githubPullRequestPath(owner: string, repo: string, number: string): string {
-  return `${githubRepoPrefix(owner, repo)}/pulls/${assertNonEmptySegment(number, 'PR number')}/metadata.json`;
-}
-
-export function githubIssuePath(owner: string, repo: string, number: string): string {
-  return `${githubRepoPrefix(owner, repo)}/issues/${assertNonEmptySegment(number, 'issue number')}/metadata.json`;
-}
-
-export function githubReviewPath(owner: string, repo: string, reviewId: string): string {
-  return `${githubRepoPrefix(owner, repo)}/reviews/${assertNonEmptySegment(reviewId, 'review id')}.json`;
-}
-
-export function githubReviewCommentPath(owner: string, repo: string, commentId: string): string {
-  return `${githubRepoPrefix(owner, repo)}/comments/${assertNonEmptySegment(commentId, 'comment id')}.json`;
-}
-
-export function githubCheckRunPath(owner: string, repo: string, checkRunId: string): string {
-  return `${githubRepoPrefix(owner, repo)}/checks/${assertNonEmptySegment(checkRunId, 'check run id')}.json`;
-}
-
-export function githubCommitPath(owner: string, repo: string, sha: string): string {
-  return `${githubRepoPrefix(owner, repo)}/commits/${assertNonEmptySegment(sha, 'commit sha')}/metadata.json`;
-}
-
-/**
- * Compute a GitHub VFS path from an object type, object ID, and repo context.
- *
- * If owner/repo are not provided, falls back to a generic path.
- * Unknown object types produce a fallback path instead of throwing,
- * preserving graceful handling for unsupported webhook events.
- */
 export function computeGitHubPath(
   objectType: string,
   objectId: string,
-  context?: { owner?: string; repo?: string },
+  context?: GitHubPathContext,
 ): string {
   const normalizedType = tryNormalizeGitHubObjectType(objectType);
-  const owner = context?.owner?.trim();
-  const repo = context?.repo?.trim();
-  const safeObjectId = objectId.trim() || 'unknown';
-
-  // Unknown object type — return a generic fallback path
   if (!normalizedType) {
-    const safeType = objectType.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'unknown';
-    return `${GITHUB_PATH_ROOT}/${safeType}/${encodeURIComponent(safeObjectId)}.json`;
+    const sanitized = objectType.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    return `${GITHUB_PATH_ROOT}/${sanitized}/${objectId}.json`;
   }
 
+  const owner = context?.owner;
+  const repo = context?.repo;
+
   if (!owner || !repo) {
-    // Fallback: no repo context — use a generic path
-    return `${GITHUB_PATH_ROOT}/${normalizedType}/${encodeGitHubPathSegment(safeObjectId)}.json`;
+    return `${GITHUB_PATH_ROOT}/${normalizedType}/${objectId}.json`;
   }
 
   switch (normalizedType) {
-    case 'repository':
-      return githubRepositoryMetadataPath(owner, repo);
     case 'pull_request':
       return githubPullRequestPath(owner, repo, objectId);
     case 'issue':
       return githubIssuePath(owner, repo, objectId);
+    case 'repository':
+      return githubRepositoryMetadataPath(owner, repo);
     case 'review':
       return githubReviewPath(owner, repo, objectId);
     case 'review_comment':
@@ -173,7 +167,7 @@ export function computeGitHubPath(
       return githubCheckRunPath(owner, repo, objectId);
     case 'commit':
       return githubCommitPath(owner, repo, objectId);
+    default:
+      return `${GITHUB_PATH_ROOT}/${normalizedType}/${objectId}.json`;
   }
 }
-
-export { GITHUB_PATH_ROOT as GITHUB_ROOT };
