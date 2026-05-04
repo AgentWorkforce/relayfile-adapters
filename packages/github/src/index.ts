@@ -335,6 +335,7 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
 
 export * from './config.js';
 export * from './adapter.js';
+export * from './operations.js';
 export * from './path-mapper.js';
 export * from './types.js';
 export * from './webhook/event-map.js';
