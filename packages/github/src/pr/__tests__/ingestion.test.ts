@@ -320,21 +320,21 @@ describe('pull request ingestion', () => {
       filesUpdated: 0,
       filesDeleted: 0,
       paths: [
-        '/github/repos/octocat/hello-world/pulls/42/meta.json',
-        '/github/repos/octocat/hello-world/pulls/42/files/src/index.ts',
-        '/github/repos/octocat/hello-world/pulls/42/files/src/utils/math.ts',
-        '/github/repos/octocat/hello-world/pulls/42/files/README.md',
-        '/github/repos/octocat/hello-world/pulls/42/diff.patch',
+        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/meta.json',
+        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/index.ts',
+        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/utils/math.ts',
+        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/README.md',
+        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/diff.patch',
       ],
       errors: [],
     });
-    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? '');
+    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/meta.json') ?? '');
     assert.strictEqual(meta.number, 42);
     assert.strictEqual(meta.title, mockPRPayload.title);
     assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
     assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
     assert.deepStrictEqual(
-      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts') ?? ''),
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/index.ts') ?? ''),
       {
         filename: 'src/index.ts',
         path: 'src/index.ts',
@@ -343,7 +343,7 @@ describe('pull request ingestion', () => {
         deletions: 1,
       },
     );
-    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch'), mockDiff);
+    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/diff.patch'), mockDiff);
   });
 
   it('ingestPullRequest handles API errors gracefully', async () => {

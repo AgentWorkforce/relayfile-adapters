@@ -97,11 +97,12 @@ test('GitHubAdapter ingests an issue and its comments into the VFS', async () =>
   assert.equal(adapter instanceof GitHubAdapter, true);
 
   const result = await adapter.ingestIssue('octocat', 'hello-world', 10);
-  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number);
+  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, mockIssuePayload.title);
   const commentsPath = issueCommentsPath(
     mockRepoContext.owner,
     mockRepoContext.repo,
     mockIssuePayload.number,
+    mockIssuePayload.title,
   );
 
   assert.ok(result.filesWritten > 0);
@@ -132,7 +133,7 @@ test('GitHubAdapter ingests an issue and its comments into the VFS', async () =>
     result.paths.includes(metaPath),
     true,
   );
-  assert.equal(result.paths.every((path) => path.includes('/issues/10/')), true);
+  assert.equal(result.paths.every((path) => path.includes('/issues/10--track-adapter-issue-ingestion-coverage')), true);
   assert.equal(result.paths.some((path) => path.includes('/pulls/10/')), false);
   assert.equal(provider.requests.some((request) => request.endpoint.includes('/pulls/10')), false);
 });
@@ -144,7 +145,7 @@ test('GitHubAdapter routes issues.opened webhooks into issue ingestion', async (
   const payload = createIssueWebhookPayload('opened', mockIssuePayload);
 
   const result = await adapter.routeWebhook(payload, undefined, { 'x-github-event': 'issues' });
-  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number);
+  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, mockIssuePayload.title);
 
   assert.ok(result.filesWritten > 0);
   assert.deepEqual(result.errors, []);
@@ -180,7 +181,7 @@ test('GitHubAdapter routes issues.closed webhooks and updates issue state', asyn
   });
 
   const result = await adapter.routeWebhook(closedPayload, undefined, { 'x-github-event': 'issues' });
-  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number);
+  const metaPath = issueMetaPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, mockIssuePayload.title);
   const meta = readJsonFile(vfs, metaPath);
 
   assert.equal(result.filesWritten, 0);
@@ -191,7 +192,7 @@ test('GitHubAdapter routes issues.closed webhooks and updates issue state', asyn
   assert.equal(meta.state, 'closed');
   assert.equal(meta.closed_at, '2026-03-28T09:00:00Z');
   assert.equal(
-    vfs.list(issueCommentsPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number))
+    vfs.list(issueCommentsPath(mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, mockIssuePayload.title))
       .length,
     mockIssueComments.length,
   );
@@ -231,7 +232,7 @@ async function ingestIssueIntoVfs(
 
   const metaResult = await writeIssueMeta(vfs, owner, repo, issue);
   const comments = await fetchIssueComments(provider, owner, repo, number, connectionId);
-  const commentResult = await writeIssueComments(vfs, owner, repo, number, comments);
+  const commentResult = await writeIssueComments(vfs, owner, repo, number, comments, issue.title);
 
   return mergeResults(metaResult, commentResult);
 }
@@ -252,6 +253,7 @@ async function writeIssueComments(
   repo: string,
   issueNumber: number,
   comments: JsonObject[],
+  title?: string,
 ): Promise<IngestResult> {
   const result = emptyResult();
 
@@ -277,7 +279,7 @@ async function writeIssueComments(
       result,
       await writeFile(
         vfs,
-        `${issueCommentsPath(owner, repo, issueNumber)}${commentId}.json`,
+        `${issueCommentsPath(owner, repo, issueNumber, title)}${commentId}.json`,
         `${JSON.stringify(payload, null, 2)}\n`,
       ),
     );
@@ -402,12 +404,14 @@ function readJsonFile(vfs: MemoryVfs, path: string): JsonObject {
   return expectObject(JSON.parse(raw), `VFS JSON file ${path}`);
 }
 
-function issueMetaPath(owner: string, repo: string, number: number): string {
-  return `/github/repos/${owner}/${repo}/issues/${number}/meta.json`;
+function issueMetaPath(owner: string, repo: string, number: number, title?: string): string {
+  const slug = title ? `--${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
+  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/meta.json`;
 }
 
-function issueCommentsPath(owner: string, repo: string, number: number): string {
-  return `/github/repos/${owner}/${repo}/issues/${number}/comments/`;
+function issueCommentsPath(owner: string, repo: string, number: number, title?: string): string {
+  const slug = title ? `--${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
+  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/comments/`;
 }
 
 function absoluteIssuePath(owner: string, repo: string, relativePath: string): string {
