@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-gitlab",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "GitLab adapter for relayfile — maps GitLab merge requests, issues, pipelines, jobs, commits, and webhooks to relayfile VFS paths",
   "type": "module",
   "main": "dist/index.js",
