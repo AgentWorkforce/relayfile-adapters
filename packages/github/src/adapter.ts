@@ -20,46 +20,59 @@ const NOOP_CLIENT = {
 let _mappingPath: string | undefined;
 let _mappingSpec: MappingSpec | undefined;
 
-/**
- * Resolve the absolute filesystem path of `github.mapping.yaml`.
- *
- * Computed lazily on first call. Previously this was a top-level
- * `const` initialized at module load via
- * `fileURLToPath(new URL(..., import.meta.url))`, which made the
- * module impossible to bundle into a Cloudflare Worker: esbuild
- * rewrites `import.meta.url` to a synthetic `placeholder:…` string
- * during bundling, and `new URL(relative, 'placeholder:…')` throws
- * `TypeError: Invalid URL string` when CF runs the worker's
- * top-level code as part of deploy validation (error 10021).
- *
- * Deferring to first call lets the package be safely imported from
- * Workers code that never actually invokes the schema adapter
- * (e.g. consumers that only need `searchIssues` / `searchRepos`
- * from `./operations`, but still import them via the barrel because
- * the package doesn't expose a `./operations` subpath).
- *
- * Throws on platforms without `import.meta.url` filesystem mapping
- * (Cloudflare Workers, browsers). Don't call this from
- * Worker-bundled code paths.
- */
-export function githubMappingPath(): string {
+function resolveGitHubMappingPath(): string {
   return (_mappingPath ??= fileURLToPath(new URL('../github.mapping.yaml', import.meta.url)));
 }
 
-/**
- * Lazily parse and memoize the GitHub mapping spec.
- *
- * Same lazy semantics as {@link githubMappingPath} — reads
- * `github.mapping.yaml` from disk on first call. Requires a
- * Node-style filesystem; not callable from Cloudflare Workers.
- */
-export function githubMappingSpec(): MappingSpec {
+function resolveGitHubMappingSpec(): MappingSpec {
   if (_mappingSpec === undefined) {
-    const path = githubMappingPath();
+    const path = resolveGitHubMappingPath();
     _mappingSpec = parseMappingSpecText(readFileSync(path, 'utf8'), path);
   }
   return _mappingSpec;
 }
+
+/**
+ * Resolve the absolute filesystem path of `github.mapping.yaml`.
+ *
+ * Exposed as a lazy value so existing consumers can keep treating it
+ * as a string while Cloudflare Worker bundles avoid top-level fs/url
+ * side effects until the property is actually accessed.
+ */
+export const githubMappingPath = {
+  toString(): string {
+    return resolveGitHubMappingPath();
+  },
+  valueOf(): string {
+    return resolveGitHubMappingPath();
+  },
+  [Symbol.toPrimitive](): string {
+    return resolveGitHubMappingPath();
+  },
+  endsWith(searchString: string, endPosition?: number): boolean {
+    return resolveGitHubMappingPath().endsWith(searchString, endPosition);
+  },
+} as Pick<string, 'endsWith'> & { toString(): string; valueOf(): string; [Symbol.toPrimitive](): string };
+
+/**
+ * Lazily parse and memoize the GitHub mapping spec while preserving the
+ * existing value export shape for consumers that treat it like a spec object.
+ */
+export const githubMappingSpec = new Proxy({} as MappingSpec, {
+  get(_target, prop, receiver) {
+    return Reflect.get(resolveGitHubMappingSpec() as object, prop, receiver);
+  },
+  has(_target, prop) {
+    return prop in (resolveGitHubMappingSpec() as object);
+  },
+  ownKeys() {
+    return Reflect.ownKeys(resolveGitHubMappingSpec() as object);
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    const descriptor = Object.getOwnPropertyDescriptor(resolveGitHubMappingSpec() as object, prop);
+    return descriptor ? { ...descriptor, configurable: true } : undefined;
+  },
+});
 
 export function createGitHubSchemaAdapter(
   provider: ConnectionProvider,
@@ -68,7 +81,7 @@ export function createGitHubSchemaAdapter(
   return new SchemaAdapter({
     client: NOOP_CLIENT,
     provider: provider as never,
-    spec: githubMappingSpec(),
+    spec: resolveGitHubMappingSpec(),
     defaultConnectionId: config.connectionId,
   });
 }
