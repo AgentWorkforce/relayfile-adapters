@@ -9,3 +9,4 @@ packages/*/tests/**/*.d.ts
 packages/*/tests/**/*.js.map
 packages/*/tests/**/*.d.ts.map
 .claude/settings.json
+.mcp.json

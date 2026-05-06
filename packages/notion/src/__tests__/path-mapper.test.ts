@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computePath,
+  normalizeNangoNotionModel,
   notionDatabaseBlockPath,
   notionDatabaseMetadataPath,
   notionDatabasePageCommentsPath,
@@ -10,6 +11,7 @@ import {
   notionStandalonePageCommentsPath,
   notionStandalonePageContentPath,
   notionStandalonePagePath,
+  tryNormalizeNangoNotionModel,
 } from '../path-mapper.js';
 
 describe('path mapping', () => {
@@ -29,5 +31,31 @@ describe('path mapping', () => {
     assert.strictEqual(notionStandalonePagePath('page-1'), '/notion/pages/page-1.json');
     assert.strictEqual(notionStandalonePageContentPath('page-1'), '/notion/pages/page-1/content.md');
     assert.strictEqual(notionStandalonePageCommentsPath('page-1'), '/notion/pages/page-1/comments.json');
+  });
+
+  describe('normalizeNangoNotionModel', () => {
+    // The Nango notion-relay `fetch-pages` sync emits records under the
+    // `NotionPage` model — see
+    // cloud/nango-integrations/notion-relay/syncs/fetch-pages.ts. The other
+    // entries are forward-compatible for syncs we plan to add.
+    it('maps NotionPage to the standalone page object type', () => {
+      assert.strictEqual(normalizeNangoNotionModel('NotionPage'), 'page');
+    });
+
+    it('maps richer notion models for forward compatibility', () => {
+      assert.strictEqual(normalizeNangoNotionModel('NotionDatabase'), 'database');
+      assert.strictEqual(normalizeNangoNotionModel('NotionDatabasePage'), 'database_page');
+      assert.strictEqual(normalizeNangoNotionModel('NotionBlock'), 'block');
+      assert.strictEqual(normalizeNangoNotionModel('NotionComment'), 'comment');
+    });
+
+    it('throws on unknown models', () => {
+      assert.throws(() => normalizeNangoNotionModel('NotionFlarb'));
+    });
+
+    it('try-variant returns undefined on unknown models', () => {
+      assert.strictEqual(tryNormalizeNangoNotionModel('NotionFlarb'), undefined);
+      assert.strictEqual(tryNormalizeNangoNotionModel('NotionPage'), 'page');
+    });
   });
 });

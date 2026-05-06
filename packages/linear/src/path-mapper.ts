@@ -16,23 +16,48 @@ export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
 const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   comment: 'comment',
   comments: 'comment',
+  linearcomment: 'comment',
   cycle: 'cycle',
   cycles: 'cycle',
+  linearcycle: 'cycle',
   issue: 'issue',
   issues: 'issue',
+  linearissue: 'issue',
   milestone: 'milestone',
   milestones: 'milestone',
   projectmilestone: 'milestone',
   projectmilestones: 'milestone',
+  linearmilestone: 'milestone',
   project: 'project',
   projects: 'project',
   linearproject: 'project',
   roadmap: 'roadmap',
   roadmaps: 'roadmap',
+  linearroadmap: 'roadmap',
   team: 'team',
   teams: 'team',
+  linearteam: 'team',
   user: 'user',
   users: 'user',
+  linearuser: 'user',
+};
+
+/**
+ * Nango sync record `model` names → canonical Linear object types. The Nango
+ * `linear-relay` integration emits records under these PascalCase model names
+ * (see `cloud/nango-integrations/linear-relay/syncs/*.ts`). Resolving them
+ * here lets the cloud's record-writer turn a Nango payload into a relayfile
+ * path without hardcoding the mapping at the dispatch site.
+ */
+const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
+  LinearComment: 'comment',
+  LinearCycle: 'cycle',
+  LinearIssue: 'issue',
+  LinearMilestone: 'milestone',
+  LinearProject: 'project',
+  LinearRoadmap: 'roadmap',
+  LinearTeam: 'team',
+  LinearUser: 'user',
 };
 
 function assertNonEmptySegment(value: string, label: string): string {
@@ -78,6 +103,20 @@ export function normalizeLinearObjectType(objectType: string): LinearPathObjectT
     throw new Error(`Unsupported Linear object type: ${objectType}`);
   }
   return mapped;
+}
+
+export function tryNormalizeLinearObjectType(objectType: string): LinearPathObjectType | undefined {
+  try {
+    return normalizeLinearObjectType(objectType);
+  } catch {
+    return undefined;
+  }
+}
+
+export function normalizeNangoLinearModel(model: string): LinearPathObjectType {
+  const direct = NANGO_MODEL_MAP[model];
+  if (direct) return direct;
+  return normalizeLinearObjectType(model);
 }
 
 export function linearIssuePath(issueId: string, title?: string): string {

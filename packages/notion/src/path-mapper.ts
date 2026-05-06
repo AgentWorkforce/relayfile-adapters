@@ -120,6 +120,35 @@ export function notionDiscoveryManifestPath(): string {
   return `${NOTION_PATH_ROOT}/discovery/manifest.json`;
 }
 
+/**
+ * Nango sync record `model` names → canonical Notion path object types. The
+ * Nango `notion-relay` integration's `fetch-pages` sync emits records under
+ * the `NotionPage` model (see
+ * `cloud/nango-integrations/notion-relay/syncs/fetch-pages.ts`). Future
+ * notion syncs (databases, blocks, comments) extend this map.
+ */
+const NANGO_MODEL_MAP: Readonly<Record<string, NotionPathObjectType>> = {
+  NotionPage: 'page',
+  NotionDatabase: 'database',
+  NotionDatabasePage: 'database_page',
+  NotionBlock: 'block',
+  NotionComment: 'comment',
+};
+
+export function normalizeNangoNotionModel(model: string): NotionPathObjectType {
+  const mapped = NANGO_MODEL_MAP[model];
+  if (mapped) return mapped;
+  throw new Error(`Unsupported Notion Nango model: ${model}`);
+}
+
+export function tryNormalizeNangoNotionModel(model: string): NotionPathObjectType | undefined {
+  try {
+    return normalizeNangoNotionModel(model);
+  } catch {
+    return undefined;
+  }
+}
+
 export function computePath(input: ComputePathInput): string {
   switch (input.objectType) {
     case 'database':
