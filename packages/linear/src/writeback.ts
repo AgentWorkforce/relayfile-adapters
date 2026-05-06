@@ -77,6 +77,10 @@ function extractLinearId(segment: string): string {
   return decoded;
 }
 
+/**
+ * Reformat a 32-char hex string back to canonical UUID `8-4-4-4-12` form.
+ * Inverse of the dehyphenation done by `path-mapper.idSuffix()`.
+ */
 function formatUuid(hex32: string): string {
   return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
 }
@@ -106,6 +110,15 @@ const ISSUE_UPDATE_MUTATION = `mutation RelayfileIssueUpdate($id: String!, $inpu
   }
 }`;
 
+/**
+ * Build a `commentCreate` mutation request for the writeback engine.
+ *
+ * Accepts two payload shapes:
+ *   - a plain string: becomes the comment body verbatim.
+ *   - a JSON object with a `body` field plus optional `parentId` (thread
+ *     reply target) and `doNotSubscribeToIssue` (skip the implicit
+ *     subscription Linear adds for commenters).
+ */
 function buildCommentCreate(issueId: string, content: string): LinearWritebackRequest {
   const parsed = safeParseJson(content);
 
@@ -148,6 +161,12 @@ function buildCommentCreate(issueId: string, content: string): LinearWritebackRe
   };
 }
 
+/**
+ * Build an `issueCreate` mutation request for the writeback engine.
+ *
+ * Requires `teamId` and `title` in the payload. All other Linear
+ * `IssueCreateInput` fields are optional and forwarded if present.
+ */
 function buildIssueCreate(content: string): LinearWritebackRequest {
   const payload = parseJsonObject(content);
   const teamId = readString(payload, 'teamId');
@@ -189,23 +208,58 @@ function buildIssueCreate(content: string): LinearWritebackRequest {
   };
 }
 
+/**
+ * Server-managed fields that must never be forwarded as part of an
+ * `IssueUpdateInput`. Linear rejects updates that try to mutate these.
+ */
+const ISSUE_UPDATE_DENYLIST = new Set([
+  'id',
+  'identifier',
+  'createdAt',
+  'updatedAt',
+  'archivedAt',
+  'url',
+  'team',
+  'creator',
+  'parent',
+]);
+
+/**
+ * Envelope marker fields written by `LinearAdapter.renderContent()`. When the
+ * payload presents itself as the synced envelope (rather than a bare update
+ * input), unwrap to the inner `payload` before applying the denylist.
+ *
+ * Without this step, a round-tripped synced file would forward `provider`,
+ * `workspaceId`, `objectType`, etc. into the GraphQL mutation and Linear
+ * would reject the request.
+ */
+const ENVELOPE_MARKER_KEYS = ['provider', 'objectType', 'objectId', 'workspaceId'] as const;
+
+function looksLikeSyncedEnvelope(payload: Record<string, unknown>): boolean {
+  if (!isRecord(payload.payload)) return false;
+  return ENVELOPE_MARKER_KEYS.some((key) => key in payload);
+}
+
+/**
+ * Build an `issueUpdate` mutation request for the writeback engine.
+ *
+ * Accepts two payload shapes:
+ *   - the full synced envelope produced by `LinearAdapter.renderContent()`,
+ *     with editable fields under `payload`. We unwrap automatically.
+ *   - a bare update input where the top-level object IS the input (the form
+ *     a hand-written workflow or specialist agent typically produces).
+ *
+ * Server-managed fields are stripped in either case.
+ */
 function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequest {
-  const payload = parseJsonObject(content);
-  // Drop server-managed fields if present in the payload.
-  const denylist = new Set([
-    'id',
-    'identifier',
-    'createdAt',
-    'updatedAt',
-    'archivedAt',
-    'url',
-    'team',
-    'creator',
-    'parent',
-  ]);
+  const parsed = parseJsonObject(content);
+  const source = looksLikeSyncedEnvelope(parsed)
+    ? (parsed.payload as Record<string, unknown>)
+    : parsed;
+
   const input: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (denylist.has(key)) continue;
+  for (const [key, value] of Object.entries(source)) {
+    if (ISSUE_UPDATE_DENYLIST.has(key)) continue;
     input[key] = value;
   }
   if (Object.keys(input).length === 0) {
@@ -224,6 +278,7 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
  * JSON helpers
  * ------------------------------------------------------------------ */
 
+/** Parse `content` as a JSON object, throwing if it isn't an object. */
 function parseJsonObject(content: string): Record<string, unknown> {
   const parsed = safeParseJson(content);
   if (!isRecord(parsed)) {
@@ -232,6 +287,11 @@ function parseJsonObject(content: string): Record<string, unknown> {
   return parsed;
 }
 
+/**
+ * Parse `content` as JSON, falling back to the trimmed raw string when
+ * parsing fails. Lets a caller accept both `'"hello"'` and `hello` for
+ * plain-text comment bodies.
+ */
 function safeParseJson(content: string): JsonValue | string {
   try {
     return JSON.parse(content) as JsonValue;
@@ -240,25 +300,33 @@ function safeParseJson(content: string): JsonValue | string {
   }
 }
 
+/** Type guard: is the value a non-array, non-null object? */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+/** Return the value at `key` if it is a non-empty string, otherwise `undefined`. */
 function readString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/** Return the value at `key` if it is a boolean, otherwise `undefined`. */
 function readBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
   return typeof record[key] === 'boolean' ? (record[key] as boolean) : undefined;
 }
 
+/** Return the value at `key` if it is a finite number, otherwise `undefined`. */
 function readNumber(record: Record<string, unknown>, key: string): number | undefined {
   return typeof record[key] === 'number' && Number.isFinite(record[key])
     ? (record[key] as number)
     : undefined;
 }
 
+/**
+ * Return the value at `key` if it is a non-empty array of strings, otherwise
+ * `undefined`. Non-string entries are filtered out.
+ */
 function readStringArray(record: Record<string, unknown>, key: string): string[] | undefined {
   const value = record[key];
   if (!Array.isArray(value)) return undefined;

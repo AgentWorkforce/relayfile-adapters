@@ -39,10 +39,28 @@ function extractNotionId(segment: string): string {
   return decoded;
 }
 
+/**
+ * Reformat a 32-char hex string back to canonical UUID `8-4-4-4-12` form.
+ * Inverse of the dehyphenation done by `path-mapper.idSuffix()`.
+ */
 function formatUuid(hex32: string): string {
   return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
 }
 
+/**
+ * Resolve a relayfile writeback into a Notion REST request.
+ *
+ * Routes:
+ *   - PATCH /notion/databases/<db>/pages/<slug>--<id>.json       → page properties
+ *   - PATCH /notion/pages/<slug>--<id>.json                       → page properties (top-level)
+ *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/content.md  → page markdown
+ *   - PATCH /notion/pages/<slug>--<id>/content.md                  → page markdown (top-level)
+ *   - POST  /notion/databases/<db>/pages/<slug>--<id>/comments.json → comment create
+ *   - POST  /notion/pages/<slug>--<id>/comments.json               → comment create (top-level)
+ *   - POST  /notion/databases/<db>/pages                            → create page in database
+ *
+ * Throws when no rule matches the path.
+ */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (databasePageMatch) {
@@ -82,6 +100,11 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   throw new Error(`No Notion writeback rule matched ${path}`);
 }
 
+/**
+ * Build a `PATCH /v1/pages/{id}` request to update a page's properties,
+ * archived flag, icon, or cover. The payload must include a `properties`
+ * object; everything else is optional.
+ */
 function buildPagePropertiesWriteback(pageId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
   const properties = extractSerializedProperties(payload);
@@ -98,6 +121,11 @@ function buildPagePropertiesWriteback(pageId: string, content: string): NotionWr
   };
 }
 
+/**
+ * Build a `PATCH /v1/pages/{id}/markdown` request that replaces the page
+ * body. Always uses `replace_content` semantics — partial markdown patches
+ * are not supported by this entrypoint.
+ */
 function buildMarkdownWriteback(pageId: string, markdown: string): NotionWritebackRequest {
   return {
     action: 'update_page_markdown',
@@ -114,6 +142,16 @@ function buildMarkdownWriteback(pageId: string, markdown: string): NotionWriteba
   };
 }
 
+/**
+ * Build a `POST /v1/comments` request creating a comment on the page.
+ *
+ * Accepts three payload shapes:
+ *   - a plain string: becomes a single rich_text run with that content.
+ *   - a JSON object with optional `discussionId`, `richText`, and/or `text`.
+ *   - a JSON array: the last entry is treated as the comment to post (so an
+ *     agent can append to a comments.json file and have writeback fire on
+ *     the new entry).
+ */
 function buildCommentWriteback(pageId: string, content: string): NotionWritebackRequest {
   const parsed = safeParseJson(content);
   if (typeof parsed === 'string') {
@@ -158,6 +196,12 @@ function buildCommentWriteback(pageId: string, content: string): NotionWriteback
   };
 }
 
+/**
+ * Build a `POST /v1/pages` request creating a new page in the given
+ * database. The payload must include `properties`; optional `children`
+ * (block array) and `markdown` (string) populate the new page's body.
+ * If `markdown` is present we use the markdown API version.
+ */
 function buildCreatePageWriteback(databaseId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
   const properties = extractSerializedProperties(payload);
@@ -178,6 +222,12 @@ function buildCreatePageWriteback(databaseId: string, content: string): NotionWr
   };
 }
 
+/**
+ * Convert a writeback payload's `properties` object from the relayfile
+ * file shape (with `id`, `type`, `value`) back into Notion's API shape via
+ * `deserializePropertyMap`. Throws if the payload is missing the
+ * `properties` object entirely.
+ */
 function extractSerializedProperties(payload: Record<string, unknown>): Record<string, unknown> {
   const properties = readObject(payload, 'properties');
   if (!properties) {
@@ -194,6 +244,7 @@ function extractSerializedProperties(payload: Record<string, unknown>): Record<s
   return deserializePropertyMap(propertyEntries);
 }
 
+/** Parse `content` as a JSON object, throwing if it isn't an object. */
 function parseJson(content: string): Record<string, unknown> {
   const parsed = safeParseJson(content);
   if (!isRecord(parsed)) {
@@ -202,6 +253,11 @@ function parseJson(content: string): Record<string, unknown> {
   return parsed;
 }
 
+/**
+ * Parse `content` as JSON, falling back to the trimmed raw string when
+ * parsing fails. Lets a caller accept both `'"hello"'` and `hello` for
+ * plain-text comment bodies.
+ */
 function safeParseJson(content: string): JsonValue | string {
   try {
     return JSON.parse(content) as JsonValue;
@@ -210,15 +266,18 @@ function safeParseJson(content: string): JsonValue | string {
   }
 }
 
+/** Return the value at `key` if it is a non-null, non-array object. */
 function readObject(record: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
   const value = record[key];
   return isRecord(value) ? value : undefined;
 }
 
+/** Return the value at `key` if it is a boolean, otherwise `undefined`. */
 function readBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
   return typeof record[key] === 'boolean' ? (record[key] as boolean) : undefined;
 }
 
+/** Type guard: is the value a non-array, non-null object? */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

@@ -105,6 +105,42 @@ describe('linear writeback', () => {
         description: 'New description',
       });
     });
+
+    it('unwraps the synced envelope written by LinearAdapter.renderContent', () => {
+      // This is the exact shape an agent sees when it reads a synced
+      // /linear/issues/<id>.json file produced by LinearAdapter.renderContent.
+      // The agent edits payload.title and writes the whole envelope back; the
+      // resolver must NOT forward `provider`, `workspaceId`, etc. into the
+      // GraphQL IssueUpdateInput.
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+        JSON.stringify({
+          provider: 'linear',
+          connectionId: 'conn-1',
+          workspaceId: 'wks-1',
+          eventType: 'issue.updated',
+          objectType: 'issue',
+          objectId: PAGE_UUID,
+          deleted: false,
+          payload: {
+            id: PAGE_UUID,
+            identifier: 'PROJ-441',
+            title: 'Edited title',
+            description: 'Edited description',
+            priority: 1,
+          },
+        }),
+      );
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      // Only mutable fields from payload survive the denylist; envelope
+      // markers (provider, workspaceId, etc.) must not appear.
+      assert.deepStrictEqual(variables.input, {
+        title: 'Edited title',
+        description: 'Edited description',
+        priority: 1,
+      });
+    });
   });
 
   describe('unmatched paths', () => {
