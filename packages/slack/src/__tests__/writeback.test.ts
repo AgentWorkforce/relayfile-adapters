@@ -22,6 +22,27 @@ describe('slack writeback', () => {
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
     });
 
+    it('extracts canonical channel id from <slug>--<id> path (round-trip safe)', () => {
+      // path-mapper.channelSegment(name, id) emits this form so writeback can
+      // recover the canonical id even when the slug is lossy (e.g. names with
+      // underscores that slugify into hyphens).
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success--C01ABC1234/messages/new.json',
+        'Hello team!',
+      );
+      assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
+    });
+
+    it('honors `channel` payload override over path-derived channel', () => {
+      // Escape hatch when the path uses a lossy slug — agent passes the
+      // canonical id (or a different channel entirely) in the JSON payload.
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/new.json',
+        JSON.stringify({ text: 'hi', channel: 'C01ABC1234' }),
+      );
+      assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
+    });
+
     it('forwards JSON object payload with text, blocks, attachments, and overrides', () => {
       const blocks = [{ type: 'section', text: { type: 'mrkdwn', text: '*hi*' } }];
       const req = resolveWritebackRequest(
@@ -97,6 +118,30 @@ describe('slack writeback', () => {
       );
       assert.strictEqual((req.body as { reply_broadcast: boolean }).reply_broadcast, true);
     });
+
+    it('honors reply_broadcast when thread_ts comes from payload (top-level route)', () => {
+      // top-level messages/new.json route + payload thread_ts → still a reply
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/new.json',
+        JSON.stringify({
+          text: 'announce',
+          thread_ts: '1762445678.001234',
+          reply_broadcast: true,
+        }),
+      );
+      assert.strictEqual(req.action, 'reply_in_thread');
+      assert.strictEqual((req.body as { thread_ts: string }).thread_ts, '1762445678.001234');
+      assert.strictEqual((req.body as { reply_broadcast: boolean }).reply_broadcast, true);
+    });
+
+    it('does not set reply_broadcast on a top-level message with no thread context', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/new.json',
+        JSON.stringify({ text: 'plain', reply_broadcast: true }),
+      );
+      assert.strictEqual(req.action, 'post_message');
+      assert.strictEqual('reply_broadcast' in (req.body as object), false);
+    });
   });
 
   describe('add_reaction', () => {
@@ -139,6 +184,22 @@ describe('slack writeback', () => {
           ),
         /requires `name`/,
       );
+    });
+
+    it('extracts canonical channel id from <slug>--<id> reaction path', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success--C01ABC1234/messages/1762445678_001234/reactions/new.json',
+        'eyes',
+      );
+      assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
+    });
+
+    it('honors `channel` payload override on reactions', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/1762445678_001234/reactions/new.json',
+        JSON.stringify({ name: 'rocket', channel: 'C01ABC1234' }),
+      );
+      assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
     });
   });
 

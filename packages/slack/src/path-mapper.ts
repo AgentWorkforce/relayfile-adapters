@@ -60,6 +60,25 @@ function namedSegment(name: string | undefined, id: string): string {
   return slug || normalizeSegment(id);
 }
 
+/**
+ * Channel segment for VFS paths that need to round-trip back to the canonical
+ * Slack channel id at writeback time.
+ *
+ * Slack channel names can contain underscores (e.g. `customer_success`), but
+ * `slugify()` lossily replaces them with hyphens, so the slug alone cannot be
+ * uniquely reversed to a channel name. We embed the canonical id alongside
+ * the slug as `<slug>--<channelId>`; the writeback resolver extracts the id
+ * from the suffix and uses it as the API target.
+ *
+ * If no name is available we fall back to the normalized id alone, which is
+ * already round-trip safe.
+ */
+function channelSegment(channelName: string | undefined, channelId: string): string {
+  const slug = channelName ? slugify(channelName) : '';
+  const normalizedId = normalizeSegment(channelId);
+  return slug ? `${slug}--${normalizedId}` : normalizedId;
+}
+
 function messageSegment(messageTs: string, subject?: string): string {
   const tsToken = slackTimestampToPathToken(messageTs);
   const subjectSlug = subject ? slugify(subject) : '';
@@ -207,11 +226,11 @@ export function parseSlackReactionObjectId(objectId: string): SlackReactionObjec
 }
 
 export function channelMetadataPath(channelId: string, channelName?: string): string {
-  return joinPath(SLACK_ROOT, 'channels', namedSegment(channelName, channelId), 'meta.json');
+  return joinPath(SLACK_ROOT, 'channels', channelSegment(channelName, channelId), 'meta.json');
 }
 
 export function channelMessagesDirectory(channelId: string, channelName?: string): string {
-  return joinPath(SLACK_ROOT, 'channels', namedSegment(channelName, channelId), 'messages');
+  return joinPath(SLACK_ROOT, 'channels', channelSegment(channelName, channelId), 'messages');
 }
 
 export function messagePath(

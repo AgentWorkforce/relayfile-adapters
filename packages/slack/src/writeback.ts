@@ -57,14 +57,30 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
 
 /**
  * Resolve the channel path segment to a value Slack's `channel` parameter
- * accepts: a raw Slack id (e.g. `C01ABC123`) is forwarded as-is; anything
- * else is treated as a channel name and prefixed with `#` so the bot can
- * post via the channel name without needing an id lookup.
+ * accepts. Resolution priority (most → least specific):
+ *
+ *   1. `<slug>--<channelId>` form emitted by `path-mapper.channelSegment()`:
+ *      extract and return the canonical id. This is the round-trip-safe
+ *      shape — Slack channel names can contain underscores that the slug
+ *      lossily replaces with hyphens, so we must rely on the id suffix.
+ *   2. Bare Slack id (`^[CDG][A-Z0-9]{7,}$`): forward as-is.
+ *   3. Bare slug (no id suffix): forward as `#<slug>` as a best effort.
+ *      Channels whose name contains an underscore will silently target the
+ *      wrong channel; callers should either re-sync paths into the new
+ *      `<slug>--<id>` form or pass an explicit `channel` field in the JSON
+ *      payload to override.
  */
 function extractSlackChannel(segment: string): string {
   const decoded = decodeURIComponent(segment);
-  // Slack ids: C (public), G (private/legacy), D (DM) prefix + uppercase alphanumerics.
+
+  // Round-trip-safe form: <slug>--<channelId>
+  const sluggedId = /--([CDG][A-Z0-9]{7,})$/.exec(decoded);
+  if (sluggedId?.[1]) return sluggedId[1];
+
+  // Bare canonical id
   if (/^[CDG][A-Z0-9]{7,}$/.test(decoded)) return decoded;
+
+  // Bare slug — best-effort. Documented limitation: lossy for names with `_`.
   return decoded.startsWith('#') ? decoded : `#${decoded}`;
 }
 
@@ -107,18 +123,18 @@ function buildPostMessage(
   threadTs: string | undefined,
   content: string,
 ): SlackWritebackRequest {
-  const channel = extractSlackChannel(channelSegment);
+  const pathChannel = extractSlackChannel(channelSegment);
   const parsed = safeParseJson(content);
-  const action: SlackWritebackRequest['action'] = threadTs ? 'reply_in_thread' : 'post_message';
 
   if (typeof parsed === 'string') {
     if (!parsed) throw new Error('messages/new.json writeback requires a non-empty body');
+    const action: SlackWritebackRequest['action'] = threadTs ? 'reply_in_thread' : 'post_message';
     return {
       action,
       method: 'POST',
       endpoint: '/api/chat.postMessage',
       body: {
-        channel,
+        channel: pathChannel,
         text: parsed,
         ...(threadTs ? { thread_ts: threadTs } : {}),
       },
@@ -138,7 +154,12 @@ function buildPostMessage(
     );
   }
 
-  const body: Record<string, unknown> = { channel };
+  // Channel: explicit payload override wins over the path-derived channel.
+  // This is the documented escape hatch when the path uses a lossy slug
+  // (e.g. for channel names containing underscores) and the caller wants
+  // to target the canonical id directly.
+  const explicitChannel = readString(parsed, 'channel');
+  const body: Record<string, unknown> = { channel: explicitChannel ?? pathChannel };
   if (text) body.text = text;
   if (blocks) body.blocks = blocks;
   if (attachments) body.attachments = attachments;
@@ -164,9 +185,17 @@ function buildPostMessage(
   const mrkdwn = readBoolean(parsed, 'mrkdwn');
   if (mrkdwn !== undefined) body.mrkdwn = mrkdwn;
 
-  // Reply-broadcasting (thread reply also visible in channel).
+  // Reply-broadcasting requires a thread context, regardless of whether
+  // the thread_ts came from the URL or the payload override.
   const replyBroadcast = readBoolean(parsed, 'reply_broadcast');
-  if (replyBroadcast !== undefined && threadTs) body.reply_broadcast = replyBroadcast;
+  if (replyBroadcast !== undefined && body.thread_ts) {
+    body.reply_broadcast = replyBroadcast;
+  }
+
+  // Action follows the *effective* thread state, including payload override.
+  const action: SlackWritebackRequest['action'] = body.thread_ts
+    ? 'reply_in_thread'
+    : 'post_message';
 
   return {
     action,
@@ -187,15 +216,17 @@ function buildAddReaction(
   messageTs: string,
   content: string,
 ): SlackWritebackRequest {
-  const channel = extractSlackChannel(channelSegment);
+  const pathChannel = extractSlackChannel(channelSegment);
   const parsed = safeParseJson(content);
 
   let name: string | undefined;
+  let explicitChannel: string | undefined;
   if (typeof parsed === 'string') {
     name = parsed.trim().replace(/^:|:$/g, '');
   } else if (isRecord(parsed)) {
     name = readString(parsed, 'name') ?? readString(parsed, 'reaction');
     if (name) name = name.replace(/^:|:$/g, '');
+    explicitChannel = readString(parsed, 'channel');
   } else {
     throw new Error(
       'reactions/new.json writeback expects a JSON object with `name` or a plain string',
@@ -213,7 +244,7 @@ function buildAddReaction(
     method: 'POST',
     endpoint: '/api/reactions.add',
     body: {
-      channel,
+      channel: explicitChannel ?? pathChannel,
       timestamp: messageTs,
       name,
     },
