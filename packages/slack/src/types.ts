@@ -9,6 +9,18 @@ export interface SlackAdapterConfig {
   normalizeThreads?: boolean;
 }
 
+/**
+ * Describes a Slack write the cloud writeback engine should execute via the
+ * provider proxy. Each request maps onto a Slack Web API endpoint
+ * (`/api/<method>`) that accepts a JSON body.
+ */
+export interface SlackWritebackRequest {
+  action: 'post_message' | 'reply_in_thread' | 'add_reaction';
+  method: 'POST';
+  endpoint: '/api/chat.postMessage' | '/api/reactions.add';
+  body: Record<string, unknown>;
+}
+
 export const SLACK_CHANNEL_TYPES = ['app_home', 'channel', 'group', 'im', 'mpim'] as const;
 export const SLACK_ENVELOPE_EVENT_TYPES = [
   'app_rate_limited',
