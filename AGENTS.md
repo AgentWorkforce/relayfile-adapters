@@ -150,6 +150,18 @@ Your trajectory helps others understand:
 
 Future agents can query past trajectories to learn from your decisions.
 <!-- prpm:snippet:end @agent-workforce/trail-snippet@1.1.0 -->
+
+## Repository conventions
+
+### Do not bump package versions in feature PRs
+
+Versions in `packages/*/package.json` are bumped by the publish phase, not in the PR that introduces the change. The repo's pattern (see `chore(release): bump all (patch)` commits in history) is:
+
+1. Open a feature PR with the source change only — leave `version` fields untouched.
+2. After merge, the publish workflow (`.github/workflows/publish.yml`, `workflow_dispatch`) handles the version bump and npm publish.
+
+If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
+
 <!-- PRPM_MANIFEST_START -->
 
 <skills_system priority="1">
