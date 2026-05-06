@@ -55,13 +55,20 @@ function slugify(value: string): string {
     .toLowerCase();
 }
 
-function shortId(id: string): string {
-  return id.replace(/-/g, '').slice(0, 8);
+/**
+ * Encode an id as a path-safe suffix that can be losslessly reversed.
+ * We dehyphenate so the suffix is a single token (no `-` collision with
+ * the slug separator) but keep the full id so the round-trip is
+ * unambiguous. Truncating to 8 chars (the previous behaviour) breaks
+ * writeback resolvers that need the full id to address the resource.
+ */
+function idSuffix(id: string): string {
+  return id.replace(/-/g, '');
 }
 
 function titleSegmentWithId(title: string | undefined, id: string): string {
   const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${shortId(id)}` : encodeLinearPathSegment(id);
+  return slug ? `${slug}--${idSuffix(id)}` : encodeLinearPathSegment(id);
 }
 
 export function normalizeLinearObjectType(objectType: string): LinearPathObjectType {

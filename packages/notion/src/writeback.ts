@@ -2,40 +2,81 @@ import { DEFAULT_NOTION_MARKDOWN_API_VERSION } from './types.js';
 import { deserializePropertyMap } from './pages/properties.js';
 import type { JsonValue, NotionWritebackRequest } from './types.js';
 
+/**
+ * Extract a Notion id from a path segment.
+ *
+ * Path-mapper emits segments in two shapes:
+ *   - `<slug>--<id-suffix>` when a title is available (the common case).
+ *     `id-suffix` is the dehyphenated 32-char hex form of the UUID — see
+ *     `path-mapper.ts:idSuffix()`. We reformat back to canonical 8-4-4-4-12.
+ *   - bare `<id>` when no title is available. We pass it through (decoded)
+ *     and let the API validate.
+ *
+ * Legacy 8-char suffixes are rejected explicitly so the caller gets a clear
+ * "re-sync required" signal instead of an opaque downstream 400.
+ */
+function extractNotionId(segment: string): string {
+  const decoded = decodeURIComponent(segment);
+
+  // slug--<32-hex>: reverse the path-mapper encoding to canonical UUID.
+  const slugged32 = /--([0-9a-f]{32})$/i.exec(decoded);
+  if (slugged32) return formatUuid(slugged32[1]);
+
+  // slug--<8-hex>: legacy form, can't be reversed losslessly.
+  if (/--[0-9a-f]{8}$/i.test(decoded)) {
+    throw new Error(
+      `Notion path "${segment}" uses a legacy 8-char id suffix that cannot be ` +
+        `losslessly resolved. Run \`relayfile pull\` to re-sync paths.`,
+    );
+  }
+
+  // Bare 32-char hex: dehyphenated UUID. Reformat for the API.
+  const bareHex = /^([0-9a-f]{32})$/i.exec(decoded);
+  if (bareHex) return formatUuid(bareHex[1]);
+
+  // Anything else (canonical UUIDs, synthetic test ids, percent-encoded ids)
+  // passes through as-is. The Notion API will validate.
+  return decoded;
+}
+
+function formatUuid(hex32: string): string {
+  return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
+}
+
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (databasePageMatch) {
-    return buildPagePropertiesWriteback(databasePageMatch[2], content);
+    return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
   }
 
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
   if (standalonePageMatch) {
-    return buildPagePropertiesWriteback(standalonePageMatch[1], content);
+    return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
   const databaseContentMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/content\.md$/);
   if (databaseContentMatch) {
-    return buildMarkdownWriteback(databaseContentMatch[2], content);
+    return buildMarkdownWriteback(extractNotionId(databaseContentMatch[2]), content);
   }
 
   const standaloneContentMatch = path.match(/^\/notion\/pages\/([^/]+)\/content\.md$/);
   if (standaloneContentMatch) {
-    return buildMarkdownWriteback(standaloneContentMatch[1], content);
+    return buildMarkdownWriteback(extractNotionId(standaloneContentMatch[1]), content);
   }
 
   const databaseCommentsMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/comments\.json$/);
   if (databaseCommentsMatch) {
-    return buildCommentWriteback(databaseCommentsMatch[2], content);
+    return buildCommentWriteback(extractNotionId(databaseCommentsMatch[2]), content);
   }
 
   const standaloneCommentsMatch = path.match(/^\/notion\/pages\/([^/]+)\/comments\.json$/);
   if (standaloneCommentsMatch) {
-    return buildCommentWriteback(standaloneCommentsMatch[1], content);
+    return buildCommentWriteback(extractNotionId(standaloneCommentsMatch[1]), content);
   }
 
   const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/?$/);
   if (createDatabasePageMatch) {
-    return buildCreatePageWriteback(createDatabasePageMatch[1], content);
+    return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
   }
 
   throw new Error(`No Notion writeback rule matched ${path}`);

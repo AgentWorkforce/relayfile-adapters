@@ -32,8 +32,17 @@ function slugify(value: string): string {
     .toLowerCase();
 }
 
-function shortId(id: string): string {
-  return id.replace(/-/g, '').slice(0, 8);
+/**
+ * Encode an id as a path-safe suffix that can be losslessly reversed
+ * by the writeback resolver. We dehyphenate UUIDs so the suffix is a
+ * single token (no `-` collisions with the slug separator), but keep
+ * the full id so the round-trip is unambiguous.
+ *
+ * Previously this was truncated to 8 chars, which broke writebacks for
+ * providers (e.g. Notion) that need the full UUID to address the resource.
+ */
+function idSuffix(id: string): string {
+  return id.replace(/-/g, '');
 }
 
 function titleSegment(title: string | undefined, id: string, label: string): string {
@@ -43,7 +52,7 @@ function titleSegment(title: string | undefined, id: string, label: string): str
 
 function titleSegmentWithId(title: string | undefined, id: string, label: string): string {
   const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${shortId(id)}` : assertSegment(id, label);
+  return slug ? `${slug}--${idSuffix(id)}` : assertSegment(id, label);
 }
 
 export function notionDatabaseMetadataPath(databaseId: string, title?: string): string {
