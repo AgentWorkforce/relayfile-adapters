@@ -14,8 +14,11 @@ import {
 } from './types.js';
 
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
+// PR segment is emitted by `githubNumberSlug` as either a bare `<number>` or
+// `<number>--<slug>` (when the PR title is known). Capture the leading number
+// and tolerate an optional `--<slug>` suffix on the same segment.
 const REVIEW_WRITEBACK_PATH =
-  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)\/reviews\/[^/]+(?:\.json)?$/;
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:--[^/]+)?\/reviews\/[^/]+(?:\.json)?$/;
 
 interface GitHubReviewResponse {
   id: number;
