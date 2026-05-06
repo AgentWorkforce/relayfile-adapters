@@ -1,0 +1,153 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { resolveWritebackRequest } from '../writeback.js';
+
+describe('slack writeback', () => {
+  describe('post_message', () => {
+    it('posts a plain-string body to a channel-name slug path', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/new.json',
+        'Hello team!',
+      );
+      assert.strictEqual(req.action, 'post_message');
+      assert.strictEqual(req.endpoint, '/api/chat.postMessage');
+      assert.deepStrictEqual(req.body, { channel: '#customer-success', text: 'Hello team!' });
+    });
+
+    it('uses raw channel id when the segment matches Slack id shape', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/C01ABC1234/messages/new.json',
+        'Hello team!',
+      );
+      assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
+    });
+
+    it('forwards JSON object payload with text, blocks, attachments, and overrides', () => {
+      const blocks = [{ type: 'section', text: { type: 'mrkdwn', text: '*hi*' } }];
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/new.json',
+        JSON.stringify({
+          text: 'fallback',
+          blocks,
+          username: 'Sage',
+          icon_emoji: ':robot_face:',
+          unfurl_links: false,
+          mrkdwn: true,
+        }),
+      );
+      assert.deepStrictEqual(req.body, {
+        channel: '#customer-success',
+        text: 'fallback',
+        blocks,
+        username: 'Sage',
+        icon_emoji: ':robot_face:',
+        unfurl_links: false,
+        mrkdwn: true,
+      });
+    });
+
+    it('rejects an empty body', () => {
+      assert.throws(
+        () => resolveWritebackRequest('/slack/channels/general/messages/new.json', ''),
+        /requires a non-empty body/,
+      );
+    });
+
+    it('rejects a JSON object that has no text/blocks/attachments', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/slack/channels/general/messages/new.json',
+            JSON.stringify({ username: 'NoBody' }),
+          ),
+        /requires `text`, `blocks`, or `attachments`/,
+      );
+    });
+  });
+
+  describe('reply_in_thread', () => {
+    it('reverses the tsToken (underscore → dot) and sets thread_ts', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/1762445678_001234/replies/new.json',
+        'Following up here.',
+      );
+      assert.strictEqual(req.action, 'reply_in_thread');
+      assert.deepStrictEqual(req.body, {
+        channel: '#customer-success',
+        text: 'Following up here.',
+        thread_ts: '1762445678.001234',
+      });
+    });
+
+    it('handles subjectSlug--tsToken message segment', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/onboarding-acme--1762445678_001234/replies/new.json',
+        'Reply body.',
+      );
+      assert.strictEqual(
+        (req.body as { thread_ts: string }).thread_ts,
+        '1762445678.001234',
+      );
+    });
+
+    it('honors reply_broadcast on thread replies only', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/1762445678_001234/replies/new.json',
+        JSON.stringify({ text: 'announce', reply_broadcast: true }),
+      );
+      assert.strictEqual((req.body as { reply_broadcast: boolean }).reply_broadcast, true);
+    });
+  });
+
+  describe('add_reaction', () => {
+    it('accepts a bare emoji name', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        'eyes',
+      );
+      assert.strictEqual(req.action, 'add_reaction');
+      assert.strictEqual(req.endpoint, '/api/reactions.add');
+      assert.deepStrictEqual(req.body, {
+        channel: '#general',
+        timestamp: '1762445678.001234',
+        name: 'eyes',
+      });
+    });
+
+    it('strips surrounding colons from the emoji name', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        ':white_check_mark:',
+      );
+      assert.strictEqual((req.body as { name: string }).name, 'white_check_mark');
+    });
+
+    it('accepts JSON {name} payload', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        JSON.stringify({ name: 'rocket' }),
+      );
+      assert.strictEqual((req.body as { name: string }).name, 'rocket');
+    });
+
+    it('rejects missing emoji name', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+            JSON.stringify({}),
+          ),
+        /requires `name`/,
+      );
+    });
+  });
+
+  describe('unmatched paths', () => {
+    it('throws for unrecognized paths', () => {
+      assert.throws(
+        () => resolveWritebackRequest('/slack/users/U01ABC.json', '{}'),
+        /No Slack writeback rule matched/,
+      );
+    });
+  });
+});

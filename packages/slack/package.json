@@ -16,6 +16,16 @@
       "types": "./dist/path-mapper.d.ts",
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
     }
   },
   "files": [

@@ -44,6 +44,8 @@ export {
   SLACK_REACTION_ITEM_TYPES,
 } from './types.js';
 
+export { resolveWritebackRequest } from './writeback.js';
+
 export type {
   ConnectionProvider,
   FileSemantics,
@@ -95,4 +97,5 @@ export type {
   SlackReactionItemType,
   SlackReactionRemovedEvent,
   SlackUrlVerificationEnvelope,
+  SlackWritebackRequest,
 } from './types.js';
