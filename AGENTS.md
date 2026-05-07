@@ -162,6 +162,26 @@ Versions in `packages/*/package.json` are bumped by the publish phase, not in th
 
 If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
 
+### Adding a new adapter package: update `publish.yml`
+
+Any PR that introduces a new directory under `packages/` (e.g. a new adapter like `packages/asana/`) **must also update `.github/workflows/publish.yml`** in the same PR. Two places need to stay in sync:
+
+1. **`inputs.package.options`** — add the new slug to the choice list so it can be selected for one-off publishing.
+2. **The "Resolve packages to publish" step** — add the slug to the space-separated `packages=...` list under the `if "all"` branch so it gets included in `package=all` runs.
+
+Without this, the new adapter never publishes to npm. The rest of the test plan can be green and reviewers won't notice — but the package will never appear on the registry, which silently breaks downstream consumers. CI does not verify this; treat it as part of the package-creation checklist.
+
+Quick sanity check before opening the PR (should print nothing and exit 0):
+
+```bash
+diff \
+  <(ls packages/ | grep -v '^webhook-server$' | sort) \
+  <(sed -n '/^      package:/,/^      version:/p' .github/workflows/publish.yml \
+    | grep -oE '^ *- [a-z-]+' | sed 's/^ *- //' | grep -v '^all$' | sort -u)
+```
+
+`webhook-server` is intentionally excluded (it's a server, not an npm-published adapter). Any other directory under `packages/` that doesn't appear in `publish.yml` is a forgotten registration.
+
 <!-- PRPM_MANIFEST_START -->
 
 <skills_system priority="1">
