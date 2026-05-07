@@ -106,6 +106,47 @@ describe('linear writeback', () => {
       });
     });
 
+    it('drops denormalized synced-read fields that IssueUpdateInput does not accept', () => {
+      // Pins the bug surfaced on op_31 in workspace rw_517d60b6: the synced
+      // file the path-mapper wrote on the read side included Linear's
+      // denormalized fields (state_name, assignee_name, priority_label,
+      // _connection, _webhook, descriptionData, …). When a user edited the
+      // file in place keeping the full envelope and just changed the title,
+      // the writeback forwarded every field as IssueUpdateInput and Linear
+      // rejected with `Field "state_name" is not defined by type
+      // "IssueUpdateInput". Did you mean "stateId"?`.
+      //
+      // The fix: explicit allowlist matching IssueUpdateInput. Anything not
+      // in the schema is silently dropped; only mutable fields go through.
+      const req = resolveWritebackRequest(
+        `/linear/issues/${PAGE_UUID}.json`,
+        JSON.stringify({
+          id: PAGE_UUID,
+          identifier: 'PROJ-441',
+          title: 'edited title',
+          description: 'edited description',
+          // Denormalized read-only fields the writeback must NOT forward:
+          state_name: 'Backlog',
+          assignee_name: null,
+          priority_label: 'No priority',
+          created_at: '2026-04-03T18:38:27.932Z',
+          updated_at: '2026-04-03T18:38:28.177Z',
+          url: 'https://linear.app/x/issue/PROJ-441',
+          // Read-side metadata Linear's webhook normalizer emits:
+          _connection: { provider: 'linear' },
+          _webhook: { action: 'update' },
+          descriptionData: '{"type":"doc"}',
+        }),
+      );
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, {
+        title: 'edited title',
+        description: 'edited description',
+        descriptionData: '{"type":"doc"}',
+      });
+    });
+
     it('unwraps the synced envelope written by LinearAdapter.renderContent', () => {
       // This is the exact shape an agent sees when it reads a synced
       // /linear/issues/<id>.json file produced by LinearAdapter.renderContent.
