@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  ZENDESK_SIGNATURE_256_HEADER,
+  ZENDESK_SIGNATURE_HEADER,
   ZENDESK_SIGNATURE_TIMESTAMP_HEADER,
   assertValidZendeskWebhookSignature,
   computeZendeskWebhookSignature,
@@ -20,9 +20,17 @@ const rawTicketPayload = JSON.stringify({
   },
 });
 
-const timestamp = '1710000000000';
+// Real Zendesk sends the timestamp header in ISO 8601 UTC format
+// (e.g. "2021-03-25T05:09:27Z") — confirmed by the verifying-webhooks
+// reference. The HMAC input is the raw header string concatenated with
+// the body, so this fixture must use that exact format. A millisecond
+// fixture passes our internal validation but doesn't reflect production:
+// the signature we'd compute against ms differs from the signature Zendesk
+// signs with ISO 8601, so production webhooks would fail verification.
+const timestamp = '2024-01-15T12:00:00Z';
+const timestampEpochMs = Date.parse(timestamp); // 1_705_320_000_000
 const secret = 'zendesk-secret';
-const knownGoodSignature = 'vdCfjyMhIiiE6i7NGS5ky3B3OiUWAqhLc/djqfUnrKU=';
+const knownGoodSignature = '5TncuXWaIPS6N52iK6ZdIfE3Ru4lDjMfqka/CndZBTY=';
 
 test('normalizeZendeskWebhook extracts normalized event metadata and connection metadata', () => {
   const normalized = normalizeZendeskWebhook(rawTicketPayload, {
@@ -50,11 +58,11 @@ test('validateZendeskWebhookSignature accepts a known-good HMAC-SHA256 signature
   const valid = validateZendeskWebhookSignature(
     rawTicketPayload,
     {
-      [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+      [ZENDESK_SIGNATURE_HEADER]: knownGoodSignature,
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     secret,
-    Number(timestamp) + 30_000,
+    timestampEpochMs + 30_000,
   );
 
   assert.equal(valid.ok, true);
@@ -63,11 +71,11 @@ test('validateZendeskWebhookSignature accepts a known-good HMAC-SHA256 signature
     assertValidZendeskWebhookSignature(
       rawTicketPayload,
       {
-        [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+        [ZENDESK_SIGNATURE_HEADER]: knownGoodSignature,
         [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
       },
       secret,
-      Number(timestamp) + 30_000,
+      timestampEpochMs + 30_000,
     ),
   );
 });
@@ -85,11 +93,11 @@ test('validateZendeskWebhookSignature rejects a tampered raw body', () => {
   const invalid = validateZendeskWebhookSignature(
     tamperedPayload,
     {
-      [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+      [ZENDESK_SIGNATURE_HEADER]: knownGoodSignature,
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     secret,
-    Number(timestamp) + 30_000,
+    timestampEpochMs + 30_000,
   );
 
   assert.equal(invalid.ok, false);
@@ -103,13 +111,13 @@ test('validateZendeskWebhookSignature rejects a missing signature header', () =>
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     secret,
-    Number(timestamp) + 30_000,
+    timestampEpochMs + 30_000,
   );
 
   assert.deepEqual(missing, {
     ok: false,
     reason: 'missing-signature',
-    webhookTimestamp: Number(timestamp),
+    webhookTimestamp: timestampEpochMs,
   });
 });
 
@@ -120,11 +128,11 @@ test('validateZendeskWebhookSignature rejects parsed payloads and malformed base
     () => validateZendeskWebhookSignature(
       parsedPayload,
       {
-        [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+        [ZENDESK_SIGNATURE_HEADER]: knownGoodSignature,
         [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
       },
       secret,
-      Number(timestamp) + 30_000,
+      timestampEpochMs + 30_000,
     ),
     /raw request body/,
   );
@@ -132,11 +140,11 @@ test('validateZendeskWebhookSignature rejects parsed payloads and malformed base
   const malformed = validateZendeskWebhookSignature(
     rawTicketPayload,
     {
-      [ZENDESK_SIGNATURE_256_HEADER]: 'a=bc',
+      [ZENDESK_SIGNATURE_HEADER]: 'a=bc',
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     secret,
-    Number(timestamp) + 30_000,
+    timestampEpochMs + 30_000,
   );
 
   assert.equal(malformed.ok, false);
@@ -147,11 +155,11 @@ test('validateZendeskWebhookSignature rejects expired timestamps', () => {
   const expired = validateZendeskWebhookSignature(
     rawTicketPayload,
     {
-      [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+      [ZENDESK_SIGNATURE_HEADER]: knownGoodSignature,
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     secret,
-    Number(timestamp) + 300_001,
+    timestampEpochMs + 300_001,
   );
 
   assert.equal(expired.ok, false);
@@ -162,7 +170,7 @@ test('validateZendeskWebhookSignature rejects expired timestamps', () => {
       [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
     },
     300_000,
-    Number(timestamp) + 300_001,
+    timestampEpochMs + 300_001,
   );
   assert.equal(timestampOnly.ok, false);
   assert.equal(timestampOnly.reason, 'expired-timestamp');

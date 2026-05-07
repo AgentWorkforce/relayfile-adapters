@@ -78,6 +78,15 @@ const ACTION_ALIASES: Readonly<Record<string, string>> = {
 type ClickUpRecord = Record<string, unknown>;
 type HeaderValue = boolean | number | readonly string[] | string | null | undefined;
 
+/**
+ * Raw HTTP request body forms accepted by signature verification.
+ * Already-parsed objects must NOT be re-serialized — JSON.stringify produces
+ * different bytes than the original request (whitespace, key order), which
+ * makes the HMAC mismatch even when the secret is correct. Callers must hand
+ * us the raw body verbatim.
+ */
+export type ClickUpWebhookRawBody = string | Buffer | Uint8Array | ArrayBuffer;
+
 export type ClickUpWebhookHeaders =
   | Headers
   | Iterable<readonly [string, string]>
@@ -343,7 +352,10 @@ export function extractClickUpObjectId(payload: unknown, objectType?: string): s
   return objectId;
 }
 
-export function computeClickUpWebhookSignature(rawPayload: unknown, secret: string): string {
+export function computeClickUpWebhookSignature(
+  rawPayload: ClickUpWebhookRawBody,
+  secret: string,
+): string {
   const normalizedSecret = secret.trim();
   if (!normalizedSecret) {
     throw new Error('ClickUp webhook secret must be a non-empty string.');
@@ -355,7 +367,7 @@ export function computeClickUpWebhookSignature(rawPayload: unknown, secret: stri
 }
 
 export function validateClickUpWebhookSignature(
-  rawPayload: unknown,
+  rawPayload: ClickUpWebhookRawBody,
   headers: ClickUpWebhookHeaders,
   secret: string,
 ): ClickUpWebhookSignatureValidationResult {
@@ -397,7 +409,7 @@ export function validateClickUpWebhookSignature(
 }
 
 export function assertValidClickUpWebhookSignature(
-  rawPayload: unknown,
+  rawPayload: ClickUpWebhookRawBody,
   headers: ClickUpWebhookHeaders,
   secret: string,
 ): void {
@@ -534,7 +546,7 @@ function decodeWebhookPayload(rawPayload: unknown): unknown {
   return rawPayload;
 }
 
-function toRawBodyBuffer(rawPayload: unknown): Buffer {
+function toRawBodyBuffer(rawPayload: ClickUpWebhookRawBody): Buffer {
   if (typeof rawPayload === 'string') {
     return Buffer.from(rawPayload, 'utf8');
   }
@@ -551,7 +563,14 @@ function toRawBodyBuffer(rawPayload: unknown): Buffer {
     return Buffer.from(rawPayload);
   }
 
-  return Buffer.from(JSON.stringify(rawPayload), 'utf8');
+  // The ClickUpWebhookRawBody type guards us at compile time, but we still
+  // throw at runtime for callers who slip past the type system (e.g. via
+  // `as any`). Re-serializing with JSON.stringify would silently produce
+  // bytes that differ from the original request — wrong key order or
+  // whitespace breaks the HMAC even when the secret is correct.
+  throw new Error(
+    'ClickUp webhook signature verification requires the raw request body as string | Buffer | Uint8Array | ArrayBuffer.',
+  );
 }
 
 function normalizeHeaders(headers: ClickUpWebhookHeaders): Record<string, string> {
