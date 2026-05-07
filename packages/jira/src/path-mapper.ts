@@ -44,13 +44,14 @@ function slugify(value: string): string {
     .toLowerCase();
 }
 
-function idSuffix(id: string): string {
-  return id.replace(/-/g, '');
-}
-
 function titleSegmentWithId(title: string | undefined, id: string): string {
   const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${idSuffix(id)}` : encodeJiraPathSegment(id);
+  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "--"
+  // separator between slug and ID is the disambiguator, and slugs never
+  // contain "--" because slugify collapses any non-alphanumeric run into a
+  // single "-". So extractJiraIdFromPathSegment can recover the ID
+  // verbatim by capturing everything after the last "--".
+  return slug ? `${slug}--${id}` : encodeJiraPathSegment(id);
 }
 
 export function normalizeJiraObjectType(objectType: string): JiraPathObjectType {
@@ -82,7 +83,15 @@ export function jiraSprintPath(sprintId: string, name?: string): string {
   return `${JIRA_PATH_ROOT}/sprints/${titleSegmentWithId(name, sprintId)}.json`;
 }
 
-export function jiraCommentPath(commentId: string): string {
+export function jiraCommentPath(commentId: string, issueIdOrKey?: string): string {
+  // Nested form is required for read/update because the Jira REST API needs
+  // the parent issue context for both GET and PUT on a single comment:
+  // GET/PUT /rest/api/3/issue/{issueIdOrKey}/comment/{commentId}.
+  // The flat form is retained only for legacy webhook payloads that lack
+  // issue context; it cannot be round-tripped through the API.
+  if (issueIdOrKey) {
+    return `${JIRA_PATH_ROOT}/issues/${encodeJiraPathSegment(issueIdOrKey)}/comments/${encodeJiraPathSegment(commentId)}.json`;
+  }
   return `${JIRA_PATH_ROOT}/comments/${encodeJiraPathSegment(commentId)}.json`;
 }
 
@@ -98,7 +107,10 @@ export function computeJiraPath(objectType: string, objectId: string, title?: st
     case 'sprint':
       return jiraSprintPath(normalizedId, title);
     case 'comment':
-      return jiraCommentPath(normalizedId);
+      // For comments, the optional `title` argument is repurposed as the
+      // parent issueIdOrKey. Callers using the public API should prefer
+      // jiraCommentPath(commentId, issueIdOrKey) directly.
+      return jiraCommentPath(normalizedId, title);
   }
 }
 

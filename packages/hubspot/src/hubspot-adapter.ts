@@ -236,7 +236,7 @@ export class HubSpotAdapter extends IntegrationAdapter {
         semantics: this.computeSemantics(objectType, objectId, normalized.payload),
       });
 
-      const counts = inferWriteCounts(writeResult, false);
+      const counts = inferWriteCounts(writeResult, false, normalized);
       return {
         errors: [],
         filesDeleted: 0,
@@ -286,7 +286,7 @@ export class HubSpotAdapter extends IntegrationAdapter {
       semantics: this.computeSemantics(objectType, normalized.objectId, normalized.payload),
     });
 
-    const counts = inferWriteCounts(writeResult, true);
+    const counts = inferWriteCounts(writeResult, true, normalized);
     return {
       errors: [],
       filesDeleted: counts.filesDeleted,
@@ -707,6 +707,7 @@ function asPropertyValue(value: unknown): string | number | boolean | null | und
 function inferWriteCounts(
   result: WriteFileResult | void,
   deleted: boolean,
+  event?: NormalizedWebhook,
 ): { filesDeleted: number; filesUpdated: number; filesWritten: number } {
   if (deleted) {
     return {
@@ -724,11 +725,33 @@ function inferWriteCounts(
     };
   }
 
+  // RelayFileClientLike.writeFile() may resolve without metadata. When that
+  // happens and the inbound event represents a creation (eventType ends with
+  // ".creation" or ".created"), count it as filesWritten so *.created
+  // webhooks are not under-counted.
+  if (
+    (result === undefined || (result?.created === undefined && result?.status === undefined)) &&
+    event &&
+    isCreationEventType(event.eventType)
+  ) {
+    return {
+      filesDeleted: 0,
+      filesUpdated: 0,
+      filesWritten: 1,
+    };
+  }
+
   return {
     filesDeleted: 0,
     filesUpdated: 1,
     filesWritten: 0,
   };
+}
+
+function isCreationEventType(eventType: string | undefined): boolean {
+  if (!eventType) return false;
+  const lower = eventType.toLowerCase();
+  return lower.endsWith('.creation') || lower.endsWith('.created') || lower === 'creation';
 }
 
 function inferFallbackPath(event: NormalizedWebhook): string {

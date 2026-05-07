@@ -430,9 +430,12 @@ function applyIssueSemantics(
   }
 
   const embeddedComments = fields?.comment?.comments ?? [];
+  // Prefer the parent issue key (e.g. "ENG-42") for the nested comment path
+  // so read/write resolvers can recover it; fall back to the numeric id.
+  const parentIssueRef = issue.key ?? issue.id;
   for (const comment of embeddedComments) {
     if (comment.id) {
-      relations.add(jiraCommentPath(comment.id));
+      relations.add(jiraCommentPath(comment.id, parentIssueRef));
     }
   }
   if (embeddedComments.length > 0) {
@@ -598,8 +601,14 @@ function readObjectTitle(objectType: string, payload: Record<string, unknown>): 
       return asString(payload.name) ?? asString(payload.key);
     case 'sprint':
       return asString(payload.name);
-    case 'comment':
-      return undefined;
+    case 'comment': {
+      // For comments, computeJiraPath repurposes the title slot as the
+      // parent issueIdOrKey so the nested path /jira/issues/{key}/comments/
+      // {commentId}.json can round-trip through the API. Prefer the parent
+      // issue key, fall back to its numeric id.
+      const issue = getRecord(payload.issue);
+      return asString(issue?.key) ?? asString(issue?.id);
+    }
   }
 }
 

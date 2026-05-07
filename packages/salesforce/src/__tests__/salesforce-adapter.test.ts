@@ -251,10 +251,13 @@ test('read and writeback route resolution maps VFS paths to Salesforce REST requ
     method: 'GET',
     endpoint: '/services/data/v59.0/sobjects/Account/001A',
   });
+  // Collection reads must route through SOQL; the sObject metadata route
+  // (e.g. /sobjects/Contact) describes the schema and returns no records.
   assert.deepEqual(resolveReadRequest('/salesforce/contacts'), {
     action: 'list_contacts',
     method: 'GET',
-    endpoint: '/services/data/v59.0/sobjects/Contact',
+    endpoint: '/services/data/v59.0/query',
+    query: { q: 'SELECT Id, FirstName, LastName, Email FROM Contact' },
   });
 
   assert.deepEqual(resolveWritebackRequest('/salesforce/accounts/new.json', '{"Name":"Acme"}'), {

@@ -7,6 +7,18 @@ export const SALESFORCE_CONTACT_ROUTE = '/services/data/v59.0/sobjects/Contact';
 export const SALESFORCE_OPPORTUNITY_ROUTE = '/services/data/v59.0/sobjects/Opportunity';
 export const SALESFORCE_LEAD_ROUTE = '/services/data/v59.0/sobjects/Lead';
 export const SALESFORCE_CASE_ROUTE = '/services/data/v59.0/sobjects/Case';
+// Salesforce REST: collection reads must go through SOQL via /query, not the
+// sObject metadata route. The metadata route describes the object schema and
+// returns no records.
+export const SALESFORCE_QUERY_ROUTE = '/services/data/v59.0/query';
+
+const SOQL_LIST_BY_OBJECT = {
+  Account: 'SELECT Id, Name FROM Account',
+  Contact: 'SELECT Id, FirstName, LastName, Email FROM Contact',
+  Opportunity: 'SELECT Id, Name, StageName, Amount, CloseDate FROM Opportunity',
+  Lead: 'SELECT Id, FirstName, LastName, Company, Status FROM Lead',
+  Case: 'SELECT Id, CaseNumber, Subject, Status FROM Case',
+} as const;
 
 const COLLECTION_ACTIONS = {
   Account: 'list_accounts',
@@ -57,7 +69,8 @@ export function resolveReadRequest(path: string): SalesforceQueryRequest {
     return {
       action: COLLECTION_ACTIONS[objectType],
       method: 'GET',
-      endpoint: ROUTES[objectType],
+      endpoint: SALESFORCE_QUERY_ROUTE,
+      query: { q: SOQL_LIST_BY_OBJECT[objectType] },
     };
   }
 

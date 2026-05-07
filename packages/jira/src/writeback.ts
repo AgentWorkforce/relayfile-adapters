@@ -13,9 +13,23 @@ export function resolveJiraWritebackRequest(path: string, content: string): Jira
     return buildCommentCreate(extractJiraIdFromPathSegment(newCommentMatch[1]), content);
   }
 
-  const commentUpdateMatch = normalized.match(/^\/jira\/comments\/([^/]+)\.json$/u);
-  if (commentUpdateMatch?.[1]) {
-    return buildCommentUpdate(extractJiraIdFromPathSegment(commentUpdateMatch[1]), content);
+  const nestedCommentUpdateMatch = normalized.match(
+    /^\/jira\/issues\/([^/]+)\/comments\/([^/]+)\.json$/u,
+  );
+  if (nestedCommentUpdateMatch?.[1] && nestedCommentUpdateMatch[2]) {
+    return buildCommentUpdate(
+      extractJiraIdFromPathSegment(nestedCommentUpdateMatch[1]),
+      extractJiraIdFromPathSegment(nestedCommentUpdateMatch[2]),
+      content,
+    );
+  }
+
+  // Reject the flat form for updates: Jira's PUT /comment requires the
+  // parent issue ID in the path, so the flat form cannot resolve.
+  if (/^\/jira\/comments\/[^/]+\.json$/u.test(normalized)) {
+    throw new Error(
+      `Comment update writeback requires the parent issue context. Use /jira/issues/{issueIdOrKey}/comments/{commentId}.json instead of ${path}`,
+    );
   }
 
   if (normalized === '/jira/issues/new.json' || normalized === '/jira/issues/') {
@@ -58,7 +72,11 @@ function buildCommentCreate(issueIdOrKey: string, content: string): JiraWritebac
   };
 }
 
-function buildCommentUpdate(commentId: string, content: string): JiraWritebackRequest {
+function buildCommentUpdate(
+  issueIdOrKey: string,
+  commentId: string,
+  content: string,
+): JiraWritebackRequest {
   const parsed = parseJsonObject(content);
   const body = readUnknown(parsed, 'body');
   if (!body) {
@@ -67,7 +85,7 @@ function buildCommentUpdate(commentId: string, content: string): JiraWritebackRe
   return {
     action: 'update_comment',
     method: 'PUT',
-    endpoint: `${JIRA_REST_ISSUE_ROUTE}/comment/${commentId}`,
+    endpoint: `${JIRA_REST_ISSUE_ROUTE}/${issueIdOrKey}/comment/${commentId}`,
     body: { body },
   };
 }

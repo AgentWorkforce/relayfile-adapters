@@ -124,7 +124,7 @@ describe('JiraAdapter', () => {
     });
 
     assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/jira/comments/9001.json');
+    assert.equal(client.writes[0]?.path, '/jira/issues/ENG-42/comments/9001.json');
     assert.equal(client.writes[0]?.semantics?.comments?.[0], 'Looks good.');
     assert.deepEqual(client.writes[0]?.semantics?.relations, [jiraIssuePath('ENG-42', 'Fix login redirect')]);
   });
@@ -151,10 +151,13 @@ describe('JiraAdapter', () => {
   });
 
   it('computes deterministic path mappings for all primary object types', () => {
-    assert.equal(computeJiraPath('issue', 'ENG-42', 'Fix login redirect'), '/jira/issues/fix-login-redirect--ENG42.json');
+    assert.equal(computeJiraPath('issue', 'ENG-42', 'Fix login redirect'), '/jira/issues/fix-login-redirect--ENG-42.json');
     assert.equal(computeJiraPath('project', 'ENG', 'Engineering Platform'), '/jira/projects/engineering-platform--ENG.json');
     assert.equal(computeJiraPath('sprint', '77', 'Sprint 77'), '/jira/sprints/sprint-77--77.json');
+    // Flat form is the no-issue-context fallback (still emitted by paths
+    // generated without the parent issue ref); nested form is preferred.
     assert.equal(computeJiraPath('comment', '9001'), '/jira/comments/9001.json');
+    assert.equal(computeJiraPath('comment', '9001', 'ENG-42'), '/jira/issues/ENG-42/comments/9001.json');
   });
 
   it('deletes files for deleted events when deleteFile is available', async () => {

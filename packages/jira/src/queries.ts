@@ -77,16 +77,21 @@ export function resolveJiraReadRequest(path: string): JiraReadRequest {
     };
   }
 
-  const commentMatch = normalized.match(/^\/jira\/comments\/([^/]+)\.json$/u);
-  if (commentMatch?.[1]) {
+  const nestedCommentMatch = normalized.match(
+    /^\/jira\/issues\/([^/]+)\/comments\/([^/]+)\.json$/u,
+  );
+  if (nestedCommentMatch?.[1] && nestedCommentMatch[2]) {
     return {
       action: 'get_comment',
       method: 'GET',
-      endpoint: `${JIRA_REST_ISSUE_ROUTE}/comment/list`,
-      query: {
-        ids: extractJiraIdFromPathSegment(commentMatch[1]),
-      },
+      endpoint: `${JIRA_REST_ISSUE_ROUTE}/${extractJiraIdFromPathSegment(nestedCommentMatch[1])}/comment/${extractJiraIdFromPathSegment(nestedCommentMatch[2])}`,
     };
+  }
+
+  if (/^\/jira\/comments\/[^/]+\.json$/u.test(normalized)) {
+    throw new Error(
+      `Comment read requires the parent issue context. Use /jira/issues/{issueIdOrKey}/comments/{commentId}.json instead of ${path}`,
+    );
   }
 
   throw new Error(`No Jira read rule matched ${path}`);
