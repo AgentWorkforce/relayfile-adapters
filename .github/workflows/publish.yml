@@ -16,6 +16,10 @@ on:
           - slack
           - linear
           - notion
+          - hubspot
+          - salesforce
+          - pipedrive
+          - jira
         default: "all"
       version:
         description: "Version bump type"
@@ -77,7 +81,10 @@ jobs:
         id: resolve
         run: |
           if [ "${{ github.event.inputs.package }}" = "all" ]; then
-            echo "packages=core github gitlab teams slack linear notion" >> "$GITHUB_OUTPUT"
+            # Keep this list in sync with the `package` input options above and
+            # the directories under packages/. See AGENTS.md → "Adding a new
+            # adapter package" for the checklist that gates new entries here.
+            echo "packages=core github gitlab teams slack linear notion hubspot salesforce pipedrive jira" >> "$GITHUB_OUTPUT"
           else
             echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
           fi
