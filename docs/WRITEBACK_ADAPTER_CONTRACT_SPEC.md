@@ -23,6 +23,22 @@ The pattern isn't getting cleaner: each new provider adds a roughly-identical `e
 
 This spec proposes moving response interpretation into the adapter package alongside the request resolver, behind a single contract the cloud can dispatch through generically.
 
+## Motivating incident: linear writeback gate vs bridge drift
+
+Concrete repro that landed while drafting this spec.
+
+[cloud#466](https://github.com/AgentWorkforce/cloud/pull/466) wired Linear into the dispatch switch in `cloud/packages/web/lib/integrations/relayfile-writeback-bridge.ts` — that PR's tests (7/7) all passed and the deploy succeeded. End-to-end verification immediately afterward showed local writes to `/linear/issues/new.json` still failing:
+
+```
+{ "opId":"op_116", "path":"/linear/issues/new.json",
+  "provider":"linear", "status":"failed",
+  "lastError":"unsupported provider writeback path: /linear/issues/new.json" }
+```
+
+Root cause: a *second* path-pattern gate in `cloud/packages/relayfile/src/writeback/provider-executor.ts` — a different package, a different deployment target (Cloudflare Workers vs Next.js Lambda) — had its own switch with `notion` and `github` cases and a default deny. Linear was wired in the bridge dispatch but rejected at the upstream gate before the bridge ever got called. Fixed in [cloud#467](https://github.com/AgentWorkforce/cloud/pull/467) by adding a `LINEAR_WRITEBACK_PATH` regex and a `case "linear"`.
+
+This is the exact failure mode `pathMatchers` on the contract is designed to eliminate: **two files, in two packages, each maintaining their own copy of "what paths does this provider support?"** Tests in either file pass on their own; the divergence only shows up at runtime, on a path that exercises both call sites. Each new provider doubles the surface area for this kind of drift.
+
 ## Goals
 
 - New providers added by writing one adapter package + one registry entry in cloud. No new `executeXWriteback` per provider.
@@ -162,47 +178,67 @@ export interface WritebackAdapter {
 }
 ```
 
-The cloud bridge's `executeRelayfileProviderWriteback` collapses to:
+### One registry, both call sites
+
+The `REGISTRY` is the single source of truth for "what providers are wired" and "what paths each provider supports." **Every code path that needs to answer either of those questions reads from the registry — no provider-specific switches, no per-call-site regex literals.**
+
+This is the load-bearing constraint that prevents the [motivating incident](#motivating-incident-linear-writeback-gate-vs-bridge-drift) from recurring. The two call sites today are:
+
+1. **Upstream gate** in `cloud/packages/relayfile/src/writeback/provider-executor.ts` (Cloudflare Workers) — runs first, decides whether to dispatch at all. Currently has its own `getUnsupportedReason()` switch with `notion` / `github` regex literals.
+2. **Dispatch + execution** in `cloud/packages/web/lib/integrations/relayfile-writeback-bridge.ts` (Next.js Lambda) — runs second, actually calls the provider. Currently has its own `executeXWriteback` per provider.
+
+Under the contract, both reduce to:
 
 ```ts
-const REGISTRY: Readonly<Record<string, WritebackAdapter>> = Object.freeze({
+// Shared library, importable from both Workers + Lambda contexts
+import type { WritebackAdapter } from "@relayfile/adapter-protocol";
+import { githubWritebackAdapter } from "@relayfile/adapter-github/writeback-adapter";
+import { linearWritebackAdapter } from "@relayfile/adapter-linear/writeback-adapter";
+import { notionWritebackAdapter } from "@relayfile/adapter-notion/writeback-adapter";
+import { slackWritebackAdapter  } from "@relayfile/adapter-slack/writeback-adapter";
+
+export const REGISTRY: Readonly<Record<string, WritebackAdapter>> = Object.freeze({
   github: githubWritebackAdapter,
   linear: linearWritebackAdapter,
   notion: notionWritebackAdapter,
   slack:  slackWritebackAdapter,
 });
 
-async function executeAdapterWriteback(
-  input: RelayfileWritebackInput,
-  integration: WorkspaceIntegrationRecord,
-): Promise<RelayfileWritebackExecutionResult> {
-  const adapter = REGISTRY[providerFromPath(input.path)];
-  if (!adapter) {
-    return permanentFailure(integration.provider, "unsupported_provider", `No adapter for ${integration.provider}`);
-  }
-
-  let request: WritebackRequest;
-  try {
-    request = adapter.resolve(input);
-  } catch (e) {
-    return permanentFailure(adapter.provider, "unsupported_path", errorMessage(e));
-  }
-
-  const headers = { ...adapter.buildDefaultHeaders?.(), ...request.headers };
-  const response = await proxyThroughNango({
-    connectionId: integration.connectionId,
-    providerConfigKey: normalizeProviderConfigKey(integration),
-    method: request.method,
-    endpoint: request.endpoint,
-    headers,
-    data: request.body,
-  });
-
-  return adapter.interpret(response, request);
+export function pathIsWritable(provider: string, path: string): boolean {
+  const adapter = REGISTRY[provider];
+  return Boolean(adapter && adapter.pathMatchers.some((rx) => rx.test(path)));
 }
 ```
 
-The provider-specific functions in `relayfile-writeback-bridge.ts` (~360 lines today) shrink to ~30 lines of generic transport plus a `REGISTRY` literal.
+```ts
+// provider-executor.ts — the upstream gate
+if (!pathIsWritable(provider, path)) {
+  return ackUnsupported(`unsupported ${provider} writeback path: ${path}`);
+}
+```
+
+```ts
+// relayfile-writeback-bridge.ts — the dispatch + execution
+const adapter = REGISTRY[providerFromPath(input.path)];
+if (!adapter) return permanentFailure(integration.provider, "unsupported_provider", ...);
+
+const request = adapter.resolve(input);
+const headers = { ...adapter.buildDefaultHeaders?.(), ...request.headers };
+const response = await proxyThroughNango({ ...request, headers });
+return adapter.interpret(response, request);
+```
+
+Adding a new provider:
+
+1. Write the adapter package (`@relayfile/adapter-<x>/writeback-adapter`).
+2. Add **one** import + **one** registry entry to the shared file.
+3. Done. Both the gate and the dispatch pick it up.
+
+You cannot add it to one and forget the other — there's only one place to add it. The provider-executor's `LINEAR_WRITEBACK_PATH` regex literal that necessitated [cloud#467](https://github.com/AgentWorkforce/cloud/pull/467) wouldn't exist; `pathIsWritable("linear", path)` would consult `linearWritebackAdapter.pathMatchers` directly.
+
+### The cloud-side reduction
+
+The provider-specific functions in `relayfile-writeback-bridge.ts` (~360 lines today) shrink to ~30 lines of generic transport plus a `REGISTRY` import. The `getUnsupportedReason` switch in `provider-executor.ts` collapses to a single `pathIsWritable` call.
 
 ## Migration Plan
 
@@ -227,10 +263,10 @@ For each of Linear and Notion:
 
 1. Add a `<provider>WritebackAdapter` export to the adapter package that wraps the existing `resolveWritebackRequest` + the response-interpretation logic that currently lives in cloud.
 2. Add the adapter to the cloud `REGISTRY`.
-3. Flip the dispatch from `executeXWriteback` to `REGISTRY[provider]` for that provider only.
-4. Delete the cloud-side `executeXWriteback` and its provider-specific extractors.
+3. Flip the dispatch from `executeXWriteback` to `REGISTRY[provider]` for that provider only — **and** swap the provider's branch in `provider-executor.ts:getUnsupportedReason()` for a `pathIsWritable(provider, path)` call against the same registry. The two flips happen in the same PR; otherwise the gate and the bridge can drift again, exactly the way they drifted in the [motivating incident](#motivating-incident-linear-writeback-gate-vs-bridge-drift).
+4. Delete the cloud-side `executeXWriteback` and its provider-specific extractors. Delete the provider's regex literal in `provider-executor.ts` (e.g. `LINEAR_WRITEBACK_PATH`).
 
-The cloud-side test changes are minimal — the test asserts on the `RelayfileWritebackExecutionResult` shape, not on which function produced it. We keep the existing `tests/relayfile-writeback-bridge.test.ts` cases and migrate the response-shape assertions into adapter-package unit tests where they belong.
+The cloud-side test changes are minimal — the test asserts on the `RelayfileWritebackExecutionResult` shape, not on which function produced it. We keep the existing `tests/relayfile-writeback-bridge.test.ts` cases and migrate the response-shape assertions into adapter-package unit tests where they belong. `provider-writeback-executor.test.ts` keeps its supported/unsupported path tests, but they now exercise the registry path rather than provider-specific regex literals.
 
 ### Phase 3 — GitHub
 
@@ -352,6 +388,17 @@ Things to notice:
 - **Tests for `interpret()` are pure and fast.** Construct a `WritebackResponse` literal, call `interpret`, assert on the `WritebackOutcome`. No mocking Nango, no pglite db, no HTTP server. Should live in `packages/slack/src/__tests__/writeback-adapter.test.ts`.
 
 A complete Phase 1 also adds a transport-level test in cloud (`tests/relayfile-writeback-bridge.test.ts`) that asserts the bridge correctly dispatches `/slack/...` paths through the registry, but the body-shape assertions move to the adapter package.
+
+## What this spec doesn't fix
+
+Honest scope-limiting so reviewers don't expect the contract to do more than it does.
+
+- **Sync (incoming) is a separate flow with its own per-provider switches.** [cloud#465](https://github.com/AgentWorkforce/cloud/pull/465) wired Notion into `record-writer.ts`'s sync dispatch; Linear has its own there. Adding a provider today touches both writeback and sync. The contract proposed here addresses writeback only. A sister `SyncAdapter` contract (or extending `WritebackAdapter` to a generic `ProviderAdapter`) is plausible follow-on work but is **out of scope for this spec**.
+- **Schema / database surface for new integrations.** Adding a provider also touches: `workspace_integrations` enum/check constraints, Nango `provider_config_key` normalization, auth scope tables, and any provider-listing UI. None of those read from this registry today. The contract could grow a `providerMetadata` field to drive some of them, but the database-migration path is its own work.
+- **Path-mapper / webhook normalizer / sync record routing.** Out of scope per [Non-Goals](#non-goals); just calling out explicitly so it's clear the registry is not a one-stop shop.
+- **Cross-runtime importability is an assumption that needs verification.** The two writeback call sites today run in different deployment targets (Cloudflare Workers and Next.js Lambda). The spec assumes `@relayfile/adapter-protocol` and the per-provider adapter packages can be imported from both — true in theory, but Workers' module-resolution constraints (no Node built-ins, ESM-only, no dynamic require) need a smoke test in Phase 0 before Phase 1 adapters depend on it.
+
+The "two-files-with-the-same-switch" pattern in the [motivating incident](#motivating-incident-linear-writeback-gate-vs-bridge-drift) almost certainly recurs in those other surfaces. Closing them off is its own design work.
 
 ## Open Questions
 
