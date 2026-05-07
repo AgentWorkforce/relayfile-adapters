@@ -4,7 +4,17 @@ import type { NormalizedWebhook } from './zendesk-adapter.js';
 import { normalizeZendeskObjectType } from './path-mapper.js';
 
 export const ZENDESK_PROVIDER = 'zendesk';
-export const ZENDESK_SIGNATURE_256_HEADER = 'X-Zendesk-Webhook-Signature-256';
+/**
+ * Header name as documented by Zendesk's verifying-webhooks reference. The
+ * value is HMAC-SHA256 of (timestamp + raw body) encoded as base64. Despite
+ * the algorithm being SHA-256, Zendesk does NOT include "-256" in the header
+ * name — that mistake produces silent "missing-signature" rejections in
+ * production because the header lookup never matches a real delivery.
+ */
+export const ZENDESK_SIGNATURE_HEADER = 'X-Zendesk-Webhook-Signature';
+
+/** @deprecated Alias for ZENDESK_SIGNATURE_HEADER. The "-256" suffix is not part of the actual Zendesk header name; use ZENDESK_SIGNATURE_HEADER. */
+export const ZENDESK_SIGNATURE_256_HEADER = ZENDESK_SIGNATURE_HEADER;
 export const ZENDESK_SIGNATURE_TIMESTAMP_HEADER = 'X-Zendesk-Webhook-Signature-Timestamp';
 export const ZENDESK_EVENT_HEADER = 'X-Zendesk-Webhook-Event';
 export const ZENDESK_DELIVERY_HEADER = 'X-Zendesk-Webhook-Id';
@@ -183,7 +193,7 @@ export function extractZendeskConnectionMetadata(
   }
 
   const signature =
-    readOptionalString(normalizedHeaders[ZENDESK_SIGNATURE_256_HEADER.toLowerCase()]) ??
+    readOptionalString(normalizedHeaders[ZENDESK_SIGNATURE_HEADER.toLowerCase()]) ??
     readOptionalString(record.signature) ??
     readOptionalString(metadata?.signature) ??
     readOptionalString(webhook?.signature);
@@ -373,7 +383,7 @@ export function validateZendeskWebhookSignature(
 
   const normalizedHeaders = normalizeHeaders(headers);
   const timestamp = normalizedHeaders[ZENDESK_SIGNATURE_TIMESTAMP_HEADER.toLowerCase()];
-  const receivedSignature = readOptionalString(normalizedHeaders[ZENDESK_SIGNATURE_256_HEADER.toLowerCase()]);
+  const receivedSignature = readOptionalString(normalizedHeaders[ZENDESK_SIGNATURE_HEADER.toLowerCase()]);
   if (!receivedSignature) {
     return { ok: false, reason: 'missing-signature', webhookTimestamp: timestampResult.webhookTimestamp };
   }
@@ -512,6 +522,14 @@ function decodeWebhookPayload(rawPayload: unknown): unknown {
 }
 
 function toRawBodyBuffer(rawPayload: unknown): Buffer {
+  // GET/DELETE deliveries can have an empty body. Treat null/undefined as a
+  // zero-length buffer so the HMAC matches what the provider signed; falling
+  // back to JSON.stringify would produce the literal string "undefined" or
+  // "null" and break verification of legitimate empty-body events.
+  if (rawPayload === undefined || rawPayload === null) {
+    return Buffer.alloc(0);
+  }
+
   if (typeof rawPayload === 'string') {
     return Buffer.from(rawPayload, 'utf8');
   }
