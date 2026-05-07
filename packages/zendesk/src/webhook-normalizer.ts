@@ -54,6 +54,7 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, string>> = {
 
 type ZendeskRecord = Record<string, unknown>;
 type HeaderValue = boolean | number | readonly string[] | string | null | undefined;
+export type ZendeskWebhookRawBody = string | Buffer | Uint8Array | ArrayBuffer;
 
 export type ZendeskWebhookHeaders =
   | Headers
@@ -362,11 +363,13 @@ export function validateZendeskWebhookTimestamp(
 }
 
 export function validateZendeskWebhookSignature(
-  rawPayload: unknown,
+  rawPayload: ZendeskWebhookRawBody,
   headers: ZendeskWebhookHeaders,
   secret: string,
   now = Date.now(),
 ): ZendeskWebhookSignatureValidationResult {
+  assertRawZendeskWebhookPayload(rawPayload);
+
   const normalizedSecret = secret.trim();
   if (!normalizedSecret) {
     return { ok: false, reason: 'missing-secret' };
@@ -427,7 +430,7 @@ export function validateZendeskWebhookSignature(
 }
 
 export function assertValidZendeskWebhookSignature(
-  rawPayload: unknown,
+  rawPayload: ZendeskWebhookRawBody,
   headers: ZendeskWebhookHeaders,
   secret: string,
   now = Date.now(),
@@ -703,7 +706,22 @@ function isBase64Digest(value: string): boolean {
   if (value.length === 0 || value.length % 4 !== 0) {
     return false;
   }
-  return /^[0-9a-z+/]+={0,2}$/i.test(value);
+  return /^(?:[0-9A-Za-z+/]{4})*(?:[0-9A-Za-z+/]{2}==|[0-9A-Za-z+/]{3}=)?$/u.test(value);
+}
+
+function assertRawZendeskWebhookPayload(rawPayload: unknown): asserts rawPayload is ZendeskWebhookRawBody {
+  if (
+    typeof rawPayload === 'string' ||
+    Buffer.isBuffer(rawPayload) ||
+    rawPayload instanceof Uint8Array ||
+    rawPayload instanceof ArrayBuffer
+  ) {
+    return;
+  }
+
+  throw new TypeError(
+    'Zendesk webhook signature verification requires the raw request body as a string, Buffer, Uint8Array, or ArrayBuffer.',
+  );
 }
 
 function getRecord(value: unknown): ZendeskRecord | undefined {

@@ -48,28 +48,31 @@ export function resolveReadRequest(path: string): IntercomReadRequest {
 
   const conversationMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\.json$/);
   if (conversationMatch?.[1]) {
+    const conversationId = encodeURIComponent(decodeSegment(conversationMatch[1]));
     return {
       action: 'get_conversation',
       method: 'GET',
-      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${decodeSegment(conversationMatch[1])}`,
+      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationId}`,
     };
   }
 
   const contactMatch = normalizedPath.match(/^\/intercom\/contacts\/([^/]+)\.json$/);
   if (contactMatch?.[1]) {
+    const contactId = encodeURIComponent(decodeSegment(contactMatch[1]));
     return {
       action: 'get_contact',
       method: 'GET',
-      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${decodeSegment(contactMatch[1])}`,
+      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactId}`,
     };
   }
 
   const companyMatch = normalizedPath.match(/^\/intercom\/companies\/([^/]+)\.json$/);
   if (companyMatch?.[1]) {
+    const companyId = encodeURIComponent(decodeSegment(companyMatch[1]));
     return {
       action: 'get_company',
       method: 'GET',
-      endpoint: `${INTERCOM_COMPANIES_ROUTE}/${decodeSegment(companyMatch[1])}`,
+      endpoint: `${INTERCOM_COMPANIES_ROUTE}/${companyId}`,
     };
   }
 

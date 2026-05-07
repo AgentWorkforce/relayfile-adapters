@@ -31,6 +31,50 @@
             "reasoning": "Existing adapter public APIs and tests depend on ID-only paths; optional title/name arguments let ingestion produce readable paths without breaking callers that only know IDs."
           },
           "significance": "high"
+        },
+        {
+          "ts": 1778168967407,
+          "type": "decision",
+          "content": "Address PR #40 comments in existing branch worktree: Address PR #40 comments in existing branch worktree",
+          "raw": {
+            "question": "Address PR #40 comments in existing branch worktree",
+            "chosen": "Address PR #40 comments in existing branch worktree",
+            "alternatives": [],
+            "reasoning": "PR branch feat/tier1-adapters-batch-2 is already checked out in relayfile-adapters-verify2; using that worktree avoids disturbing the main checkout's untracked docs file."
+          },
+          "significance": "high"
+        },
+        {
+          "ts": 1778169632657,
+          "type": "reflection",
+          "content": "Addressed PR #40 CodeRabbit feedback across Asana, ClickUp, Intercom, and Zendesk; focused package tests pass and typecheck is clean. Leaving new package version fields intact because they are newly introduced package manifests rather than feature-PR version bumps of existing packages.",
+          "raw": {
+            "focalPoints": [
+              "review-comments",
+              "validation",
+              "package-versions"
+            ],
+            "confidence": 0.86
+          },
+          "significance": "high",
+          "tags": [
+            "focal:review-comments",
+            "focal:validation",
+            "focal:package-versions",
+            "confidence:0.86"
+          ]
+        },
+        {
+          "ts": 1778169710670,
+          "type": "decision",
+          "content": "Pushed PR #40 review fixes: Pushed PR #40 review fixes",
+          "raw": {
+            "question": "Pushed PR #40 review fixes",
+            "chosen": "Pushed PR #40 review fixes",
+            "alternatives": [],
+            "reasoning": "Focused typecheck, tests, build, diff --check, and publish.yml adapter-list sanity checks passed before pushing commit 251f7c9."
+          },
+          "significance": "high"
         }
       ]
     }

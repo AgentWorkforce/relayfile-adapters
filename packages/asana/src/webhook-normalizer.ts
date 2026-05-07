@@ -567,7 +567,7 @@ function readOptionalString(value: unknown): string | undefined {
 
 function readOptionalTimestamp(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value > 10_000_000_000 ? value : value * 1000;
+    return value < 100_000_000_000 ? value * 1000 : value;
   }
   if (typeof value !== 'string') {
     return undefined;
@@ -576,9 +576,11 @@ function readOptionalTimestamp(value: unknown): number | undefined {
   if (!trimmed) {
     return undefined;
   }
-  const numeric = Number(trimmed);
-  if (Number.isFinite(numeric)) {
-    return numeric > 10_000_000_000 ? numeric : numeric * 1000;
+  if (/^\d+$/u.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) {
+      return trimmed.length <= 10 ? numeric * 1000 : numeric;
+    }
   }
   const parsed = Date.parse(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;

@@ -21,7 +21,7 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
     return {
       action: 'reply_conversation',
       method: 'POST',
-      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${decodeSegment(replyMatch[1])}/reply`,
+      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${replyMatch[1]}/reply`,
       body: parseJsonObject(content),
     };
   }
@@ -32,7 +32,7 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
       action: 'update_conversation',
       // Use PUT for updates to conform with Intercom API expectations
       method: 'PUT',
-      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${decodeSegment(conversationMatch[1])}`,
+      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationMatch[1]}`,
       body: unwrapSyncedEnvelope(content),
     };
   }
@@ -51,7 +51,7 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
     return {
       action: 'update_contact',
       method: 'PUT',
-      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${decodeSegment(contactMatch[1])}`,
+      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactMatch[1]}`,
       body: unwrapSyncedEnvelope(content),
     };
   }
@@ -119,8 +119,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function normalizePath(path: string): string {
   const trimmed = path.trim();
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-}
-
-function decodeSegment(segment: string): string {
-  return decodeURIComponent(segment);
 }

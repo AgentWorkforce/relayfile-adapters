@@ -276,6 +276,11 @@ test('read request resolver maps Intercom paths to GET API routes', () => {
     method: 'GET',
     endpoint: '/contacts/contact_123',
   });
+  assert.deepEqual(resolveReadRequest('/intercom/conversations/conv%201%2F2.json'), {
+    action: 'get_conversation',
+    method: 'GET',
+    endpoint: '/conversations/conv%201%2F2',
+  });
   assert.deepEqual(resolveReadRequest('/intercom/companies/company_123.json'), {
     action: 'get_company',
     method: 'GET',
@@ -290,6 +295,14 @@ test('writeback resolver maps Intercom edit paths to REST mutations', () => {
     endpoint: '/conversations/conv_123/reply',
     body: {
       message_type: 'comment',
+      body: 'Thanks',
+    },
+  });
+  assert.deepEqual(resolveWritebackRequest('/intercom/conversations/conv%201%2F2/reply.json', '{"body":"Thanks"}'), {
+    action: 'reply_conversation',
+    method: 'POST',
+    endpoint: '/conversations/conv%201%2F2/reply',
+    body: {
       body: 'Thanks',
     },
   });

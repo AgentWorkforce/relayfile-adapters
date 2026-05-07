@@ -28,7 +28,7 @@ export interface FileSemantics {
 }
 
 export interface IngestError {
-  path: string;
+  path?: string;
   error: string;
 }
 
@@ -187,17 +187,18 @@ export class ZendeskAdapter extends IntegrationAdapter {
         errors: [],
       };
     } catch (error) {
-      const fallbackPath = inferFallbackPath(event);
+      const fallbackPath = inferFallbackPath(event) || undefined;
+      const ingestError: IngestError = { error: toErrorMessage(error) };
+      if (fallbackPath) {
+        ingestError.path = fallbackPath;
+      }
       return {
         filesWritten: 0,
         filesUpdated: 0,
         filesDeleted: 0,
         paths: fallbackPath ? [fallbackPath] : [],
         errors: [
-          {
-            path: fallbackPath,
-            error: toErrorMessage(error),
-          },
+          ingestError,
         ],
       };
     }
@@ -228,8 +229,7 @@ export class ZendeskAdapter extends IntegrationAdapter {
     const webhook = getRecord(payload._webhook);
     if (webhook) {
       addStringProperty(properties, 'zendesk.webhook.action', webhook.action);
-      addStringProperty(properties, 'zendesk.webhook.created_at', webhook.created_at);
-      addStringProperty(properties, 'zendesk.webhook.created_at', webhook.createdAt);
+      addStringProperty(properties, 'zendesk.webhook.created_at', webhook.created_at ?? webhook.createdAt);
       addStringProperty(properties, 'zendesk.webhook.event_type', webhook.eventType);
       addStringProperty(properties, 'zendesk.webhook.account_id', webhook.accountId);
       addStringProperty(properties, 'zendesk.webhook.subdomain', webhook.subdomain);

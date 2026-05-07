@@ -43,21 +43,8 @@ export function encodeAsanaPathSegment(value: string): string {
   return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
 }
 
-function slugify(value: string): string {
-  return value
-    .replace(/[{}]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-}
-
-function idSuffix(id: string): string {
-  return id.replace(/-/g, '');
-}
-
-function titleSegmentWithId(title: string | undefined, id: string): string {
-  const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${idSuffix(id)}` : encodeAsanaPathSegment(id);
+function titleSegmentWithId(_title: string | undefined, id: string): string {
+  return encodeAsanaPathSegment(id);
 }
 
 export function normalizeAsanaObjectType(objectType: string): AsanaPathObjectType {

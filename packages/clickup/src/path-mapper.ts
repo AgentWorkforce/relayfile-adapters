@@ -43,17 +43,8 @@ export function encodeClickUpPathSegment(value: string): string {
   return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
 }
 
-function slugify(value: string): string {
-  return value
-    .replace(/[{}]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-}
-
-function titleSegmentWithId(title: string | undefined, id: string): string {
-  const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${encodeClickUpPathSegment(id)}` : encodeClickUpPathSegment(id);
+function titleSegmentWithId(_title: string | undefined, id: string): string {
+  return encodeClickUpPathSegment(id);
 }
 
 export function normalizeClickUpObjectType(objectType: string): ClickUpPathObjectType {

@@ -80,9 +80,9 @@ test('ingestWebhook writes normalized ticket callbacks to deterministic paths', 
   const result = await adapter.ingestWebhook('workspace_123', normalized);
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/zendesk/tickets/cannot-log-in--123.json']);
+  assert.deepEqual(result.paths, ['/zendesk/tickets/123.json']);
   assert.equal(captures.length, 1);
-  assert.equal(captures[0]?.path, '/zendesk/tickets/cannot-log-in--123.json');
+  assert.equal(captures[0]?.path, '/zendesk/tickets/123.json');
   assert.equal(captures[0]?.semantics?.properties?.['zendesk.status'], 'open');
   assert.deepEqual(captures[0]?.semantics?.relations, [
     '/zendesk/organizations/789.json',
@@ -180,16 +180,16 @@ test('computeSemantics extracts ticket fields, comments, tags, and relations det
 test('path mapping stays deterministic for supported Zendesk VFS objects', () => {
   const adapter = createAdapter();
 
-  assert.equal(zendeskTicketPath('123', 'Cannot log in'), '/zendesk/tickets/cannot-log-in--123.json');
+  assert.equal(zendeskTicketPath('123', 'Cannot log in'), '/zendesk/tickets/123.json');
   assert.equal(zendeskTicketPath('ticket 1/2'), '/zendesk/tickets/ticket%201%2F2.json');
   assert.equal(zendeskUserPath('user@example.com'), '/zendesk/users/user%40example.com.json');
   assert.equal(zendeskOrganizationPath('org#7'), '/zendesk/organizations/org%237.json');
 
-  assert.equal(computeZendeskPath('Ticket', '123', 'Cannot log in'), '/zendesk/tickets/cannot-log-in--123.json');
+  assert.equal(computeZendeskPath('Ticket', '123', 'Cannot log in'), '/zendesk/tickets/123.json');
   assert.equal(computeZendeskPath('users', '456'), '/zendesk/users/456.json');
   assert.equal(computeZendeskPath('organizations', '789'), '/zendesk/organizations/789.json');
 
-  assert.equal(adapter.computePath('ticket', '123', 'Cannot log in'), '/zendesk/tickets/cannot-log-in--123.json');
+  assert.equal(adapter.computePath('ticket', '123', 'Cannot log in'), '/zendesk/tickets/123.json');
   assert.equal(adapter.computePath('user', '456'), '/zendesk/users/456.json');
   assert.equal(adapter.computePath('organization', '789'), '/zendesk/organizations/789.json');
 });

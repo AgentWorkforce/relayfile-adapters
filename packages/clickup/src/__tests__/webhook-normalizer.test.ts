@@ -98,3 +98,15 @@ test('validateClickUpWebhookTimestamp rejects expired timestamps', () => {
   assert.equal(stale.ok, false);
   assert.equal(stale.reason, 'stale-timestamp');
 });
+
+test('validateClickUpWebhookTimestamp accepts headers passed as entry arrays', () => {
+  const fresh = validateClickUpWebhookTimestamp(
+    [[CLICKUP_TIMESTAMP_HEADER, '1743155400000']],
+    {},
+    60_000,
+    1_743_155_401_000,
+  );
+
+  assert.equal(fresh.ok, true);
+  assert.equal(fresh.webhookTimestamp, 1_743_155_400_000);
+});

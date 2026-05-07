@@ -137,11 +137,7 @@ export class ClickUpAdapter extends IntegrationAdapter {
   ): Promise<IngestResult> {
     try {
       const normalized = this.normalizeEvent(event);
-      const path = computeClickUpPath(
-        normalized.objectType,
-        normalized.objectId,
-        readDisplayName(normalized.objectType, normalized.payload),
-      );
+      const path = computeClickUpPath(normalized.objectType, normalized.objectId);
 
       if (this.isDeleteEvent(normalized)) {
         if (this.client.deleteFile) {
@@ -569,17 +565,6 @@ function applySpaceSemantics(
   }
   if (space.archived === true) {
     permissions.add('state:archived');
-  }
-}
-
-function readDisplayName(objectType: string, payload: Record<string, unknown>): string | undefined {
-  const normalized = normalizeClickUpObjectType(objectType);
-  switch (normalized) {
-    case 'folder':
-    case 'list':
-    case 'space':
-    case 'task':
-      return asString(payload.name);
   }
 }
 

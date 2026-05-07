@@ -113,6 +113,36 @@ test('validateZendeskWebhookSignature rejects a missing signature header', () =>
   });
 });
 
+test('validateZendeskWebhookSignature rejects parsed payloads and malformed base64', () => {
+  const parsedPayload = JSON.parse(rawTicketPayload) as never;
+
+  assert.throws(
+    () => validateZendeskWebhookSignature(
+      parsedPayload,
+      {
+        [ZENDESK_SIGNATURE_256_HEADER]: knownGoodSignature,
+        [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
+      },
+      secret,
+      Number(timestamp) + 30_000,
+    ),
+    /raw request body/,
+  );
+
+  const malformed = validateZendeskWebhookSignature(
+    rawTicketPayload,
+    {
+      [ZENDESK_SIGNATURE_256_HEADER]: 'a=bc',
+      [ZENDESK_SIGNATURE_TIMESTAMP_HEADER]: timestamp,
+    },
+    secret,
+    Number(timestamp) + 30_000,
+  );
+
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.reason, 'malformed-signature');
+});
+
 test('validateZendeskWebhookSignature rejects expired timestamps', () => {
   const expired = validateZendeskWebhookSignature(
     rawTicketPayload,

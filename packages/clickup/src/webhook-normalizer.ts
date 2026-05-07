@@ -415,7 +415,11 @@ export function validateClickUpWebhookTimestamp(
   toleranceMs = 300_000,
   now = Date.now(),
 ): ClickUpWebhookTimestampValidationResult {
-  const metadata = extractClickUpConnectionMetadata(payloadOrHeaders, headers);
+  const headersOnly = isHeadersLike(payloadOrHeaders) && isEmptyHeaders(headers);
+  const metadata = extractClickUpConnectionMetadata(
+    headersOnly ? {} : payloadOrHeaders,
+    headersOnly ? (payloadOrHeaders as ClickUpWebhookHeaders) : headers,
+  );
   if (metadata.webhookTimestamp === undefined) {
     return { ok: false, reason: 'missing-timestamp' };
   }
@@ -706,7 +710,31 @@ function isIterableEntries(value: unknown): value is Iterable<readonly [string, 
     typeof value === 'object' &&
     value !== null &&
     Symbol.iterator in value &&
-    !(typeof Headers !== 'undefined' && value instanceof Headers) &&
-    !Array.isArray(value)
+    !(typeof Headers !== 'undefined' && value instanceof Headers)
   );
+}
+
+function isHeadersLike(value: unknown): value is ClickUpWebhookHeaders {
+  if (typeof Headers !== 'undefined' && value instanceof Headers) {
+    return true;
+  }
+  if (isIterableEntries(value)) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value).map((key) => key.toLowerCase());
+  return keys.some((key) => (
+    key === CLICKUP_SIGNATURE_HEADER ||
+    key === CLICKUP_EVENT_HEADER ||
+    key === CLICKUP_DELIVERY_HEADER ||
+    key === CLICKUP_TIMESTAMP_HEADER ||
+    key.startsWith('x-clickup-')
+  ));
+}
+
+function isEmptyHeaders(headers: ClickUpWebhookHeaders): boolean {
+  return Object.keys(normalizeHeaders(headers)).length === 0;
 }

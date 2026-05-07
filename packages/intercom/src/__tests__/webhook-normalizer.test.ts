@@ -122,3 +122,12 @@ test('validateIntercomWebhookTimestamp rejects expired timestamps when supplied'
   assert.equal(stale.ok, false);
   assert.equal(stale.reason, 'stale-timestamp');
 });
+
+test('validateIntercomWebhookTimestamp does not treat a single custom x-field as headers', () => {
+  const result = validateIntercomWebhookTimestamp({
+    timestamp: '1746600000',
+    'x-custom-field': '1746600000',
+  }, 60_000, 1_746_600_030_000);
+
+  assert.equal(result.ok, true);
+});

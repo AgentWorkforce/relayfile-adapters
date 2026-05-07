@@ -57,7 +57,7 @@ export function resolveWritebackRequest(path: string, content: string): ClickUpW
 
 function buildTaskComment(taskId: string, content: string): ClickUpWritebackRequest {
   const parsed = safeParseJson(content);
-  const body = typeof parsed === 'string' ? parsed : readString(parseRecord(parsed), 'comment_text');
+  const body = typeof parsed === 'string' ? parsed.trim() : readString(parseRecord(parsed), 'comment_text');
   if (!body) {
     throw new Error('comments/new.json writeback requires a non-empty comment_text or plain string body');
   }

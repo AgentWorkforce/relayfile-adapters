@@ -136,55 +136,25 @@ export class AsanaAdapter extends IntegrationAdapter {
     event: NormalizedWebhook | AsanaWebhookPayload,
   ): Promise<IngestResult> {
     try {
-      const normalized = this.normalizeEvent(event);
-      const name = readObjectName(normalized.payload);
-      const path = computeAsanaPath(normalized.objectType, normalized.objectId, name);
-      const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
-
-      if (this.isDeleteEvent(normalized)) {
-        if (this.client.deleteFile) {
-          await this.client.deleteFile({ workspaceId, path });
-          return {
-            filesWritten: 0,
-            filesUpdated: 0,
-            filesDeleted: 1,
-            paths: [path],
-            errors: [],
-          };
-        }
-
-        const deleteResult = await this.client.writeFile({
-          workspaceId,
-          path,
-          content: this.renderContent(workspaceId, normalized, true),
-          contentType: JSON_CONTENT_TYPE,
-          semantics,
-        });
-        const counts = inferWriteCounts(deleteResult, true);
-        return {
-          filesWritten: counts.filesWritten,
-          filesUpdated: counts.filesUpdated,
-          filesDeleted: counts.filesDeleted,
-          paths: [path],
-          errors: [],
-        };
-      }
-
-      const writeResult = await this.client.writeFile({
-        workspaceId,
-        path,
-        content: this.renderContent(workspaceId, normalized, false),
-        contentType: JSON_CONTENT_TYPE,
-        semantics,
-      });
-      const counts = inferWriteCounts(writeResult, false);
-      return {
-        filesWritten: counts.filesWritten,
-        filesUpdated: counts.filesUpdated,
+      const normalizedEvents = this.normalizeEvents(event);
+      const result: IngestResult = {
+        filesWritten: 0,
+        filesUpdated: 0,
         filesDeleted: 0,
-        paths: [path],
+        paths: [],
         errors: [],
       };
+
+      for (const normalized of normalizedEvents) {
+        const eventResult = await this.ingestNormalizedEvent(workspaceId, normalized);
+        result.filesWritten += eventResult.filesWritten;
+        result.filesUpdated += eventResult.filesUpdated;
+        result.filesDeleted += eventResult.filesDeleted;
+        result.paths.push(...eventResult.paths);
+        result.errors.push(...eventResult.errors);
+      }
+
+      return result;
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
       return {
@@ -200,6 +170,57 @@ export class AsanaAdapter extends IntegrationAdapter {
         ],
       };
     }
+  }
+
+  private async ingestNormalizedEvent(workspaceId: string, normalized: NormalizedWebhook): Promise<IngestResult> {
+    const name = readObjectName(normalized.payload);
+    const path = computeAsanaPath(normalized.objectType, normalized.objectId, name);
+    const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
+
+    if (this.isDeleteEvent(normalized)) {
+      if (this.client.deleteFile) {
+        await this.client.deleteFile({ workspaceId, path });
+        return {
+          filesWritten: 0,
+          filesUpdated: 0,
+          filesDeleted: 1,
+          paths: [path],
+          errors: [],
+        };
+      }
+
+      const deleteResult = await this.client.writeFile({
+        workspaceId,
+        path,
+        content: this.renderContent(workspaceId, normalized, true),
+        contentType: JSON_CONTENT_TYPE,
+        semantics,
+      });
+      const counts = inferWriteCounts(deleteResult, true);
+      return {
+        filesWritten: counts.filesWritten,
+        filesUpdated: counts.filesUpdated,
+        filesDeleted: counts.filesDeleted,
+        paths: [path],
+        errors: [],
+      };
+    }
+
+    const writeResult = await this.client.writeFile({
+      workspaceId,
+      path,
+      content: this.renderContent(workspaceId, normalized, false),
+      contentType: JSON_CONTENT_TYPE,
+      semantics,
+    });
+    const counts = inferWriteCounts(writeResult, false);
+    return {
+      filesWritten: counts.filesWritten,
+      filesUpdated: counts.filesUpdated,
+      filesDeleted: 0,
+      paths: [path],
+      errors: [],
+    };
   }
 
   override computePath(objectType: string, objectId: string, name?: string): string {
@@ -260,7 +281,7 @@ export class AsanaAdapter extends IntegrationAdapter {
     return compactSemantics(semantics);
   }
 
-  private normalizeEvent(event: NormalizedWebhook | AsanaWebhookPayload): NormalizedWebhook {
+  private normalizeEvents(event: NormalizedWebhook | AsanaWebhookPayload): NormalizedWebhook[] {
     if (isNormalizedWebhook(event)) {
       const normalized: NormalizedWebhook = {
         provider: event.provider || this.config.provider || ASANA_PROVIDER_NAME,
@@ -273,38 +294,46 @@ export class AsanaAdapter extends IntegrationAdapter {
       if (connectionId) {
         normalized.connectionId = connectionId;
       }
-      return normalized;
+      return [normalized];
     }
 
-    const firstEvent = event.events.find(isRecord);
-    if (!firstEvent) {
-      throw new Error('Asana webhook payload is missing events[0]');
+    const eventItems = event.events.filter(isRecord);
+    if (eventItems.length === 0) {
+      throw new Error('Asana webhook payload is missing events');
     }
 
-    const resource = getRecord(firstEvent.resource);
-    const objectType = normalizeAsanaObjectType(
-      asString(resource?.resource_type) ?? asString(firstEvent.type) ?? 'task',
-    );
-    const objectId = asString(resource?.gid) ?? asString(firstEvent.gid);
-    if (!objectId) {
-      throw new Error(`Asana ${objectType} webhook is missing resource.gid`);
+    const normalizedEvents: NormalizedWebhook[] = [];
+    for (const eventItem of eventItems) {
+      const resource = getRecord(eventItem.resource);
+      const objectType = normalizeAsanaObjectType(
+        asString(resource?.resource_type) ?? asString(eventItem.type) ?? 'task',
+      );
+      const objectId = asString(resource?.gid) ?? asString(eventItem.gid);
+      if (!objectId) {
+        continue;
+      }
+
+      const action = normalizeAction(
+        asString(eventItem.action) ?? asString(getRecord(eventItem.change)?.action) ?? 'changed',
+      );
+      const payload = mergeAsanaPayload(event, eventItem, objectType, objectId, action);
+      const normalized: NormalizedWebhook = {
+        provider: this.config.provider || ASANA_PROVIDER_NAME,
+        eventType: `${objectType}.${action}`,
+        objectType,
+        objectId,
+        payload,
+      };
+      if (this.config.connectionId) {
+        normalized.connectionId = this.config.connectionId;
+      }
+      normalizedEvents.push(normalized);
     }
 
-    const action = normalizeAction(
-      asString(firstEvent.action) ?? asString(getRecord(firstEvent.change)?.action) ?? 'changed',
-    );
-    const payload = mergeAsanaPayload(event, firstEvent, objectType, objectId, action);
-    const normalized: NormalizedWebhook = {
-      provider: this.config.provider || ASANA_PROVIDER_NAME,
-      eventType: `${objectType}.${action}`,
-      objectType,
-      objectId,
-      payload,
-    };
-    if (this.config.connectionId) {
-      normalized.connectionId = this.config.connectionId;
+    if (normalizedEvents.length === 0) {
+      throw new Error('Asana webhook payload is missing resource.gid');
     }
-    return normalized;
+    return normalizedEvents;
   }
 
   private isDeleteEvent(event: NormalizedWebhook): boolean {

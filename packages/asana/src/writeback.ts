@@ -211,7 +211,7 @@ function buildSectionUpdate(sectionId: string, content: string): AsanaWritebackR
 }
 
 function buildAddTaskToProject(taskId: string, projectId: string, content: string): AsanaWritebackRequest {
-  const payload = parseJsonObjectOrEmpty(content);
+  const payload = unwrapEnvelope(parseJsonObjectOrEmpty(content));
   const data: Record<string, unknown> = { project: projectId };
   copyString(payload, data, 'section');
   copyString(payload, data, 'insert_before');

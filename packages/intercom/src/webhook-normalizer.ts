@@ -36,6 +36,17 @@ const REQUEST_ID_HEADER_KEYS = [
   'x-relay-request-id',
 ] as const;
 
+const WELL_KNOWN_INTERCOM_HEADERS = new Set([
+  INTERCOM_SIGNATURE_HEADER,
+  INTERCOM_TIMESTAMP_HEADER,
+  INTERCOM_DELIVERY_HEADER,
+  INTERCOM_TOPIC_HEADER,
+  'x-intercom-signature',
+  'x-intercom-timestamp',
+  'x-hook-secret',
+  'x-intercom-event-name',
+]);
+
 type IntercomRecord = Record<string, unknown>;
 type HeaderValue = boolean | number | readonly string[] | string | null | undefined;
 
@@ -570,7 +581,9 @@ function isHeadersLike(value: unknown): boolean {
   if (!isRecord(value)) {
     return false;
   }
-  return Object.keys(value).some((key) => key.toLowerCase().startsWith('x-'));
+  const keys = Object.keys(value).map((key) => key.toLowerCase());
+  return keys.some((key) => WELL_KNOWN_INTERCOM_HEADERS.has(key)) ||
+    keys.filter((key) => key.startsWith('x-')).length >= 2;
 }
 
 function decodeWebhookPayload(rawPayload: unknown): unknown {

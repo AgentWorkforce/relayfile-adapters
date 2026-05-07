@@ -92,13 +92,13 @@ test('ingestWebhook writes task events with deterministic content and semantics'
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/asana/tasks/ship-asana-adapter--12001.json']);
-  assert.equal(writes[0]?.path, '/asana/tasks/ship-asana-adapter--12001.json');
+  assert.deepEqual(result.paths, ['/asana/tasks/12001.json']);
+  assert.equal(writes[0]?.path, '/asana/tasks/12001.json');
   assert.equal(writes[0]?.semantics?.properties?.['asana.assignee_name'], 'Ada');
   assert.deepEqual(writes[0]?.semantics?.relations, [
-    '/asana/projects/adapters--project_1.json',
-    '/asana/sections/in-progress--section_1.json',
-    '/asana/workspaces/engineering--workspace_1.json',
+    '/asana/projects/project_1.json',
+    '/asana/sections/section_1.json',
+    '/asana/workspaces/workspace_1.json',
   ]);
   assert.deepEqual(writes[0]?.semantics?.comments, ['Implementation notes']);
 });
@@ -123,9 +123,9 @@ test('ingestWebhook writes project events and extracts project relations', async
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/asana/projects/adapters--project_1.json']);
+  assert.deepEqual(result.paths, ['/asana/projects/project_1.json']);
   assert.equal(writes[0]?.semantics?.properties?.['asana.status_title'], 'On track');
-  assert.deepEqual(writes[0]?.semantics?.relations, ['/asana/workspaces/engineering--workspace_1.json']);
+  assert.deepEqual(writes[0]?.semantics?.relations, ['/asana/workspaces/workspace_1.json']);
 });
 
 test('ingestWebhook writes section events and extracts parent project relation', async () => {
@@ -145,8 +145,8 @@ test('ingestWebhook writes section events and extracts parent project relation',
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/asana/sections/backlog--section_1.json']);
-  assert.deepEqual(writes[0]?.semantics?.relations, ['/asana/projects/adapters--project_1.json']);
+  assert.deepEqual(result.paths, ['/asana/sections/section_1.json']);
+  assert.deepEqual(writes[0]?.semantics?.relations, ['/asana/projects/project_1.json']);
 });
 
 test('ingestWebhook writes workspace events and extracts organization fields', async () => {
@@ -167,9 +167,32 @@ test('ingestWebhook writes workspace events and extracts organization fields', a
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/asana/workspaces/engineering--workspace_1.json']);
+  assert.deepEqual(result.paths, ['/asana/workspaces/workspace_1.json']);
   assert.equal(writes[0]?.semantics?.properties?.['asana.email_domain_count'], '2');
   assert.equal(writes[0]?.semantics?.properties?.['asana.is_organization'], 'true');
+});
+
+test('ingestWebhook writes every event from raw Asana webhook batches', async () => {
+  const writes: WriteFileInput[] = [];
+  const adapter = createAdapter({ connectionId: 'conn_asana_123' }, writes);
+
+  const result = await adapter.ingestWebhook('ws_relay', {
+    events: [
+      {
+        action: 'changed',
+        resource: { gid: 'task_1', name: 'Task one', resource_type: 'task' },
+      },
+      {
+        action: 'added',
+        resource: { gid: 'project_1', name: 'Project one', resource_type: 'project' },
+      },
+    ],
+  });
+
+  assert.equal(result.filesWritten, 2);
+  assert.deepEqual(result.paths, ['/asana/tasks/task_1.json', '/asana/projects/project_1.json']);
+  assert.deepEqual(writes.map((write) => write.path), result.paths);
+  assert.equal(JSON.parse(writes[0]?.content ?? '{}').connectionId, 'conn_asana_123');
 });
 
 test('computeSemantics extracts task custom fields and path relations deterministically', () => {
@@ -201,7 +224,7 @@ test('computeSemantics extracts task custom fields and path relations determinis
     '/asana/projects/project_b.json',
     '/asana/sections/section_a.json',
     '/asana/sections/section_b.json',
-    '/asana/tasks/launch--task_parent.json',
+    '/asana/tasks/task_parent.json',
   ]);
 });
 
@@ -212,8 +235,8 @@ test('path mapper, read routes, and writeback routes cover primary Asana objects
   assert.equal(asanaProjectPath('project#7'), '/asana/projects/project%237.json');
   assert.equal(asanaSectionPath('section:42'), '/asana/sections/section%3A42.json');
   assert.equal(asanaWorkspacePath('workspace alpha'), '/asana/workspaces/workspace%20alpha.json');
-  assert.equal(computeAsanaPath('Tasks', '12001', 'Ship adapter'), '/asana/tasks/ship-adapter--12001.json');
-  assert.equal(adapter.computePath('projects', 'project_1', 'Adapters'), '/asana/projects/adapters--project_1.json');
+  assert.equal(computeAsanaPath('Tasks', '12001', 'Ship adapter'), '/asana/tasks/12001.json');
+  assert.equal(adapter.computePath('projects', 'project_1', 'Adapters'), '/asana/projects/project_1.json');
 
   assert.deepEqual(resolveAsanaReadRequest('/asana/tasks/ship--12001.json').endpoint, '/api/1.0/tasks/12001');
   assert.deepEqual(resolveAsanaReadRequest('/asana/projects/adapters--project_1.json').endpoint, '/api/1.0/projects/project_1');

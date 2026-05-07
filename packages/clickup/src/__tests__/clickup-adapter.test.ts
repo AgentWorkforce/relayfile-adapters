@@ -88,13 +88,13 @@ test('ingestWebhook writes task payloads with semantics and deterministic path',
   const result = await adapter.ingestWebhook('workspace_1', normalized);
 
   assert.equal(result.filesWritten, 1);
-  assert.equal(client.writes[0]?.path, '/clickup/tasks/ship-clickup-adapter--task_123.json');
+  assert.equal(client.writes[0]?.path, '/clickup/tasks/task_123.json');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status'], 'in progress');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.priority'], 'high');
   assert.deepEqual(client.writes[0]?.semantics?.relations, [
-    '/clickup/folders/platform--folder_123.json',
-    '/clickup/lists/adapters--list_123.json',
-    '/clickup/spaces/engineering--space_123.json',
+    '/clickup/folders/folder_123.json',
+    '/clickup/lists/list_123.json',
+    '/clickup/spaces/space_123.json',
     'clickup:tag:adapter',
   ]);
 });
@@ -117,7 +117,7 @@ test('ingestWebhook writes list payloads', async () => {
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.equal(client.writes[0]?.path, '/clickup/lists/adapter-qa--list_123.json');
+  assert.equal(client.writes[0]?.path, '/clickup/lists/list_123.json');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.task_count'], '4');
 });
 
@@ -136,7 +136,7 @@ test('ingestWebhook writes space payloads', async () => {
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.equal(client.writes[0]?.path, '/clickup/spaces/engineering--space_123.json');
+  assert.equal(client.writes[0]?.path, '/clickup/spaces/space_123.json');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status_count'], '2');
   assert.deepEqual(client.writes[0]?.semantics?.permissions, ['scope:private']);
 });
@@ -157,7 +157,7 @@ test('ingestWebhook writes folder payloads', async () => {
   });
 
   assert.equal(result.filesWritten, 1);
-  assert.equal(client.writes[0]?.path, '/clickup/folders/platform--folder_123.json');
+  assert.equal(client.writes[0]?.path, '/clickup/folders/folder_123.json');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.list_count'], '2');
   assert.deepEqual(client.writes[0]?.semantics?.permissions, ['visibility:hidden']);
 });
@@ -189,17 +189,22 @@ test('computeSemantics extracts task relations, assignees, and custom fields', (
 test('path mapper, read resolver, and writeback resolver cover ClickUp task and list routes', () => {
   const { adapter } = createAdapter();
 
-  assert.equal(clickUpTaskPath('task 1/2', 'Fix prod bug'), '/clickup/tasks/fix-prod-bug--task%201%2F2.json');
-  assert.equal(clickUpListPath('list:42', 'Sprint Backlog'), '/clickup/lists/sprint-backlog--list%3A42.json');
-  assert.equal(clickUpFolderPath('folder#7', 'Product Area'), '/clickup/folders/product-area--folder%237.json');
-  assert.equal(clickUpSpacePath('space 9', 'Engineering'), '/clickup/spaces/engineering--space%209.json');
-  assert.equal(computeClickUpPath('Tasks', 'task_123', 'Hello World'), '/clickup/tasks/hello-world--task_123.json');
+  assert.equal(clickUpTaskPath('task 1/2', 'Fix prod bug'), '/clickup/tasks/task%201%2F2.json');
+  assert.equal(clickUpListPath('list:42', 'Sprint Backlog'), '/clickup/lists/list%3A42.json');
+  assert.equal(clickUpFolderPath('folder#7', 'Product Area'), '/clickup/folders/folder%237.json');
+  assert.equal(clickUpSpacePath('space 9', 'Engineering'), '/clickup/spaces/space%209.json');
+  assert.equal(computeClickUpPath('Tasks', 'task_123', 'Hello World'), '/clickup/tasks/task_123.json');
   assert.equal(adapter.computePath('list', 'list_123'), '/clickup/lists/list_123.json');
 
   assert.deepEqual(resolveReadRequest('/clickup/tasks/hello-world--task_123.json'), {
     action: 'get_task',
     method: 'GET',
     endpoint: '/api/v2/task/task_123',
+  });
+  assert.deepEqual(resolveReadRequest('/clickup/tasks/task%201%2F2.json'), {
+    action: 'get_task',
+    method: 'GET',
+    endpoint: '/api/v2/task/task%201%2F2',
   });
   assert.deepEqual(resolveReadRequest('/clickup/lists/list_123/tasks.json'), {
     action: 'list_tasks',
@@ -216,4 +221,8 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
     endpoint: '/api/v2/list/list_123/task',
     body: { name: 'New task' },
   });
+  assert.throws(
+    () => resolveWritebackRequest('/clickup/tasks/task_123/comments/new.json', '   '),
+    /non-empty comment_text/,
+  );
 });
