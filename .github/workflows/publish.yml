@@ -20,6 +20,10 @@ on:
           - salesforce
           - pipedrive
           - jira
+          - asana
+          - clickup
+          - intercom
+          - zendesk
         default: "all"
       version:
         description: "Version bump type"
@@ -84,7 +88,7 @@ jobs:
             # Keep this list in sync with the `package` input options above and
             # the directories under packages/. See AGENTS.md → "Adding a new
             # adapter package" for the checklist that gates new entries here.
-            echo "packages=core github gitlab teams slack linear notion hubspot salesforce pipedrive jira" >> "$GITHUB_OUTPUT"
+            echo "packages=core github gitlab teams slack linear notion hubspot salesforce pipedrive jira asana clickup intercom zendesk" >> "$GITHUB_OUTPUT"
           else
             echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
           fi
