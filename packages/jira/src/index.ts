@@ -44,3 +44,5 @@ export {
   resolveJiraWritebackRequest,
 } from './writeback.js';
 export type * from './types.js';
+
+export * from './resources.js';

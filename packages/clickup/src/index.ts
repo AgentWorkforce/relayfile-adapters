@@ -87,3 +87,5 @@ export type {
   JsonValue,
 } from './types.js';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
+
+export * from './resources.js';

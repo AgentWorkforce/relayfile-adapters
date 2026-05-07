@@ -4,29 +4,29 @@ import type { JsonValue, LinearWritebackRequest } from './types.js';
  * Resolve a relayfile writeback into a Linear GraphQL mutation request.
  *
  * Supported routes (today):
- *   POST /linear/issues/<slug>--<uuid>/comments/new.json   → commentCreate
- *   POST /linear/issues/new.json                            → issueCreate
- *   PATCH/PUT /linear/issues/<slug>--<uuid>.json            → issueUpdate
+ *   POST /linear/issues/<slug>--<uuid>/comments/<draft>.json → commentCreate
+ *   POST /linear/issues/<draft>.json                         → issueCreate
+ *   PATCH/PUT /linear/issues/<slug>--<uuid>.json             → issueUpdate
  *
  * The path-mapper emits issue paths as `<slug>--<32-hex>`. We reverse the
  * suffix to recover the canonical UUID Linear's API requires.
  */
 export function resolveWritebackRequest(path: string, content: string): LinearWritebackRequest {
   // Comment on an existing issue.
-  const newCommentMatch = path.match(/^\/linear\/issues\/([^/]+)\/comments\/new\.json$/);
-  if (newCommentMatch?.[1]) {
+  const newCommentMatch = path.match(/^\/linear\/issues\/([^/]+)\/comments\/([^/]+)\.json$/);
+  if (newCommentMatch?.[1] && newCommentMatch[2] && !isCanonicalLinearIdSegment(newCommentMatch[2])) {
     return buildCommentCreate(extractLinearId(newCommentMatch[1]), content);
   }
 
-  // Create a brand-new issue.
-  if (path === '/linear/issues/new.json' || path === '/linear/issues/') {
+  // Create a brand-new issue from any non-canonical filename.
+  const issueFileMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
+  if (issueFileMatch?.[1] && !isCanonicalLinearIdSegment(issueFileMatch[1])) {
     return buildIssueCreate(content);
   }
 
   // Update an existing issue's metadata.
-  const issueUpdateMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
-  if (issueUpdateMatch?.[1]) {
-    return buildIssueUpdate(extractLinearId(issueUpdateMatch[1]), content);
+  if (issueFileMatch?.[1]) {
+    return buildIssueUpdate(extractLinearId(issueFileMatch[1]), content);
   }
 
   throw new Error(`No Linear writeback rule matched ${path}`);
@@ -75,6 +75,15 @@ function extractLinearId(segment: string): string {
 
   // Canonical UUIDs and synthetic test ids fall through.
   return decoded;
+}
+
+function isCanonicalLinearIdSegment(segment: string): boolean {
+  const decoded = decodeURIComponent(segment);
+  return (
+    /--[0-9a-f]{32}$/i.test(decoded) ||
+    /^[0-9a-f]{32}$/i.test(decoded) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded)
+  );
 }
 
 /**
@@ -138,13 +147,13 @@ function buildCommentCreate(issueId: string, content: string): LinearWritebackRe
   // JSON object: pull body + optional parentId, doNotSubscribeToIssue, etc.
   if (!isRecord(parsed)) {
     throw new Error(
-      'comments/new.json writeback expects a JSON object or plain string',
+      'comments/<draft>.json writeback expects a JSON object or plain string',
     );
   }
 
   const body = readString(parsed, 'body');
   if (!body) {
-    throw new Error('comments/new.json writeback requires a non-empty `body`');
+    throw new Error('comments/<draft>.json writeback requires a non-empty `body`');
   }
 
   const input: Record<string, unknown> = { issueId, body };
@@ -169,13 +178,14 @@ function buildCommentCreate(issueId: string, content: string): LinearWritebackRe
  */
 function buildIssueCreate(content: string): LinearWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const teamId = readString(payload, 'teamId');
   if (!teamId) {
-    throw new Error('issues/new.json writeback requires a `teamId`');
+    throw new Error('issues/<draft>.json writeback requires a `teamId`');
   }
   const title = readString(payload, 'title');
   if (!title) {
-    throw new Error('issues/new.json writeback requires a `title`');
+    throw new Error('issues/<draft>.json writeback requires a `title`');
   }
 
   const input: Record<string, unknown> = { teamId, title };
@@ -218,6 +228,30 @@ function buildIssueCreate(content: string): LinearWritebackRequest {
  * would reject the request.
  */
 const ENVELOPE_MARKER_KEYS = ['provider', 'objectType', 'objectId', 'workspaceId'] as const;
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'identifier',
+  'url',
+  'createdAt',
+  'updatedAt',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+export class ReadOnlyFieldError extends Error {
+  readonly field: string;
+
+  constructor(field: string) {
+    super(`Field "${field}" is read-only and cannot be written`);
+    this.name = 'ReadOnlyFieldError';
+    this.field = field;
+  }
+}
 
 function looksLikeSyncedEnvelope(payload: Record<string, unknown>): boolean {
   if (!isRecord(payload.payload)) return false;
@@ -273,9 +307,11 @@ const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
  */
 function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequest {
   const parsed = parseJsonObject(content);
+  rejectReadOnlyFields(parsed);
   const source = looksLikeSyncedEnvelope(parsed)
     ? (parsed.payload as Record<string, unknown>)
     : parsed;
+  rejectReadOnlyFields(source);
 
   const input: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
@@ -295,6 +331,14 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
     endpoint: '/graphql',
     body: { query: ISSUE_UPDATE_MUTATION, variables: { id: issueId, input } },
   };
+}
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *

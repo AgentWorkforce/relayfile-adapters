@@ -19,6 +19,7 @@
     "src/index.ts",
     "src/config.ts",
     "src/types.ts",
+    "src/resources.ts",
     "src/writeback.ts",
     "src/webhook/event-map.ts"
   ],

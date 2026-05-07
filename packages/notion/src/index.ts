@@ -34,3 +34,5 @@ export type {
   NotionSearchOptions,
 } from './queries.js';
 export * from './writeback.js';
+
+export * from './resources.js';

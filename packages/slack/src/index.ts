@@ -99,3 +99,5 @@ export type {
   SlackUrlVerificationEnvelope,
   SlackWritebackRequest,
 } from './types.js';
+
+export * from './resources.js';

@@ -184,14 +184,15 @@ diff \
 
 ### Adapter writeback discovery is required
 
-Every adapter write endpoint that exposes a `new.json` template must also ship two sibling artifacts in the adapter discovery tree:
+Every adapter resource that supports writeback must declare file-native writeback metadata:
 
-1. `new.schema.json` — JSON Schema draft 2020-12 for the accepted write document.
-2. `new.example.json` — a minimal valid example document.
+1. `src/resources.ts` entry with a resource path, schema path, create example path, and `idPattern` regex.
+2. `.schema.json` — JSON Schema draft 2020-12 for the full synced record shape, not only the create payload.
+3. `.create.example.json` — a minimal valid create document that omits read-only fields.
 
-Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, write endpoint table, and short agent usage flow. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, required vs optional fields must be explicit, and provider enum values must be represented as `enum` values.
+Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, resource table, operation table, and ID pattern section. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, create-time required fields must be explicit, provider enum values must be represented as `enum` values, and server-managed fields such as `id`, `createdAt`, `updatedAt`, `url`, `_webhook`, and `_connection` must use `"readOnly": true`.
 
-When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
+New resources must not introduce a magic `new.json` create path. Creates happen by writing a valid JSON document to any non-canonical filename in the resource directory; edits happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`. When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
 
 <!-- PRPM_MANIFEST_START -->
 
