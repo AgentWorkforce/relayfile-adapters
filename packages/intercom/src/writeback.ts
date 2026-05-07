@@ -30,7 +30,8 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
   if (conversationMatch?.[1]) {
     return {
       action: 'update_conversation',
-      method: 'PATCH',
+      // Use PUT for updates to conform with Intercom API expectations
+      method: 'PUT',
       endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${decodeSegment(conversationMatch[1])}`,
       body: unwrapSyncedEnvelope(content),
     };
@@ -68,8 +69,9 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
   if (companyMatch?.[1]) {
     return {
       action: 'update_company',
-      method: 'PUT',
-      endpoint: `${INTERCOM_COMPANIES_ROUTE}/${decodeSegment(companyMatch[1])}`,
+      // Upsert of a company is performed via POST /companies keyed by company_id
+      method: 'POST',
+      endpoint: `${INTERCOM_COMPANIES_ROUTE}`,
       body: unwrapSyncedEnvelope(content),
     };
   }
