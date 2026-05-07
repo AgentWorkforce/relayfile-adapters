@@ -120,6 +120,38 @@ test('ingestWebhook writes SendGrid event payloads with message and contact rela
   ]);
 });
 
+test('ingestWebhook writes every SendGrid event in a batched event payload', async () => {
+  const writes: WriteFileInput[] = [];
+  const adapter = createAdapter(writes);
+
+  const result = await adapter.ingestWebhook('workspace_123', [
+    {
+      sg_event_id: 'evt_delivered',
+      sg_message_id: 'msg_123',
+      email: 'customer@example.com',
+      event: 'delivered',
+      timestamp: 1_774_000_000,
+    },
+    {
+      sg_event_id: 'evt_opened',
+      sg_message_id: 'msg_123',
+      email: 'customer@example.com',
+      event: 'open',
+      timestamp: 1_774_000_001,
+    },
+  ]);
+
+  assert.equal(result.filesWritten, 2);
+  assert.deepEqual(result.paths, [
+    '/sendgrid/events/evt_delivered.json',
+    '/sendgrid/events/evt_opened.json',
+  ]);
+  assert.deepEqual(writes.map((write) => write.path), [
+    '/sendgrid/events/evt_delivered.json',
+    '/sendgrid/events/evt_opened.json',
+  ]);
+});
+
 test('ingestWebhook writes SendGrid contact payloads with marketing semantics', async () => {
   const writes: WriteFileInput[] = [];
   const adapter = createAdapter(writes);

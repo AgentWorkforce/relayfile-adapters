@@ -1,11 +1,11 @@
 import { extractShopifyIdFromPathSegment } from './path-mapper.js';
 import type { ShopifyRestRequest } from './types.js';
 
-export const SHOPIFY_API_VERSION = '2024-01';
-export const SHOPIFY_ORDERS_ROUTE = '/admin/api/2024-01/orders.json';
-export const SHOPIFY_PRODUCTS_ROUTE = '/admin/api/2024-01/products.json';
-export const SHOPIFY_CUSTOMERS_ROUTE = '/admin/api/2024-01/customers.json';
-export const SHOPIFY_FULFILLMENTS_ROUTE = '/admin/api/2024-01/fulfillments.json';
+export const SHOPIFY_API_VERSION = '2026-04';
+export const SHOPIFY_ORDERS_ROUTE = `/admin/api/${SHOPIFY_API_VERSION}/orders.json`;
+export const SHOPIFY_PRODUCTS_ROUTE = `/admin/api/${SHOPIFY_API_VERSION}/products.json`;
+export const SHOPIFY_CUSTOMERS_ROUTE = `/admin/api/${SHOPIFY_API_VERSION}/customers.json`;
+export const SHOPIFY_FULFILLMENTS_ROUTE = `/admin/api/${SHOPIFY_API_VERSION}/fulfillments.json`;
 
 export const SHOPIFY_ORDER_FIELDS = [
   'id',

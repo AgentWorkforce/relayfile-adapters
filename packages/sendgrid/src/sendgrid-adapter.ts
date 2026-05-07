@@ -8,6 +8,7 @@ import {
   sendGridMailPath,
 } from './path-mapper.js';
 import { SENDGRID_WEBHOOK_OBJECT_TYPES } from './types.js';
+import { normalizeSendGridWebhookEvents } from './webhook-normalizer.js';
 import type {
   SendGridAdapterConfig,
   SendGridContact,
@@ -143,59 +144,14 @@ export class SendGridAdapter extends IntegrationAdapter {
     event: NormalizedWebhook | SendGridWebhookPayload,
   ): Promise<IngestResult> {
     try {
-      const normalized = this.normalizeEvent(event);
-      const path = computeSendGridPath(normalized.objectType, normalized.objectId);
-      const semantics = this.computeSemantics(
-        normalized.objectType,
-        normalized.objectId,
-        normalized.payload,
-      );
+      const normalizedEvents = this.normalizeEvents(event);
+      const results: IngestResult[] = [];
 
-      if (this.isDeleteEvent(normalized)) {
-        if (this.client.deleteFile) {
-          await this.client.deleteFile({ workspaceId, path });
-          return {
-            filesWritten: 0,
-            filesUpdated: 0,
-            filesDeleted: 1,
-            paths: [path],
-            errors: [],
-          };
-        }
-
-        const deleteResult = await this.client.writeFile({
-          workspaceId,
-          path,
-          content: this.renderContent(workspaceId, normalized, true),
-          contentType: JSON_CONTENT_TYPE,
-          semantics,
-        });
-        const counts = inferWriteCounts(deleteResult, true);
-        return {
-          filesWritten: counts.filesWritten,
-          filesUpdated: counts.filesUpdated,
-          filesDeleted: counts.filesDeleted,
-          paths: [path],
-          errors: [],
-        };
+      for (const normalized of normalizedEvents) {
+        results.push(await this.ingestNormalizedWebhook(workspaceId, normalized));
       }
 
-      const writeResult = await this.client.writeFile({
-        workspaceId,
-        path,
-        content: this.renderContent(workspaceId, normalized, false),
-        contentType: JSON_CONTENT_TYPE,
-        semantics,
-      });
-
-      const counts = inferWriteCounts(writeResult, false);
-      return {
-        filesWritten: counts.filesWritten,
-        filesUpdated: counts.filesUpdated,
-        filesDeleted: 0,
-        paths: [path],
-        errors: [],
-      };
+      return aggregateIngestResults(results);
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
       return {
@@ -263,7 +219,7 @@ export class SendGridAdapter extends IntegrationAdapter {
     return compactSemantics(semantics);
   }
 
-  private normalizeEvent(event: NormalizedWebhook | SendGridWebhookPayload): NormalizedWebhook {
+  private normalizeEvents(event: NormalizedWebhook | SendGridWebhookPayload): NormalizedWebhook[] {
     if (isNormalizedWebhook(event)) {
       const objectType = normalizeSendGridObjectType(event.objectType);
       const normalized: NormalizedWebhook = {
@@ -277,31 +233,87 @@ export class SendGridAdapter extends IntegrationAdapter {
       if (connectionId) {
         normalized.connectionId = connectionId;
       }
-      return normalized;
+      return [normalized];
     }
 
-    const payload = normalizeProviderPayload(event);
-    const objectType = inferSendGridObjectType(payload);
-    const objectId = extractSendGridObjectId(objectType, payload);
-    const action = inferSendGridAction(objectType, payload);
-    const normalizedPayload = buildAdapterPayload(payload, {
-      action,
-      objectId,
-      objectType,
-      provider: this.config.provider || SENDGRID_PROVIDER_NAME,
+    return normalizeSendGridWebhookEvents(event).map((normalizedEvent) => {
+      const provider = this.config.provider || normalizedEvent.provider || SENDGRID_PROVIDER_NAME;
+      const normalized: NormalizedWebhook = {
+        provider,
+        eventType: normalizedEvent.eventType,
+        objectType: normalizeSendGridObjectType(normalizedEvent.objectType),
+        objectId: normalizedEvent.objectId.trim(),
+        payload: buildAdapterPayload(normalizedEvent.payload, {
+          action: getEventAction(normalizedEvent.eventType),
+          objectId: normalizedEvent.objectId,
+          objectType: normalizedEvent.objectType,
+          provider,
+        }),
+      };
+      const connectionId = normalizedEvent.connectionId || this.config.connectionId;
+      if (connectionId) {
+        normalized.connectionId = connectionId;
+      }
+      return normalized;
+    });
+  }
+
+  private async ingestNormalizedWebhook(
+    workspaceId: string,
+    normalized: NormalizedWebhook,
+  ): Promise<IngestResult> {
+    const path = computeSendGridPath(normalized.objectType, normalized.objectId);
+    const semantics = this.computeSemantics(
+      normalized.objectType,
+      normalized.objectId,
+      normalized.payload,
+    );
+
+    if (this.isDeleteEvent(normalized)) {
+      if (this.client.deleteFile) {
+        await this.client.deleteFile({ workspaceId, path });
+        return {
+          filesWritten: 0,
+          filesUpdated: 0,
+          filesDeleted: 1,
+          paths: [path],
+          errors: [],
+        };
+      }
+
+      const deleteResult = await this.client.writeFile({
+        workspaceId,
+        path,
+        content: this.renderContent(workspaceId, normalized, true),
+        contentType: JSON_CONTENT_TYPE,
+        semantics,
+      });
+      const counts = inferWriteCounts(deleteResult, true);
+      return {
+        filesWritten: counts.filesWritten,
+        filesUpdated: counts.filesUpdated,
+        filesDeleted: counts.filesDeleted,
+        paths: [path],
+        errors: [],
+      };
+    }
+
+    const writeResult = await this.client.writeFile({
+      workspaceId,
+      path,
+      content: this.renderContent(workspaceId, normalized, false),
+      contentType: JSON_CONTENT_TYPE,
+      semantics,
     });
 
-    const normalized: NormalizedWebhook = {
-      provider: this.config.provider || SENDGRID_PROVIDER_NAME,
-      eventType: `${objectType}.${action}`,
-      objectType,
-      objectId,
-      payload: normalizedPayload,
+    const counts = inferWriteCounts(writeResult, false);
+    return {
+      filesWritten: counts.filesWritten,
+      filesUpdated: counts.filesUpdated,
+      filesDeleted: 0,
+      paths: [path],
+      errors: [],
     };
-    if (this.config.connectionId) {
-      normalized.connectionId = this.config.connectionId;
-    }
-    return normalized;
   }
 
   private isDeleteEvent(event: NormalizedWebhook): boolean {
@@ -742,6 +754,26 @@ function inferWriteCounts(
     return { filesDeleted: 0, filesUpdated: 0, filesWritten: 1 };
   }
   return { filesDeleted: 0, filesUpdated: 1, filesWritten: 0 };
+}
+
+function aggregateIngestResults(results: IngestResult[]): IngestResult {
+  const aggregate: IngestResult = {
+    filesWritten: 0,
+    filesUpdated: 0,
+    filesDeleted: 0,
+    paths: [],
+    errors: [],
+  };
+
+  for (const result of results) {
+    aggregate.filesWritten += result.filesWritten;
+    aggregate.filesUpdated += result.filesUpdated;
+    aggregate.filesDeleted += result.filesDeleted;
+    aggregate.paths.push(...result.paths);
+    aggregate.errors.push(...result.errors);
+  }
+
+  return aggregate;
 }
 
 function inferFallbackPath(event: NormalizedWebhook | SendGridWebhookPayload): string {

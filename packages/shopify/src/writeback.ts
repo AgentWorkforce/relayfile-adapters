@@ -1,10 +1,11 @@
 import { extractShopifyIdFromPathSegment } from './path-mapper.js';
+import {
+  SHOPIFY_API_VERSION,
+  SHOPIFY_CUSTOMERS_ROUTE,
+  SHOPIFY_ORDERS_ROUTE,
+  SHOPIFY_PRODUCTS_ROUTE,
+} from './queries.js';
 import type { JsonValue, ShopifyWritebackRequest } from './types.js';
-
-const SHOPIFY_API_VERSION = '2024-01';
-const SHOPIFY_ORDERS_ROUTE = '/admin/api/2024-01/orders.json';
-const SHOPIFY_PRODUCTS_ROUTE = '/admin/api/2024-01/products.json';
-const SHOPIFY_CUSTOMERS_ROUTE = '/admin/api/2024-01/customers.json';
 
 export function resolveShopifyWritebackRequest(path: string, content: string): ShopifyWritebackRequest {
   const normalizedPath = normalizePath(path);

@@ -225,21 +225,21 @@ test('computePath and deterministic path helpers encode every primary object typ
 test('read routes include Shopify REST endpoints and required route anchors', () => {
   assert.deepEqual(resolveShopifyReadRequest('/shopify/orders'), {
     method: 'GET',
-    endpoint: '/admin/api/2024-01/orders.json',
+    endpoint: '/admin/api/2026-04/orders.json',
     query: {
       limit: '250',
       status: 'any',
       fields: 'id,admin_graphql_api_id,app_id,cancel_reason,cancelled_at,closed_at,created_at,currency,current_subtotal_price,current_total_discounts,current_total_price,current_total_tax,customer,email,financial_status,fulfillment_status,line_items,name,note,order_number,order_status_url,processed_at,shipping_address,tags,total_price,updated_at',
     },
   });
-  assert.equal(resolveShopifyReadRequest('/shopify/products/relay-tee--632910392.json').endpoint, '/admin/api/2024-01/products/632910392.json');
+  assert.equal(resolveShopifyReadRequest('/shopify/products/relay-tee--632910392.json').endpoint, '/admin/api/2026-04/products/632910392.json');
 });
 
 test('writeback routes map VFS writes to Shopify REST mutations', () => {
   assert.deepEqual(resolveShopifyWritebackRequest('/shopify/products/new.json', JSON.stringify({ title: 'Relay Tee', vendor: 'Relayfile' })), {
     action: 'create_product',
     method: 'POST',
-    endpoint: '/admin/api/2024-01/products.json',
+    endpoint: '/admin/api/2026-04/products.json',
     body: {
       product: {
         title: 'Relay Tee',
@@ -251,7 +251,7 @@ test('writeback routes map VFS writes to Shopify REST mutations', () => {
   assert.deepEqual(resolveShopifyWritebackRequest('/shopify/customers/ada--207119551.json', JSON.stringify({ email: 'new@example.com' })), {
     action: 'update_customer',
     method: 'PUT',
-    endpoint: '/admin/api/2024-01/customers/207119551.json',
+    endpoint: '/admin/api/2026-04/customers/207119551.json',
     body: {
       customer: {
         email: 'new@example.com',
