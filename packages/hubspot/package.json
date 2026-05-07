@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-hubspot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "HubSpot adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
