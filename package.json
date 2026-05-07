@@ -10,7 +10,9 @@
   "scripts": {
     "build": "npx turbo build",
     "test": "npx turbo test",
-    "typecheck": "npx turbo typecheck"
+    "typecheck": "npx turbo typecheck",
+    "catalog:audit": "node scripts/catalog-audit.mjs",
+    "test:catalog": "node --test test/catalog-audit.test.mjs"
   },
   "devDependencies": {
     "@agentworkforce/workload-router": "^0.1.3",
