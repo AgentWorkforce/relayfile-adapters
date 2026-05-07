@@ -22,7 +22,7 @@ export type JsonArray = JsonValue[];
 export type JsonObject = { [key: string]: JsonValue };
 
 export interface SalesforceAdapterConfig {
-  apiVersion?: 'v59.0' | string;
+  apiVersion?: 'v62.0' | string;
   appName?: string;
   connectionId?: string;
   instanceUrl?: string;

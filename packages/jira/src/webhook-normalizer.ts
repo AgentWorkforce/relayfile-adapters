@@ -78,14 +78,26 @@ export interface JiraWebhookSignatureValidationResult {
   reason?:
     | 'expired'
     | 'invalid-algorithm'
+    | 'invalid-iss'
     | 'invalid-qsh'
     | 'invalid-signature'
+    | 'issued-in-future'
     | 'malformed-jwt'
     | 'missing-authorization'
     | 'missing-exp'
+    | 'missing-iat'
+    | 'missing-iss'
     | 'missing-qsh'
     | 'missing-secret';
 }
+
+/**
+ * Default clock skew tolerance for `exp` and `iat` validation. Atlassian
+ * recommends "no more than a few minutes"; 180s sits in the middle of that
+ * range and tolerates modest server clock drift without accepting stale
+ * tokens. Override per-deployment via `JiraAdapterConfig.clockSkewSeconds`.
+ */
+export const DEFAULT_JIRA_CLOCK_SKEW_SECONDS = 180;
 
 interface DecodedJwt {
   claims: AtlassianJwtClaims;
@@ -103,6 +115,8 @@ export function normalizeJiraWebhook(
   const authorization = readOptionalString(normalizedHeaders[JIRA_AUTHORIZATION_HEADER]);
   const verificationInput: {
     authorization?: string;
+    clientKey?: string;
+    clockSkewSeconds?: number;
     method: string;
     nowSeconds?: number;
     path: string;
@@ -116,6 +130,10 @@ export function normalizeJiraWebhook(
   if (options.nowSeconds !== undefined) verificationInput.nowSeconds = options.nowSeconds;
   if (options.query !== undefined) verificationInput.query = options.query;
   if (options.config.sharedSecret) verificationInput.sharedSecret = options.config.sharedSecret;
+  if (options.config.clientKey) verificationInput.clientKey = options.config.clientKey;
+  if (options.config.clockSkewSeconds !== undefined) {
+    verificationInput.clockSkewSeconds = options.config.clockSkewSeconds;
+  }
   const validation = verifyAtlassianConnectJwt(verificationInput);
   if (!validation.ok) {
     throw new Error(`Invalid Jira webhook JWT: ${validation.reason ?? 'unknown'}`);
@@ -146,6 +164,8 @@ export function normalizeJiraWebhook(
 
 export function verifyAtlassianConnectJwt(input: {
   authorization?: string;
+  clientKey?: string;
+  clockSkewSeconds?: number;
   method: string;
   nowSeconds?: number;
   path: string;
@@ -178,10 +198,35 @@ export function verifyAtlassianConnectJwt(input: {
   }
 
   const nowSeconds = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const skewSeconds = input.clockSkewSeconds ?? DEFAULT_JIRA_CLOCK_SKEW_SECONDS;
+
+  // `iss` is mandatory per Atlassian Connect; without checking it, a leaked
+  // sharedSecret could be used to mint tokens under arbitrary issuers. We
+  // only enforce when the caller has configured `clientKey`; that allows
+  // the adapter to keep working in environments that don't bind a single
+  // issuer (e.g. tenant-per-row orgs), while still flagging the soft
+  // requirement.
+  if (typeof decoded.claims.iss !== 'string' || decoded.claims.iss.length === 0) {
+    return { ok: false, claims: decoded.claims, reason: 'missing-iss' };
+  }
+  if (input.clientKey && decoded.claims.iss !== input.clientKey) {
+    return { ok: false, claims: decoded.claims, reason: 'invalid-iss' };
+  }
+
+  // `iat` is mandatory per spec; reject tokens issued meaningfully in the
+  // future (beyond clock skew). `iat` from the past is fine — only `exp`
+  // bounds the upper edge of the validity window.
+  if (typeof decoded.claims.iat !== 'number') {
+    return { ok: false, claims: decoded.claims, reason: 'missing-iat' };
+  }
+  if (decoded.claims.iat > nowSeconds + skewSeconds) {
+    return { ok: false, claims: decoded.claims, reason: 'issued-in-future' };
+  }
+
   if (typeof decoded.claims.exp !== 'number') {
     return { ok: false, claims: decoded.claims, reason: 'missing-exp' };
   }
-  if (nowSeconds > decoded.claims.exp + 60) {
+  if (nowSeconds > decoded.claims.exp + skewSeconds) {
     return { ok: false, claims: decoded.claims, reason: 'expired' };
   }
 

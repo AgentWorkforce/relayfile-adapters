@@ -22,6 +22,15 @@ export type JsonObject = { [key: string]: JsonValue };
 export interface JiraAdapterConfig {
   apiUrl?: string;
   appName?: string;
+  /**
+   * Atlassian Connect app key — the value of the `iss` claim in the JWT.
+   * When set, the verifier rejects tokens whose `iss` does not match. This
+   * prevents a leaked sharedSecret from being used to mint tokens under
+   * arbitrary issuers.
+   */
+  clientKey?: string;
+  /** Allowed clock skew when validating `exp` and `iat` (default 180). */
+  clockSkewSeconds?: number;
   cloudId?: string;
   connectionId?: string;
   provider?: string;

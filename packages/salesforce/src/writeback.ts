@@ -1,11 +1,11 @@
 import { decodeSalesforcePathSegment, pathObjectTypeFromCollection } from './path-mapper.js';
 import type { SalesforceWritebackRequest } from './types.js';
 
-export const SALESFORCE_ACCOUNT_WRITEBACK_ROUTE = '/services/data/v59.0/sobjects/Account';
-export const SALESFORCE_CONTACT_WRITEBACK_ROUTE = '/services/data/v59.0/sobjects/Contact';
-export const SALESFORCE_OPPORTUNITY_WRITEBACK_ROUTE = '/services/data/v59.0/sobjects/Opportunity';
-export const SALESFORCE_LEAD_WRITEBACK_ROUTE = '/services/data/v59.0/sobjects/Lead';
-export const SALESFORCE_CASE_WRITEBACK_ROUTE = '/services/data/v59.0/sobjects/Case';
+export const SALESFORCE_ACCOUNT_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Account';
+export const SALESFORCE_CONTACT_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Contact';
+export const SALESFORCE_OPPORTUNITY_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Opportunity';
+export const SALESFORCE_LEAD_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Lead';
+export const SALESFORCE_CASE_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Case';
 
 const ROUTES = {
   Account: SALESFORCE_ACCOUNT_WRITEBACK_ROUTE,

@@ -1,16 +1,16 @@
 import { decodeSalesforcePathSegment, pathObjectTypeFromCollection } from './path-mapper.js';
 import type { SalesforceQueryRequest } from './types.js';
 
-export const SALESFORCE_API_VERSION = 'v59.0';
-export const SALESFORCE_ACCOUNT_ROUTE = '/services/data/v59.0/sobjects/Account';
-export const SALESFORCE_CONTACT_ROUTE = '/services/data/v59.0/sobjects/Contact';
-export const SALESFORCE_OPPORTUNITY_ROUTE = '/services/data/v59.0/sobjects/Opportunity';
-export const SALESFORCE_LEAD_ROUTE = '/services/data/v59.0/sobjects/Lead';
-export const SALESFORCE_CASE_ROUTE = '/services/data/v59.0/sobjects/Case';
+export const SALESFORCE_API_VERSION = 'v62.0';
+export const SALESFORCE_ACCOUNT_ROUTE = '/services/data/v62.0/sobjects/Account';
+export const SALESFORCE_CONTACT_ROUTE = '/services/data/v62.0/sobjects/Contact';
+export const SALESFORCE_OPPORTUNITY_ROUTE = '/services/data/v62.0/sobjects/Opportunity';
+export const SALESFORCE_LEAD_ROUTE = '/services/data/v62.0/sobjects/Lead';
+export const SALESFORCE_CASE_ROUTE = '/services/data/v62.0/sobjects/Case';
 // Salesforce REST: collection reads must go through SOQL via /query, not the
 // sObject metadata route. The metadata route describes the object schema and
 // returns no records.
-export const SALESFORCE_QUERY_ROUTE = '/services/data/v59.0/query';
+export const SALESFORCE_QUERY_ROUTE = '/services/data/v62.0/query';
 
 const SOQL_LIST_BY_OBJECT = {
   Account: 'SELECT Id, Name FROM Account',

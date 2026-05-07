@@ -249,27 +249,27 @@ test('read and writeback route resolution maps VFS paths to Salesforce REST requ
   assert.deepEqual(resolveReadRequest('/salesforce/accounts/001A.json'), {
     action: 'get_account',
     method: 'GET',
-    endpoint: '/services/data/v59.0/sobjects/Account/001A',
+    endpoint: '/services/data/v62.0/sobjects/Account/001A',
   });
   // Collection reads must route through SOQL; the sObject metadata route
   // (e.g. /sobjects/Contact) describes the schema and returns no records.
   assert.deepEqual(resolveReadRequest('/salesforce/contacts'), {
     action: 'list_contacts',
     method: 'GET',
-    endpoint: '/services/data/v59.0/query',
+    endpoint: '/services/data/v62.0/query',
     query: { q: 'SELECT Id, FirstName, LastName, Email FROM Contact' },
   });
 
   assert.deepEqual(resolveWritebackRequest('/salesforce/accounts/new.json', '{"Name":"Acme"}'), {
     action: 'create_account',
     method: 'POST',
-    endpoint: '/services/data/v59.0/sobjects/Account',
+    endpoint: '/services/data/v62.0/sobjects/Account',
     body: { Name: 'Acme' },
   });
   assert.deepEqual(resolveWritebackRequest('/salesforce/contacts/003A.json', '{"Title":"CEO"}'), {
     action: 'update_contact',
     method: 'PATCH',
-    endpoint: '/services/data/v59.0/sobjects/Contact/003A',
+    endpoint: '/services/data/v62.0/sobjects/Contact/003A',
     body: { Title: 'CEO' },
   });
 });

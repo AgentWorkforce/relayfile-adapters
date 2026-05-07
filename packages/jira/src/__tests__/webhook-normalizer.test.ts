@@ -18,6 +18,7 @@ function signJwt(claimOverrides: Record<string, unknown> = {}): string {
   const header = { alg: 'HS256', typ: 'JWT' };
   const payload = {
     iss: 'jira-client-key',
+    iat: NOW,
     exp: NOW + 300,
     qsh: computeAtlassianQueryStringHash({ method: METHOD, path: PATH, query: QUERY }),
     ...claimOverrides,
@@ -97,7 +98,8 @@ describe('normalizeJiraWebhook', () => {
   });
 
   it('rejects an expired token beyond the allowed clock skew', () => {
-    const token = signJwt({ exp: NOW - 61 });
+    // Default skew is 180s; -200 is past the window.
+    const token = signJwt({ exp: NOW - 200 });
 
     const result = verifyAtlassianConnectJwt({
       authorization: `JWT ${token}`,
@@ -110,6 +112,72 @@ describe('normalizeJiraWebhook', () => {
 
     assert.equal(result.ok, false);
     assert.equal(result.reason, 'expired');
+  });
+
+  it('honors a configurable clockSkewSeconds for exp validation', () => {
+    // exp slightly in the past, but within a generous configured skew.
+    const token = signJwt({ exp: NOW - 240 });
+
+    const result = verifyAtlassianConnectJwt({
+      authorization: `JWT ${token}`,
+      clockSkewSeconds: 600,
+      method: METHOD,
+      nowSeconds: NOW,
+      path: PATH,
+      query: QUERY,
+      sharedSecret: SHARED_SECRET,
+    });
+
+    assert.equal(result.ok, true);
+  });
+
+  it('rejects a token with a missing iss claim', () => {
+    const token = signJwt({ iss: undefined });
+
+    const result = verifyAtlassianConnectJwt({
+      authorization: `JWT ${token}`,
+      method: METHOD,
+      nowSeconds: NOW,
+      path: PATH,
+      query: QUERY,
+      sharedSecret: SHARED_SECRET,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'missing-iss');
+  });
+
+  it('rejects a token whose iss does not match the configured clientKey', () => {
+    const token = signJwt({ iss: 'rogue-issuer' });
+
+    const result = verifyAtlassianConnectJwt({
+      authorization: `JWT ${token}`,
+      clientKey: 'jira-client-key',
+      method: METHOD,
+      nowSeconds: NOW,
+      path: PATH,
+      query: QUERY,
+      sharedSecret: SHARED_SECRET,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'invalid-iss');
+  });
+
+  it('rejects a token with iat in the future beyond the clock skew', () => {
+    const token = signJwt({ iat: NOW + 600 });
+
+    const result = verifyAtlassianConnectJwt({
+      authorization: `JWT ${token}`,
+      method: METHOD,
+      nowSeconds: NOW,
+      path: PATH,
+      query: QUERY,
+      sharedSecret: SHARED_SECRET,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'issued-in-future');
   });
 
   it('rejects a qsh mismatch', () => {
