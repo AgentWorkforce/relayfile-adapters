@@ -258,16 +258,43 @@ test('queries resolve read paths to Calendly REST endpoints', () => {
       count: '100',
     },
   });
+  assert.deepEqual(resolveCalendlyReadRequest('/calendly/scheduled-events/event_123/invitees/invitee_123.json'), {
+    method: 'GET',
+    endpoint: '/scheduled_events/event_123/invitees/invitee_123',
+  });
   assert.deepEqual(resolveCalendlyReadRequest('/calendly/event-types/type_123.json'), {
     method: 'GET',
     endpoint: '/event_types/type_123',
   });
+  assert.throws(
+    () => resolveCalendlyReadRequest('/calendly/invitees/invitee_123.json'),
+    /No Calendly read route matched/,
+  );
 });
 
-test('writeback resolves create, update, and cancellation paths', () => {
+test('writeback resolves supported create, update, and cancellation paths', () => {
+  assert.deepEqual(
+    resolveCalendlyWritebackRequest(
+      '/calendly/scheduled-events/new.json',
+      '{"event_type":"https://api.calendly.com/event_types/type_123","start_time":"2026-04-11T10:00:00Z","invitee":{"email":"ada@example.com","name":"Ada"}}',
+    ),
+    {
+      action: 'create_event_invitee',
+      method: 'POST',
+      endpoint: '/invitees',
+      body: {
+        event_type: 'https://api.calendly.com/event_types/type_123',
+        start_time: '2026-04-11T10:00:00Z',
+        invitee: {
+          email: 'ada@example.com',
+          name: 'Ada',
+        },
+      },
+    },
+  );
   assert.deepEqual(resolveCalendlyWritebackRequest('/calendly/event-types/type_123.json', '{"name":"Demo","duration":30}'), {
     action: 'update_event_type',
-    method: 'PUT',
+    method: 'PATCH',
     endpoint: '/event_types/type_123',
     body: {
       name: 'Demo',
@@ -282,4 +309,12 @@ test('writeback resolves create, update, and cancellation paths', () => {
       reason: 'No longer needed',
     },
   });
+  assert.throws(
+    () => resolveCalendlyWritebackRequest('/calendly/invitees/invitee_123.json', '{"name":"Ada"}'),
+    /does not support updating invitees/,
+  );
+  assert.throws(
+    () => resolveCalendlyWritebackRequest('/calendly/invitees/invitee_123/cancel.json', '{"reason":"No"}'),
+    /does not support invitee-level cancellation/,
+  );
 });

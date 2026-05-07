@@ -3,6 +3,7 @@ import type { CalendlyWritebackRequest, JsonValue } from './types.js';
 
 const CALENDLY_SCHEDULED_EVENTS_ROUTE = '/scheduled_events';
 const CALENDLY_EVENT_TYPES_ROUTE = '/event_types';
+const CALENDLY_INVITEES_ROUTE = '/invitees';
 
 export function resolveCalendlyWritebackRequest(path: string, content: string): CalendlyWritebackRequest {
   const normalizedPath = normalizePath(path);
@@ -18,17 +19,17 @@ export function resolveCalendlyWritebackRequest(path: string, content: string): 
 
   const scheduledEventUpdateMatch = normalizedPath.match(/^\/calendly\/scheduled-events\/([^/]+)\.json$/u);
   if (scheduledEventUpdateMatch?.[1]) {
-    return buildScheduledEventUpdate(extractCalendlyIdFromPathSegment(scheduledEventUpdateMatch[1]), content);
+    throw new Error('Calendly does not support updating scheduled events through the public API; cancel the event and create a new invitee instead');
   }
 
   const inviteeCancelMatch = normalizedPath.match(/^\/calendly\/invitees\/([^/]+)\/cancel\.json$/u);
   if (inviteeCancelMatch?.[1]) {
-    return buildInviteeCancel(extractCalendlyIdFromPathSegment(inviteeCancelMatch[1]), content);
+    throw new Error('Calendly does not support invitee-level cancellation through the public API; cancel the scheduled event or use the invitee cancel_url');
   }
 
   const inviteeUpdateMatch = normalizedPath.match(/^\/calendly\/invitees\/([^/]+)\.json$/u);
   if (inviteeUpdateMatch?.[1]) {
-    return buildInviteeUpdate(extractCalendlyIdFromPathSegment(inviteeUpdateMatch[1]), content);
+    throw new Error('Calendly does not support updating invitees through the public API; use the invitee reschedule_url when available');
   }
 
   if (normalizedPath === '/calendly/event-types/new.json' || normalizedPath === '/calendly/event-types/') {
@@ -47,11 +48,15 @@ function buildScheduledEventCreate(content: string): CalendlyWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
   const eventType = readString(payload, 'event_type');
   const startTime = readString(payload, 'start_time');
+  const invitee = readRecord(payload, 'invitee');
   if (!eventType) {
     throw new Error('scheduled-events/new.json writeback requires `event_type`');
   }
   if (!startTime) {
     throw new Error('scheduled-events/new.json writeback requires `start_time`');
+  }
+  if (!invitee) {
+    throw new Error('scheduled-events/new.json writeback requires `invitee`');
   }
 
   const body = pickAllowed(payload, [
@@ -65,30 +70,9 @@ function buildScheduledEventCreate(content: string): CalendlyWritebackRequest {
   ]);
 
   return {
-    action: 'create_scheduled_event',
+    action: 'create_event_invitee',
     method: 'POST',
-    endpoint: CALENDLY_SCHEDULED_EVENTS_ROUTE,
-    body,
-  };
-}
-
-function buildScheduledEventUpdate(eventId: string, content: string): CalendlyWritebackRequest {
-  const payload = unwrapEnvelope(parseJsonObject(content));
-  const body = pickAllowed(payload, [
-    'name',
-    'start_time',
-    'end_time',
-    'location',
-    'status',
-  ]);
-  if (Object.keys(body).length === 0) {
-    throw new Error('scheduled-events/<id>.json update writeback requires at least one mutable field');
-  }
-
-  return {
-    action: 'update_scheduled_event',
-    method: 'PATCH',
-    endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/${encodeURIComponent(eventId)}`,
+    endpoint: CALENDLY_INVITEES_ROUTE,
     body,
   };
 }
@@ -102,52 +86,6 @@ function buildScheduledEventCancel(eventId: string, content: string): CalendlyWr
     action: 'cancel_scheduled_event',
     method: 'POST',
     endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/${encodeURIComponent(eventId)}/cancellation`,
-    body,
-  };
-}
-
-function buildInviteeUpdate(inviteeId: string, content: string): CalendlyWritebackRequest {
-  const payload = unwrapEnvelope(parseJsonObject(content));
-  const eventId = readString(payload, 'event_uuid') ?? readString(payload, 'scheduled_event_uuid');
-  if (!eventId) {
-    throw new Error('invitees/<id>.json writeback requires `event_uuid` or `scheduled_event_uuid`');
-  }
-
-  const body = pickAllowed(payload, [
-    'email',
-    'name',
-    'first_name',
-    'last_name',
-    'timezone',
-    'questions_and_answers',
-    'tracking',
-  ]);
-  if (Object.keys(body).length === 0) {
-    throw new Error('invitees/<id>.json update writeback requires at least one mutable invitee field');
-  }
-
-  return {
-    action: 'update_invitee',
-    method: 'PATCH',
-    endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/${encodeURIComponent(eventId)}/invitees/${encodeURIComponent(inviteeId)}`,
-    body,
-  };
-}
-
-function buildInviteeCancel(inviteeId: string, content: string): CalendlyWritebackRequest {
-  const payload = unwrapEnvelope(parseJsonObjectOrEmpty(content));
-  const eventId = readString(payload, 'event_uuid') ?? readString(payload, 'scheduled_event_uuid');
-  if (!eventId) {
-    throw new Error('invitees/<id>/cancel.json writeback requires `event_uuid` or `scheduled_event_uuid`');
-  }
-
-  const body: Record<string, unknown> = {};
-  copyString(payload, body, 'reason');
-
-  return {
-    action: 'cancel_invitee',
-    method: 'POST',
-    endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/${encodeURIComponent(eventId)}/invitees/${encodeURIComponent(inviteeId)}/cancellation`,
     body,
   };
 }
@@ -194,7 +132,7 @@ function buildEventTypeUpdate(eventTypeId: string, content: string): CalendlyWri
 
   return {
     action: 'update_event_type',
-    method: 'PUT',
+    method: 'PATCH',
     endpoint: `${CALENDLY_EVENT_TYPES_ROUTE}/${encodeURIComponent(eventTypeId)}`,
     body,
   };
@@ -258,6 +196,11 @@ function copyString(source: Record<string, unknown>, target: Record<string, unkn
 function readString(payload: Record<string, unknown>, key: string): string | undefined {
   const value = payload[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readRecord(payload: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const value = payload[key];
+  return isRecord(value) ? value : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

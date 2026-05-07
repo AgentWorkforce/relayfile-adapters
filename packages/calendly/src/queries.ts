@@ -70,6 +70,16 @@ export function resolveCalendlyReadRequest(path: string): CalendlyRestRequest {
     };
   }
 
+  const scheduledEventInviteeMatch = normalizedPath.match(/^\/calendly\/scheduled-events\/([^/]+)\/invitees\/([^/]+)\.json$/u);
+  if (scheduledEventInviteeMatch?.[1] && scheduledEventInviteeMatch[2]) {
+    const eventId = extractCalendlyIdFromPathSegment(scheduledEventInviteeMatch[1]);
+    const inviteeId = extractCalendlyIdFromPathSegment(scheduledEventInviteeMatch[2]);
+    return {
+      method: 'GET',
+      endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/${encodeURIComponent(eventId)}/invitees/${encodeURIComponent(inviteeId)}`,
+    };
+  }
+
   const scheduledEventMatch = normalizedPath.match(/^\/calendly\/scheduled-events\/([^/]+)\.json$/u);
   if (scheduledEventMatch?.[1]) {
     const eventId = extractCalendlyIdFromPathSegment(scheduledEventMatch[1]);
@@ -95,25 +105,6 @@ export function resolveCalendlyReadRequest(path: string): CalendlyRestRequest {
     return {
       method: 'GET',
       endpoint: `${CALENDLY_EVENT_TYPES_ROUTE}/${encodeURIComponent(eventTypeId)}`,
-    };
-  }
-
-  if (normalizedPath === '/calendly/invitees' || normalizedPath === '/calendly/invitees/') {
-    return {
-      method: 'GET',
-      endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/invitees`,
-      query: {
-        count: '100',
-      },
-    };
-  }
-
-  const inviteeMatch = normalizedPath.match(/^\/calendly\/invitees\/([^/]+)\.json$/u);
-  if (inviteeMatch?.[1]) {
-    const inviteeId = extractCalendlyIdFromPathSegment(inviteeMatch[1]);
-    return {
-      method: 'GET',
-      endpoint: `${CALENDLY_SCHEDULED_EVENTS_ROUTE}/invitees/${encodeURIComponent(inviteeId)}`,
     };
   }
 

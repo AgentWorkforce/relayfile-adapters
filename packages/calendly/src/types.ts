@@ -162,12 +162,9 @@ export interface CalendlyRestRequest {
 
 export interface CalendlyWritebackRequest extends CalendlyRestRequest {
   action:
-    | 'cancel_invitee'
     | 'cancel_scheduled_event'
+    | 'create_event_invitee'
     | 'create_event_type'
-    | 'create_scheduled_event'
-    | 'update_event_type'
-    | 'update_invitee'
-    | 'update_scheduled_event';
-  method: 'PATCH' | 'POST' | 'PUT';
+    | 'update_event_type';
+  method: 'PATCH' | 'POST';
 }
