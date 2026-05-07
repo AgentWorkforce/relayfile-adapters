@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-zendesk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zendesk adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
