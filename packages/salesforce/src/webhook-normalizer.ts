@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 
 import type { NormalizedWebhook } from './salesforce-adapter.js';
 import { normalizeSalesforceObjectType } from './path-mapper.js';
@@ -11,7 +11,7 @@ export const SALESFORCE_ORGANIZATION_ID_HEADER = 'x-sfdc-organization-id';
 export const SALESFORCE_DELIVERY_ID_HEADER = 'x-sfdc-delivery-id';
 
 export const SALESFORCE_MTLS_DEPLOYMENT_NOTE =
-  'Salesforce Outbound Messages SOAP transport should be protected with org-level mTLS; this package verifies the application-layer X-SFDC-Webhook-Secret HMAC.';
+  'Salesforce Outbound Messages SOAP transport should be protected with org-level mTLS; this package verifies the application-layer X-SFDC-Webhook-Secret shared-secret header (literal value compare, not HMAC).';
 
 const CONNECTION_ID_HEADER_KEYS = [
   'x-relay-connection-id',
@@ -51,7 +51,7 @@ export interface SalesforceWebhookConnectionMetadata {
 export interface SalesforceWebhookSignatureValidationResult {
   expectedSignature?: string;
   ok: boolean;
-  reason?: 'invalid-secret' | 'malformed-secret' | 'missing-secret' | 'missing-secret-header';
+  reason?: 'invalid-secret' | 'missing-secret' | 'missing-secret-header';
   receivedSignature?: string;
 }
 
@@ -282,19 +282,27 @@ export function extractSalesforceAction(payload: unknown): string {
   return normalizeAction(action);
 }
 
-export function computeSalesforceWebhookSecret(rawPayload: unknown, secret: string): string {
+/**
+ * Salesforce Outbound Messages do not HMAC-sign the body — the
+ * `X-SFDC-Webhook-Secret` header carries the literal shared secret value
+ * configured on the Outbound Message. Transport integrity is provided by
+ * org-level mTLS (see SALESFORCE_MTLS_DEPLOYMENT_NOTE). This function exists
+ * only for callers that previously imported it; it now returns the raw
+ * configured secret so the contract `header === computed` still holds.
+ *
+ * @deprecated Use the configured secret directly; HMAC computation does not
+ * apply to Salesforce webhook verification.
+ */
+export function computeSalesforceWebhookSecret(_rawPayload: unknown, secret: string): string {
   const normalizedSecret = secret.trim();
   if (!normalizedSecret) {
     throw new Error('Salesforce webhook secret must be a non-empty string.');
   }
-
-  return createHmac('sha256', normalizedSecret)
-    .update(toRawBodyBuffer(rawPayload))
-    .digest('hex');
+  return normalizedSecret;
 }
 
 export function validateSalesforceWebhookSecret(
-  rawPayload: unknown,
+  _rawPayload: unknown,
   headers: SalesforceWebhookHeaders,
   secret: string,
 ): SalesforceWebhookSignatureValidationResult {
@@ -304,26 +312,19 @@ export function validateSalesforceWebhookSecret(
   }
 
   const normalizedHeaders = normalizeHeaders(headers);
-  const receivedSignature = readOptionalString(normalizedHeaders[SALESFORCE_WEBHOOK_SECRET_HEADER]);
-  if (!receivedSignature) {
+  const receivedSecret = readOptionalString(normalizedHeaders[SALESFORCE_WEBHOOK_SECRET_HEADER]);
+  if (!receivedSecret) {
     return { ok: false, reason: 'missing-secret-header' };
   }
 
-  const normalizedSignature = normalizeSignatureDigest(receivedSignature);
-  if (!normalizedSignature) {
-    return { ok: false, reason: 'malformed-secret', receivedSignature };
-  }
+  const expectedBuffer = Buffer.from(normalizedSecret, 'utf8');
+  const headerBuffer = Buffer.from(receivedSecret, 'utf8');
 
-  const expectedSignature = computeSalesforceWebhookSecret(rawPayload, normalizedSecret);
-  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-  const headerBuffer = Buffer.from(normalizedSignature, 'hex');
-
-  if (headerBuffer.length === 0 || headerBuffer.length !== expectedBuffer.length) {
+  if (headerBuffer.length !== expectedBuffer.length) {
     return {
       ok: false,
       reason: 'invalid-secret',
-      expectedSignature,
-      receivedSignature,
+      receivedSignature: receivedSecret,
     };
   }
 
@@ -331,8 +332,8 @@ export function validateSalesforceWebhookSecret(
   return {
     ok,
     ...(ok
-      ? { expectedSignature, receivedSignature }
-      : { reason: 'invalid-secret', expectedSignature, receivedSignature }),
+      ? { receivedSignature: receivedSecret }
+      : { reason: 'invalid-secret', receivedSignature: receivedSecret }),
   };
 }
 
@@ -521,26 +522,6 @@ function decodeXmlEntities(value: string): string {
     .replace(/&amp;/gu, '&');
 }
 
-function toRawBodyBuffer(rawPayload: unknown): Buffer {
-  if (typeof rawPayload === 'string') {
-    return Buffer.from(rawPayload, 'utf8');
-  }
-
-  if (Buffer.isBuffer(rawPayload)) {
-    return rawPayload;
-  }
-
-  if (rawPayload instanceof Uint8Array) {
-    return Buffer.from(rawPayload);
-  }
-
-  if (rawPayload instanceof ArrayBuffer) {
-    return Buffer.from(rawPayload);
-  }
-
-  return Buffer.from(JSON.stringify(rawPayload), 'utf8');
-}
-
 function getWebhookData(record: SalesforceRecord): SalesforceRecord | undefined {
   return getRecord(record.data) ?? getRecord(record.sObject) ?? getRecord(record.sobject) ?? record;
 }
@@ -566,14 +547,6 @@ function normalizeAction(action: string): string {
     default:
       return normalized || 'updated';
   }
-}
-
-function normalizeSignatureDigest(value: string): string | undefined {
-  const trimmed = value.trim();
-  const digest = trimmed.toLowerCase().startsWith('sha256=')
-    ? trimmed.slice('sha256='.length)
-    : trimmed;
-  return /^[0-9a-f]{64}$/iu.test(digest) ? digest.toLowerCase() : undefined;
 }
 
 function normalizeHeaders(headers: SalesforceWebhookHeaders): Record<string, string> {

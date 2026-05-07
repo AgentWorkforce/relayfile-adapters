@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
 import test from 'node:test';
 
 import {
@@ -24,15 +23,16 @@ const accountPayload = {
   },
 };
 
-test('normalizeSalesforceWebhook accepts a known-good HMAC in X-SFDC-Webhook-Secret', () => {
+test('normalizeSalesforceWebhook accepts the literal shared secret in X-SFDC-Webhook-Secret', () => {
+  // Salesforce Outbound Messages send the configured secret as the literal
+  // header value — there is no body HMAC. mTLS handles transport integrity.
   const rawPayload = JSON.stringify(accountPayload);
   const secret = 'salesforce-webhook-secret';
-  const signature = createHmac('sha256', secret).update(rawPayload).digest('hex');
 
   const normalized = normalizeSalesforceWebhook(
     rawPayload,
     {
-      [SALESFORCE_WEBHOOK_SECRET_HEADER]: `sha256=${signature}`,
+      [SALESFORCE_WEBHOOK_SECRET_HEADER]: secret,
       [SALESFORCE_WEBHOOK_TIMESTAMP_HEADER]: '1800000000000',
       'X-Relay-Connection-Id': 'conn_salesforce_123',
     },
@@ -55,18 +55,13 @@ test('normalizeSalesforceWebhook accepts a known-good HMAC in X-SFDC-Webhook-Sec
   assert.match(SALESFORCE_MTLS_DEPLOYMENT_NOTE, /mTLS/);
 });
 
-test('validateSalesforceWebhookSecret rejects a tampered body', () => {
+test('validateSalesforceWebhookSecret rejects a header with the wrong secret', () => {
   const rawPayload = JSON.stringify(accountPayload);
-  const tamperedPayload = JSON.stringify({
-    ...accountPayload,
-    data: { ...accountPayload.data, Name: 'Mallory Corp' },
-  });
   const secret = 'salesforce-webhook-secret';
-  const signature = computeSalesforceWebhookSecret(rawPayload, secret);
 
   const invalid = validateSalesforceWebhookSecret(
-    tamperedPayload,
-    { [SALESFORCE_WEBHOOK_SECRET_HEADER]: signature },
+    rawPayload,
+    { [SALESFORCE_WEBHOOK_SECRET_HEADER]: 'wrong-secret-value' },
     secret,
   );
 
@@ -75,12 +70,34 @@ test('validateSalesforceWebhookSecret rejects a tampered body', () => {
   assert.throws(
     () =>
       normalizeSalesforceWebhook(
-        tamperedPayload,
-        { [SALESFORCE_WEBHOOK_SECRET_HEADER]: signature },
+        rawPayload,
+        { [SALESFORCE_WEBHOOK_SECRET_HEADER]: 'wrong-secret-value' },
         { webhookSecret: secret },
       ),
     /invalid-secret/,
   );
+});
+
+test('validateSalesforceWebhookSecret accepts when header matches secret regardless of body content', () => {
+  // Body is irrelevant to Salesforce shared-secret verification — verifier
+  // must accept the header even if the body has been modified, because it
+  // never participates in the signature.
+  const tamperedPayload = JSON.stringify({
+    ...accountPayload,
+    data: { ...accountPayload.data, Name: 'Mallory Corp' },
+  });
+  const secret = 'salesforce-webhook-secret';
+
+  const result = validateSalesforceWebhookSecret(
+    tamperedPayload,
+    { [SALESFORCE_WEBHOOK_SECRET_HEADER]: secret },
+    secret,
+  );
+
+  assert.equal(result.ok, true);
+  // computeSalesforceWebhookSecret is now a deprecated identity helper —
+  // it returns the configured secret since no HMAC is computed.
+  assert.equal(computeSalesforceWebhookSecret(tamperedPayload, secret), secret);
 });
 
 test('validateSalesforceWebhookSecret rejects a missing X-SFDC-Webhook-Secret header', () => {
