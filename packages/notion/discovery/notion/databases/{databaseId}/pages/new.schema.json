@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Notion database page",
+  "type": "object",
+  "required": [
+    "properties"
+  ],
+  "properties": {
+    "properties": {
+      "type": "object",
+      "description": "Serialized Notion property map. Each property value should match the adapter property serializer shape.",
+      "additionalProperties": true
+    },
+    "children": {
+      "type": "array",
+      "description": "Optional child blocks for the new page.",
+      "items": {
+        "type": "object",
+        "description": "Notion block object.",
+        "additionalProperties": true
+      }
+    },
+    "markdown": {
+      "type": "string",
+      "description": "Optional markdown body. When present the adapter uses the Notion markdown API version."
+    }
+  },
+  "additionalProperties": false
+}

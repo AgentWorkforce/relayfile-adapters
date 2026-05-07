@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create ClickUp space list",
+  "type": "object",
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "List name."
+    },
+    "content": {
+      "type": "string",
+      "description": "List description."
+    },
+    "due_date": {
+      "type": "integer",
+      "description": "Due date as Unix epoch milliseconds."
+    },
+    "priority": {
+      "type": "integer",
+      "description": "ClickUp priority id."
+    },
+    "assignee": {
+      "type": "string",
+      "description": "Assignee user id."
+    },
+    "status": {
+      "type": "string",
+      "description": "List status."
+    }
+  },
+  "additionalProperties": false
+}

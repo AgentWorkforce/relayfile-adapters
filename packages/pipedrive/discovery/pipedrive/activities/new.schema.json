@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Pipedrive activity",
+  "type": "object",
+  "required": [
+    "subject"
+  ],
+  "properties": {
+    "subject": {
+      "type": "string",
+      "description": "Activity subject."
+    },
+    "type": {
+      "type": "string",
+      "description": "Activity type."
+    },
+    "done": {
+      "type": "boolean",
+      "description": "Whether the activity is complete."
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Due date in YYYY-MM-DD form."
+    },
+    "due_time": {
+      "type": "string",
+      "description": "Due time in HH:MM form."
+    },
+    "duration": {
+      "type": "string",
+      "description": "Duration in HH:MM form."
+    },
+    "note": {
+      "type": "string",
+      "description": "Activity note."
+    },
+    "deal_id": {
+      "type": "integer",
+      "description": "Linked deal id."
+    },
+    "person_id": {
+      "type": "integer",
+      "description": "Linked person id."
+    },
+    "org_id": {
+      "type": "integer",
+      "description": "Linked organization id."
+    },
+    "user_id": {
+      "type": "integer",
+      "description": "Owner user id."
+    }
+  },
+  "additionalProperties": false
+}

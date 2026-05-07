@@ -1,0 +1,8 @@
+{
+  "properties": {
+    "Name": {
+      "type": "title",
+      "value": "Replace example page title"
+    }
+  }
+}

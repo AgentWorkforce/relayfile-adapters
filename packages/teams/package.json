@@ -14,7 +14,8 @@
   "files": [
     "dist",
     "README.md",
-    "teams.mapping.yaml"
+    "teams.mapping.yaml",
+    "discovery"
   ],
   "scripts": {
     "build": "tsc",

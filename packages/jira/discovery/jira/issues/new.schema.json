@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Jira issue",
+  "type": "object",
+  "required": [
+    "fields"
+  ],
+  "properties": {
+    "fields": {
+      "type": "object",
+      "description": "Jira issue fields.",
+      "properties": {
+        "project": {
+          "type": "object",
+          "description": "Project object. Usually includes `key` or `id`.",
+          "additionalProperties": true
+        },
+        "summary": {
+          "type": "string",
+          "description": "Issue summary."
+        },
+        "issuetype": {
+          "type": "object",
+          "description": "Issue type object. Usually includes `name` or `id`.",
+          "additionalProperties": true
+        },
+        "description": {
+          "type": "object",
+          "description": "Jira rich-text description document.",
+          "additionalProperties": true
+        },
+        "priority": {
+          "type": "object",
+          "description": "Priority object. Usually includes `name` or `id`.",
+          "additionalProperties": true
+        },
+        "labels": {
+          "type": "array",
+          "description": "Issue labels.",
+          "items": {
+            "type": "string",
+            "description": "Issue label."
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

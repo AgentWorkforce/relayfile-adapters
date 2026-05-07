@@ -1,0 +1,11 @@
+{
+  "fields": {
+    "project": {
+      "key": "PROJ"
+    },
+    "summary": "Replace example summary",
+    "issuetype": {
+      "name": "Task"
+    }
+  }
+}

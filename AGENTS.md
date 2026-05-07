@@ -182,6 +182,17 @@ diff \
 
 `webhook-server` is intentionally excluded (it's a server, not an npm-published adapter). Any other directory under `packages/` that doesn't appear in `publish.yml` is a forgotten registration.
 
+### Adapter writeback discovery is required
+
+Every adapter write endpoint that exposes a `new.json` template must also ship two sibling artifacts in the adapter discovery tree:
+
+1. `new.schema.json` — JSON Schema draft 2020-12 for the accepted write document.
+2. `new.example.json` — a minimal valid example document.
+
+Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, write endpoint table, and short agent usage flow. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, required vs optional fields must be explicit, and provider enum values must be represented as `enum` values.
+
+When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
+
 <!-- PRPM_MANIFEST_START -->
 
 <skills_system priority="1">

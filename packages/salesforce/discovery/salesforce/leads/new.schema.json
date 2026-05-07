@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Salesforce lead",
+  "type": "object",
+  "required": [],
+  "description": "Salesforce sObject fields for the target object type.",
+  "properties": {},
+  "additionalProperties": {
+    "description": "Writable Salesforce sObject field value. Use Salesforce object metadata to discover required fields for the object type."
+  }
+}

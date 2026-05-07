@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Jira issue comment",
+  "type": "object",
+  "required": [
+    "body"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "description": "Jira rich-text document body. A plain string body is also accepted by the resolver.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

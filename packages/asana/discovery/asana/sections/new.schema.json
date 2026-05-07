@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Asana section",
+  "type": "object",
+  "required": [
+    "name",
+    "project"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Section name."
+    },
+    "project": {
+      "type": "string",
+      "description": "Project gid that will contain the section."
+    }
+  },
+  "additionalProperties": false
+}
