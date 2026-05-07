@@ -209,25 +209,9 @@ function buildIssueCreate(content: string): LinearWritebackRequest {
 }
 
 /**
- * Server-managed fields that must never be forwarded as part of an
- * `IssueUpdateInput`. Linear rejects updates that try to mutate these.
- */
-const ISSUE_UPDATE_DENYLIST = new Set([
-  'id',
-  'identifier',
-  'createdAt',
-  'updatedAt',
-  'archivedAt',
-  'url',
-  'team',
-  'creator',
-  'parent',
-]);
-
-/**
  * Envelope marker fields written by `LinearAdapter.renderContent()`. When the
  * payload presents itself as the synced envelope (rather than a bare update
- * input), unwrap to the inner `payload` before applying the denylist.
+ * input), unwrap to the inner `payload` before applying the allowlist.
  *
  * Without this step, a round-tripped synced file would forward `provider`,
  * `workspaceId`, `objectType`, etc. into the GraphQL mutation and Linear
@@ -241,15 +225,51 @@ function looksLikeSyncedEnvelope(payload: Record<string, unknown>): boolean {
 }
 
 /**
+ * Fields Linear's `IssueUpdateInput` accepts. We use an explicit allowlist
+ * (rather than a denylist) so that synced-file fields the read API returns
+ * — `state_name`, `assignee_name`, `priority_label`, `created_at`, `_webhook`,
+ * etc. — get silently dropped instead of being forwarded into the mutation
+ * and rejected with `Field "X" is not defined by type "IssueUpdateInput"`.
+ *
+ * Mirrors the field set buildIssueCreate already accepts (which is itself a
+ * subset of `IssueCreateInput`), plus update-specific fields that are
+ * commonly edited in a synced-file workflow:
+ *   - `subscriberIds`     — change watchers
+ *   - `sortOrder`         — manual reordering
+ *   - `descriptionData`   — Linear's prosemirror-doc form of `description`
+ *
+ * If you need to set a field not in this list (e.g. `addedLabelIds` /
+ * `removedLabelIds` for incremental label changes), add it here and add a
+ * regression test in `__tests__/writeback-allowlist.test.ts`.
+ */
+const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'title',
+  'description',
+  'descriptionData',
+  'priority',
+  'assigneeId',
+  'stateId',
+  'projectId',
+  'cycleId',
+  'labelIds',
+  'dueDate',
+  'estimate',
+  'parentId',
+  'subscriberIds',
+  'sortOrder',
+]);
+
+/**
  * Build an `issueUpdate` mutation request for the writeback engine.
  *
  * Accepts two payload shapes:
  *   - the full synced envelope produced by `LinearAdapter.renderContent()`,
  *     with editable fields under `payload`. We unwrap automatically.
- *   - a bare update input where the top-level object IS the input (the form
- *     a hand-written workflow or specialist agent typically produces).
- *
- * Server-managed fields are stripped in either case.
+ *   - a bare update input where the top-level object IS the input — covers
+ *     both hand-written workflow payloads and edits to the synced-file
+ *     denormalized read (where the user keeps the full `{state_name,
+ *     assignee_name, ...}` envelope and just changes a field). Synced-only
+ *     fields are silently dropped via the allowlist.
  */
 function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequest {
   const parsed = parseJsonObject(content);
@@ -259,11 +279,14 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
 
   const input: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
-    if (ISSUE_UPDATE_DENYLIST.has(key)) continue;
+    if (!ISSUE_UPDATE_ALLOWLIST.has(key)) continue;
     input[key] = value;
   }
   if (Object.keys(input).length === 0) {
-    throw new Error('issues/<id>.json update writeback requires at least one mutable field');
+    throw new Error(
+      'issues/<id>.json update writeback requires at least one mutable field ' +
+        '(see ISSUE_UPDATE_ALLOWLIST in @relayfile/adapter-linear/writeback for the accepted set)',
+    );
   }
 
   return {
