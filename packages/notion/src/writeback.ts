@@ -57,11 +57,17 @@ function formatUuid(hex32: string): string {
  *   - PATCH /notion/pages/<slug>--<id>/content.md                  → page markdown (top-level)
  *   - POST  /notion/databases/<db>/pages/<slug>--<id>/comments.json → comment create
  *   - POST  /notion/pages/<slug>--<id>/comments.json               → comment create (top-level)
+ *   - POST  /notion/databases/<db>/pages/new.json                   → create page in database
  *   - POST  /notion/databases/<db>/pages                            → create page in database
  *
  * Throws when no rule matches the path.
  */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
+  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages(?:\/new\.json)?\/?$/);
+  if (createDatabasePageMatch) {
+    return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
+  }
+
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (databasePageMatch) {
     return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
@@ -90,11 +96,6 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   const standaloneCommentsMatch = path.match(/^\/notion\/pages\/([^/]+)\/comments\.json$/);
   if (standaloneCommentsMatch) {
     return buildCommentWriteback(extractNotionId(standaloneCommentsMatch[1]), content);
-  }
-
-  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/?$/);
-  if (createDatabasePageMatch) {
-    return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
   }
 
   throw new Error(`No Notion writeback rule matched ${path}`);

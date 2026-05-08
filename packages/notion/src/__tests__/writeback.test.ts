@@ -60,4 +60,24 @@ describe('writeback rule matching', () => {
       rich_text: [{ type: 'text', text: { content: 'Looks good', link: null } }],
     });
   });
+
+  it('maps database page new.json templates to page creation', () => {
+    const request = resolveWritebackRequest(
+      '/notion/databases/db-1/pages/new.json',
+      JSON.stringify({
+        properties: {
+          Name: {
+            id: 'title',
+            type: 'title',
+            value: 'New page title',
+          },
+        },
+      }),
+    );
+
+    assert.strictEqual(request.action, 'create_page');
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.endpoint, '/v1/pages');
+    assert.deepStrictEqual(request.body.parent, { database_id: 'db-1' });
+  });
 });

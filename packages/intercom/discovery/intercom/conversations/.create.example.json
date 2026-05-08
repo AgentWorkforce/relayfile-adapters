@@ -1,0 +1,7 @@
+{
+  "from": {
+    "type": "user",
+    "id": "replace-user-id"
+  },
+  "body": "Replace example conversation body."
+}

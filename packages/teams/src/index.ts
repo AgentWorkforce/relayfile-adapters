@@ -72,3 +72,5 @@ export type {
   WritebackTarget,
 } from './types.js';
 export type { ValidationResult } from './notification/validator.js';
+
+export * from './resources.js';
