@@ -16,18 +16,22 @@ on:
           - slack
           - linear
           - mailgun
+          - mixpanel
           - notion
           - hubspot
           - salesforce
           - pipedrive
           - jira
           - asana
+          - airtable
+          - calendly
           - shopify
           - clickup
           - intercom
           - zendesk
-          - stripe
+          - segment
           - sendgrid
+          - stripe
         default: "all"
       version:
         description: "Version bump type"
@@ -92,7 +96,7 @@ jobs:
             # Keep this list in sync with the `package` input options above and
             # the directories under packages/. See AGENTS.md → "Adding a new
             # adapter package" for the checklist that gates new entries here.
-            echo "packages=core github gitlab teams slack linear mailgun notion hubspot salesforce pipedrive jira asana shopify clickup intercom zendesk stripe sendgrid" >> "$GITHUB_OUTPUT"
+            echo "packages=core github gitlab teams slack linear mailgun mixpanel notion hubspot salesforce pipedrive jira asana airtable calendly shopify clickup intercom zendesk segment sendgrid stripe" >> "$GITHUB_OUTPUT"
           else
             echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
           fi
