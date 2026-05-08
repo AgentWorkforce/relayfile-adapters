@@ -232,6 +232,20 @@ describe('writeback routing', () => {
     assert.strictEqual(newMessageResult?.objectType, 'message');
     assert.strictEqual(newMessageResult?.objectId, 'team-1:channel-1:new');
     assert.strictEqual(newMessageResult?.url, 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages');
+
+    const newReplyResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1/replies/new.json', {
+      text: '<p>Hello new thread reply</p>',
+    });
+    assert.strictEqual(newReplyResult?.objectType, 'reply');
+    assert.strictEqual(newReplyResult?.objectId, 'team-1:channel-1:message-1:new');
+    assert.strictEqual(newReplyResult?.url, 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages/message-1/replies');
+
+    const newChatMessageResult = resolveWriteback('/teams/chats/chat-1/messages/new.json', {
+      text: '<p>Hello new chat message</p>',
+    });
+    assert.strictEqual(newChatMessageResult?.objectType, 'chat_message');
+    assert.strictEqual(newChatMessageResult?.objectId, 'chat-1:new');
+    assert.strictEqual(newChatMessageResult?.url, 'https://graph.microsoft.com/v1.0/chats/chat-1/messages');
   });
 });
 
