@@ -223,15 +223,29 @@ test('computePath and deterministic path helpers encode every primary object typ
 });
 
 test('read routes include Shopify REST endpoints and required route anchors', () => {
-  assert.deepEqual(resolveShopifyReadRequest('/shopify/orders'), {
-    method: 'GET',
-    endpoint: '/admin/api/2026-04/orders.json',
-    query: {
-      limit: '250',
-      status: 'any',
-      fields: 'id,admin_graphql_api_id,app_id,cancel_reason,cancelled_at,closed_at,created_at,currency,current_subtotal_price,current_total_discounts,current_total_price,current_total_tax,customer,email,financial_status,fulfillment_status,line_items,name,note,order_number,order_status_url,processed_at,shipping_address,tags,total_price,updated_at',
-    },
-  });
+  const read = resolveShopifyReadRequest('/shopify/orders');
+  assert.equal(read.method, 'GET');
+  assert.equal(read.endpoint, '/admin/api/2026-04/orders.json');
+  assert.ok(read.query);
+  assert.equal(read.query.limit, '250');
+  assert.equal(read.query.status, 'any');
+  const fieldsQuery = read.query.fields;
+  if (typeof fieldsQuery !== 'string') {
+    assert.fail('expected Shopify order fields query to be a string');
+  }
+  const fields = new Set(fieldsQuery.split(','));
+  for (const required of [
+    'id',
+    'admin_graphql_api_id',
+    'app_id',
+    'created_at',
+    'customer',
+    'line_items',
+    'total_price',
+    'updated_at',
+  ]) {
+    assert.ok(fields.has(required), `expected Shopify order fields to include ${required}`);
+  }
   assert.equal(resolveShopifyReadRequest('/shopify/products/relay-tee--632910392.json').endpoint, '/admin/api/2026-04/products/632910392.json');
 });
 

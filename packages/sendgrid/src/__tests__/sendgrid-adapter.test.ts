@@ -152,6 +152,68 @@ test('ingestWebhook writes every SendGrid event in a batched event payload', asy
   ]);
 });
 
+test('ingestWebhook preserves successful SendGrid batch writes when one event fails', async () => {
+  const writes: WriteFileInput[] = [];
+  const attempts: string[] = [];
+  const client: RelayFileClientLike = {
+    async writeFile(input) {
+      attempts.push(input.path);
+      if (input.path === '/sendgrid/events/evt_opened.json') {
+        throw new Error('simulated write failure');
+      }
+      writes.push(input);
+      return { created: true };
+    },
+    async deleteFile() {
+      return undefined;
+    },
+  };
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
+      return { status: 200, headers: {}, data: null as never };
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+  const adapter = new SendGridAdapter(client, provider);
+
+  const result = await adapter.ingestWebhook('workspace_123', [
+    {
+      sg_event_id: 'evt_delivered',
+      sg_message_id: 'msg_123',
+      email: 'customer@example.com',
+      event: 'delivered',
+      timestamp: 1_774_000_000,
+    },
+    {
+      sg_event_id: 'evt_opened',
+      sg_message_id: 'msg_123',
+      email: 'customer@example.com',
+      event: 'open',
+      timestamp: 1_774_000_001,
+    },
+  ]);
+
+  assert.equal(result.filesWritten, 1);
+  assert.deepEqual(result.paths, [
+    '/sendgrid/events/evt_delivered.json',
+    '/sendgrid/events/evt_opened.json',
+  ]);
+  assert.deepEqual(result.errors, [
+    {
+      path: '/sendgrid/events/evt_opened.json',
+      error: 'simulated write failure',
+    },
+  ]);
+  assert.deepEqual(attempts, [
+    '/sendgrid/events/evt_delivered.json',
+    '/sendgrid/events/evt_opened.json',
+  ]);
+  assert.deepEqual(writes.map((write) => write.path), ['/sendgrid/events/evt_delivered.json']);
+});
+
 test('ingestWebhook writes SendGrid contact payloads with marketing semantics', async () => {
   const writes: WriteFileInput[] = [];
   const adapter = createAdapter(writes);

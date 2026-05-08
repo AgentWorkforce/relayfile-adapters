@@ -143,15 +143,9 @@ export class SendGridAdapter extends IntegrationAdapter {
     workspaceId: string,
     event: NormalizedWebhook | SendGridWebhookPayload,
   ): Promise<IngestResult> {
+    let normalizedEvents: NormalizedWebhook[];
     try {
-      const normalizedEvents = this.normalizeEvents(event);
-      const results: IngestResult[] = [];
-
-      for (const normalized of normalizedEvents) {
-        results.push(await this.ingestNormalizedWebhook(workspaceId, normalized));
-      }
-
-      return aggregateIngestResults(results);
+      normalizedEvents = this.normalizeEvents(event);
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
       return {
@@ -167,6 +161,29 @@ export class SendGridAdapter extends IntegrationAdapter {
         ],
       };
     }
+
+    const results: IngestResult[] = [];
+    for (const normalized of normalizedEvents) {
+      try {
+        results.push(await this.ingestNormalizedWebhook(workspaceId, normalized));
+      } catch (error) {
+        const path = computeSendGridPath(normalized.objectType, normalized.objectId);
+        results.push({
+          filesWritten: 0,
+          filesUpdated: 0,
+          filesDeleted: 0,
+          paths: [path],
+          errors: [
+            {
+              path,
+              error: toErrorMessage(error),
+            },
+          ],
+        });
+      }
+    }
+
+    return aggregateIngestResults(results);
   }
 
   override computePath(objectType: string, objectId: string): string {
