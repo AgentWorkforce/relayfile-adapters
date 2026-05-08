@@ -48,7 +48,7 @@ describe('scaffold', () => {
     });
 
     assert.strictEqual(result.filesWritten, 1);
-    assert.strictEqual(result.paths[0], '/github/repos/AgentWorkforce/relayfile/pulls/42/metadata.json');
+    assert.strictEqual(result.paths[0], '/github/repos/AgentWorkforce/relayfile/pulls/42/meta.json');
   });
 
   it('GitHubAdapter loads the copied schema mapping for webhook path computation', async () => {

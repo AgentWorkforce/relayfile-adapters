@@ -12,6 +12,7 @@ import {
   linearUserPath,
   normalizeLinearObjectType,
 } from './path-mapper.js';
+import { getLinearCommentHumanReadable, getLinearIssueHumanReadable } from './queries.js';
 import { LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   LinearAdapterConfig,
@@ -146,7 +147,7 @@ export class LinearAdapter extends IntegrationAdapter {
       const path = computeLinearPath(
         normalized.objectType,
         normalized.objectId,
-        readIssueTitle(normalized.objectType, normalized.payload),
+        readPathHumanReadable(normalized.objectType, normalized.payload),
       );
 
       if (this.isRemoveEvent(normalized)) {
@@ -419,13 +420,13 @@ function applyIssueSemantics(
   }
 
   if (issue.parent?.id) {
-    relations.add(linearIssuePath(issue.parent.id));
+    relations.add(buildLinearIssueReferencePath(issue.parent));
     addStringProperty(properties, 'linear.parent_id', issue.parent.id);
   }
 
   for (const child of issue.children ?? []) {
     if (child.id) {
-      relations.add(linearIssuePath(child.id));
+      relations.add(buildLinearIssueReferencePath(child));
     }
   }
 
@@ -450,12 +451,15 @@ function applyIssueSemantics(
   addFirstStringProperty(properties, 'linear.team_name', properties['linear.team_name'], issue.team_name);
 }
 
-function readIssueTitle(objectType: string, payload: Record<string, unknown>): string | undefined {
-  if (normalizeLinearObjectType(objectType) !== 'issue') {
-    return undefined;
+function readPathHumanReadable(objectType: string, payload: Record<string, unknown>): string | undefined {
+  switch (normalizeLinearObjectType(objectType)) {
+    case 'issue':
+      return getLinearIssueHumanReadable(buildLinearIssueHumanReadableInput(payload));
+    case 'comment':
+      return getLinearCommentHumanReadable(buildLinearCommentHumanReadableInput(payload));
+    default:
+      return undefined;
   }
-
-  return asString(payload.title);
 }
 
 function applyCommentSemantics(
@@ -489,7 +493,7 @@ function applyCommentSemantics(
   addFirstStringProperty(properties, 'linear.author_email', properties['linear.author_email'], comment.user_email, comment.author_email);
 
   if (comment.issue?.id) {
-    relations.add(linearIssuePath(comment.issue.id));
+    relations.add(buildLinearIssueReferencePath(comment.issue));
     addStringProperty(properties, 'linear.issue_id', comment.issue.id);
     addStringProperty(properties, 'linear.issue_identifier', comment.issue.identifier);
     addStringProperty(properties, 'linear.issue_title', comment.issue.title);
@@ -497,7 +501,17 @@ function applyCommentSemantics(
   }
   const issueId = asString(comment.issue_id);
   if (issueId) {
-    relations.add(linearIssuePath(issueId));
+    relations.add(
+      linearIssuePath(
+        issueId,
+        getLinearIssueHumanReadable(
+          buildLinearIssueHumanReadableInput({
+            identifier: comment.issue_identifier,
+            title: comment.issue_title,
+          }),
+        ),
+      ),
+    );
     addStringProperty(properties, 'linear.issue_id', issueId);
   }
   addFirstStringProperty(properties, 'linear.issue_identifier', properties['linear.issue_identifier'], comment.issue_identifier);
@@ -543,6 +557,43 @@ function applyProjectSemantics(
       relations.add(linearTeamPath(teamId));
     }
   }
+}
+
+function buildLinearIssueReferencePath(issue: {
+  id: string;
+  identifier?: string | null;
+  title?: string | null;
+}): string {
+  return linearIssuePath(issue.id, getLinearIssueHumanReadable(issue));
+}
+
+function buildLinearIssueHumanReadableInput(record: Record<string, unknown>): {
+  identifier?: string | null;
+  title?: string | null;
+} {
+  const identifier = asString(record.identifier);
+  const title = asString(record.title);
+  return {
+    ...(identifier ? { identifier } : {}),
+    ...(title ? { title } : {}),
+  };
+}
+
+function buildLinearCommentIssueInput(issue: Record<string, unknown> | undefined): { identifier?: string | null } | undefined {
+  const identifier = asString(issue?.identifier);
+  return identifier ? { identifier } : undefined;
+}
+
+function buildLinearCommentHumanReadableInput(record: Record<string, unknown>): {
+  body?: string | null;
+  issue?: { identifier?: string | null } | null;
+} {
+  const body = asString(record.body);
+  const issue = buildLinearCommentIssueInput(getRecord(record.issue));
+  return {
+    ...(body ? { body } : {}),
+    ...(issue ? { issue } : {}),
+  };
 }
 
 function applyCycleSemantics(properties: Record<string, string>, payload: LinearRecord): void {

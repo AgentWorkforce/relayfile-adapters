@@ -409,18 +409,23 @@ describe('bulk ingest', () => {
     assert.strictEqual(result.filesUpdated, 0);
     assert.deepStrictEqual(result.errors, []);
     assert.strictEqual(result.paths.length, 8);
-    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42/diff.patch'), mockDiff);
-    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42/meta.json') ?? '{}');
+    assert.strictEqual(
+      writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/diff.patch'),
+      mockDiff,
+    );
+    const meta = JSON.parse(
+      writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json') ?? '{}',
+    );
     assert.strictEqual(meta.number, 42);
     assert.strictEqual(meta.title, mockPRPayload.title);
     assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
     assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
     assert.strictEqual(
-      writes.get('/github/repos/octocat/hello-world/pulls/42/files/src/index.ts'),
+      writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/index.ts'),
       decodeFixtureContent(mockFileContents, 'src/index.ts'),
     );
     assert.strictEqual(
-      writes.get('/github/repos/octocat/hello-world/pulls/42/base/src/index.ts'),
+      writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/base/src/index.ts'),
       decodeFixtureContent(mockBaseFileContents, 'src/index.ts'),
     );
     assert.strictEqual(metadataCache.set.mock.calls.length, 4);
