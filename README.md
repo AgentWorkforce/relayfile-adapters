@@ -1,11 +1,49 @@
+<p align="center">
+  <img src="assets/banner.png" alt="Relayfile Adapters — map any SaaS into the relayfile filesystem" />
+</p>
+
 # Relayfile Adapters
 
-Map external services to the [relayfile](https://github.com/AgentWorkforce/relayfile) Virtual File System (VFS).
+**Map any SaaS API into the relayfile filesystem — agents read with `cat`, write by saving files.**
 
-Each adapter has exactly 3 jobs:
-1. **Path mapping** — compute VFS path from webhook events
-2. **Webhook normalization** — convert provider-specific payloads to `WebhookInput`
-3. **Writeback** — post changes back to source API via provider proxy
+An adapter is the small, focused piece of code that turns a SaaS integration into a directory tree. It tells [relayfile](https://github.com/AgentWorkforce/relayfile) where each resource lives in the virtual filesystem, how to interpret incoming webhooks from that service, and how to push agent edits back to the source API. Once an adapter exists for a service, agents can interact with it the same way they interact with any other file: open it, read it, write to it, list it, watch it.
+
+Each adapter has exactly three jobs. **Path mapping** computes the VFS path for an object (a PR, an issue, a Slack message). **Webhook normalization** converts provider-specific event payloads into a uniform `WebhookInput` shape so the rest of the system doesn't care which SaaS sent it. **Writeback** takes a file an agent wrote and posts it back to the source API through a provider proxy. That's the whole contract — three functions, and a SaaS becomes a folder.
+
+### What agents see
+
+Agents don't use adapters, providers, or even the SDK. They read and write files — that's it:
+
+```bash
+# Agent reads a PR — it's a file on disk
+cat /relayfile/github/repos/acme/api/pulls/42/metadata.json
+
+# Agent writes a review — it writes a file
+echo '{"body": "LGTM! Ship it.", "event": "APPROVE"}' \
+  > /relayfile/github/repos/acme/api/pulls/42/reviews/agent-review.json
+
+# Done. The review is now posted to GitHub.
+# The agent didn't import anything, call any API, or authenticate.
+```
+
+That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
+
+1. Relayfile detects the file write
+2. The adapter matches the path (`/github/.../reviews/`) to a writeback rule
+3. The provider authenticates and posts the review to GitHub's API
+
+**The agent doesn't even know GitHub exists.** It just sees files.
+
+## Coverage ceiling
+
+The reason this architecture has a structurally larger reach than per-resource VFS projects is the split between **adapters** and **providers**.
+
+- An **adapter** defines path mapping + webhook normalization + writeback for an *integration class* — issue trackers, chat platforms, CRMs, code hosts, and so on.
+- A **provider** handles auth and HTTP proxying across an entire ecosystem of apps. [Nango](https://www.nango.dev) ships ~200 integrations. [Composio](https://composio.dev) ships ~250. [Pipedream](https://pipedream.com) ships 2,000+. One provider integration in relayfile unlocks every app that provider supports.
+
+You don't write a new adapter per app. You write the *integration shape* once — what a "PR" looks like, what a "ticket" looks like, what a "chat message" looks like — and the provider layer handles the long tail of authenticating to and calling the actual services.
+
+**Multiplicative coverage, not additive.** Each adapter × each provider's app catalog = the addressable surface. That ceiling scales with the provider ecosystem, not with how many integrations relayfile has personally written.
 
 ## Quick Start
 
@@ -64,30 +102,6 @@ app.post("/webhooks/github", async (req, res) => {
 });
 ```
 
-### What agents see
-
-Agents don't use adapters, providers, or even the SDK. They read and write files — that's it:
-
-```bash
-# Agent reads a PR — it's a file on disk
-cat /relayfile/github/repos/acme/api/pulls/42/metadata.json
-
-# Agent writes a review — it writes a file
-echo '{"body": "LGTM! Ship it.", "event": "APPROVE"}' \
-  > /relayfile/github/repos/acme/api/pulls/42/reviews/agent-review.json
-
-# Done. The review is now posted to GitHub.
-# The agent didn't import anything, call any API, or authenticate.
-```
-
-That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
-
-1. Relayfile detects the file write
-2. The adapter matches the path (`/github/.../reviews/`) to a writeback rule
-3. The provider authenticates and posts the review to GitHub's API
-
-**The agent doesn't even know GitHub exists.** It just sees files.
-
 For agents using the SDK programmatically (e.g., in a Node.js agent framework):
 
 ```ts
@@ -143,17 +157,29 @@ GitHub/GitLab/Slack/...
 | Package | Description |
 |---------|-------------|
 | `@relayfile/adapter-core` | Schema-driven adapter generator — build adapters from OpenAPI specs |
+| `@relayfile/adapter-airtable` | Airtable (bases, tables, records) |
+| `@relayfile/adapter-asana` | Asana (projects, tasks, sections) |
+| `@relayfile/adapter-calendly` | Calendly (event types, scheduled events, invitees) |
+| `@relayfile/adapter-clickup` | ClickUp (spaces, lists, tasks) |
 | `@relayfile/adapter-github` | GitHub (PRs, issues, commits, checks, reviews) |
 | `@relayfile/adapter-gitlab` | GitLab (MRs, issues, pipelines, commits) |
-| `@relayfile/adapter-teams` | Microsoft Teams (channels, messages, chats) |
-| `@relayfile/adapter-slack` | Slack (channels, messages, reactions) |
+| `@relayfile/adapter-hubspot` | HubSpot (contacts, deals, companies, tickets) |
+| `@relayfile/adapter-intercom` | Intercom (conversations, contacts, articles) |
+| `@relayfile/adapter-jira` | Jira (issues, projects, sprints) |
 | `@relayfile/adapter-linear` | Linear (issues, projects, cycles) |
+| `@relayfile/adapter-mailgun` | Mailgun (domains, messages, events) |
+| `@relayfile/adapter-mixpanel` | Mixpanel (events, profiles, cohorts) |
 | `@relayfile/adapter-notion` | Notion (pages, databases, blocks, comments) |
+| `@relayfile/adapter-pipedrive` | Pipedrive (deals, persons, organizations, activities) |
+| `@relayfile/adapter-salesforce` | Salesforce (leads, accounts, opportunities, contacts) |
+| `@relayfile/adapter-segment` | Segment (sources, destinations, tracking events) |
+| `@relayfile/adapter-sendgrid` | SendGrid (templates, campaigns, contacts) |
+| `@relayfile/adapter-shopify` | Shopify (products, orders, customers) |
+| `@relayfile/adapter-slack` | Slack (channels, messages, reactions) |
+| `@relayfile/adapter-stripe` | Stripe (customers, charges, subscriptions, invoices) |
+| `@relayfile/adapter-teams` | Microsoft Teams (channels, messages, chats) |
+| `@relayfile/adapter-zendesk` | Zendesk (tickets, users, organizations) |
 | `@relayfile/webhook-server` | Hono webhook receiver for adapter-driven relayfile ingestion |
-
-## Mapping YAML Specification
-
-See [docs/MAPPING_YAML_SPEC.md](docs/MAPPING_YAML_SPEC.md) for the formal specification of the mapping YAML format used by `@relayfile/adapter-core`.
 
 ## Mapping YAML Specification
 
@@ -197,6 +223,12 @@ npm install
 npx turbo build
 npx turbo test
 ```
+
+## How this compares
+
+Other "give agents a filesystem" projects exist (e.g. [Mirage](https://github.com/strukto-ai/mirage)), and their work in this space is good. The scope is different: those projects focus on infrastructure and storage primitives — S3, Postgres, Redis, GDrive — exposed as a unified mount. Relayfile adapters focus on **SaaS integrations** — Linear, Notion, GitHub, Slack, HubSpot, Salesforce, Pipedrive, Jira, and the rest — with a uniform read/write/writeback contract per provider. Different scopes, both useful. Pick the one your work lives in.
+
+Relayfile's structural edge for SaaS coverage is the adapter + provider split: one provider integration unlocks every app the provider supports. That's how the resource ceiling scales.
 
 ## License
 
