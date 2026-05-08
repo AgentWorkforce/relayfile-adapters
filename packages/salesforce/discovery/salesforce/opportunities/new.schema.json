@@ -2,10 +2,80 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Create Salesforce opportunity",
   "type": "object",
-  "required": [],
+  "required": [
+    "Name",
+    "StageName",
+    "CloseDate"
+  ],
   "description": "Salesforce sObject fields for the target object type.",
-  "properties": {},
+  "propertyNames": {
+    "pattern": "^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$"
+  },
+  "properties": {
+    "Name": {
+      "type": "string",
+      "description": "Opportunity name."
+    },
+    "StageName": {
+      "type": "string",
+      "description": "Opportunity stage name."
+    },
+    "CloseDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected close date in YYYY-MM-DD form."
+    },
+    "Amount": {
+      "type": "number",
+      "description": "Opportunity amount."
+    },
+    "AccountId": {
+      "type": "string",
+      "description": "Linked Account id."
+    },
+    "Type": {
+      "type": "string",
+      "description": "Opportunity type."
+    },
+    "LeadSource": {
+      "type": "string",
+      "description": "Lead source."
+    },
+    "OwnerId": {
+      "type": "string",
+      "description": "Owner user id."
+    },
+    "Description": {
+      "type": "string",
+      "description": "Opportunity description."
+    }
+  },
   "additionalProperties": {
+    "oneOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "number"
+      },
+      {
+        "type": "integer"
+      },
+      {
+        "type": "boolean"
+      },
+      {
+        "type": "null"
+      },
+      {
+        "type": "object",
+        "additionalProperties": true
+      },
+      {
+        "type": "array",
+        "items": true
+      }
+    ],
     "description": "Writable Salesforce sObject field value. Use Salesforce object metadata to discover required fields for the object type."
   }
 }

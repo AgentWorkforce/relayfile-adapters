@@ -7,9 +7,16 @@
   ],
   "properties": {
     "body": {
-      "type": "object",
-      "description": "Jira rich-text document body. A plain string body is also accepted by the resolver.",
-      "additionalProperties": true
+      "description": "Jira rich-text document body, or plain string body.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": true
+        },
+        {
+          "type": "string"
+        }
+      ]
     }
   },
   "additionalProperties": false

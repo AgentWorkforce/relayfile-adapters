@@ -25,11 +25,13 @@
     },
     "due_time": {
       "type": "string",
-      "description": "Due time in HH:MM form."
+      "description": "Due time in HH:MM form.",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
     },
     "duration": {
       "type": "string",
-      "description": "Duration in HH:MM form."
+      "description": "Duration in HH:MM form.",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
     },
     "note": {
       "type": "string",

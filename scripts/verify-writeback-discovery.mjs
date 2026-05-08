@@ -15,8 +15,8 @@ for (const adapter of adapters) {
   }
 
   const adapterMdPath = join(root, 'packages', adapter.slug, 'discovery', adapter.slug, '.adapter.md');
-  await assertFile(adapterMdPath, `${adapter.slug} adapter README`);
-  const adapterMd = await readFile(adapterMdPath, 'utf8');
+  const hasAdapterMd = await assertFile(adapterMdPath, `${adapter.slug} adapter README`);
+  const adapterMd = hasAdapterMd ? await readFile(adapterMdPath, 'utf8') : '';
 
   for (const endpoint of adapter.endpoints) {
     if (!endpoint.path.endsWith('/new.json')) {
@@ -31,13 +31,19 @@ for (const adapter of adapters) {
 
     const schemaFile = join(root, 'packages', adapter.slug, 'discovery', endpoint.schemaPath.slice(1));
     const exampleFile = join(root, 'packages', adapter.slug, 'discovery', endpoint.examplePath.slice(1));
-    await assertFile(schemaFile, endpoint.schemaPath);
-    await assertFile(exampleFile, endpoint.examplePath);
+    const hasSchema = await assertFile(schemaFile, endpoint.schemaPath);
+    const hasExample = await assertFile(exampleFile, endpoint.examplePath);
+    if (!hasSchema || !hasExample) {
+      continue;
+    }
 
-    const schema = JSON.parse(await readFile(schemaFile, 'utf8'));
-    const example = JSON.parse(await readFile(exampleFile, 'utf8'));
+    const schema = await readJson(schemaFile, endpoint.schemaPath);
+    const example = await readJson(exampleFile, endpoint.examplePath);
+    if (!schema || !example) {
+      continue;
+    }
     validateSchema(adapter.slug, endpoint, schema);
-    validateExample(adapter.slug, endpoint, example);
+    validateExample(adapter.slug, endpoint, schema, example);
 
     if (!adapterMd.includes(`\`${endpoint.path}\``) || !adapterMd.includes(`\`${endpoint.schemaPath}\``)) {
       failures.push(`${adapter.slug}: .adapter.md does not list ${endpoint.path} with ${endpoint.schemaPath}`);
@@ -55,8 +61,19 @@ console.log(`Verified ${adapters.reduce((sum, adapter) => sum + adapter.endpoint
 async function assertFile(path, label) {
   try {
     await access(path);
+    return true;
   } catch {
     failures.push(`missing ${label}: ${path}`);
+    return false;
+  }
+}
+
+async function readJson(path, label) {
+  try {
+    return JSON.parse(await readFile(path, 'utf8'));
+  } catch (error) {
+    failures.push(`${label} must contain valid JSON: ${error.message}`);
+    return null;
   }
 }
 
@@ -82,13 +99,13 @@ function validateSchema(adapterSlug, endpoint, schema) {
   }
 }
 
-function validateExample(adapterSlug, endpoint, example) {
+function validateExample(adapterSlug, endpoint, schema, example) {
   if (!example || typeof example !== 'object' || Array.isArray(example)) {
     failures.push(`${adapterSlug}: ${endpoint.examplePath} must contain a JSON object example`);
     return;
   }
 
-  for (const requiredKey of endpoint.schema.required ?? []) {
+  for (const requiredKey of schema.required ?? []) {
     if (!(requiredKey in example)) {
       failures.push(`${adapterSlug}: ${endpoint.examplePath} missing required key ${requiredKey}`);
     }

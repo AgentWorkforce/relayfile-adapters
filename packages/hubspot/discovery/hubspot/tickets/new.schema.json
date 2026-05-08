@@ -4,11 +4,34 @@
   "type": "object",
   "required": [],
   "description": "Provide either a `properties` object or top-level HubSpot writable property keys.",
+  "oneOf": [
+    {
+      "required": [
+        "properties"
+      ],
+      "properties": {
+        "properties": {
+          "type": "object",
+          "minProperties": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "minProperties": 1,
+      "not": {
+        "required": [
+          "properties"
+        ]
+      }
+    }
+  ],
   "properties": {
     "properties": {
       "type": "object",
       "description": "HubSpot CRM property names and values. Read HubSpot object property metadata to discover object-specific keys.",
-      "additionalProperties": true
+      "additionalProperties": true,
+      "minProperties": 1
     }
   },
   "additionalProperties": {

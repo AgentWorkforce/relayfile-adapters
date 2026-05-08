@@ -95,7 +95,7 @@ export const adapters = [
           side: en(['LEFT', 'RIGHT'], 'Diff side for the comment. Defaults to RIGHT.'),
           body: str('Inline comment body.'),
           suggestion: str('Optional suggested replacement text appended to the comment body.'),
-        }), 'Inline review comments. Use an empty array for a body-only review.'),
+        }, { required: ['path', 'line', 'body'] }), 'Inline review comments. Use an empty array for a body-only review.'),
         metadata: obj('Optional submission metadata.', {
           commitSha: str('Commit SHA to anchor the review to.'),
           connectionId: str('Relayfile connection id override.'),
@@ -183,7 +183,13 @@ export const adapters = [
     ],
     endpoints: [
       endpoint('/jira/issues/{issueIdOrKey}/comments/new.json', 'Create Jira issue comment', 'Adds a comment to a Jira issue.', ['body'], {
-        body: obj('Jira rich-text document body. A plain string body is also accepted by the resolver.'),
+        body: {
+          description: 'Jira rich-text document body, or plain string body.',
+          oneOf: [
+            { type: 'object', additionalProperties: true },
+            { type: 'string' },
+          ],
+        },
       }, { body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Replace example comment text.' }] }] } }),
       endpoint('/jira/issues/new.json', 'Create Jira issue', 'Creates a Jira issue.', ['fields'], {
         fields: obj('Jira issue fields.', {
@@ -193,7 +199,7 @@ export const adapters = [
           description: obj('Jira rich-text description document.'),
           priority: obj('Priority object. Usually includes `name` or `id`.'),
           labels: arr(str('Issue label.'), 'Issue labels.'),
-        }),
+        }, { required: ['project', 'summary', 'issuetype'] }),
       }, { fields: { project: { key: 'PROJ' }, summary: 'Replace example summary', issuetype: { name: 'Task' } } }),
       endpoint('/jira/projects/new.json', 'Create Jira project', 'Creates a Jira project.', ['key', 'name', 'projectTypeKey', 'leadAccountId'], {
         key: str('Project key.'),
@@ -271,8 +277,8 @@ export const adapters = [
     ],
     endpoints: [
       endpoint('/pipedrive/deals/new.json', 'Create Pipedrive deal', 'Creates a Pipedrive deal.', ['title'], pipedriveDealProps(), { title: 'Replace example deal title' }),
-      endpoint('/pipedrive/persons/new.json', 'Create Pipedrive person', 'Creates a Pipedrive person.', ['name'], pipedrivePersonProps(), { name: 'Ada Lovelace' }),
-      endpoint('/pipedrive/organizations/new.json', 'Create Pipedrive organization', 'Creates a Pipedrive organization.', ['name'], pipedriveOrganizationProps(), { name: 'Example Inc' }),
+      endpoint('/pipedrive/persons/new.json', 'Create Pipedrive person', 'Creates a Pipedrive person.', ['name'], pipedrivePersonProps(), { name: 'Replace example person name' }),
+      endpoint('/pipedrive/organizations/new.json', 'Create Pipedrive organization', 'Creates a Pipedrive organization.', ['name'], pipedriveOrganizationProps(), { name: 'Replace example organization name' }),
       endpoint('/pipedrive/activities/new.json', 'Create Pipedrive activity', 'Creates a Pipedrive activity.', ['subject'], pipedriveActivityProps(), { subject: 'Replace example activity subject' }),
     ],
   },
@@ -289,11 +295,11 @@ export const adapters = [
       ['/salesforce/cases/<caseId>.json', 'Case records.'],
     ],
     endpoints: [
-      salesforceEndpoint('/salesforce/accounts/new.json', 'Create Salesforce account', 'Creates a Salesforce Account.', { Name: 'Example Inc' }),
-      salesforceEndpoint('/salesforce/contacts/new.json', 'Create Salesforce contact', 'Creates a Salesforce Contact.', { LastName: 'Lovelace', Email: 'ada@example.com' }),
-      salesforceEndpoint('/salesforce/opportunities/new.json', 'Create Salesforce opportunity', 'Creates a Salesforce Opportunity.', { Name: 'Example opportunity', StageName: 'Prospecting', CloseDate: '2026-06-01' }),
-      salesforceEndpoint('/salesforce/leads/new.json', 'Create Salesforce lead', 'Creates a Salesforce Lead.', { LastName: 'Lovelace', Company: 'Example Inc' }),
-      salesforceEndpoint('/salesforce/cases/new.json', 'Create Salesforce case', 'Creates a Salesforce Case.', { Subject: 'Example case' }),
+      salesforceEndpoint('/salesforce/accounts/new.json', 'Create Salesforce account', 'Creates a Salesforce Account.', { Name: 'Replace example account name' }, ['Name'], salesforceAccountProps()),
+      salesforceEndpoint('/salesforce/contacts/new.json', 'Create Salesforce contact', 'Creates a Salesforce Contact.', { LastName: 'Replace example contact last name', Email: 'contact@example.com' }, ['LastName'], salesforceContactProps()),
+      salesforceEndpoint('/salesforce/opportunities/new.json', 'Create Salesforce opportunity', 'Creates a Salesforce Opportunity.', { Name: 'Replace example opportunity name', StageName: 'Prospecting', CloseDate: '2026-06-01' }, ['Name', 'StageName', 'CloseDate'], salesforceOpportunityProps()),
+      salesforceEndpoint('/salesforce/leads/new.json', 'Create Salesforce lead', 'Creates a Salesforce Lead.', { LastName: 'Replace example lead last name', Company: 'Replace example company name' }, ['LastName', 'Company'], salesforceLeadProps()),
+      salesforceEndpoint('/salesforce/cases/new.json', 'Create Salesforce case', 'Creates a Salesforce Case.', { Subject: 'Replace example case subject' }, ['Subject'], salesforceCaseProps()),
     ],
   },
   {
@@ -308,13 +314,13 @@ export const adapters = [
       ['/slack/users/<userId>.json', 'User records.'],
     ],
     endpoints: [
-      endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }),
-      endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }),
-      endpoint('/slack/channels/{channelId}/messages/{messageTs}/reactions/new.json', 'Add Slack reaction', 'Adds an emoji reaction to a Slack message.', ['name'], {
+      endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, slackContentRequirement()),
+      endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }, slackContentRequirement()),
+      endpoint('/slack/channels/{channelId}/messages/{messageTs}/reactions/new.json', 'Add Slack reaction', 'Adds an emoji reaction to a Slack message.', [], {
         name: str('Emoji name without surrounding colons. `reaction` is also accepted.'),
         reaction: str('Alias for `name`.'),
         channel: str('Optional Slack channel id override.'),
-      }, { name: 'eyes' }),
+      }, { name: 'eyes' }, { anyOf: [{ required: ['name'] }, { required: ['reaction'] }] }),
     ],
   },
   {
@@ -329,9 +335,9 @@ export const adapters = [
       ['/teams/chats/<chatId>/messages/<messageId>.json', 'Chat message records.'],
     ],
     endpoints: [
-      endpoint('/teams/{teamId}/channels/{channelId}/messages/new.json', 'Create Teams channel message', 'Posts a new Teams channel message.', [], teamsMessageProps(), { body: { content: 'Replace example message HTML.' } }),
-      endpoint('/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies/new.json', 'Create Teams thread reply', 'Posts a reply to a Teams channel message.', [], teamsMessageProps(), { body: { content: 'Replace example reply HTML.' } }),
-      endpoint('/teams/chats/{chatId}/messages/new.json', 'Create Teams chat message', 'Posts a new Teams chat message.', [], teamsMessageProps(), { body: { content: 'Replace example chat message HTML.' } }),
+      endpoint('/teams/{teamId}/channels/{channelId}/messages/new.json', 'Create Teams channel message', 'Posts a new Teams channel message.', [], teamsMessageProps(), { body: { content: 'Replace example message HTML.' } }, teamsContentRequirement()),
+      endpoint('/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies/new.json', 'Create Teams thread reply', 'Posts a reply to a Teams channel message.', [], teamsMessageProps(), { body: { content: 'Replace example reply HTML.' } }, teamsContentRequirement()),
+      endpoint('/teams/chats/{chatId}/messages/new.json', 'Create Teams chat message', 'Posts a new Teams chat message.', [], teamsMessageProps(), { body: { content: 'Replace example chat message HTML.' } }, teamsContentRequirement()),
     ],
   },
   {
@@ -357,7 +363,7 @@ export const adapters = [
   },
 ];
 
-function endpoint(path, title, description, required, properties, example) {
+function endpoint(path, title, description, required, properties, example, schemaExtra = {}) {
   return {
     path,
     schemaPath: path.replace(/new\.json$/, 'new.schema.json'),
@@ -368,6 +374,7 @@ function endpoint(path, title, description, required, properties, example) {
       title,
       type: 'object',
       required,
+      ...schemaExtra,
       properties,
       additionalProperties: false,
     },
@@ -395,10 +402,10 @@ function arr(items, description) {
   return { type: 'array', description, items };
 }
 
-function obj(description, properties) {
+function obj(description, properties, extra = {}) {
   return properties
-    ? { type: 'object', description, properties, additionalProperties: true }
-    : { type: 'object', description, additionalProperties: true };
+    ? { type: 'object', description, properties, additionalProperties: true, ...extra }
+    : { type: 'object', description, additionalProperties: true, ...extra };
 }
 
 function en(values, description) {
@@ -420,8 +427,24 @@ function hubspotEndpoint(path, title, description, example) {
       type: 'object',
       required: [],
       description: 'Provide either a `properties` object or top-level HubSpot writable property keys.',
+      oneOf: [
+        {
+          required: ['properties'],
+          properties: {
+            properties: {
+              type: 'object',
+              minProperties: 1,
+            },
+          },
+          additionalProperties: false,
+        },
+        {
+          minProperties: 1,
+          not: { required: ['properties'] },
+        },
+      ],
       properties: {
-        properties: obj('HubSpot CRM property names and values. Read HubSpot object property metadata to discover object-specific keys.'),
+        properties: obj('HubSpot CRM property names and values. Read HubSpot object property metadata to discover object-specific keys.', undefined, { minProperties: 1 }),
       },
       additionalProperties: {
         description: 'Writable HubSpot CRM property value.',
@@ -430,17 +453,29 @@ function hubspotEndpoint(path, title, description, example) {
   };
 }
 
-function salesforceEndpoint(path, title, description, example) {
+function salesforceEndpoint(path, title, description, example, required = [], properties = {}) {
   return {
-    ...endpoint(path, title, description, [], {}, example),
+    ...endpoint(path, title, description, required, properties, example),
     schema: {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       title,
       type: 'object',
-      required: [],
+      required,
       description: 'Salesforce sObject fields for the target object type.',
-      properties: {},
+      propertyNames: {
+        pattern: '^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$',
+      },
+      properties,
       additionalProperties: {
+        oneOf: [
+          { type: 'string' },
+          { type: 'number' },
+          { type: 'integer' },
+          { type: 'boolean' },
+          { type: 'null' },
+          { type: 'object', additionalProperties: true },
+          { type: 'array', items: true },
+        ],
         description: 'Writable Salesforce sObject field value. Use Salesforce object metadata to discover required fields for the object type.',
       },
     },
@@ -505,14 +540,42 @@ function slackMessageProps() {
   };
 }
 
+function slackContentRequirement() {
+  return {
+    anyOf: [
+      { required: ['text'] },
+      { required: ['blocks'] },
+      { required: ['attachments'] },
+    ],
+  };
+}
+
 function teamsMessageProps() {
   return {
     body: obj('Teams message body.', {
       contentType: en(['html', 'text'], 'Message content type. The adapter sends html by default.'),
       content: str('Message body content.'),
-    }),
+    }, { required: ['content'] }),
     text: str('Plain text or HTML message content. Used when `body.content` is omitted.'),
     content: str('Plain text or HTML message content. Used when `body.content` and `text` are omitted.'),
+  };
+}
+
+function teamsContentRequirement() {
+  return {
+    anyOf: [
+      {
+        required: ['body'],
+        properties: {
+          body: {
+            type: 'object',
+            required: ['content'],
+          },
+        },
+      },
+      { required: ['text'] },
+      { required: ['content'] },
+    ],
   };
 }
 
@@ -561,13 +624,86 @@ function pipedriveActivityProps() {
     type: str('Activity type.'),
     done: bool('Whether the activity is complete.'),
     due_date: str('Due date in YYYY-MM-DD form.', 'date'),
-    due_time: str('Due time in HH:MM form.'),
-    duration: str('Duration in HH:MM form.'),
+    due_time: str('Due time in HH:MM form.', undefined, { pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }),
+    duration: str('Duration in HH:MM form.', undefined, { pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }),
     note: str('Activity note.'),
     deal_id: int('Linked deal id.'),
     person_id: int('Linked person id.'),
     org_id: int('Linked organization id.'),
     user_id: int('Owner user id.'),
+  };
+}
+
+function salesforceAccountProps() {
+  return {
+    Name: str('Account name.'),
+    Website: str('Account website URL.', 'uri'),
+    Phone: str('Account phone number.'),
+    Industry: str('Account industry.'),
+    Type: str('Account type.'),
+    BillingStreet: str('Billing street address.'),
+    BillingCity: str('Billing city.'),
+    BillingState: str('Billing state or province.'),
+    BillingPostalCode: str('Billing postal code.'),
+    BillingCountry: str('Billing country.'),
+    OwnerId: str('Owner user id.'),
+  };
+}
+
+function salesforceContactProps() {
+  return {
+    LastName: str('Contact last name.'),
+    FirstName: str('Contact first name.'),
+    Email: str('Contact email address.', 'email'),
+    Phone: str('Contact phone number.'),
+    MobilePhone: str('Contact mobile phone number.'),
+    Title: str('Contact job title.'),
+    AccountId: str('Linked Account id.'),
+    OwnerId: str('Owner user id.'),
+  };
+}
+
+function salesforceOpportunityProps() {
+  return {
+    Name: str('Opportunity name.'),
+    StageName: str('Opportunity stage name.'),
+    CloseDate: str('Expected close date in YYYY-MM-DD form.', 'date'),
+    Amount: num('Opportunity amount.'),
+    AccountId: str('Linked Account id.'),
+    Type: str('Opportunity type.'),
+    LeadSource: str('Lead source.'),
+    OwnerId: str('Owner user id.'),
+    Description: str('Opportunity description.'),
+  };
+}
+
+function salesforceLeadProps() {
+  return {
+    LastName: str('Lead last name.'),
+    Company: str('Lead company name.'),
+    FirstName: str('Lead first name.'),
+    Email: str('Lead email address.', 'email'),
+    Phone: str('Lead phone number.'),
+    Status: str('Lead status.'),
+    LeadSource: str('Lead source.'),
+    OwnerId: str('Owner user id.'),
+    Title: str('Lead job title.'),
+  };
+}
+
+function salesforceCaseProps() {
+  return {
+    Subject: str('Case subject.'),
+    Description: str('Case description.'),
+    Status: str('Case status.'),
+    Priority: str('Case priority.'),
+    Origin: str('Case origin.'),
+    Type: str('Case type.'),
+    Reason: str('Case reason.'),
+    AccountId: str('Linked Account id.'),
+    ContactId: str('Linked Contact id.'),
+    SuppliedEmail: str('Supplied contact email address.', 'email'),
+    OwnerId: str('Owner user id.'),
   };
 }
 

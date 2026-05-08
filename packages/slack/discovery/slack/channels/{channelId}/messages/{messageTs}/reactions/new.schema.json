@@ -2,8 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Add Slack reaction",
   "type": "object",
-  "required": [
-    "name"
+  "required": [],
+  "anyOf": [
+    {
+      "required": [
+        "name"
+      ]
+    },
+    {
+      "required": [
+        "reaction"
+      ]
+    }
   ],
   "properties": {
     "name": {

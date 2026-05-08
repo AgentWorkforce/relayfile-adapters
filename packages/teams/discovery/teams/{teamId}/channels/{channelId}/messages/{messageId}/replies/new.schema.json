@@ -3,6 +3,31 @@
   "title": "Create Teams thread reply",
   "type": "object",
   "required": [],
+  "anyOf": [
+    {
+      "required": [
+        "body"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "required": [
+            "content"
+          ]
+        }
+      }
+    },
+    {
+      "required": [
+        "text"
+      ]
+    },
+    {
+      "required": [
+        "content"
+      ]
+    }
+  ],
   "properties": {
     "body": {
       "type": "object",
@@ -20,7 +45,10 @@
           "description": "Message body content."
         }
       },
-      "additionalProperties": true
+      "additionalProperties": true,
+      "required": [
+        "content"
+      ]
     },
     "text": {
       "type": "string",

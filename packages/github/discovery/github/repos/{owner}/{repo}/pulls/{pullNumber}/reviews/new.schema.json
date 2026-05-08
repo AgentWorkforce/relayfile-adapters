@@ -52,7 +52,12 @@
             "description": "Optional suggested replacement text appended to the comment body."
           }
         },
-        "additionalProperties": true
+        "additionalProperties": true,
+        "required": [
+          "path",
+          "line",
+          "body"
+        ]
       }
     },
     "metadata": {
