@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create GitLab issue note",
+  "type": "object",
+  "required": [
+    "body"
+  ],
+  "properties": {
+    "body": {
+      "type": "string",
+      "description": "Markdown note body."
+    },
+    "position": {
+      "type": "object",
+      "description": "Optional GitLab position object for diff discussions.",
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional timestamp for imports when supported by GitLab."
+    }
+  },
+  "additionalProperties": false
+}

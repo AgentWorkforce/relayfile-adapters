@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Intercom conversation",
+  "type": "object",
+  "required": [],
+  "properties": {
+    "from": {
+      "type": "object",
+      "description": "Message author. Include the shape required by Intercom for the selected source type.",
+      "additionalProperties": true
+    },
+    "body": {
+      "type": "string",
+      "description": "Conversation body."
+    },
+    "message_type": {
+      "type": "string",
+      "description": "Conversation message type."
+    }
+  },
+  "additionalProperties": false
+}

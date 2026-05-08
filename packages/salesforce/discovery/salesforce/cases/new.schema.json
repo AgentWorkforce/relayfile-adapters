@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Salesforce case",
+  "type": "object",
+  "required": [
+    "Subject"
+  ],
+  "description": "Salesforce sObject fields for the target object type.",
+  "propertyNames": {
+    "pattern": "^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$"
+  },
+  "properties": {
+    "Subject": {
+      "type": "string",
+      "description": "Case subject."
+    },
+    "Description": {
+      "type": "string",
+      "description": "Case description."
+    },
+    "Status": {
+      "type": "string",
+      "description": "Case status."
+    },
+    "Priority": {
+      "type": "string",
+      "description": "Case priority."
+    },
+    "Origin": {
+      "type": "string",
+      "description": "Case origin."
+    },
+    "Type": {
+      "type": "string",
+      "description": "Case type."
+    },
+    "Reason": {
+      "type": "string",
+      "description": "Case reason."
+    },
+    "AccountId": {
+      "type": "string",
+      "description": "Linked Account id."
+    },
+    "ContactId": {
+      "type": "string",
+      "description": "Linked Contact id."
+    },
+    "SuppliedEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Supplied contact email address."
+    },
+    "OwnerId": {
+      "type": "string",
+      "description": "Owner user id."
+    }
+  },
+  "additionalProperties": {
+    "oneOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "number"
+      },
+      {
+        "type": "integer"
+      },
+      {
+        "type": "boolean"
+      },
+      {
+        "type": "null"
+      },
+      {
+        "type": "object",
+        "additionalProperties": true
+      },
+      {
+        "type": "array",
+        "items": true
+      }
+    ],
+    "description": "Writable Salesforce sObject field value. Use Salesforce object metadata to discover required fields for the object type."
+  }
+}

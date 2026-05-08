@@ -25,7 +25,8 @@
   "files": [
     "dist",
     "README.md",
-    "notion.mapping.yaml"
+    "notion.mapping.yaml",
+    "discovery"
   ],
   "scripts": {
     "build": "tsc",

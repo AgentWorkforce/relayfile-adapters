@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Jira project",
+  "type": "object",
+  "required": [
+    "key",
+    "name",
+    "projectTypeKey",
+    "leadAccountId"
+  ],
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Project key."
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name."
+    },
+    "projectTypeKey": {
+      "type": "string",
+      "description": "Project type key such as software, business, or service_desk."
+    },
+    "leadAccountId": {
+      "type": "string",
+      "description": "Jira account id for the project lead."
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Project URL."
+    },
+    "assigneeType": {
+      "type": "string",
+      "description": "Default assignee type."
+    }
+  },
+  "additionalProperties": false
+}

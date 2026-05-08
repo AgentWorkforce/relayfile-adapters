@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Zendesk user",
+  "type": "object",
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "User name."
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User email address."
+    },
+    "role": {
+      "type": "string",
+      "description": "Zendesk user role."
+    },
+    "phone": {
+      "type": "string",
+      "description": "User phone number."
+    },
+    "organization_id": {
+      "type": "integer",
+      "description": "Organization id."
+    },
+    "external_id": {
+      "type": "string",
+      "description": "External id."
+    },
+    "tags": {
+      "type": "array",
+      "description": "User tags.",
+      "items": {
+        "type": "string",
+        "description": "Tag."
+      }
+    },
+    "user_fields": {
+      "type": "object",
+      "description": "Zendesk user field values.",
+      "additionalProperties": true
+    },
+    "verified": {
+      "type": "boolean",
+      "description": "Whether the email is verified."
+    }
+  },
+  "additionalProperties": false
+}

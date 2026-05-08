@@ -14,7 +14,8 @@
   "files": [
     "dist",
     "gitlab.mapping.yaml",
-    "README.md"
+    "README.md",
+    "discovery"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

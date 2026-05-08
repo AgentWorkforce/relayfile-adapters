@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create Salesforce lead",
+  "type": "object",
+  "required": [
+    "LastName",
+    "Company"
+  ],
+  "description": "Salesforce sObject fields for the target object type.",
+  "propertyNames": {
+    "pattern": "^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$"
+  },
+  "properties": {
+    "LastName": {
+      "type": "string",
+      "description": "Lead last name."
+    },
+    "Company": {
+      "type": "string",
+      "description": "Lead company name."
+    },
+    "FirstName": {
+      "type": "string",
+      "description": "Lead first name."
+    },
+    "Email": {
+      "type": "string",
+      "format": "email",
+      "description": "Lead email address."
+    },
+    "Phone": {
+      "type": "string",
+      "description": "Lead phone number."
+    },
+    "Status": {
+      "type": "string",
+      "description": "Lead status."
+    },
+    "LeadSource": {
+      "type": "string",
+      "description": "Lead source."
+    },
+    "OwnerId": {
+      "type": "string",
+      "description": "Owner user id."
+    },
+    "Title": {
+      "type": "string",
+      "description": "Lead job title."
+    }
+  },
+  "additionalProperties": {
+    "oneOf": [
+      {
+        "type": "string"
+      },
+      {
+        "type": "number"
+      },
+      {
+        "type": "integer"
+      },
+      {
+        "type": "boolean"
+      },
+      {
+        "type": "null"
+      },
+      {
+        "type": "object",
+        "additionalProperties": true
+      },
+      {
+        "type": "array",
+        "items": true
+      }
+    ],
+    "description": "Writable Salesforce sObject field value. Use Salesforce object metadata to discover required fields for the object type."
+  }
+}

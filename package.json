@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "build": "npx turbo build",
-    "test": "npx turbo test",
+    "test": "npm run test:writeback-discovery && npx turbo test",
+    "test:writeback-discovery": "node scripts/verify-writeback-discovery.mjs",
     "typecheck": "npx turbo typecheck"
   },
   "devDependencies": {

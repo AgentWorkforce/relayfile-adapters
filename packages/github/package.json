@@ -29,7 +29,8 @@
   },
   "files": [
     "dist",
-    "github.mapping.yaml"
+    "github.mapping.yaml",
+    "discovery"
   ],
   "scripts": {
     "build": "npm run build --workspace @relayfile/adapter-core && tsc -p tsconfig.json",
