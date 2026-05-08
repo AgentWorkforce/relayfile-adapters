@@ -307,6 +307,20 @@ Be honest in the report. If you cannot fetch a doc URL, record that in findings 
 const ARTIFACT_GATE = (t: VerifyTarget): string =>
   `test -s '${ARTIFACT_DIR}/${t.slug}-drift.json' && node -e "const r = require('./${ARTIFACT_DIR}/${t.slug}-drift.json'); if (!r.verdict || !['PASS','DRIFT'].includes(r.verdict)) { console.error('bad verdict:', r.verdict); process.exit(1); } console.log('VERIFY_ARTIFACT_${t.slug.toUpperCase()}_OK verdict=' + r.verdict + ' findings=' + (r.findings||[]).length);"`;
 
+const PACKAGE_PREFLIGHT_GATE = (targets: VerifyTarget[]): string => {
+  const checks = targets
+    .flatMap((t) => [
+      `test -d packages/${t.slug} || { echo "missing package directory: packages/${t.slug}"; exit 1; }`,
+      `test -f packages/${t.slug}/src/${t.slug}-adapter.ts || { echo "missing adapter file: packages/${t.slug}/src/${t.slug}-adapter.ts"; exit 1; }`,
+      `test -f packages/${t.slug}/src/webhook-normalizer.ts || { echo "missing webhook normalizer: packages/${t.slug}/src/webhook-normalizer.ts"; exit 1; }`,
+      `test -f packages/${t.slug}/src/queries.ts || { echo "missing queries file: packages/${t.slug}/src/queries.ts"; exit 1; }`,
+      `test -f packages/${t.slug}/src/writeback.ts || { echo "missing writeback file: packages/${t.slug}/src/writeback.ts"; exit 1; }`,
+    ])
+    .join(' && ');
+
+  return `${checks} && echo "PACKAGE_PREFLIGHT_BATCH_${BATCH_KEY}_OK adapters=${targets.map((t) => t.slug).join(',')}"`;
+};
+
 async function main() {
   const targets = BATCHES[BATCH_KEY]!;
 
@@ -331,6 +345,14 @@ async function main() {
     failOnError: true,
   });
 
+  wf = wf.step('package-preflight', {
+    type: 'deterministic',
+    dependsOn: ['init-artifact-dir'],
+    command: PACKAGE_PREFLIGHT_GATE(targets),
+    captureOutput: true,
+    failOnError: true,
+  });
+
   const artifactGates: string[] = [];
   for (const t of targets) {
     const VERIFY = `verify-${t.slug}`;
@@ -339,7 +361,7 @@ async function main() {
     wf = wf
       .step(VERIFY, {
         agent: 'verifier',
-        dependsOn: ['init-artifact-dir'],
+        dependsOn: ['package-preflight'],
         task: verifyTask(t),
         verification: { type: 'output_contains', value: `VERIFY_${t.slug.toUpperCase()}_DONE` },
         timeout: 900_000, // 15 min per adapter
