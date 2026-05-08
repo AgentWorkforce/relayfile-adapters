@@ -340,3 +340,5 @@ export * from './path-mapper.js';
 export * from './types.js';
 export * from './webhook/event-map.js';
 export * from './writeback.js';
+
+export * from './resources.js';

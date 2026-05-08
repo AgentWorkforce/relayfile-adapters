@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Asana task",
+  "type": "object",
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Task name."
+    },
+    "workspace": {
+      "type": "string",
+      "description": "Workspace gid for the new task."
+    },
+    "assignee": {
+      "type": "string",
+      "description": "User gid or `me` to assign the task."
+    },
+    "assignee_status": {
+      "type": "string",
+      "description": "Assignee status such as inbox, later, upcoming, or today."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Plain-text task notes."
+    },
+    "html_notes": {
+      "type": "string",
+      "description": "HTML task notes."
+    },
+    "due_on": {
+      "type": "string",
+      "format": "date",
+      "description": "Due date in YYYY-MM-DD form."
+    },
+    "due_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Due timestamp in ISO 8601 form."
+    },
+    "start_on": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date in YYYY-MM-DD form."
+    },
+    "start_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start timestamp in ISO 8601 form."
+    },
+    "completed": {
+      "type": "boolean",
+      "description": "Whether the task starts completed."
+    },
+    "projects": {
+      "type": "array",
+      "description": "Project gids to add the task to.",
+      "items": {
+        "type": "string",
+        "description": "Project gid."
+      }
+    },
+    "followers": {
+      "type": "array",
+      "description": "Follower user gids.",
+      "items": {
+        "type": "string",
+        "description": "Follower user gid."
+      }
+    },
+    "tags": {
+      "type": "array",
+      "description": "Tag gids to attach.",
+      "items": {
+        "type": "string",
+        "description": "Tag gid."
+      }
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "Asana custom field gid to value map.",
+      "additionalProperties": true
+    },
+    "parent": {
+      "type": "string",
+      "description": "Parent task gid for subtasks."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

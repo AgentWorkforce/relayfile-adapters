@@ -60,3 +60,5 @@ export {
 } from './webhook-normalizer.js';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 export type * from './types.js';
+
+export * from './resources.js';
