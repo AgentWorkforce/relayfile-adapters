@@ -51,10 +51,7 @@ function slugify(value: string): string {
 }
 
 function stableIdSuffix(id: string): string {
-  return id
-    .trim()
-    .replace(/[^a-zA-Z0-9]+/g, '')
-    .toLowerCase();
+  return encodeMixpanelPathSegment(id);
 }
 
 function labelSegmentWithId(label: string | undefined, id: string): string {

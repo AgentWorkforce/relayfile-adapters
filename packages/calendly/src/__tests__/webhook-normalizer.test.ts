@@ -106,6 +106,19 @@ test('validateCalendlyWebhookSignature rejects expired timestamps older than thr
   assert.equal(result.reason, 'expired-timestamp');
 });
 
+test('validateCalendlyWebhookSignature rejects future timestamps outside tolerance', () => {
+  const body = JSON.stringify(webhookPayload);
+  const secret = 'calendly-signing-secret';
+  const timestamp = 1_776_000_000;
+  const headers = signedHeaders(body, secret, timestamp);
+
+  const result = validateCalendlyWebhookSignature(body, headers, secret, {
+    nowMs: timestamp * 1000 - 181_000,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'expired-timestamp');
+});
+
 test('parseCalendlySignatureHeader rejects malformed signatures', () => {
   assert.equal(parseCalendlySignatureHeader('v1=abc'), undefined);
   assert.equal(parseCalendlySignatureHeader('t=not-a-number,v1=abc'), undefined);

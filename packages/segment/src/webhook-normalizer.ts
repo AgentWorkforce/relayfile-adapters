@@ -88,9 +88,12 @@ export function normalizeSegmentWebhook(
   options: NormalizeSegmentWebhookOptions = {},
 ): NormalizedWebhook {
   const normalizedHeaders = normalizeHeaders(headers);
-  const rawBody = rawBodyString(rawPayload);
-  const secret = resolveWebhookSecret(rawBody, normalizedHeaders, options);
+  const rawBody = getRawWebhookBody(rawPayload);
+  const secret = resolveWebhookSecretCandidate(rawPayload, normalizedHeaders, options);
   if (options.requireSignature || secret) {
+    if (rawBody === undefined) {
+      throw new Error('Segment webhook signature validation requires the original raw request body.');
+    }
     assertValidSegmentWebhookSignature(rawBody, normalizedHeaders, secret, options);
   }
 
@@ -435,12 +438,31 @@ function buildNormalizedPayload(
   return normalizedPayload;
 }
 
-function resolveWebhookSecret(
-  rawPayload: string,
+function resolveWebhookSecretCandidate(
+  rawPayload: unknown,
   headers: Record<string, string>,
   options: NormalizeSegmentWebhookOptions,
 ): string | undefined {
-  return resolveSecretFromOptions(rawPayload, headers, options.secret, options);
+  const rawBody = getRawWebhookBody(rawPayload);
+  if (rawBody !== undefined) {
+    return resolveSecretFromOptions(rawBody, headers, options.secret, options);
+  }
+
+  const explicit = normalizeSecret(options.secret);
+  if (explicit) {
+    return explicit;
+  }
+
+  const sourceId =
+    options.sourceId ??
+    readOptionalString(headers[SEGMENT_SOURCE_ID_HEADER]) ??
+    (isRecord(rawPayload)
+      ? readOptionalString(rawPayload.writeKey) ?? readOptionalString(rawPayload.write_key)
+      : undefined);
+  if (sourceId) {
+    return normalizeSecret(options.sourceSecrets?.[sourceId]);
+  }
+  return undefined;
 }
 
 function resolveSecretFromOptions(
@@ -484,10 +506,11 @@ function decodeWebhookPayload(rawPayload: unknown): unknown {
   return rawPayload;
 }
 
-function rawBodyString(rawPayload: unknown): string {
-  if (typeof rawPayload === 'string') return rawPayload;
-  if (Buffer.isBuffer(rawPayload)) return rawPayload.toString('utf8');
-  return stableJson(rawPayload);
+function getRawWebhookBody(rawPayload: unknown): string | Buffer | undefined {
+  if (typeof rawPayload === 'string' || Buffer.isBuffer(rawPayload)) {
+    return rawPayload;
+  }
+  return undefined;
 }
 
 function normalizeHeaders(headers: SegmentWebhookHeaders = {}): Record<string, string> {
@@ -585,22 +608,4 @@ function compactRecord(input: Record<string, unknown>): SegmentRecord {
     }
   }
   return result;
-}
-
-function stableJson(value: unknown): string {
-  return JSON.stringify(sortJson(value));
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => sortJson(item));
-  }
-  if (isRecord(value)) {
-    const result: SegmentRecord = {};
-    for (const key of Object.keys(value).sort((left, right) => left.localeCompare(right))) {
-      result[key] = sortJson(value[key]);
-    }
-    return result;
-  }
-  return value;
 }

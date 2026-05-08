@@ -1,9 +1,11 @@
 import type { SegmentWritebackRequest } from './types.js';
 
+type SegmentWritebackMethod = SegmentWritebackRequest['method'];
+
 export function resolveWritebackRequest(
   path: string,
   content: string,
-  method: 'POST' | 'PUT' | 'PATCH' = 'POST',
+  method: SegmentWritebackMethod = 'POST',
 ): SegmentWritebackRequest {
   const normalizedPath = normalizePath(path);
   const payload = parseJsonObject(content);
@@ -51,7 +53,7 @@ export function resolveWritebackRequest(
   throw new Error(`No Segment writeback rule matched ${path}`);
 }
 
-function buildIdentify(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'PATCH'): SegmentWritebackRequest {
+function buildIdentify(payload: Record<string, unknown>, method: SegmentWritebackMethod): SegmentWritebackRequest {
   const body = unwrapPayload(payload);
   const userId = readString(body, 'userId') ?? readString(body, 'user_id');
   const anonymousId = readString(body, 'anonymousId') ?? readString(body, 'anonymous_id');
@@ -75,7 +77,7 @@ function buildIdentify(payload: Record<string, unknown>, method: 'POST' | 'PUT' 
   };
 }
 
-function buildTrack(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'PATCH'): SegmentWritebackRequest {
+function buildTrack(payload: Record<string, unknown>, method: SegmentWritebackMethod): SegmentWritebackRequest {
   const body = unwrapPayload(payload);
   const event = readString(body, 'event');
   if (!event) {
@@ -99,7 +101,7 @@ function buildTrack(payload: Record<string, unknown>, method: 'POST' | 'PUT' | '
   };
 }
 
-function buildPage(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'PATCH'): SegmentWritebackRequest {
+function buildPage(payload: Record<string, unknown>, method: SegmentWritebackMethod): SegmentWritebackRequest {
   const body = unwrapPayload(payload);
   const name = readString(body, 'name');
   const properties = readRecord(body, 'properties') ?? {};
@@ -122,7 +124,7 @@ function buildPage(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'P
   };
 }
 
-function buildGroup(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'PATCH'): SegmentWritebackRequest {
+function buildGroup(payload: Record<string, unknown>, method: SegmentWritebackMethod): SegmentWritebackRequest {
   const body = unwrapPayload(payload);
   const groupId = readString(body, 'groupId') ?? readString(body, 'group_id');
   if (!groupId) {
@@ -146,7 +148,7 @@ function buildGroup(payload: Record<string, unknown>, method: 'POST' | 'PUT' | '
   };
 }
 
-function buildBatch(payload: Record<string, unknown>, method: 'POST' | 'PUT' | 'PATCH'): SegmentWritebackRequest {
+function buildBatch(payload: Record<string, unknown>, method: SegmentWritebackMethod): SegmentWritebackRequest {
   const batch = payload.batch;
   if (!Array.isArray(batch)) {
     throw new Error('Segment batch writeback requires a `batch` array');

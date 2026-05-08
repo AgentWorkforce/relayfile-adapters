@@ -54,12 +54,13 @@ export interface MixpanelWritebackRequest {
 export interface MixpanelReadRequest {
   endpoint:
     | '/api/2.0/cohorts/list'
-    | '/api/2.0/cohorts/members'
+    | '/api/query/engage'
     | '/api/2.0/events/names'
     | '/api/2.0/engage'
     | '/api/2.0/segmentation';
-  method: 'GET';
-  query: Record<string, string>;
+  method: 'GET' | 'POST';
+  body?: Record<string, string>;
+  query?: Record<string, string>;
 }
 
 export interface MixpanelEventProperties {

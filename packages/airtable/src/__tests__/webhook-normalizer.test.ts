@@ -89,6 +89,21 @@ test('rejects tampered body with invalid-signature result and throwing helper', 
   );
 });
 
+test('normalizeAirtableWebhook requires raw request bytes for signature validation', () => {
+  const rawPayload = JSON.stringify(payload);
+  const signature = computeAirtableWebhookSignature(rawPayload, 'airtable-secret');
+
+  assert.throws(
+    () =>
+      normalizeAirtableWebhook(payload, {
+        [AIRTABLE_CONTENT_MAC_HEADER]: signature,
+      }, {
+        webhookSecret: 'airtable-secret',
+      }),
+    /original raw request body/,
+  );
+});
+
 test('rejects missing content MAC header', () => {
   const rawPayload = JSON.stringify(payload);
   const missing = validateAirtableWebhookSignature(rawPayload, {}, 'airtable-secret');

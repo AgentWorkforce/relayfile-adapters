@@ -55,10 +55,11 @@ export function resolveReadRequest(path: string): MixpanelReadRequest {
 
   const cohortMembersMatch = path.match(/^\/mixpanel\/cohorts\/([^/]+)\/members\.json$/);
   if (cohortMembersMatch?.[1]) {
+    const cohortId = decodeURIComponent(cohortMembersMatch[1]);
     return {
-      method: 'GET',
-      endpoint: '/api/2.0/cohorts/members',
-      query: { id: decodeURIComponent(cohortMembersMatch[1]) },
+      body: { filter_by_cohort: JSON.stringify({ id: cohortId }) },
+      method: 'POST',
+      endpoint: '/api/query/engage',
     };
   }
 
@@ -67,7 +68,7 @@ export function resolveReadRequest(path: string): MixpanelReadRequest {
 
 function extractEventName(segment: string): string {
   const decoded = decodeURIComponent(segment);
-  const slugged = /^(.+)--[a-z0-9]+$/i.exec(decoded);
+  const slugged = /^(.+)--.+$/u.exec(decoded);
   if (!slugged?.[1]) {
     return decoded;
   }

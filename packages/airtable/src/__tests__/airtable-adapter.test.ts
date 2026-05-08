@@ -238,4 +238,9 @@ test('path mapper, read routes, and writeback routes cover primary Airtable obje
     method: 'PATCH',
     routeTemplate: '/v0/{baseId}/{tableId}',
   });
+
+  assert.throws(
+    () => resolveAirtableWritebackRequest('/airtable/bases/app_base/tables/tbl_tasks/records/rec_1.json', '{"fields":{}}'),
+    /at least one field/,
+  );
 });

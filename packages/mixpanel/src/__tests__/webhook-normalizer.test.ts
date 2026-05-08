@@ -40,7 +40,10 @@ function authHeader(): string {
 
 test('normalizeMixpanelWebhook accepts valid Basic auth and normalizes event metadata', () => {
   const normalized = normalizeMixpanelWebhook(
-    JSON.stringify(eventPayload),
+    JSON.stringify({
+      ...eventPayload,
+      webhookTimestamp: eventPayload.timestamp,
+    }),
     {
       [MIXPANEL_AUTHORIZATION_HEADER]: authHeader(),
       'X-Relay-Connection-Id': 'conn_mixpanel_123',
@@ -65,6 +68,21 @@ test('normalizeMixpanelWebhook accepts valid Basic auth and normalizes event met
   });
 });
 
+test('normalizeMixpanelWebhook treats dotted event names as labels, not event types', () => {
+  const normalized = normalizeMixpanelWebhook(
+    {
+      ...eventPayload,
+      event: 'Product.Purchased',
+      webhookTimestamp: 1_743_155_200_000,
+    },
+    { [MIXPANEL_AUTHORIZATION_HEADER]: authHeader() },
+    config,
+    { now: 1_743_155_230_000 },
+  );
+
+  assert.equal(normalized.eventType, 'event.create');
+});
+
 test('validateMixpanelWebhookAuthorization rejects missing and invalid authorization headers', () => {
   const missing = validateMixpanelWebhookAuthorization({}, config);
   assert.deepEqual(missing, { ok: false, reason: 'missing-authorization' });
@@ -84,6 +102,7 @@ test('validateMixpanelWebhookAuthorization rejects missing and invalid authoriza
 test('normalizeMixpanelWebhook rejects a tampered body that no longer contains an object id', () => {
   const tamperedPayload = {
     ...eventPayload,
+    webhookTimestamp: eventPayload.timestamp,
     data: {
       properties: {
         mp_lib: 'tampered',
@@ -104,8 +123,12 @@ test('normalizeMixpanelWebhook rejects a tampered body that no longer contains a
 });
 
 test('validateMixpanelWebhookTimestamp rejects expired timestamps', () => {
+  const webhookPayload = {
+    ...eventPayload,
+    webhookTimestamp: eventPayload.timestamp,
+  };
   const fresh = validateMixpanelWebhookTimestamp(
-    eventPayload,
+    webhookPayload,
     { [MIXPANEL_AUTHORIZATION_HEADER]: authHeader() },
     config,
     1_743_155_230_000,
@@ -113,13 +136,25 @@ test('validateMixpanelWebhookTimestamp rejects expired timestamps', () => {
   assert.equal(fresh.ok, true);
 
   const stale = validateMixpanelWebhookTimestamp(
-    eventPayload,
+    webhookPayload,
     { [MIXPANEL_AUTHORIZATION_HEADER]: authHeader() },
     config,
     1_743_155_400_001,
   );
   assert.equal(stale.ok, false);
   assert.equal(stale.reason, 'stale-timestamp');
+});
+
+test('validateMixpanelWebhookTimestamp ignores event timestamps for freshness', () => {
+  const result = validateMixpanelWebhookTimestamp(
+    eventPayload,
+    { [MIXPANEL_AUTHORIZATION_HEADER]: authHeader() },
+    config,
+    1_743_155_230_000,
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'missing-timestamp');
 });
 
 test('computeMixpanelPayloadFingerprint uses node crypto HMAC as an audit fingerprint, not auth', () => {

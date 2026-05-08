@@ -224,7 +224,6 @@ export function extractMixpanelEventType(
   const explicit =
     readOptionalString(record.eventType) ??
     readOptionalString(record.event_type) ??
-    readOptionalString(record.event) ??
     readOptionalString(metadata?.eventType) ??
     readOptionalString(metadata?.event_type) ??
     readOptionalString(webhook?.eventType) ??
@@ -506,10 +505,8 @@ function readWebhookTimestamp(
   const webhook = getRecord(record._webhook);
   return (
     readOptionalTimestamp(headers[MIXPANEL_TIMESTAMP_HEADER]) ??
-    readOptionalTimestamp(record.timestamp) ??
     readOptionalTimestamp(record.webhookTimestamp) ??
     readOptionalTimestamp(record.webhook_timestamp) ??
-    readOptionalTimestamp(metadata?.timestamp) ??
     readOptionalTimestamp(metadata?.webhookTimestamp) ??
     readOptionalTimestamp(metadata?.webhook_timestamp) ??
     readOptionalTimestamp(webhook?.timestamp) ??

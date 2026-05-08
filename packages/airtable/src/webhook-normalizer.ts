@@ -80,6 +80,9 @@ export function normalizeAirtableWebhook(
 ): NormalizedWebhook {
   const normalizedHeaders = normalizeHeaders(headers);
   if (options.webhookSecret !== undefined) {
+    if (!isRawWebhookBody(rawPayload)) {
+      throw new Error('Airtable webhook signature validation requires the original raw request body.');
+    }
     assertValidAirtableWebhookSignature(rawPayload, normalizedHeaders, options.webhookSecret);
   }
 
@@ -555,6 +558,15 @@ function toRawBodyBuffer(rawPayload: unknown): Buffer {
     return Buffer.from(rawPayload);
   }
   return Buffer.from(JSON.stringify(rawPayload), 'utf8');
+}
+
+function isRawWebhookBody(rawPayload: unknown): boolean {
+  return (
+    typeof rawPayload === 'string' ||
+    Buffer.isBuffer(rawPayload) ||
+    rawPayload instanceof Uint8Array ||
+    rawPayload instanceof ArrayBuffer
+  );
 }
 
 function normalizeMacHeader(value: string): string | undefined {

@@ -85,6 +85,9 @@ function unwrapFields(payload: Record<string, unknown>): Record<string, unknown>
   }
 
   if (isRecord(payload.fields)) {
+    if (Object.keys(payload.fields).length === 0) {
+      throw new Error('Airtable writeback requires at least one field');
+    }
     return { ...payload.fields };
   }
 

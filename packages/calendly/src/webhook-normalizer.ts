@@ -148,7 +148,7 @@ export function validateCalendlyWebhookSignature(
 
   const nowMs = options.nowMs ?? Date.now();
   const toleranceMs = options.toleranceMs ?? DEFAULT_CALENDLY_WEBHOOK_TOLERANCE_MS;
-  if (nowMs - parsed.timestampMs > toleranceMs) {
+  if (Math.abs(nowMs - parsed.timestampMs) > toleranceMs) {
     return {
       ok: false,
       reason: 'expired-timestamp',

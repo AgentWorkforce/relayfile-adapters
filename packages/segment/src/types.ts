@@ -136,7 +136,7 @@ export interface SegmentWritebackRequest {
     | 'page'
     | 'group'
     | 'batch';
-  method: 'POST' | 'PUT' | 'PATCH';
+  method: 'POST';
   endpoint: '/v1/identify' | '/v1/track' | '/v1/page' | '/v1/group' | '/v1/batch';
   body: Record<string, unknown>;
 }

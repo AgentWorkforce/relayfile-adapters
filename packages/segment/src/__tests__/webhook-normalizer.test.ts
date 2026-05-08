@@ -83,6 +83,32 @@ test('validateSegmentWebhookSignature rejects a tampered body', () => {
   );
 });
 
+test('normalizeSegmentWebhook requires raw request bytes for signature validation', () => {
+  const rawBody = JSON.stringify({
+    type: 'track',
+    messageId: 'msg_123',
+    userId: 'user_123',
+    event: 'Signed Up',
+  });
+  const signature = sign(rawBody, 'segment-secret');
+
+  assert.throws(
+    () =>
+      normalizeSegmentWebhook(
+        JSON.parse(rawBody) as Record<string, unknown>,
+        {
+          [SEGMENT_SIGNATURE_HEADER]: signature,
+          [SEGMENT_TIMESTAMP_HEADER]: String(Math.floor(NOW / 1000)),
+        },
+        {
+          now: NOW,
+          secret: 'segment-secret',
+        },
+      ),
+    /original raw request body/,
+  );
+});
+
 test('validateSegmentWebhookSignature rejects missing signature headers', () => {
   const rawBody = JSON.stringify({
     type: 'page',

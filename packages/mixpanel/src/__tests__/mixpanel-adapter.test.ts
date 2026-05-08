@@ -8,6 +8,7 @@ import {
   mixpanelEventPath,
   mixpanelProfilePath,
   normalizeMixpanelWebhook,
+  resolveReadRequest,
   type ConnectionProvider,
   type MixpanelAdapterConfig,
   type ProxyRequest,
@@ -84,6 +85,7 @@ test('ingestWebhook writes Mixpanel event webhooks to deterministic event paths'
     {
       action: 'create',
       timestamp: 1_000_000,
+      webhookTimestamp: 1_000_100,
       type: 'event',
       data: {
         event: 'Signed Up',
@@ -102,8 +104,8 @@ test('ingestWebhook writes Mixpanel event webhooks to deterministic event paths'
   const result = await adapter.ingestWebhook('workspace_1', normalized);
 
   assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/mixpanel/events/signed-up--evt123.json']);
-  assert.equal(writes[0]?.path, '/mixpanel/events/signed-up--evt123.json');
+  assert.deepEqual(result.paths, ['/mixpanel/events/signed-up--evt_123.json']);
+  assert.equal(writes[0]?.path, '/mixpanel/events/signed-up--evt_123.json');
   assert.equal(writes[0]?.semantics?.properties?.['mixpanel.event'], 'Signed Up');
   assert.deepEqual(writes[0]?.semantics?.relations, ['/mixpanel/profiles/user_123.json']);
 });
@@ -206,13 +208,22 @@ test('computeSemantics extracts event campaign properties and profile relation',
 test('path mapping stays deterministic for supported Mixpanel VFS objects', () => {
   const { adapter } = createAdapter();
 
-  assert.equal(mixpanelEventPath('evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt12.json');
+  assert.equal(mixpanelEventPath('evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt%201%2F2.json');
   assert.equal(mixpanelProfilePath('user@example.com'), '/mixpanel/profiles/user%40example.com.json');
   assert.equal(mixpanelCohortPath('cohort/1'), '/mixpanel/cohorts/cohort%2F1.json');
-  assert.equal(computeMixpanelPath('Events', 'evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt12.json');
+  assert.equal(computeMixpanelPath('Events', 'evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt%201%2F2.json');
   assert.equal(computeMixpanelPath('people', 'user@example.com'), '/mixpanel/profiles/user%40example.com.json');
   assert.equal(computeMixpanelPath('cohorts', 'cohort/1'), '/mixpanel/cohorts/cohort%2F1.json');
-  assert.equal(adapter.computePath('event', 'evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt12.json');
+  assert.equal(adapter.computePath('event', 'evt 1/2', 'Signed Up'), '/mixpanel/events/signed-up--evt%201%2F2.json');
   assert.equal(adapter.computePath('profile', 'user@example.com'), '/mixpanel/profiles/user%40example.com.json');
   assert.equal(adapter.computePath('cohort', 'cohort/1'), '/mixpanel/cohorts/cohort%2F1.json');
+  assert.notEqual(mixpanelEventPath('abc-123', 'Signed Up'), mixpanelEventPath('abc_123', 'Signed Up'));
+});
+
+test('resolveReadRequest uses Mixpanel Query API for cohort members', () => {
+  assert.deepEqual(resolveReadRequest('/mixpanel/cohorts/cohort%2F1/members.json'), {
+    body: { filter_by_cohort: JSON.stringify({ id: 'cohort/1' }) },
+    endpoint: '/api/query/engage',
+    method: 'POST',
+  });
 });
