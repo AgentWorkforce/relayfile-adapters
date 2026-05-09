@@ -119,7 +119,7 @@ async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefin
   return undefined;
 }
 
-function parseIndexRows<T>(content: string | undefined): T[] {
+export function parseIndexRows<T>(content: string | undefined): T[] {
   if (!content) {
     return [];
   }

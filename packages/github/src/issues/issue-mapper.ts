@@ -8,14 +8,15 @@ import {
   githubRepoPullsIndexPath,
 } from '../path-mapper.js';
 import {
-  buildRepoIndexFile,
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
-  readRecordIndexRows,
-  readRepoIndexRows,
   upsertRecordIndexRow,
   upsertRepoIndexRow,
 } from '../index-emitter.js';
+import {
+  atomicUpsertRecordIndex,
+  atomicUpsertRepoIndex,
+} from '../atomic-index.js';
 import { githubLayoutPromptFile } from '../layout-prompt.js';
 
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
@@ -118,40 +119,37 @@ export async function ingestIssue(
   // Write indexes after the canonical record write resolves so failed writes
   // do not leak into the lightweight directory indexes.
   const updated = mappedMetaField(mapped.content, 'updated_at') || mappedMetaField(mapped.content, 'created_at');
-  const issueIndexRows = upsertRecordIndexRow(
-    await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(owner, repo)),
-    {
-      id: String(number),
-      title: mapped.title ?? '',
-      updated,
-      number,
-      state: mappedMetaField(mapped.content, 'state'),
-    },
+
+  // Atomic CAS upserts — concurrent issue/PR webhooks otherwise race on the
+  // shared `_index.json` files and silently drop rows on the second write
+  // (issue #106 / CodeRabbit follow-up).
+  const issueIndexResult = await atomicUpsertRecordIndex(
+    vfs,
+    githubRepoIssuesIndexPath(owner, repo),
+    (rows) =>
+      upsertRecordIndexRow(rows, {
+        id: String(number),
+        title: mapped.title ?? '',
+        updated,
+        number,
+        state: mappedMetaField(mapped.content, 'state'),
+      }),
+    (rows) => buildRepoIssuesIndexFile(owner, repo, rows).content,
   );
-  const pullIndexRows = await readRecordIndexRows(vfs, githubRepoPullsIndexPath(owner, repo));
-  const repoIndexRows = upsertRepoIndexRow(
-    await readRepoIndexRows(vfs),
-    {
+  // Re-emit the pulls index under CAS so we never clobber a pull row that
+  // was concurrently appended by another ingestion.
+  const pullIndexResult = await atomicUpsertRecordIndex(
+    vfs,
+    githubRepoPullsIndexPath(owner, repo),
+    (rows) => rows,
+    (rows) => buildRepoPullsIndexFile(owner, repo, rows).content,
+  );
+  const repoIndexResult = await atomicUpsertRepoIndex(vfs, (rows) =>
+    upsertRepoIndexRow(rows, {
       id: `${owner}/${repo}`,
       title: `${owner}/${repo}`,
       updated,
-    },
-  );
-
-  const issueIndexResult = await writeMappedFile(
-    vfs,
-    buildRepoIssuesIndexFile(owner, repo, issueIndexRows).path,
-    buildRepoIssuesIndexFile(owner, repo, issueIndexRows).content,
-  );
-  const pullIndexResult = await writeMappedFile(
-    vfs,
-    buildRepoPullsIndexFile(owner, repo, pullIndexRows).path,
-    buildRepoPullsIndexFile(owner, repo, pullIndexRows).content,
-  );
-  const repoIndexResult = await writeMappedFile(
-    vfs,
-    buildRepoIndexFile(repoIndexRows).path,
-    buildRepoIndexFile(repoIndexRows).content,
+    }),
   );
   const layoutFile = githubLayoutPromptFile();
   const layoutResult = await writeMappedFile(vfs, layoutFile.path, layoutFile.content);
