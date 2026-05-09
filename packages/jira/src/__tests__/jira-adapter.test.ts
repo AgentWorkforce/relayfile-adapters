@@ -164,7 +164,7 @@ describe('JiraAdapter', () => {
     const client = createClient();
     const adapter = createAdapter(client);
 
-    await adapter.ingestWebhook('workspace-1', {
+    const result = await adapter.ingestWebhook('workspace-1', {
       provider: 'jira',
       eventType: 'issue.updated',
       objectType: 'issue',
@@ -197,6 +197,9 @@ describe('JiraAdapter', () => {
       },
     });
 
+    assert.equal(result.filesWritten, 1);
+    assert.equal(client.writes.length, 1);
+
     const content = JSON.parse(client.writes[0]?.content ?? '{}') as {
       payload?: { fields?: Record<string, unknown>; changelog?: unknown; _webhook?: Record<string, unknown> };
     };
@@ -205,9 +208,20 @@ describe('JiraAdapter', () => {
     assert.equal(content.payload?.fields?.reporter, null);
     assert.equal(content.payload?.changelog, undefined);
     assert.equal(content.payload?._webhook?.user, undefined);
-    assert.equal(client.writes[0]?.content.includes('ada@example.com'), false);
-    assert.equal(client.writes[0]?.content.includes('Ada Lovelace'), false);
-    assert.equal(client.writes[0]?.content.includes('acct-1'), false);
+    for (const write of client.writes) {
+      for (const token of [
+        'acct-1',
+        'acct-2',
+        'acct-3',
+        'ada@example.com',
+        'grace@example.com',
+        'Ada Lovelace',
+        'Grace Hopper',
+        'Webhook Actor',
+      ]) {
+        assert.equal(write.content.includes(token), false);
+      }
+    }
   });
 
   it('returns an object when sanitizing a root Jira user profile record', () => {
