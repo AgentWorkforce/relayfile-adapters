@@ -145,10 +145,64 @@ describe('JiraAdapter', () => {
       },
     });
 
-    assert.equal(semantics.properties?.['jira.assignee_display_name'], 'Ada Lovelace');
+    assert.equal(semantics.properties?.['jira.assignee_account_id'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_display_name'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_email'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_time_zone'], undefined);
+    assert.deepEqual(semantics.relations ?? [], []);
     assert.equal(semantics.properties?.['jira.priority_name'], 'High');
     assert.equal(semantics.properties?.['jira.status_category_key'], 'indeterminate');
     assert.equal(semantics.properties?.['jira.labels'], 'auth, web');
+  });
+
+  it('redacts Jira user profile fields from stored file content', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'jira',
+      eventType: 'issue.updated',
+      objectType: 'issue',
+      objectId: '10001',
+      payload: {
+        id: '10001',
+        key: 'ENG-42',
+        fields: {
+          summary: 'Fix login redirect',
+          assignee: {
+            accountId: 'acct-1',
+            displayName: 'Ada Lovelace',
+            emailAddress: 'ada@example.com',
+            timeZone: 'Europe/London',
+            avatarUrls: { '48x48': 'https://avatar.example/ada.png' },
+          },
+          reporter: {
+            accountId: 'acct-2',
+            displayName: 'Grace Hopper',
+            emailAddress: 'grace@example.com',
+          },
+        },
+        changelog: {
+          histories: [{ author: { accountId: 'acct-1', displayName: 'Ada Lovelace' } }],
+        },
+        _webhook: {
+          webhookEvent: 'jira:issue_updated',
+          user: { accountId: 'acct-3', displayName: 'Webhook Actor' },
+        },
+      },
+    });
+
+    const content = JSON.parse(client.writes[0]?.content ?? '{}') as {
+      payload?: { fields?: Record<string, unknown>; changelog?: unknown; _webhook?: Record<string, unknown> };
+    };
+
+    assert.equal(content.payload?.fields?.assignee, null);
+    assert.equal(content.payload?.fields?.reporter, null);
+    assert.equal(content.payload?.changelog, undefined);
+    assert.equal(content.payload?._webhook?.user, undefined);
+    assert.equal(client.writes[0]?.content.includes('ada@example.com'), false);
+    assert.equal(client.writes[0]?.content.includes('Ada Lovelace'), false);
+    assert.equal(client.writes[0]?.content.includes('acct-1'), false);
   });
 
   it('computes deterministic path mappings for all primary object types', () => {

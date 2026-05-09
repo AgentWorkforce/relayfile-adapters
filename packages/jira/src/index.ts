@@ -1,6 +1,7 @@
 export {
   IntegrationAdapter,
   JiraAdapter,
+  sanitizeJiraRecordForStorage,
 } from './jira-adapter.js';
 export type {
   DeleteFileInput,
