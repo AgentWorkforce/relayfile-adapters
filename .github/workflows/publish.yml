@@ -4,45 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: "Package to publish"
+        description: |
+          Package(s) to publish. Accepts:
+            • all
+            • missing (only versions not yet on npm)
+            • a group alias: storage, messaging, devtools, crm, pm, support, analytics, email, commerce, db
+            • one or more package dir names, comma- or space-separated (e.g. "slack,linear" or "github gitlab")
         required: true
-        type: choice
-        options:
-          - all
-          - azure-blob
-          - box
-          - core
-          - dropbox
-          - gcs
-          - gmail
-          - github
-          - gitlab
-          - google-drive
-          - onedrive
-          - postgres
-          - redis
-          - s3
-          - sharepoint
-          - teams
-          - slack
-          - linear
-          - mailgun
-          - mixpanel
-          - notion
-          - hubspot
-          - salesforce
-          - pipedrive
-          - jira
-          - asana
-          - airtable
-          - calendly
-          - shopify
-          - clickup
-          - intercom
-          - zendesk
-          - segment
-          - sendgrid
-          - stripe
+        type: string
         default: "all"
       version:
         description: "Version bump type"
@@ -102,15 +71,10 @@ jobs:
 
       - name: Resolve packages to publish
         id: resolve
+        env:
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
         run: |
-          if [ "${{ github.event.inputs.package }}" = "all" ]; then
-            # Keep this list in sync with the `package` input options above and
-            # the directories under packages/. See AGENTS.md → "Adding a new
-            # adapter package" for the checklist that gates new entries here.
-            echo "packages=azure-blob box core dropbox gcs gmail github gitlab google-drive onedrive postgres redis s3 sharepoint teams slack linear mailgun mixpanel notion hubspot salesforce pipedrive jira asana airtable calendly shopify clickup intercom zendesk segment sendgrid stripe" >> "$GITHUB_OUTPUT"
-          else
-            echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
-          fi
+          node scripts/resolve-publish-targets.mjs "$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
 
       - name: Version & Publish
         run: |
