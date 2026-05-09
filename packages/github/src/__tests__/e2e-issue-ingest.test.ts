@@ -404,14 +404,18 @@ function readJsonFile(vfs: MemoryVfs, path: string): JsonObject {
   return expectObject(JSON.parse(raw), `VFS JSON file ${path}`);
 }
 
+function issueSlugSuffix(title?: string): string {
+  if (!title) return '';
+  const normalized = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return normalized ? `__${normalized}` : '';
+}
+
 function issueMetaPath(owner: string, repo: string, number: number, title?: string): string {
-  const slug = title ? `__${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
-  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/meta.json`;
+  return `/github/repos/${owner}/${repo}/issues/${number}${issueSlugSuffix(title)}/meta.json`;
 }
 
 function issueCommentsPath(owner: string, repo: string, number: number, title?: string): string {
-  const slug = title ? `__${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
-  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/comments/`;
+  return `/github/repos/${owner}/${repo}/issues/${number}${issueSlugSuffix(title)}/comments/`;
 }
 
 function absoluteIssuePath(owner: string, repo: string, relativePath: string): string {

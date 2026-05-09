@@ -1,3 +1,5 @@
+import type { LinearTeam, LinearUser } from './types.js';
+
 const LINEAR_PAGE_INFO_FIELDS = `
         hasNextPage
         endCursor
@@ -468,6 +470,17 @@ export interface LinearCommentNode {
   updatedAt?: string | null;
 }
 
+export interface LinearBaseIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+}
+
+export interface LinearIssueIndexRow extends LinearBaseIndexRow {
+  identifier: string;
+  state: string;
+}
+
 export interface LinearGraphqlResponse<T> {
   data?: T;
   errors?: Array<{ message?: string; path?: string[] }>;
@@ -496,6 +509,19 @@ function normalizeString(value: string | undefined): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeIndexTitle(value: string | null | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeUpdated(...values: Array<string | null | undefined>): string {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return '';
+}
+
 function normalizeStringArray(values: string[] | undefined): string[] {
   if (!Array.isArray(values)) {
     return [];
@@ -508,6 +534,44 @@ function normalizeStringArray(values: string[] | undefined): string[] {
 
 function isUppercaseTeamKey(value: string): boolean {
   return UPPERCASE_TEAM_KEY_PATTERN.test(value);
+}
+
+export function linearIssueIndexRow(issue: LinearIssueNode): LinearIssueIndexRow {
+  return {
+    id: issue.id,
+    title: normalizeIndexTitle(issue.title),
+    updated: normalizeUpdated(issue.updatedAt, issue.createdAt),
+    identifier: normalizeIndexTitle(issue.identifier),
+    state: normalizeIndexTitle(issue.state?.name),
+  };
+}
+
+export function linearCommentIndexRow(comment: LinearCommentNode): LinearBaseIndexRow {
+  return {
+    id: comment.id,
+    title: normalizeIndexTitle(comment.body) || normalizeIndexTitle(comment.issue?.title),
+    updated: normalizeUpdated(comment.updatedAt, comment.createdAt),
+  };
+}
+
+export function linearUserIndexRow(user: LinearUser): LinearBaseIndexRow {
+  return {
+    id: user.id,
+    title:
+      normalizeIndexTitle(user.displayName) ||
+      normalizeIndexTitle(user.display_name) ||
+      normalizeIndexTitle(user.name) ||
+      normalizeIndexTitle(user.email),
+    updated: normalizeUpdated(user.updatedAt, user.updated_at, user.createdAt, user.created_at),
+  };
+}
+
+export function linearTeamIndexRow(team: LinearTeam): LinearBaseIndexRow {
+  return {
+    id: team.id,
+    title: normalizeIndexTitle(team.name) || normalizeIndexTitle(team.key),
+    updated: normalizeUpdated(team.updatedAt, team.updated_at, team.createdAt, team.created_at),
+  };
 }
 
 export function buildLinearIssueFilter(input: LinearIssueFilterInput): Record<string, unknown> | undefined {

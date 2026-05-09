@@ -3,12 +3,14 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
+import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from './lazy.js';
 import { githubIssuePath, githubPullRequestPath } from './path-mapper.js';
 import {
   type FileSemantics,
   type GitHubAdapterConfig,
   type IngestResult,
   IntegrationAdapter as LocalIntegrationAdapter,
+  type MaterializeResult,
   type NormalizedWebhook,
   type SyncOptions,
   type SyncResult,
@@ -16,6 +18,9 @@ import {
 import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event-map.js';
 import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
+
+export * from './index-emitter.js';
+export * from './layout-prompt.js';
 
 const EMPTY_RESULT: IngestResult = {
   filesWritten: 0,
@@ -31,6 +36,7 @@ export const GITHUB_ADAPTER_NAME = adapterName;
 export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAdapter {
   readonly name = GITHUB_ADAPTER_NAME;
   readonly version = '0.1.0';
+  private readonly inFlightMaterializations = new Map<string, Promise<MaterializeResult>>();
   private readonly schemaAdapter: SchemaAdapter;
   private readonly writebackHandler: GitHubWritebackHandler;
 
@@ -176,14 +182,18 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async sync(_workspaceId: string, options: SyncOptions = {}): Promise<SyncResult> {
-    return {
-      filesWritten: 0,
-      filesUpdated: 0,
-      filesDeleted: 0,
-      cursor: options.cursor,
-      syncedObjectTypes: [],
-      errors: [],
-    };
+    return syncGitHubWorkspace(_workspaceId, this.provider as never, this.config, this.inFlightMaterializations, options);
+  }
+
+  async materializeRepo(workspaceId: string, owner: string, repo: string): Promise<MaterializeResult> {
+    return materializeGitHubRepo(
+      workspaceId,
+      this.provider as never,
+      this.config,
+      owner,
+      repo,
+      this.inFlightMaterializations,
+    );
   }
 
   async writeBack(workspaceId: string, path: string, content: string) {
@@ -335,6 +345,7 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
 
 export * from './config.js';
 export * from './adapter.js';
+export { materializeRepo } from './lazy.js';
 export * from './operations.js';
 export * from './path-mapper.js';
 export * from './types.js';

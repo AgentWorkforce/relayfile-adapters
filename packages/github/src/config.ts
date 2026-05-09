@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG: GitHubAdapterConfig = {
   baseUrl: 'https://api.github.com',
   defaultBranch: 'main',
   fetchFileContents: true,
+  lazy: true,
   maxFileSizeBytes: 1024 * 1024,
   supportedEvents: [...DEFAULT_SUPPORTED_EVENTS],
 };
@@ -39,6 +40,10 @@ export const GITHUB_ADAPTER_CONFIG_SCHEMA = {
     fetchFileContents: {
       type: 'boolean',
       default: DEFAULT_CONFIG.fetchFileContents,
+    },
+    lazy: {
+      type: 'boolean',
+      default: DEFAULT_CONFIG.lazy,
     },
     maxFileSizeBytes: {
       type: 'integer',
@@ -77,6 +82,7 @@ export function validateConfig<T extends Partial<GitHubAdapterConfig> & Record<s
       config.fetchFileContents ?? DEFAULT_CONFIG.fetchFileContents,
       'fetchFileContents',
     ),
+    lazy: requireBoolean(config.lazy ?? DEFAULT_CONFIG.lazy, 'lazy'),
     maxFileSizeBytes: requirePositiveInteger(
       config.maxFileSizeBytes ?? DEFAULT_CONFIG.maxFileSizeBytes,
       'maxFileSizeBytes',

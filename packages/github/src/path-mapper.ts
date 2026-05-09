@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 export const GITHUB_PATH_ROOT = '/github';
 const GITHUB_ROOT = '/github/repos';
@@ -52,6 +53,8 @@ export function encodeGitHubPathSegment(value: string): string {
   return encodeURIComponent(trimmed);
 }
 
+// GitHub uses `<id>__<slug>` segments so `parseNameWithId` round-trips correctly:
+// the leading token before `__` is the id; the trailing token is the human-readable slug.
 export function nameWithId(humanReadable: string | undefined, id: string, opts: NameWithIdOptions = {}): string {
   const normalizedId = encodeGitHubPathSegment(id);
   const slug = humanReadable ? slugify(humanReadable) : '';
@@ -60,9 +63,16 @@ export function nameWithId(humanReadable: string | undefined, id: string, opts: 
   }
 
   const existingNames = opts.existingNames;
-  const baseName = existingNames?.has(slug) ? `${slug}-${shortHash(normalizedId)}` : slug;
-  existingNames?.add(baseName);
-  return `${baseName}__${normalizedId}`;
+  const candidate = `${normalizedId}__${slug}`;
+  if (existingNames?.has(candidate)) {
+    const hashedSlug = `${slug}-${shortHash(normalizedId)}`;
+    const hashedCandidate = `${normalizedId}__${hashedSlug}`;
+    existingNames.add(hashedCandidate);
+    return hashedCandidate;
+  }
+
+  existingNames?.add(candidate);
+  return candidate;
 }
 
 // For GitHub `<number>__<slug>` segments, `id` is the leading number and `humanReadable` is the trailing slug.
@@ -112,6 +122,10 @@ export function githubRepoPrefix(owner: string, repo: string): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}`;
 }
 
+export function githubReposIndexPath(): string {
+  return `${GITHUB_ROOT}/_index.json`;
+}
+
 export function githubRepositoryMetadataPath(owner: string, repo: string): string {
   return `${githubRepoPrefix(owner, repo)}/metadata.json`;
 }
@@ -125,6 +139,10 @@ export function githubIssuePath(
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/issues/${githubNumberSlug(issueNumber, title)}/meta.json`;
 }
 
+export function githubRepoIssuesIndexPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/issues/_index.json`;
+}
+
 export function githubPullRequestPath(
   owner: string,
   repo: string,
@@ -132,6 +150,10 @@ export function githubPullRequestPath(
   title?: string,
 ): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/pulls/${githubNumberSlug(prNumber, title)}/meta.json`;
+}
+
+export function githubRepoPullsIndexPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/pulls/_index.json`;
 }
 
 export function githubPullRequestRoot(
@@ -157,6 +179,37 @@ export function githubCheckRunPath(owner: string, repo: string, checkRunId: numb
 
 export function githubCommitPath(owner: string, repo: string, sha: string): string {
   return `${githubRepoPrefix(owner, repo)}/commits/${sha}/metadata.json`;
+}
+
+export function githubAliasRepoPrefix(owner: string, repo: string): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(`${owner}__${repo}`)}`;
+}
+
+export function githubByTitleAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  title: string,
+  number: number | string,
+  colliding = false,
+): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    // TODO(issue #106): define empty-slug fallback/skip behavior for emoji-only or punctuation-only GitHub titles instead of throwing.
+    throw new Error('GitHub alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(String(number))}` : slug;
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-title/${encodeGitHubPathSegment(filename)}.json`;
+}
+
+export function githubByIdAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-id/${encodeGitHubPathSegment(String(number))}.json`;
 }
 
 const OBJECT_TYPE_ALIASES: Record<string, string> = {
