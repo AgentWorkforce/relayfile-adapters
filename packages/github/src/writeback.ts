@@ -274,6 +274,17 @@ export class GitHubWritebackHandler {
   }
 }
 
+/**
+ * Build a `DELETE /repos/{owner}/{repo}/pulls/{n}/reviews/{id}` request.
+ *
+ * Caller contract — the returned `ProxyRequest.connectionId` is left as the
+ * empty string. Unlike `submitReview`/`updateReview` (which run inside the
+ * `GitHubWritebackHandler` instance and resolve a connection id from the
+ * configured workspace), this is a free function with no instance state, so
+ * the caller must populate `connectionId` from its own metadata before
+ * invoking the request. This matches the pattern used by every other
+ * adapter's `resolveDeleteRequest`.
+ */
 export function resolveDeleteRequest(path: string): ProxyRequest {
   const match = path.match(REVIEW_WRITEBACK_PATH);
   const route = classifyWrite(path, resources, { fsEvent: 'delete' });

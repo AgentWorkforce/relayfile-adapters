@@ -90,8 +90,10 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
     }
   }
 
+  // Standalone pages: see resolveDeleteRequest for why classifyWrite returns
+  // null for these paths and why the canonical-id gate substitutes for it.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if (route === null && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
@@ -125,8 +127,12 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
     return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
   }
 
+  // Standalone pages aren't declared in resources.ts (they share the parent
+  // `/notion/pages/...` namespace with markdown/comments resources), so
+  // `classifyWrite` returns null here. The canonical-id gate below replaces
+  // the route check used for database pages.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if (route === null && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
   }
 
