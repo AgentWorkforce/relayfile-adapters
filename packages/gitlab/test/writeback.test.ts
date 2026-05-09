@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GitLabWritebackHandler } from '../src/writeback.js';
+import { GitLabWritebackHandler, resolveDeleteRequest } from '../src/writeback.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabWritebackHandler', () => {
@@ -29,17 +29,39 @@ describe('GitLabWritebackHandler', () => {
 
     const discussion = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/merge_requests/42/discussions/new.json',
+      '/gitlab/projects/acme/api/merge_requests/42/discussions/draft@discussion.json',
       JSON.stringify({ body: 'LGTM' }),
     );
     const issueNote = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/comments/new.json',
+      '/gitlab/projects/acme/api/issues/7/comments/draft@note.json',
       JSON.stringify({ body: 'Needs follow-up' }),
     );
 
     assert.deepStrictEqual(discussion, { success: true, externalId: 'discussion-1' });
     assert.deepStrictEqual(issueNote, { success: true, externalId: '11' });
+  });
+
+  it('rejects missing required create fields and read-only fields', async () => {
+    const provider = new MockProvider();
+    const handler = new GitLabWritebackHandler(provider, { connectionId: 'conn', baseUrl: 'https://gitlab.com' });
+
+    const missingBody = await handler.writeBack(
+      'workspace-1',
+      '/gitlab/projects/acme/api/issues/7/comments/draft@note.json',
+      JSON.stringify({}),
+    );
+    const readOnly = await handler.writeBack(
+      'workspace-1',
+      '/gitlab/projects/acme/api/issues/7/metadata.json',
+      JSON.stringify({ id: '7', title: 'Updated issue' }),
+    );
+
+    assert.strictEqual(missingBody.success, false);
+    assert.match(missingBody.error ?? '', /requires `body`/);
+    assert.strictEqual(readOnly.success, false);
+    assert.match(readOnly.error ?? '', /read-only/);
+    assert.strictEqual(provider.requests.length, 0);
   });
 
   it('matches issue metadata updates and rejects existing comment paths', async () => {
@@ -63,5 +85,28 @@ describe('GitLabWritebackHandler', () => {
       success: false,
       error: 'Unsupported GitLab writeback path: /gitlab/projects/acme/api/issues/7/comments/11.json',
     });
+  });
+
+  it('maps canonical discussion and note paths to DELETE requests', () => {
+    assert.deepStrictEqual(
+      resolveDeleteRequest('/gitlab/projects/acme/api/issues/7/comments/11.json'),
+      {
+        action: 'delete_issue_note',
+        method: 'DELETE',
+        endpoint: '/api/v4/projects/acme%2Fapi/issues/7/notes/11',
+      },
+    );
+    assert.deepStrictEqual(
+      resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42/discussions/discussion-1.json'),
+      {
+        action: 'delete_merge_request_discussion',
+        method: 'DELETE',
+        endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42/discussions/discussion-1',
+      },
+    );
+    assert.throws(
+      () => resolveDeleteRequest('/gitlab/projects/acme/api/issues/7/comments/draft@note.json'),
+      /Unsupported GitLab delete writeback path/,
+    );
   });
 });

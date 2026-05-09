@@ -54,11 +54,11 @@
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
     "directory": "packages/linear"
   },
-  "peerDependencies": {
-    "@relayfile/sdk": ">=0.6.0 <1"
-  },
   "dependencies": {
     "@relayfile/adapter-core": "^0.2.0"
+  },
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
   },
   "devDependencies": {
     "@agent-relay/sdk": "^6.0.7",

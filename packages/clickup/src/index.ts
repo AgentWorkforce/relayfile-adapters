@@ -35,6 +35,7 @@ export {
 export {
   CLICKUP_LIST_ROUTE_ANCHOR as CLICKUP_WRITEBACK_LIST_ROUTE_ANCHOR,
   CLICKUP_TASK_ROUTE_ANCHOR as CLICKUP_WRITEBACK_TASK_ROUTE_ANCHOR,
+  resolveDeleteRequest,
   resolveWritebackRequest,
 } from './writeback.js';
 export {

@@ -1,24 +1,30 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GITHUB_API_BASE_URL } from './config.js';
+import { resources } from './resources.js';
 import {
   GITHUB_REVIEW_EVENTS,
   GITHUB_REVIEW_SIDES,
   type AgentComment,
   type AgentReview,
+  type AgentReviewMetadata,
   type GitHubRequestProvider,
   type GitHubCreateReviewInput,
   type JsonObject,
   type JsonValue,
+  type ProxyRequest,
   type ProxyResponse,
   type WritebackPathTarget,
   type WritebackResult,
 } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 // PR segment is emitted by `githubNumberSlug` as either a bare `<number>` or
 // `<number>__<slug>` (when the PR title is known). Capture the leading number
 // and tolerate an optional `__<slug>` suffix on the same segment.
 const REVIEW_WRITEBACK_PATH =
-  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/[^/]+(?:\.json)?$/;
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/([^/]+?)(?:\.json)?$/;
 
 interface GitHubReviewResponse {
   id: number;
@@ -103,13 +109,16 @@ export class GitHubWritebackHandler {
       );
     }
 
-    const [, ownerSegment, repoSegment, prNumberSegment] = match;
+    const [, ownerSegment, repoSegment, prNumberSegment, reviewSegment] = match;
     const prNumber = Number.parseInt(prNumberSegment, 10);
+    const reviewId = decodeURIComponent(reviewSegment.replace(/\.json$/, ''));
+    const route = classifyWrite(path, resources);
 
     return {
       owner: decodeURIComponent(ownerSegment),
       repo: decodeURIComponent(repoSegment),
       prNumber,
+      ...(route?.kind === 'patch' ? { reviewId } : {}),
     };
   }
 
@@ -156,6 +165,21 @@ export class GitHubWritebackHandler {
   ): Promise<WritebackResult> {
     try {
       const target = this.extractWritebackTarget(path);
+      const reviewId = target.reviewId;
+      if (reviewId) {
+        const payload = parseReviewUpdatePayload(content);
+        const response = await this.updateReview({ ...target, reviewId }, payload, workspaceId);
+        if (response.status >= 400) {
+          return {
+            success: false,
+            error: formatProviderError(response),
+          };
+        }
+        return {
+          success: true,
+          externalId: extractReviewId(response.data) ?? target.reviewId,
+        };
+      }
       const review = this.parseReviewPayload(content);
       const connectionId = await this.resolveConnectionIdFromWorkspace(workspaceId, review);
       const response = await this.submitReview(
@@ -226,6 +250,100 @@ export class GitHubWritebackHandler {
     throw new Error(
       `Missing GitHub connection id for workspace ${workspaceId}. Configure resolveConnectionId or defaultConnectionId.`,
     );
+  }
+
+  private async updateReview(
+    target: WritebackPathTarget & { reviewId: string },
+    payload: { body: string; metadata?: AgentReviewMetadata },
+    workspaceId: string,
+  ): Promise<ProxyResponse> {
+    const connectionId = payload.metadata?.connectionId?.trim() || (await this.resolveConnectionIdFromWorkspace(workspaceId, { body: payload.body, comments: [], event: 'COMMENT', metadata: payload.metadata }));
+    return this.provider.proxy({
+      method: 'PATCH',
+      baseUrl: GITHUB_API_BASE_URL,
+      endpoint: `/repos/${target.owner}/${target.repo}/pulls/${target.prNumber}/reviews/${encodeURIComponent(target.reviewId)}`,
+      connectionId,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'Provider-Config-Key': payload.metadata?.providerConfigKey ?? this.defaultProviderConfigKey,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: { body: payload.body },
+    });
+  }
+}
+
+/**
+ * Build a `DELETE /repos/{owner}/{repo}/pulls/{n}/reviews/{id}` request.
+ *
+ * Caller contract — the returned `ProxyRequest.connectionId` is left as the
+ * empty string. Unlike `submitReview`/`updateReview` (which run inside the
+ * `GitHubWritebackHandler` instance and resolve a connection id from the
+ * configured workspace), this is a free function with no instance state, so
+ * the caller must populate `connectionId` from its own metadata before
+ * invoking the request. This matches the pattern used by every other
+ * adapter's `resolveDeleteRequest`.
+ */
+export function resolveDeleteRequest(path: string): ProxyRequest {
+  const match = path.match(REVIEW_WRITEBACK_PATH);
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  if (!match || route?.kind !== 'delete') {
+    throw new Error(`Unsupported GitHub delete writeback path: ${path}`);
+  }
+  const [, ownerSegment, repoSegment, prNumberSegment, reviewSegment] = match;
+  return {
+    method: 'DELETE',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${decodeURIComponent(ownerSegment)}/${decodeURIComponent(repoSegment)}/pulls/${Number.parseInt(prNumberSegment, 10)}/reviews/${encodeURIComponent(decodeURIComponent(reviewSegment.replace(/\.json$/, '')))}`,
+    connectionId: '',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  };
+}
+
+function parseReviewUpdatePayload(content: string): { body: string; metadata?: AgentReviewMetadata } {
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(content) as JsonValue;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown JSON parse failure';
+    throw new Error(`Invalid review update JSON: ${message}`);
+  }
+  const object = expectObject(parsed, 'Review update payload');
+  rejectReadOnlyFields(object);
+  const body = readString(object, 'body', 'Review update payload');
+  const metadataValue = object.metadata;
+  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
+  return { body, metadata };
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'node_id',
+  'html_url',
+  'pull_request_url',
+  'createdAt',
+  'updatedAt',
+  'submitted_at',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
   }
 }
 

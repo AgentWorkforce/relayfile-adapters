@@ -245,6 +245,7 @@ export interface WritebackPathTarget {
   owner: string;
   prNumber: number;
   repo: string;
+  reviewId?: string;
 }
 
 export interface WritebackResult {

@@ -1,4 +1,8 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { resources } from './resources.js';
 import type { SlackWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 type JsonPrimitive = boolean | number | null | string;
 type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
@@ -7,11 +11,11 @@ type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
  * Resolve a relayfile writeback into a Slack Web API request.
  *
  * Routes:
- *   - POST /slack/channels/<channel>/messages/new.json
+ *   - POST /slack/channels/<channel>/messages/<draft>.json
  *       → chat.postMessage (top-level message)
- *   - POST /slack/channels/<channel>/messages/<msg>/replies/new.json
+ *   - POST /slack/channels/<channel>/messages/<msg>/replies/<draft>.json
  *       → chat.postMessage with thread_ts (thread reply)
- *   - POST /slack/channels/<channel>/messages/<msg>/reactions/new.json
+ *   - POST /slack/channels/<channel>/messages/<msg>/reactions/<draft>.json
  *       → reactions.add
  *
  * The `<channel>` segment is whatever `path-mapper.namedSegment(name, id)`
@@ -25,30 +29,83 @@ type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
  * recover the canonical `1234567890.001234` form Slack expects.
  */
 export function resolveWritebackRequest(path: string, content: string): SlackWritebackRequest {
-  const newMessageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/new\.json$/);
-  if (newMessageMatch?.[1]) {
-    return buildPostMessage(newMessageMatch[1], undefined, content);
+  const route = classifyWrite(path, resources);
+
+  if (route?.resource.name === 'messages') {
+    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    if (route.kind === 'create' && messageMatch?.[1]) {
+      return buildPostMessage(messageMatch[1], undefined, content);
+    }
+    if (route.kind === 'patch' && messageMatch?.[1] && messageMatch[2]) {
+      return buildUpdateMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]), content);
+    }
   }
 
-  const replyMatch = path.match(
-    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/new\.json$/,
-  );
-  if (replyMatch?.[1] && replyMatch?.[2]) {
-    return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content);
-  }
-
-  const reactionMatch = path.match(
-    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/new\.json$/,
-  );
-  if (reactionMatch?.[1] && reactionMatch?.[2]) {
-    return buildAddReaction(
-      reactionMatch[1],
-      extractMessageTimestamp(reactionMatch[2]),
-      content,
+  if (route?.resource.name === 'replies') {
+    const replyMatch = path.match(
+      /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/,
     );
+    if (route.kind === 'create' && replyMatch?.[1] && replyMatch[2]) {
+      return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content);
+    }
+    if (route.kind === 'patch' && replyMatch?.[1] && replyMatch[3]) {
+      return buildUpdateMessage(replyMatch[1], extractMessageTimestamp(replyMatch[3]), content);
+    }
+  }
+
+  if (route?.resource.name === 'reactions' && route.kind === 'create') {
+    const reactionMatch = path.match(
+      /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/([^/]+)\.json$/,
+    );
+    if (reactionMatch?.[1] && reactionMatch[2]) {
+      return buildAddReaction(
+        reactionMatch[1],
+        extractMessageTimestamp(reactionMatch[2]),
+        content,
+      );
+    }
   }
 
   throw new Error(`No Slack writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): SlackWritebackRequest {
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  if (route?.kind !== 'delete') {
+    throw new Error(`No Slack delete writeback rule matched ${path}`);
+  }
+
+  if (route.resource.name === 'messages') {
+    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    if (messageMatch?.[1] && messageMatch[2]) {
+      return buildDeleteMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]));
+    }
+  }
+
+  if (route.resource.name === 'replies') {
+    const replyMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/);
+    if (replyMatch?.[1] && replyMatch[3]) {
+      return buildDeleteMessage(replyMatch[1], extractMessageTimestamp(replyMatch[3]));
+    }
+  }
+
+  if (route.resource.name === 'reactions') {
+    const reactionMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/([^/]+)\.json$/);
+    if (reactionMatch?.[1] && reactionMatch[2] && reactionMatch[3]) {
+      return {
+        action: 'remove_reaction',
+        method: 'POST',
+        endpoint: '/api/reactions.remove',
+        body: {
+          channel: extractSlackChannel(reactionMatch[1]),
+          timestamp: extractMessageTimestamp(reactionMatch[2]),
+          name: decodeURIComponent(reactionMatch[3]).split('--')[0],
+        },
+      };
+    }
+  }
+
+  throw new Error(`No Slack delete writeback rule matched ${path}`);
 }
 
 /* ------------------------------------------------------------------ *
@@ -127,7 +184,7 @@ function buildPostMessage(
   const parsed = safeParseJson(content);
 
   if (typeof parsed === 'string') {
-    if (!parsed) throw new Error('messages/new.json writeback requires a non-empty body');
+    if (!parsed) throw new Error('Slack message create writeback requires a non-empty body');
     const action: SlackWritebackRequest['action'] = threadTs ? 'reply_in_thread' : 'post_message';
     return {
       action,
@@ -142,15 +199,16 @@ function buildPostMessage(
   }
 
   if (!isRecord(parsed)) {
-    throw new Error('messages/new.json writeback expects a JSON object or plain string');
+    throw new Error('Slack message create writeback expects a JSON object or plain string');
   }
+  rejectReadOnlyFields(parsed);
 
   const text = readString(parsed, 'text');
   const blocks = Array.isArray(parsed.blocks) ? parsed.blocks : undefined;
   const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : undefined;
   if (!text && !blocks && !attachments) {
     throw new Error(
-      'messages/new.json writeback requires `text`, `blocks`, or `attachments`',
+      'Slack message create writeback requires `text`, `blocks`, or `attachments`',
     );
   }
 
@@ -206,6 +264,77 @@ function buildPostMessage(
 }
 
 /**
+ * Build a `chat.update` request for editing an existing top-level message
+ * or thread reply. `chat.postMessage` (used by buildPostMessage) creates a
+ * new message — for PATCH semantics on a canonical `<ts>.json` filename we
+ * must call `chat.update` with the same `ts` to mutate the existing record.
+ *
+ * Accepts the same body shapes as buildPostMessage. Slack ignores
+ * `thread_ts` on update calls (the message's thread membership is fixed at
+ * post time), so we omit it.
+ */
+function buildUpdateMessage(
+  channelSegment: string,
+  ts: string,
+  content: string,
+): SlackWritebackRequest {
+  const pathChannel = extractSlackChannel(channelSegment);
+  const parsed = safeParseJson(content);
+
+  if (typeof parsed === 'string') {
+    if (!parsed) throw new Error('Slack message update writeback requires a non-empty body');
+    return {
+      action: 'update_message',
+      method: 'POST',
+      endpoint: '/api/chat.update',
+      body: { channel: pathChannel, ts, text: parsed },
+    };
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error('Slack message update writeback expects a JSON object or plain string');
+  }
+  rejectReadOnlyFields(parsed);
+
+  const text = readString(parsed, 'text');
+  const blocks = Array.isArray(parsed.blocks) ? parsed.blocks : undefined;
+  const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : undefined;
+  if (!text && !blocks && !attachments) {
+    throw new Error(
+      'Slack message update writeback requires `text`, `blocks`, or `attachments`',
+    );
+  }
+
+  const explicitChannel = readString(parsed, 'channel');
+  const body: Record<string, unknown> = {
+    channel: explicitChannel ?? pathChannel,
+    ts,
+  };
+  if (text) body.text = text;
+  if (blocks) body.blocks = blocks;
+  if (attachments) body.attachments = attachments;
+
+  return {
+    action: 'update_message',
+    method: 'POST',
+    endpoint: '/api/chat.update',
+    body,
+  };
+}
+
+function buildDeleteMessage(channelSegment: string, tsSegment: string): SlackWritebackRequest {
+  return {
+    action: 'delete_message',
+    method: 'POST',
+    endpoint: '/api/chat.delete',
+    body: {
+      channel: extractSlackChannel(channelSegment),
+      ts: tsSegment,
+    },
+  };
+}
+
+/**
  * Build a `reactions.add` request. Accepts:
  *   - a plain string: the emoji name (with or without surrounding colons,
  *     e.g. `eyes` or `:eyes:`).
@@ -229,13 +358,13 @@ function buildAddReaction(
     explicitChannel = readString(parsed, 'channel');
   } else {
     throw new Error(
-      'reactions/new.json writeback expects a JSON object with `name` or a plain string',
+      'Slack reaction create writeback expects a JSON object with `name` or a plain string',
     );
   }
 
   if (!name) {
     throw new Error(
-      'reactions/new.json writeback requires `name` (emoji name without colons)',
+      'Slack reaction create writeback requires `name` (emoji name without colons)',
     );
   }
 
@@ -249,6 +378,30 @@ function buildAddReaction(
       name,
     },
   };
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'ts',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ *

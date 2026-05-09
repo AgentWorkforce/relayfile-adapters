@@ -32,12 +32,15 @@ export interface ZendeskWritebackRequest {
     | 'add_ticket_comment'
     | 'create_ticket'
     | 'create_user'
+    | 'delete_organization'
+    | 'delete_ticket'
+    | 'delete_user'
     | 'update_organization'
     | 'update_ticket'
     | 'update_user';
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export interface ZendeskUserReference {

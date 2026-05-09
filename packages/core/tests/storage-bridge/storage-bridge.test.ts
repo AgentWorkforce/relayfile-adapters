@@ -258,6 +258,6 @@ test("assertReadOnlyFieldsRejected reports schema readOnly fields", () => {
         id: "abc",
         nested: { updatedAt: "2026-05-09T10:00:00.000Z" },
       }),
-    /id, nested\.updatedAt/,
+    /Field "id" is read-only and cannot be written/,
   );
 });

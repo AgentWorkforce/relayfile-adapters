@@ -1,4 +1,8 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { resources } from './resources.js';
 import type { HubSpotObjectType, HubSpotWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 export const HUBSPOT_WRITEBACK_CONTACTS_ROUTE = '/crm/v3/objects/contacts';
 export const HUBSPOT_WRITEBACK_COMPANIES_ROUTE = '/crm/v3/objects/companies';
@@ -26,6 +30,13 @@ const UPDATE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWriteback
   ticket: 'update_ticket',
 };
 
+const DELETE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWritebackRequest['action']>> = {
+  company: 'delete_company',
+  contact: 'delete_contact',
+  deal: 'delete_deal',
+  ticket: 'delete_ticket',
+};
+
 const ASSOCIATE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWritebackRequest['action']>> = {
   company: 'associate_company',
   contact: 'associate_contact',
@@ -33,30 +44,53 @@ const ASSOCIATE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWriteb
   ticket: 'associate_ticket',
 };
 
-interface ParsedWritebackPath {
-  associationType?: string;
-  objectId?: string;
-  objectType: HubSpotObjectType;
-  targetObjectId?: string;
-}
-
 export function resolveHubSpotWritebackRequest(path: string, content: string): HubSpotWritebackRequest {
-  const parsed = parseWritebackPath(path);
+  const trimmed = path.trim();
 
-  if (parsed.associationType && parsed.objectId && parsed.targetObjectId) {
+  // Cross-resource association path is not declared as a resource — keep ad-hoc routing.
+  const association = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\/associations\/([^/]+)\/([^/]+)\.json$/u.exec(trimmed);
+  if (association?.[1] && association[2] && association[3] && association[4]) {
     return buildAssociationRequest({
-      associationType: parsed.associationType,
-      objectId: parsed.objectId,
-      objectType: parsed.objectType,
-      targetObjectId: parsed.targetObjectId,
+      associationType: collectionToApiName(association[3]),
+      objectId: decodeURIComponent(association[2]),
+      objectType: objectTypeFromCollection(association[1]),
+      targetObjectId: decodeURIComponent(association[4]),
     });
   }
 
-  if (!parsed.objectId) {
-    return buildCreateRequest(parsed.objectType, content);
+  const route = classifyWrite(trimmed, resources);
+  const update = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\.json$/u.exec(trimmed);
+  if (route && update?.[1] && update[2]) {
+    const objectType = objectTypeFromCollection(update[1]);
+    if (route.kind === 'create') {
+      return buildCreateRequest(objectType, content);
+    }
+    if (route.kind === 'patch') {
+      return buildUpdateRequest(objectType, decodeURIComponent(update[2]), content);
+    }
   }
 
-  return buildUpdateRequest(parsed.objectType, parsed.objectId, content);
+  throw new Error(`No HubSpot writeback rule matched ${path}`);
+}
+
+export function resolveHubSpotDeleteRequest(path: string): HubSpotWritebackRequest {
+  const trimmed = path.trim();
+  const route = classifyWrite(trimmed, resources, { fsEvent: 'delete' });
+  if (route?.kind !== 'delete') {
+    throw new Error(`No HubSpot delete writeback rule matched ${path}`);
+  }
+  const update = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\.json$/u.exec(trimmed);
+  if (!update?.[1] || !update[2]) {
+    throw new Error(`No HubSpot delete writeback rule matched ${path}`);
+  }
+  const objectType = objectTypeFromCollection(update[1]);
+  const objectId = decodeURIComponent(update[2]);
+
+  return {
+    action: DELETE_ACTION_BY_TYPE[objectType],
+    endpoint: `${ROUTE_BY_TYPE[objectType]}/${encodeURIComponent(objectId)}`,
+    method: 'DELETE',
+  };
 }
 
 function buildCreateRequest(objectType: HubSpotObjectType, content: string): HubSpotWritebackRequest {
@@ -100,34 +134,6 @@ function buildAssociationRequest(parsed: {
   };
 }
 
-function parseWritebackPath(path: string): ParsedWritebackPath {
-  const trimmed = path.trim();
-  if (trimmed === '/hubspot/contacts/new.json') return { objectType: 'contact' };
-  if (trimmed === '/hubspot/companies/new.json') return { objectType: 'company' };
-  if (trimmed === '/hubspot/deals/new.json') return { objectType: 'deal' };
-  if (trimmed === '/hubspot/tickets/new.json') return { objectType: 'ticket' };
-
-  const association = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\/associations\/([^/]+)\/([^/]+)\.json$/u.exec(trimmed);
-  if (association?.[1] && association[2] && association[3] && association[4]) {
-    return {
-      associationType: collectionToApiName(association[3]),
-      objectId: decodeURIComponent(association[2]),
-      objectType: objectTypeFromCollection(association[1]),
-      targetObjectId: decodeURIComponent(association[4]),
-    };
-  }
-
-  const update = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\.json$/u.exec(trimmed);
-  if (update?.[1] && update[2]) {
-    return {
-      objectId: decodeURIComponent(update[2]),
-      objectType: objectTypeFromCollection(update[1]),
-    };
-  }
-
-  throw new Error(`No HubSpot writeback rule matched ${path}`);
-}
-
 function readPropertiesPayload(content: string): Record<string, unknown> {
   const parsed = parseJsonObject(content);
   const properties = isRecord(parsed.properties) ? parsed.properties : parsed;
@@ -137,6 +143,9 @@ function readPropertiesPayload(content: string): Record<string, unknown> {
 function sanitizeProperties(properties: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
     if (isWritablePropertyKey(key) && value !== undefined) {
       sanitized[key] = value;
     }
@@ -158,6 +167,23 @@ function isWritablePropertyKey(key: string): boolean {
     !key.startsWith('hubspot.')
   );
 }
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'archived',
+  'archivedAt',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
 
 function parseJsonObject(content: string): Record<string, unknown> {
   let parsed: unknown;

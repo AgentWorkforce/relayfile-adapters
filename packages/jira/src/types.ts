@@ -43,13 +43,16 @@ export interface JiraWritebackRequest {
     | 'create_comment'
     | 'create_issue'
     | 'create_project'
+    | 'delete_comment'
+    | 'delete_issue'
+    | 'delete_project'
     | 'update_comment'
     | 'update_issue'
     | 'update_project'
     | 'update_sprint';
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export interface JiraReadRequest {

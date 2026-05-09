@@ -36,6 +36,7 @@ export {
   PIPEDRIVE_DEALS_WRITE_ROUTE,
   PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE,
   PIPEDRIVE_PERSONS_WRITE_ROUTE,
+  resolvePipedriveDeleteRequest,
   resolvePipedriveWritebackRequest,
   type PipedriveWritebackRequest,
 } from './writeback.js';

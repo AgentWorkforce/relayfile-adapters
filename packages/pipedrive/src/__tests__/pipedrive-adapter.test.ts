@@ -8,6 +8,8 @@ import {
   pipedriveDealPath,
   pipedriveOrganizationPath,
   pipedrivePersonPath,
+  resolvePipedriveDeleteRequest,
+  resolvePipedriveWritebackRequest,
   type ConnectionProvider,
   type NormalizedWebhook,
   type ProxyRequest,
@@ -15,6 +17,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface AdapterHarness {
   adapter: PipedriveAdapter;
@@ -238,5 +241,34 @@ test('path mapping stays deterministic for supported Pipedrive VFS objects', () 
   assert.equal(adapter.computePath('person', '201', 'Ada Lovelace'), '/pipedrive/persons/ada-lovelace--201.json');
   assert.equal(adapter.computePath('organization', '301', 'Acme Corp'), '/pipedrive/organizations/acme-corp--301.json');
   assert.equal(adapter.computePath('activity', '401', 'Follow Up'), '/pipedrive/activities/follow-up--401.json');
-});
 
+  assert.deepEqual(resolvePipedriveWritebackRequest('/pipedrive/deals/draft-deal.json', '{"title":"New deal"}'), {
+    action: 'create_deal',
+    method: 'POST',
+    endpoint: '/v1/deals',
+    body: { title: 'New deal' },
+  });
+  assert.deepEqual(resolvePipedriveWritebackRequest('/pipedrive/deals/101.json', '{"title":"Renamed"}'), {
+    action: 'update_deal',
+    method: 'PUT',
+    endpoint: '/v1/deals/101',
+    body: { title: 'Renamed' },
+  });
+  assert.throws(
+    () => resolvePipedriveWritebackRequest('/pipedrive/deals/101.json', '{"id":101,"title":"Renamed"}'),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  assert.throws(
+    () => resolvePipedriveWritebackRequest('/pipedrive/deals/draft-deal.json', '{"note":"Missing title"}'),
+    /requires at least one mutable field/,
+  );
+  assert.deepEqual(resolvePipedriveDeleteRequest('/pipedrive/deals/101.json'), {
+    action: 'delete_deal',
+    method: 'DELETE',
+    endpoint: '/v1/deals/101',
+  });
+  assert.throws(
+    () => resolvePipedriveDeleteRequest('/pipedrive/deals/draft-deal.json'),
+    /No Pipedrive delete writeback rule matched/,
+  );
+});

@@ -198,8 +198,11 @@ export interface AsanaWritebackRequest extends AsanaRestRequest {
     | 'create_project'
     | 'create_section'
     | 'create_task'
+    | 'delete_project'
+    | 'delete_section'
+    | 'delete_task'
     | 'update_project'
     | 'update_section'
     | 'update_task';
-  method: 'POST' | 'PUT';
+  method: 'DELETE' | 'POST' | 'PUT';
 }

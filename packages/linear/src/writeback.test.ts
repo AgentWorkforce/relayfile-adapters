@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReadOnlyFieldError, resolveWritebackRequest } from './writeback.js';
+import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from './writeback.js';
 
 const PAGE_UUID = '2fd6800c-1c90-80ea-9ec8-fe4a0daa66b8';
 const PAGE_HEX = PAGE_UUID.replace(/-/g, '');
@@ -103,6 +103,20 @@ describe('linear writeback', () => {
       });
     });
 
+    it('builds an issueUpdate mutation for the canonical __ separator emitted by path-mapper', () => {
+      // Pins the merged convention from #49: nameWithId now emits
+      // `<basename>__<id>` rather than the legacy `<slug>--<id>`. classifyWrite
+      // and extractLinearId must treat the underscore form as canonical.
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor__${PAGE_HEX}.json`,
+        JSON.stringify({ title: 'New title' }),
+      );
+      assert.strictEqual(req.action, 'update_issue');
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, { title: 'New title' });
+    });
+
     it('rejects read-only fields instead of silently stripping them', () => {
       assert.throws(
         () =>
@@ -164,6 +178,24 @@ describe('linear writeback', () => {
             }),
           ),
         (error) => error instanceof ReadOnlyFieldError && error.field === 'provider',
+      );
+    });
+  });
+
+  describe('issue delete', () => {
+    it('builds an issueDelete mutation for a canonical id filename', () => {
+      const req = resolveDeleteRequest(`/linear/issues/auth-refactor--${PAGE_HEX}.json`);
+
+      assert.strictEqual(req.action, 'delete_issue');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.deepStrictEqual(req.body.variables, { id: PAGE_UUID });
+    });
+
+    it('rejects delete writebacks for draft filenames', () => {
+      assert.throws(
+        () => resolveDeleteRequest('/linear/issues/audit-log-export.json'),
+        /No Linear delete writeback rule matched/,
       );
     });
   });

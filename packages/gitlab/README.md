@@ -86,10 +86,14 @@ const result = await adapter.routeWebhook(payload, undefined, headers);
 
 ## Writeback paths
 
+File-native writeback uses canonical filenames for updates and any
+non-canonical ("draft") filename to create new records. `new.json` has
+no special runtime meaning — see `docs/migration/file-native-writeback.md`.
+
 - `PUT /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/metadata.json`
-- `POST /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/new.json`
+- `POST /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/<draft>.json`
 - `PUT /gitlab/projects/{namespace}/{project}/issues/{iid}/metadata.json`
-- `POST /gitlab/projects/{namespace}/{project}/issues/{iid}/comments/new.json`
+- `POST /gitlab/projects/{namespace}/{project}/issues/{iid}/comments/<draft>.json`
 
 ## Comparison with the GitHub adapter
 

@@ -59,6 +59,9 @@
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
     "directory": "packages/hubspot"
   },
+  "dependencies": {
+    "@relayfile/adapter-core": "^0.2.0"
+  },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
   },

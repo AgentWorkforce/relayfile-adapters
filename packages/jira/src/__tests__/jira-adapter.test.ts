@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
 import { JiraAdapter, type RelayFileClientLike, type WriteFileInput } from '../jira-adapter.js';
 import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
+import { ReadOnlyFieldError, resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -158,6 +159,69 @@ describe('JiraAdapter', () => {
     // generated without the parent issue ref); nested form is preferred.
     assert.equal(computeJiraPath('comment', '9001'), '/jira/comments/9001.json');
     assert.equal(computeJiraPath('comment', '9001', 'ENG-42'), '/jira/issues/ENG-42/comments/9001.json');
+  });
+
+  it('maps file-native writeback routes for create, patch, validation, and delete', () => {
+    assert.deepEqual(resolveJiraWritebackRequest('/jira/issues/draft-issue.json', JSON.stringify({
+      fields: { project: { key: 'ENG' }, summary: 'New issue', issuetype: { name: 'Task' } },
+    })), {
+      action: 'create_issue',
+      method: 'POST',
+      endpoint: '/rest/api/3/issue',
+      body: { fields: { project: { key: 'ENG' }, summary: 'New issue', issuetype: { name: 'Task' } } },
+    });
+    assert.deepEqual(resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"fields":{"summary":"Renamed"}}'), {
+      action: 'update_issue',
+      method: 'PUT',
+      endpoint: '/rest/api/3/issue/ENG-42',
+      body: { fields: { summary: 'Renamed' } },
+    });
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"id":"10001","fields":{"summary":"Renamed"}}'),
+      (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+    );
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/issues/draft-issue.json', '{"fields":{"summary":"Missing project"}}'),
+      /requires fields.project/,
+    );
+    assert.deepEqual(resolveJiraDeleteRequest('/jira/issues/ENG-42.json'), {
+      action: 'delete_issue',
+      method: 'DELETE',
+      endpoint: '/rest/api/3/issue/ENG-42',
+    });
+    assert.throws(
+      () => resolveJiraDeleteRequest('/jira/issues/draft-issue.json'),
+      /No Jira delete writeback rule matched/,
+    );
+  });
+
+  it('treats bare uppercase strings as drafts and slug-prefixed short keys as canonical', () => {
+    // Pins a Devin Review finding: an earlier idPattern made `-\d+` optional
+    // at the top level, which caused `/jira/projects/ENG.json` to classify as
+    // a canonical PATCH (issuing PUT /rest/api/3/project/ENG) instead of a
+    // CREATE. The fix: bare strings must look like KEY-123 or pure digits;
+    // short uppercase keys are canonical only inside the slug-prefixed form.
+    assert.deepEqual(
+      resolveJiraWritebackRequest(
+        '/jira/projects/engineering-platform--ENG.json',
+        JSON.stringify({ name: 'Engineering Platform' }),
+      ),
+      {
+        action: 'update_project',
+        method: 'PUT',
+        endpoint: '/rest/api/3/project/ENG',
+        body: { name: 'Engineering Platform' },
+      },
+    );
+    // /jira/projects/ENG.json must NOT route to PUT /rest/api/3/project/ENG
+    // (the bug: bare `ENG` was classified as canonical PATCH). Instead it
+    // should route to CREATE — surfaced here as the "requires key" error
+    // because the body omits the required `key` field, proving the create
+    // path was taken.
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/projects/ENG.json', JSON.stringify({})),
+      /project create writeback requires key/,
+    );
   });
 
   it('deletes files for deleted events when deleteFile is available', async () => {

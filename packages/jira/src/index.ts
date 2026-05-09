@@ -41,6 +41,7 @@ export {
   resolveJiraReadRequest,
 } from './queries.js';
 export {
+  resolveJiraDeleteRequest,
   resolveJiraWritebackRequest,
 } from './writeback.js';
 export type * from './types.js';

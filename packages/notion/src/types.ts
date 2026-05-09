@@ -404,6 +404,7 @@ export interface NotionWritebackRequest {
   action:
     | 'create_comment'
     | 'create_page'
+    | 'delete_page'
     | 'update_page_markdown'
     | 'update_page_properties';
   method: 'POST' | 'PATCH';

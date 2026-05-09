@@ -5,6 +5,8 @@ import {
   ZendeskAdapter,
   computeZendeskPath,
   normalizeZendeskWebhook,
+  resolveDeleteRequest,
+  resolveWritebackRequest,
   zendeskOrganizationPath,
   zendeskTicketPath,
   zendeskUserPath,
@@ -14,6 +16,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 function createProvider(): ConnectionProvider {
   return {
@@ -192,6 +195,80 @@ test('path mapping stays deterministic for supported Zendesk VFS objects', () =>
   assert.equal(adapter.computePath('ticket', '123', 'Cannot log in'), '/zendesk/tickets/123.json');
   assert.equal(adapter.computePath('user', '456'), '/zendesk/users/456.json');
   assert.equal(adapter.computePath('organization', '789'), '/zendesk/organizations/789.json');
+
+  assert.deepEqual(resolveWritebackRequest('/zendesk/tickets/draft-ticket.json', '{"subject":"New ticket"}'), {
+    action: 'create_ticket',
+    method: 'POST',
+    endpoint: '/api/v2/tickets.json',
+    body: { ticket: { subject: 'New ticket' } },
+  });
+  assert.deepEqual(resolveWritebackRequest('/zendesk/tickets/123.json', '{"subject":"Renamed"}'), {
+    action: 'update_ticket',
+    method: 'PUT',
+    endpoint: '/api/v2/tickets/123.json',
+    body: { ticket: { subject: 'Renamed' } },
+  });
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/tickets/123.json', '{"id":"123","subject":"Renamed"}'),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/tickets/draft-ticket.json', '{"description":"Missing subject"}'),
+    /requires a `subject`/,
+  );
+  assert.deepEqual(resolveDeleteRequest('/zendesk/tickets/123.json'), {
+    action: 'delete_ticket',
+    method: 'DELETE',
+    endpoint: '/api/v2/tickets/123.json',
+  });
+  assert.throws(
+    () => resolveDeleteRequest('/zendesk/tickets/draft-ticket.json'),
+    /No Zendesk delete writeback rule matched/,
+  );
+
+  // Pins a CodeRabbit Review finding: ticket/user create previously called
+  // rejectReadOnlyFields BEFORE unwrapping the {ticket: ...} envelope, so a
+  // payload like {ticket: {id: "...", ...}} would smuggle a read-only id
+  // through. Order is now unwrap → reject.
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/tickets/draft-ticket.json',
+        JSON.stringify({ ticket: { id: '999', subject: 'Smuggled' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/users/draft-user.json',
+        JSON.stringify({ user: { id: '999', name: 'Smuggled' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  // Pins a CodeRabbit Review finding: organization update was the only mutable
+  // zendesk path that didn't call rejectReadOnlyFields, silently letting `id`
+  // through as a generic error instead of a precise ReadOnlyFieldError.
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/organizations/123.json',
+        JSON.stringify({ organization: { id: '999', name: 'Renamed' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+
+  // Pins a CodeRabbit Review finding: organizations aren't a declared resource,
+  // so classifyWrite never gates them. Without an inline canonical-id check,
+  // /zendesk/organizations/draft-org.json would silently PUT to a draft id.
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/organizations/draft-org.json', '{}'),
+    /No Zendesk writeback rule matched/,
+  );
+  assert.throws(
+    () => resolveDeleteRequest('/zendesk/organizations/draft-org.json'),
+    /No Zendesk delete writeback rule matched/,
+  );
 });
 
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {

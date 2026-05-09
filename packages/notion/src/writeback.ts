@@ -1,6 +1,10 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { DEFAULT_NOTION_MARKDOWN_API_VERSION } from './types.js';
 import { deserializePropertyMap } from './pages/properties.js';
+import { resources } from './resources.js';
 import type { JsonValue, NotionWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 /**
  * Extract a Notion id from a path segment.
@@ -18,12 +22,13 @@ import type { JsonValue, NotionWritebackRequest } from './types.js';
 function extractNotionId(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  // slug--<32-hex>: reverse the path-mapper encoding to canonical UUID.
-  const slugged32 = /--([0-9a-f]{32})$/i.exec(decoded);
+  // <slug>__<32-hex> (current convention) or legacy <slug>--<32-hex>: reverse
+  // the path-mapper encoding to canonical UUID.
+  const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32) return formatUuid(slugged32[1]);
 
-  // slug--<8-hex>: legacy form, can't be reversed losslessly.
-  if (/--[0-9a-f]{8}$/i.test(decoded)) {
+  // Legacy <slug>--<8-hex>: form can't be reversed losslessly.
+  if (/(?:--|__)[0-9a-f]{8}$/i.test(decoded)) {
     throw new Error(
       `Notion path "${segment}" uses a legacy 8-char id suffix that cannot be ` +
         `losslessly resolved. Run \`relayfile pull\` to re-sync paths.`,
@@ -47,6 +52,21 @@ function formatUuid(hex32: string): string {
   return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
 }
 
+// Standalone notion pages aren't a declared resource (`resources.ts` only
+// covers database pages), so `classifyWrite` returns null for them. Tier-0
+// canonicity is checked inline against the same forms the page idPattern
+// accepts: dehyphenated 32-hex, canonical 8-4-4-4-12, or either form prefixed
+// by a `<slug>(?:--|__)`. We also recognize the legacy `<slug>(?:--|__)<8-hex>`
+// form so it routes through `extractNotionId`, which throws a clear "re-sync
+// required" message instead of falling through to a generic "no rule matched".
+const STANDALONE_PAGE_CANONICAL = /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const STANDALONE_PAGE_LEGACY_8HEX = /(?:--|__)[0-9a-f]{8}$/i;
+
+function isCanonicalStandalonePageSegment(segment: string): boolean {
+  const decoded = decodeURIComponent(segment);
+  return STANDALONE_PAGE_CANONICAL.test(decoded) || STANDALONE_PAGE_LEGACY_8HEX.test(decoded);
+}
+
 /**
  * Resolve a relayfile writeback into a Notion REST request.
  *
@@ -57,24 +77,27 @@ function formatUuid(hex32: string): string {
  *   - PATCH /notion/pages/<slug>--<id>/content.md                  → page markdown (top-level)
  *   - POST  /notion/databases/<db>/pages/<slug>--<id>/comments.json → comment create
  *   - POST  /notion/pages/<slug>--<id>/comments.json               → comment create (top-level)
- *   - POST  /notion/databases/<db>/pages/new.json                   → create page in database
+ *   - POST  /notion/databases/<db>/pages/<draft>.json               → create page in database
  *   - POST  /notion/databases/<db>/pages                            → create page in database
  *
  * Throws when no rule matches the path.
  */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
-  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages(?:\/new\.json)?\/?$/);
-  if (createDatabasePageMatch) {
-    return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
-  }
-
+  const route = classifyWrite(path, resources);
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
-  if (databasePageMatch) {
-    return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
+  if (route?.resource.name === 'pages' && databasePageMatch) {
+    if (route.kind === 'create') {
+      return buildCreatePageWriteback(extractNotionId(databasePageMatch[1]), content);
+    }
+    if (route.kind === 'patch') {
+      return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
+    }
   }
 
+  // Standalone pages: see resolveDeleteRequest for why classifyWrite returns
+  // null for these paths and why the canonical-id gate substitutes for it.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (standalonePageMatch) {
+  if (route === null && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
@@ -101,6 +124,25 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   throw new Error(`No Notion writeback rule matched ${path}`);
 }
 
+export function resolveDeleteRequest(path: string): NotionWritebackRequest {
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
+  if (route?.resource.name === 'pages' && route.kind === 'delete' && databasePageMatch?.[2]) {
+    return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
+  }
+
+  // Standalone pages aren't declared in resources.ts (they share the parent
+  // `/notion/pages/...` namespace with markdown/comments resources), so
+  // `classifyWrite` returns null here. The canonical-id gate below replaces
+  // the route check used for database pages.
+  const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
+  if (route === null && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+    return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
+  }
+
+  throw new Error(`No Notion delete writeback rule matched ${path}`);
+}
+
 /**
  * Build a `PATCH /v1/pages/{id}` request to update a page's properties,
  * archived flag, icon, or cover. The payload must include a `properties`
@@ -108,6 +150,7 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
  */
 function buildPagePropertiesWriteback(pageId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
+  rejectReadOnlyFields(payload);
   const properties = extractSerializedProperties(payload);
   return {
     action: 'update_page_properties',
@@ -205,6 +248,7 @@ function buildCommentWriteback(pageId: string, content: string): NotionWriteback
  */
 function buildCreatePageWriteback(databaseId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
+  rejectReadOnlyFields(payload);
   const properties = extractSerializedProperties(payload);
   const children = Array.isArray(payload.children) ? payload.children : undefined;
   const markdown = typeof payload.markdown === 'string' ? payload.markdown : undefined;
@@ -219,6 +263,17 @@ function buildCreatePageWriteback(databaseId: string, content: string): NotionWr
       properties,
       children,
       markdown,
+    },
+  };
+}
+
+function buildArchivePageWriteback(pageId: string): NotionWritebackRequest {
+  return {
+    action: 'delete_page',
+    method: 'PATCH',
+    endpoint: `/v1/pages/${encodeURIComponent(pageId)}`,
+    body: {
+      archived: true,
     },
   };
 }
@@ -282,3 +337,29 @@ function readBoolean(record: Record<string, unknown>, key: string): boolean | un
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'created_time',
+  'last_edited_time',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+

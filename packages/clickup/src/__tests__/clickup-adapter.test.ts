@@ -9,6 +9,7 @@ import {
   clickUpTaskPath,
   computeClickUpPath,
   normalizeClickUpWebhook,
+  resolveDeleteRequest,
   resolveReadRequest,
   resolveWritebackRequest,
   type ConnectionProvider,
@@ -17,6 +18,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface RecordingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -215,14 +217,37 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
       subtasks: 'true',
     },
   });
-  assert.deepEqual(resolveWritebackRequest('/clickup/lists/list_123/tasks/new.json', '{"name":"New task"}'), {
+  assert.deepEqual(resolveWritebackRequest('/clickup/lists/list_123/tasks/draft-task.json', '{"name":"New task"}'), {
     action: 'create_task',
     method: 'POST',
     endpoint: '/api/v2/list/list_123/task',
     body: { name: 'New task' },
   });
   assert.throws(
-    () => resolveWritebackRequest('/clickup/tasks/task_123/comments/new.json', '   '),
+    () => resolveWritebackRequest('/clickup/tasks/task_123/comments/draft-comment.json', '   '),
     /non-empty comment_text/,
+  );
+  assert.deepEqual(resolveWritebackRequest('/clickup/tasks/task_123.json', '{"name":"Renamed"}'), {
+    action: 'update_task',
+    method: 'PUT',
+    endpoint: '/api/v2/task/task_123',
+    body: { name: 'Renamed' },
+  });
+  assert.throws(
+    () => resolveWritebackRequest('/clickup/tasks/task_123.json', '{"id":"task_123","name":"Renamed"}'),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  assert.throws(
+    () => resolveWritebackRequest('/clickup/lists/list_123/tasks/draft-task.json', '{"description":"Missing name"}'),
+    /requires a `name`/,
+  );
+  assert.deepEqual(resolveDeleteRequest('/clickup/tasks/task123.json'), {
+    action: 'delete_task',
+    method: 'DELETE',
+    endpoint: '/api/v2/task/task123',
+  });
+  assert.throws(
+    () => resolveDeleteRequest('/clickup/tasks/draft-task.json'),
+    /No ClickUp delete writeback rule matched/,
   );
 });

@@ -1,5 +1,9 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { decodeSalesforcePathSegment, pathObjectTypeFromCollection } from './path-mapper.js';
+import { resources } from './resources.js';
 import type { SalesforceWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 export const SALESFORCE_ACCOUNT_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Account';
 export const SALESFORCE_CONTACT_WRITEBACK_ROUTE = '/services/data/v62.0/sobjects/Contact';
@@ -39,43 +43,71 @@ const REPLACE_ACTIONS = {
   Case: 'replace_case',
 } as const;
 
+const DELETE_ACTIONS = {
+  Account: 'delete_account',
+  Contact: 'delete_contact',
+  Opportunity: 'delete_opportunity',
+  Lead: 'delete_lead',
+  Case: 'delete_case',
+} as const;
+
 export function resolveWritebackRequest(
   path: string,
   content: string,
   method: 'PATCH' | 'POST' | 'PUT' = 'PATCH',
 ): SalesforceWritebackRequest {
   const normalizedPath = normalizePath(path);
-  const newMatch = normalizedPath.match(/^\/salesforce\/([^/]+)\/new\.json$/);
-  if (newMatch?.[1]) {
-    const objectType = pathObjectTypeFromCollection(newMatch[1]);
-    if (!objectType) {
-      throw new Error(`No Salesforce writeback rule matched ${path}`);
-    }
-    return {
-      action: CREATE_ACTIONS[objectType],
-      method: 'POST',
-      endpoint: ROUTES[objectType],
-      body: parseJsonObject(content),
-    };
-  }
+  const route = classifyWrite(normalizedPath, resources);
 
   const itemMatch = normalizedPath.match(/^\/salesforce\/([^/]+)\/([^/]+)\.json$/);
-  if (itemMatch?.[1] && itemMatch[2]) {
+  if (route && itemMatch?.[1] && itemMatch[2]) {
     const objectType = pathObjectTypeFromCollection(itemMatch[1]);
     if (!objectType) {
       throw new Error(`No Salesforce writeback rule matched ${path}`);
     }
-    const objectId = decodeSalesforcePathSegment(itemMatch[2]);
-    const writeMethod = method === 'PUT' ? 'PUT' : 'PATCH';
-    return {
-      action: writeMethod === 'PUT' ? REPLACE_ACTIONS[objectType] : UPDATE_ACTIONS[objectType],
-      method: writeMethod,
-      endpoint: `${ROUTES[objectType]}/${encodeURIComponent(objectId)}`,
-      body: unwrapSyncedEnvelope(parseJsonObject(content)),
-    };
+    if (route.kind === 'create') {
+      const body = parseJsonObject(content);
+      rejectReadOnlyFields(body);
+      return {
+        action: CREATE_ACTIONS[objectType],
+        method: 'POST',
+        endpoint: ROUTES[objectType],
+        body,
+      };
+    }
+    if (route.kind === 'patch') {
+      const objectId = decodeSalesforcePathSegment(itemMatch[2]);
+      const body = unwrapSyncedEnvelope(parseJsonObject(content));
+      rejectReadOnlyFields(body);
+      const writeMethod = method === 'PUT' ? 'PUT' : 'PATCH';
+      return {
+        action: writeMethod === 'PUT' ? REPLACE_ACTIONS[objectType] : UPDATE_ACTIONS[objectType],
+        method: writeMethod,
+        endpoint: `${ROUTES[objectType]}/${encodeURIComponent(objectId)}`,
+        body,
+      };
+    }
   }
 
   throw new Error(`No Salesforce writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): SalesforceWritebackRequest {
+  const normalizedPath = normalizePath(path);
+  const route = classifyWrite(normalizedPath, resources, { fsEvent: 'delete' });
+  const itemMatch = normalizedPath.match(/^\/salesforce\/([^/]+)\/([^/]+)\.json$/);
+  if (route?.kind === 'delete' && itemMatch?.[1] && itemMatch[2]) {
+    const objectType = pathObjectTypeFromCollection(itemMatch[1]);
+    if (objectType) {
+      return {
+        action: DELETE_ACTIONS[objectType],
+        method: 'DELETE',
+        endpoint: `${ROUTES[objectType]}/${encodeURIComponent(decodeSalesforcePathSegment(itemMatch[2]))}`,
+      };
+    }
+  }
+
+  throw new Error(`No Salesforce delete writeback rule matched ${path}`);
 }
 
 function unwrapSyncedEnvelope(payload: Record<string, unknown>): Record<string, unknown> {
@@ -110,6 +142,33 @@ function normalizePath(path: string): string {
     throw new Error('Salesforce writeback path must be a non-empty string');
   }
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'Id',
+  'id',
+  'CreatedDate',
+  'LastModifiedDate',
+  'SystemModstamp',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

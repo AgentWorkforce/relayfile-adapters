@@ -1,16 +1,15 @@
+import {
+  ReadOnlyFieldError,
+  type AdapterResourceConfig,
+  type AdapterResourceOperation,
+} from "../runtime/file-native-router.js";
 import type { JsonValue } from "./event.js";
 
-export interface AdapterResourceConfig {
-  readonly name: string;
-  readonly path: string;
-  readonly pathPattern: RegExp;
-  readonly idPattern: RegExp;
-  readonly schema: string;
-  readonly createExample: string;
-  readonly operations?: readonly AdapterResourceOperation[];
-}
-
-export type AdapterResourceOperation = "create" | "update" | "delete";
+export {
+  ReadOnlyFieldError,
+  type AdapterResourceConfig,
+  type AdapterResourceOperation,
+};
 
 export interface JsonSchemaObject {
   readonly $schema?: string;
@@ -23,16 +22,6 @@ export interface JsonSchemaObject {
   readonly allOf?: readonly JsonSchemaObject[];
   readonly additionalProperties?: boolean | JsonSchemaObject;
   readonly [key: string]: unknown;
-}
-
-export class ReadOnlyFieldError extends Error {
-  readonly fields: readonly string[];
-
-  constructor(fields: readonly string[]) {
-    super(`Writeback attempted to modify read-only fields: ${fields.join(", ")}`);
-    this.name = "ReadOnlyFieldError";
-    this.fields = fields;
-  }
 }
 
 export function findResourceByPath(
@@ -50,7 +39,7 @@ export function assertReadOnlyFieldsRejected(
   const readOnlyFields = collectReadOnlyFields(schema);
   const rejected = readOnlyFields.filter((field) => hasPath(patch, field));
   if (rejected.length > 0) {
-    throw new ReadOnlyFieldError(rejected);
+    throw new ReadOnlyFieldError(rejected[0]!);
   }
 }
 
