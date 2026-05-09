@@ -423,6 +423,23 @@ export const adapters = [
     ],
   },
   {
+    slug: 'google-calendar',
+    title: 'Google Calendar adapter',
+    overview:
+      'The Google Calendar adapter exposes calendar and event records under `/google-calendar`, with writeback routes for creating, patching, and deleting events.',
+    readPaths: [
+      ['/google-calendar/calendars/<calendarId>.json', 'Calendar metadata.'],
+      ['/google-calendar/calendars/<calendarId>/events/<eventId>.json', 'Calendar event records.'],
+    ],
+    endpoints: [
+      endpoint('/google-calendar/calendars/{calendarId}/events/new.json', 'Create Google Calendar event', 'Creates a calendar event in the calendar named by the path.', ['start', 'end'], googleCalendarEventProps(), {
+        summary: 'Team planning',
+        start: { dateTime: '2026-05-12T09:00:00Z' },
+        end: { dateTime: '2026-05-12T09:30:00Z' },
+      }, googleCalendarContentRequirement()),
+    ],
+  },
+  {
     slug: 'onedrive',
     title: 'OneDrive adapter',
     overview: 'The OneDrive adapter exposes drive items and Graph subscriptions with file-native writeback discovery.',
@@ -657,6 +674,56 @@ function slackContentRequirement() {
       { required: ['text'] },
       { required: ['blocks'] },
       { required: ['attachments'] },
+    ],
+  };
+}
+
+function googleCalendarEventProps() {
+  const eventTime = obj('Google Calendar event time.', {
+    date: str('All-day event date in YYYY-MM-DD form.', 'date'),
+    dateTime: str('Timed event timestamp in RFC 3339 form.', 'date-time'),
+    timeZone: str('IANA time zone name.'),
+  });
+  const attendee = obj('Event attendee.', {
+    email: str('Attendee email address.', 'email'),
+    displayName: str('Attendee display name.'),
+    optional: bool('Whether attendance is optional.'),
+    resource: bool('Whether the attendee is a room or resource.'),
+    responseStatus: en(['needsAction', 'declined', 'tentative', 'accepted'], 'Attendee response status.'),
+  });
+
+  return {
+    summary: str('Event title.'),
+    description: str('Event description. Google Calendar accepts HTML.'),
+    location: str('Free-form event location.'),
+    start: eventTime,
+    end: eventTime,
+    attendees: arr(attendee, 'Event attendees.'),
+    status: en(['confirmed', 'tentative', 'cancelled'], 'Event status.'),
+    recurrence: arr(str('RRULE, EXRULE, RDATE, or EXDATE recurrence line.'), 'Recurrence lines.'),
+    reminders: obj('Reminder settings.', {
+      useDefault: bool('Whether to use calendar default reminders.'),
+      overrides: arr(obj('Reminder override.', {
+        method: en(['email', 'popup'], 'Reminder delivery method.'),
+        minutes: int('Minutes before the event start.', { minimum: 0 }),
+      }), 'Reminder overrides.'),
+    }),
+    conferenceData: obj('Conference data such as a Google Meet create request.'),
+    transparency: en(['opaque', 'transparent'], 'Whether the event blocks calendar availability.'),
+    visibility: en(['default', 'public', 'private', 'confidential'], 'Event visibility.'),
+    colorId: str('Google Calendar color id.'),
+  };
+}
+
+function googleCalendarContentRequirement() {
+  return {
+    anyOf: [
+      { required: ['summary'] },
+      { required: ['description'] },
+      { required: ['location'] },
+      { required: ['attendees'] },
+      { required: ['recurrence'] },
+      { required: ['conferenceData'] },
     ],
   };
 }

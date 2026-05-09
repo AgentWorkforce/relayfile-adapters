@@ -8,20 +8,19 @@ on:
           Package(s) to publish. Accepts:
             • all
             • missing (only versions not yet on npm)
-            • a group alias: storage, messaging, devtools, crm, pm, support, analytics, email, commerce, db
-            • one or more package dir names, comma- or space-separated (e.g. "slack,linear" or "github gitlab")
+            • a group alias: storage, messaging, calendar, devtools, crm, pm, support, analytics, email, commerce, db
+            • one or more package dir names, comma- or space-separated (e.g. "google-calendar", "slack,linear", or "github gitlab")
         required: true
         type: string
         default: "all"
       version:
-        description: "Version bump type"
+        description: |
+          Version bump or exact version. Accepts:
+            • patch / minor / major / prerelease (npm version semantics)
+            • none (skip bump, publish current package.json version as-is)
+            • an exact semver like 1.2.3 or 0.2.0-beta.1
         required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-          - prerelease
+        type: string
         default: "patch"
       tag:
         description: "NPM dist-tag"
@@ -77,39 +76,70 @@ jobs:
           node scripts/resolve-publish-targets.mjs "$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
 
       - name: Version packages
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
         run: |
-          for pkg in ${{ steps.resolve.outputs.packages }}; do
-            cd packages/$pkg
-            npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          set -euo pipefail
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            case "$pkg" in
+              *[!a-zA-Z0-9_-]*)
+                echo "Invalid package slug: $pkg" >&2
+                exit 1
+                ;;
+            esac
+            cd "packages/$pkg"
+            if [ "$INPUT_VERSION" != "none" ]; then
+              npm version "$INPUT_VERSION" --no-git-tag-version --allow-same-version
+            fi
             cd ../..
-          done
+          done < <(printf '%s\n' "$RESOLVED_PACKAGES" | tr ' ,' '\n' | sed '/^$/d')
 
       - name: Sync internal dependency specifiers
         run: node scripts/sync-internal-dependencies.mjs
 
       - name: Publish packages
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
         run: |
-          for pkg in ${{ steps.resolve.outputs.packages }}; do
-            cd packages/$pkg
+          set -euo pipefail
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            case "$pkg" in
+              *[!a-zA-Z0-9_-]*)
+                echo "Invalid package slug: $pkg" >&2
+                exit 1
+                ;;
+            esac
+            cd "packages/$pkg"
 
-            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-              echo "DRY RUN: $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
-              npm publish --dry-run --access public --tag ${{ github.event.inputs.tag }}
+            name=$(node -p "require('./package.json').name")
+            version=$(node -p "require('./package.json').version")
+
+            if [ "$INPUT_DRY_RUN" = "true" ]; then
+              echo "DRY RUN: $name@$version"
+              npm publish --dry-run --access public --tag "$INPUT_TAG" --ignore-scripts
             else
-              npm publish --access public --provenance --tag ${{ github.event.inputs.tag }} --ignore-scripts
-              echo "Published $(node -p "require('./package.json').name")@$(node -p "require('./package.json').version")"
+              npm publish --access public --provenance --tag "$INPUT_TAG" --ignore-scripts
+              echo "Published $name@$version"
             fi
 
             cd ../..
-          done
+          done < <(printf '%s\n' "$RESOLVED_PACKAGES" | tr ' ,' '\n' | sed '/^$/d')
 
       - name: Commit version bumps
-        if: github.event.inputs.dry_run != 'true'
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.version != 'none'
+        env:
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add packages/*/package.json
           if ! git diff --staged --quiet; then
-            git commit -m "chore(release): bump ${{ github.event.inputs.package }} (${{ github.event.inputs.version }})"
+            git commit -m "chore(release): bump ${INPUT_PACKAGE} (${INPUT_VERSION})"
             git push
           fi

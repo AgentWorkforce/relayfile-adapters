@@ -23,6 +23,7 @@ const pkgsDir = join(repoRoot, 'packages');
 const GROUPS = {
   storage: ['azure-blob', 'box', 'dropbox', 'gcs', 'google-drive', 'onedrive', 's3', 'sharepoint'],
   messaging: ['gmail', 'slack', 'teams'],
+  calendar: ['google-calendar'],
   devtools: ['github', 'gitlab'],
   crm: ['hubspot', 'salesforce', 'pipedrive'],
   pm: ['asana', 'clickup', 'jira', 'linear', 'notion'],

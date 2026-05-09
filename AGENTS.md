@@ -1,4 +1,80 @@
-<!-- prpm:snippet:start @agent-workforce/trail-snippet@1.1.0 -->
+## Repository conventions
+
+### Do not bump package versions in feature PRs
+
+Versions in `packages/*/package.json` are bumped by the publish phase, not in the PR that introduces the change. The repo's pattern (see `chore(release): bump all (patch)` commits in history) is:
+
+1. Open a feature PR with the source change only — leave `version` fields untouched.
+2. After merge, the publish workflow (`.github/workflows/publish.yml`, `workflow_dispatch`) handles the version bump and npm publish.
+
+If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
+
+### Adding a new adapter package: discoverable by `publish.yml`
+
+The publish workflow's "Resolve packages to publish" step delegates to `scripts/resolve-publish-targets.mjs`, which auto-discovers every non-private directory under `packages/` from the filesystem. **A new adapter package needs no manual edits to `.github/workflows/publish.yml` to be publishable** — as long as its `package.json` exists and is not marked `"private": true`, it will be picked up by `package=all`, the `missing` selector, and any group alias that includes its slug.
+
+What you _do_ need to do when adding a new adapter:
+
+1. Ensure the package has a `package.json` with `"private"` unset (or `false`) and a `version` field — otherwise the resolver skips it.
+2. If the new adapter belongs to a category that maps to a `GROUPS` alias in `scripts/resolve-publish-targets.mjs` (e.g. `crm`, `messaging`, `storage`), add its slug to that group so it can be published as part of the group. Adding new group aliases is optional.
+
+Quick sanity check before opening the PR — confirms the resolver sees the new package (should list every non-private slug under `packages/`):
+
+```bash
+node scripts/resolve-publish-targets.mjs all
+```
+
+If your new adapter is missing from the output, check that `packages/<slug>/package.json` exists and is not marked private.
+
+### Adapter writeback discovery is required
+
+Every adapter resource that supports writeback must declare file-native writeback metadata:
+
+1. `src/resources.ts` entry with a resource path, schema path, create example path, and `idPattern` regex.
+2. `.schema.json` — JSON Schema draft 2020-12 for the full synced record shape, not only the create payload.
+3. `.create.example.json` — a minimal valid create document that omits read-only fields.
+
+Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, resource table, operation table, and ID pattern section. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, create-time required fields must be explicit, provider enum values must be represented as `enum` values, and server-managed fields such as `id`, `createdAt`, `updatedAt`, `url`, `_webhook`, and `_connection` must use `"readOnly": true`.
+
+New resources must not introduce a magic `new.json` create path. Creates happen by writing a valid JSON document to any non-canonical filename in the resource directory; edits happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`. When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
+
+<!-- PRPM_MANIFEST_START -->
+
+<skills_system priority="1">
+<usage>
+When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
+
+How to use skills (loaded into main context):
+- Use the <path> from the skill entry below
+- Invoke: Bash("cat <path>")
+- The skill content will load into your current context
+- Example: Bash("cat .openskills/backend-architect/SKILL.md")
+
+Usage notes:
+- Skills share your context window
+- Do not invoke a skill that is already loaded in your context
+</usage>
+
+<available_skills>
+
+<skill activation="lazy">
+<name>running-headless-orchestrator</name>
+<description>Use when an agent needs to self-bootstrap agent-relay and autonomously manage a team of workers - covers infrastructure startup, agent spawning, lifecycle monitoring, and team coordination without human intervention</description>
+<path>.openskills/running-headless-orchestrator/SKILL.md</path>
+</skill>
+
+<skill activation="lazy">
+<name>writing-agent-relay-workflows</name>
+<description>Use when building multi-agent workflows with the relay broker-sdk - covers the WorkflowBuilder API, DAG step dependencies, agent definitions, step output chaining via {{steps.X.output}}, verification gates, dedicated channels, swarm patterns, error handling, and event listeners</description>
+<path>.openskills/writing-agent-relay-workflows/SKILL.md</path>
+</skill>
+
+</available_skills>
+</skills_system>
+
+<!-- PRPM_MANIFEST_END -->
+
+<!-- prpm:snippet:start @agent-workforce/trail-snippet@1.1.2 -->
 # Trail
 
 Record your work as a trajectory for future agents and humans to follow.
@@ -82,6 +158,20 @@ When done, complete with a retrospective:
 trail complete --summary "Added JWT auth with refresh tokens" --confidence 0.85
 ```
 
+After completing work, compact the finished trajectory or merged PR into a
+durable summary. When the compacted summary is sufficient, discard the raw
+source trajectories so `.trajectories/index.json` and list output stay focused:
+
+```bash
+trail compact --discard-sources
+# or after a PR merge:
+trail compact --pr 42 --discard-sources
+```
+
+`--discard-sources` removes the source trajectory JSON/Markdown/trace files and
+updates the index. Use it after confirming the compacted artifact is the record
+you want to keep.
+
 **Confidence levels:**
 - 0.9+ : High confidence, well-tested
 - 0.7-0.9 : Good confidence, standard implementation
@@ -115,30 +205,33 @@ View a specific trajectory:
 trail show <trajectory-id>
 ```
 
-Export a trajectory (markdown, json, timeline, html, pr-summary):
+Export a trajectory (markdown, json, timeline, html):
 ```bash
 trail export <trajectory-id> --format markdown
 ```
 
 ## Compacting Trajectories
 
-After a PR merge, compact related trajectories into a single summary:
+After a PR merge, compact related trajectories into a single summary and prune
+raw source trajectories when the summary should replace them:
 
 ```bash
-trail compact --pr 42
+trail compact --pr 42 --discard-sources
 ```
 
-Compact by branch:
+Compact by branch (finds trajectories with commits not in the specified base branch):
 ```bash
-trail compact --branch feature/auth
+trail compact --branch main --discard-sources
 ```
 
-Compact by commit range:
+Compact by specific commits:
 ```bash
-trail compact --commits abc123..def456
+trail compact --commits abc123,def456 --discard-sources
 ```
 
-Compaction consolidates decisions and creates a grouped summary, reducing noise while preserving key decisions.
+Compaction consolidates decisions and creates a grouped summary. Adding
+`--discard-sources` makes the compacted artifact the durable record by removing
+the raw trajectories and their index entries.
 
 ## Why Trail?
 
@@ -149,83 +242,4 @@ Your trajectory helps others understand:
 - **What challenges** you faced
 
 Future agents can query past trajectories to learn from your decisions.
-<!-- prpm:snippet:end @agent-workforce/trail-snippet@1.1.0 -->
-
-## Repository conventions
-
-### Do not bump package versions in feature PRs
-
-Versions in `packages/*/package.json` are bumped by the publish phase, not in the PR that introduces the change. The repo's pattern (see `chore(release): bump all (patch)` commits in history) is:
-
-1. Open a feature PR with the source change only — leave `version` fields untouched.
-2. After merge, the publish workflow (`.github/workflows/publish.yml`, `workflow_dispatch`) handles the version bump and npm publish.
-
-If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
-
-### Adding a new adapter package: update `publish.yml`
-
-Any PR that introduces a new directory under `packages/` (e.g. a new adapter like `packages/asana/`) **must also update `.github/workflows/publish.yml`** in the same PR. Two places need to stay in sync:
-
-1. **`inputs.package.options`** — add the new slug to the choice list so it can be selected for one-off publishing.
-2. **The "Resolve packages to publish" step** — add the slug to the space-separated `packages=...` list under the `if "all"` branch so it gets included in `package=all` runs.
-
-Without this, the new adapter never publishes to npm. The rest of the test plan can be green and reviewers won't notice — but the package will never appear on the registry, which silently breaks downstream consumers. CI does not verify this; treat it as part of the package-creation checklist.
-
-Quick sanity check before opening the PR (should print nothing and exit 0):
-
-```bash
-diff \
-  <(ls packages/ | grep -v '^webhook-server$' | sort) \
-  <(sed -n '/^      package:/,/^      version:/p' .github/workflows/publish.yml \
-    | grep -oE '^ *- [a-z-]+' | sed 's/^ *- //' | grep -v '^all$' | sort -u)
-```
-
-`webhook-server` is intentionally excluded (it's a server, not an npm-published adapter). Any other directory under `packages/` that doesn't appear in `publish.yml` is a forgotten registration.
-
-### Adapter writeback discovery is required
-
-Every adapter resource that supports writeback must declare file-native writeback metadata:
-
-1. `src/resources.ts` entry with a resource path, schema path, create example path, and `idPattern` regex.
-2. `.schema.json` — JSON Schema draft 2020-12 for the full synced record shape, not only the create payload.
-3. `.create.example.json` — a minimal valid create document that omits read-only fields.
-
-Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, resource table, operation table, and ID pattern section. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, create-time required fields must be explicit, provider enum values must be represented as `enum` values, and server-managed fields such as `id`, `createdAt`, `updatedAt`, `url`, `_webhook`, and `_connection` must use `"readOnly": true`.
-
-New resources must not introduce a magic `new.json` create path. Creates happen by writing a valid JSON document to any non-canonical filename in the resource directory; edits happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`. When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
-
-<!-- PRPM_MANIFEST_START -->
-
-<skills_system priority="1">
-<usage>
-When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
-
-How to use skills (loaded into main context):
-- Use the <path> from the skill entry below
-- Invoke: Bash("cat <path>")
-- The skill content will load into your current context
-- Example: Bash("cat .openskills/backend-architect/SKILL.md")
-
-Usage notes:
-- Skills share your context window
-- Do not invoke a skill that is already loaded in your context
-</usage>
-
-<available_skills>
-
-<skill activation="lazy">
-<name>running-headless-orchestrator</name>
-<description>Use when an agent needs to self-bootstrap agent-relay and autonomously manage a team of workers - covers infrastructure startup, agent spawning, lifecycle monitoring, and team coordination without human intervention</description>
-<path>.openskills/running-headless-orchestrator/SKILL.md</path>
-</skill>
-
-<skill activation="lazy">
-<name>writing-agent-relay-workflows</name>
-<description>Use when building multi-agent workflows with the relay broker-sdk - covers the WorkflowBuilder API, DAG step dependencies, agent definitions, step output chaining via {{steps.X.output}}, verification gates, dedicated channels, swarm patterns, error handling, and event listeners</description>
-<path>.openskills/writing-agent-relay-workflows/SKILL.md</path>
-</skill>
-
-</available_skills>
-</skills_system>
-
-<!-- PRPM_MANIFEST_END -->
+<!-- prpm:snippet:end @agent-workforce/trail-snippet@1.1.2 -->
