@@ -170,6 +170,10 @@ export function notionDatabaseMetadataPath(databaseId: string, title?: string): 
   return `${NOTION_PATH_ROOT}/databases/${databaseSegment(databaseId, title)}/metadata.json`;
 }
 
+export function notionDatabasesIndexPath(): string {
+  return `${NOTION_PATH_ROOT}/databases/_index.json`;
+}
+
 export function notionDatabasePagePath(
   databaseId: string,
   pageId: string,
@@ -211,6 +215,10 @@ export function notionStandalonePagePath(pageId: string, pageTitle?: string): st
   return `${NOTION_PATH_ROOT}/pages/${standalonePageSegment(pageId, pageTitle)}.json`;
 }
 
+export function notionPagesIndexPath(): string {
+  return `${NOTION_PATH_ROOT}/pages/_index.json`;
+}
+
 export function notionStandalonePageContentPath(pageId: string, pageTitle?: string): string {
   return `${NOTION_PATH_ROOT}/pages/${standalonePageSegment(pageId, pageTitle)}/content.md`;
 }
@@ -225,6 +233,10 @@ export function notionStandaloneBlockPath(pageId: string, blockId: string, pageT
 
 export function notionDatabasePagesCollectionPath(databaseId: string, databaseTitle?: string): string {
   return `${NOTION_PATH_ROOT}/databases/${databaseSegment(databaseId, databaseTitle)}/pages`;
+}
+
+export function notionDatabasePagesIndexPath(databaseId: string, databaseTitle?: string): string {
+  return `${notionDatabasePagesCollectionPath(databaseId, databaseTitle)}/_index.json`;
 }
 
 export function notionDiscoveryManifestPath(): string {

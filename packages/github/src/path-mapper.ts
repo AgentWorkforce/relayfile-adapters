@@ -121,6 +121,10 @@ export function githubRepoPrefix(owner: string, repo: string): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}`;
 }
 
+export function githubReposIndexPath(): string {
+  return `${GITHUB_ROOT}/_index.json`;
+}
+
 export function githubRepositoryMetadataPath(owner: string, repo: string): string {
   return `${githubRepoPrefix(owner, repo)}/metadata.json`;
 }
@@ -134,6 +138,10 @@ export function githubIssuePath(
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/issues/${githubNumberSlug(issueNumber, title)}/meta.json`;
 }
 
+export function githubRepoIssuesIndexPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/issues/_index.json`;
+}
+
 export function githubPullRequestPath(
   owner: string,
   repo: string,
@@ -141,6 +149,10 @@ export function githubPullRequestPath(
   title?: string,
 ): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/pulls/${githubNumberSlug(prNumber, title)}/meta.json`;
+}
+
+export function githubRepoPullsIndexPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/pulls/_index.json`;
 }
 
 export function githubPullRequestRoot(

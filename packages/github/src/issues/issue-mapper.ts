@@ -1,6 +1,17 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
 import { githubNumberSlug } from '../path-mapper.js';
+import {
+  buildRepoIndexFile,
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
+  readRecordIndexRows,
+  readRepoIndexRows,
+  upsertRecordIndexRow,
+  upsertRepoIndexRow,
+} from '../index-emitter.js';
+import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
@@ -94,7 +105,52 @@ export async function ingestIssue(
     mapped.title ?? undefined,
   );
 
-  return mergeIngestResults(metaResult, commentResult);
+  if (metaResult.errors.length > 0) {
+    return mergeIngestResults(metaResult, commentResult);
+  }
+
+  // Write indexes after the canonical record write resolves so failed writes
+  // do not leak into the lightweight directory indexes.
+  const updated = mappedMetaField(mapped.content, 'updated_at') || mappedMetaField(mapped.content, 'created_at');
+  const issueIndexRows = upsertRecordIndexRow(
+    await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(owner, repo)),
+    {
+      id: String(number),
+      title: mapped.title ?? '',
+      updated,
+      number,
+      state: mappedMetaField(mapped.content, 'state'),
+    },
+  );
+  const pullIndexRows = await readRecordIndexRows(vfs, githubRepoPullsIndexPath(owner, repo));
+  const repoIndexRows = upsertRepoIndexRow(
+    await readRepoIndexRows(vfs),
+    {
+      id: `${owner}/${repo}`,
+      title: `${owner}/${repo}`,
+      updated,
+    },
+  );
+
+  const issueIndexResult = await writeMappedFile(
+    vfs,
+    buildRepoIssuesIndexFile(owner, repo, issueIndexRows).path,
+    buildRepoIssuesIndexFile(owner, repo, issueIndexRows).content,
+  );
+  const pullIndexResult = await writeMappedFile(
+    vfs,
+    buildRepoPullsIndexFile(owner, repo, pullIndexRows).path,
+    buildRepoPullsIndexFile(owner, repo, pullIndexRows).content,
+  );
+  const repoIndexResult = await writeMappedFile(
+    vfs,
+    buildRepoIndexFile(repoIndexRows).path,
+    buildRepoIndexFile(repoIndexRows).content,
+  );
+  const layoutFile = githubLayoutPromptFile();
+  const layoutResult = await writeMappedFile(vfs, layoutFile.path, layoutFile.content);
+
+  return mergeIngestResults(metaResult, commentResult, issueIndexResult, pullIndexResult, repoIndexResult, layoutResult);
 }
 
 function asRecord(value: JsonValue | undefined): JsonObject {
@@ -215,6 +271,12 @@ function readPositiveInteger(record: JsonObject, key: string): number {
 function readString(record: JsonObject, key: string): string | null {
   const value = record[key];
   return typeof value === 'string' ? value : null;
+}
+
+function mappedMetaField(content: string, key: keyof IssueMeta): string {
+  const parsed = JSON.parse(content) as IssueMeta;
+  const value = parsed[key];
+  return typeof value === 'string' ? value : '';
 }
 
 function resolveIssueCommentIngestor(): IssueCommentIngestor {

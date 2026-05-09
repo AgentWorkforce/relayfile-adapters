@@ -59,16 +59,18 @@ function createContentResponse(path: string, ref: string, content: string): Prox
 function createMemoryVfs(initialEntries: Record<string, string> = {}) {
   const writes = new Map(Object.entries(initialEntries));
   const exists = mock.fn(async (path: string) => writes.has(path));
+  const readFile = mock.fn(async (path: string) => writes.get(path));
   const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
 
   const vfs: VfsLike = {
     exists,
+    readFile,
     writeFile,
   };
 
-  return { exists, vfs, writeFile, writes };
+  return { exists, readFile, vfs, writeFile, writes };
 }
 
 function createProvider(
@@ -405,13 +407,33 @@ describe('bulk ingest', () => {
       },
     );
 
-    assert.strictEqual(result.filesWritten, 8);
+    assert.strictEqual(result.filesWritten, 12);
     assert.strictEqual(result.filesUpdated, 0);
     assert.deepStrictEqual(result.errors, []);
-    assert.strictEqual(result.paths.length, 8);
+    assert.strictEqual(result.paths.length, 12);
     assert.strictEqual(
       writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/diff.patch'),
       mockDiff,
+    );
+    assert.strictEqual(writes.get('/github/.layout.md')?.includes('_index.json'), true);
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'),
+      [{
+        id: '42',
+        title: mockPRPayload.title,
+        updated: mockPRPayload.updated_at,
+        number: 42,
+        state: mockPRPayload.state,
+      }],
+    );
+    assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'), []);
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/_index.json') ?? '[]'),
+      [{
+        id: 'octocat/hello-world',
+        title: 'octocat/hello-world',
+        updated: mockPRPayload.updated_at,
+      }],
     );
     const meta = JSON.parse(
       writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json') ?? '{}',
@@ -446,6 +468,100 @@ describe('bulk ingest', () => {
       },
     ]);
     assert.strictEqual(provider.proxy.mock.calls.length, 9);
+  });
+
+  it('bulkIngestPR preserves both pull rows when separate PRs are ingested sequentially', async () => {
+    const { vfs, writes } = createMemoryVfs();
+    const prPayloads = new Map<number, Record<string, unknown>>([
+      [42, {
+        ...mockPRPayload,
+        number: 42,
+        title: 'First pull request',
+        updated_at: '2026-04-03T10:00:00.000Z',
+      }],
+      [43, {
+        ...mockPRPayload,
+        number: 43,
+        title: 'Second pull request',
+        updated_at: '2026-04-04T10:00:00.000Z',
+      }],
+    ]);
+
+    const provider = createProvider(async (request) => {
+      const match = request.endpoint.match(
+        new RegExp(`^/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/(\\d+)(/files)?$`),
+      );
+      if (match) {
+        const prNumber = Number(match[1]);
+        if (match[2] === '/files') {
+          return jsonResponse(mockPRFiles as unknown as ProxyResponse['data']);
+        }
+
+        if (request.headers?.Accept === 'application/vnd.github.diff') {
+          return {
+            status: 200,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+            data: `diff --git a/pr-${prNumber}.txt b/pr-${prNumber}.txt\n`,
+          };
+        }
+
+        return jsonResponse((prPayloads.get(prNumber) ?? mockPRPayload) as ProxyResponse['data']);
+      }
+
+      const prefix = `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/contents/`;
+      if (request.endpoint.startsWith(prefix)) {
+        const path = decodeURIComponent(request.endpoint.slice(prefix.length));
+        const ref = request.query?.ref ?? mockRepoContext.headSha;
+        const source = ref === mockRepoContext.baseSha ? mockBaseFileContents : mockFileContents;
+        return jsonResponse({
+          type: 'file',
+          encoding: 'base64',
+          path,
+          sha: `${ref}:${path}`,
+          size: Buffer.from(source[path] ?? '', 'base64').byteLength,
+          content: source[path] ?? '',
+        });
+      }
+
+      throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
+    });
+
+    await bulkIngestPR(provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs, {
+      concurrency: 3,
+      skipCached: false,
+    });
+    await bulkIngestPR(provider, mockRepoContext.owner, mockRepoContext.repo, 43, vfs, {
+      concurrency: 3,
+      skipCached: false,
+    });
+
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'),
+      [
+        {
+          id: '43',
+          title: 'Second pull request',
+          updated: '2026-04-04T10:00:00.000Z',
+          number: 43,
+          state: mockPRPayload.state,
+        },
+        {
+          id: '42',
+          title: 'First pull request',
+          updated: '2026-04-03T10:00:00.000Z',
+          number: 42,
+          state: mockPRPayload.state,
+        },
+      ],
+    );
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/_index.json') ?? '[]'),
+      [{
+        id: 'octocat/hello-world',
+        title: 'octocat/hello-world',
+        updated: '2026-04-04T10:00:00.000Z',
+      }],
+    );
   });
 
   it('mergeIngestResults combines stats correctly', () => {
@@ -530,10 +646,10 @@ describe('bulk ingest', () => {
     );
 
     assert.deepStrictEqual(result.errors, []);
-    assert.strictEqual(result.filesWritten, 242);
+    assert.strictEqual(result.filesWritten, 246);
     assert.strictEqual(result.filesUpdated, 0);
-    assert.strictEqual(result.paths.length, 242);
-    assert.strictEqual(writes.size, 242);
+    assert.strictEqual(result.paths.length, 246);
+    assert.strictEqual(writes.size, 246);
     assert.strictEqual(provider.proxy.mock.calls.length, 244);
   });
 });

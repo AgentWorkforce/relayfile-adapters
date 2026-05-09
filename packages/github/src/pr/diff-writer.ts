@@ -3,6 +3,17 @@ import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
+import {
+  buildRepoIndexFile,
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
+  readRecordIndexRows,
+  readRepoIndexRows,
+  upsertRecordIndexRow,
+  upsertRepoIndexRow,
+} from '../index-emitter.js';
+import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
 import { parsePullRequest, type PullRequestMetadata } from './parser.js';
 
@@ -71,6 +82,7 @@ export async function ingestPullRequest(
   const trimmedRepo = requireNonEmpty(repo, 'repo');
   const prNumber = requirePositiveInteger(number, 'number');
   const result = createEmptyIngestResult();
+  let metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json');
 
   let parsedPullRequest: PullRequestMetadata | null = null;
   try {
@@ -83,9 +95,10 @@ export async function ingestPullRequest(
   }
 
   if (parsedPullRequest) {
+    metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title);
     await writeTrackedFile(
       vfs,
-      buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title),
+      metaPath,
       serializeJson(parsedPullRequest),
       result,
     );
@@ -129,6 +142,47 @@ export async function ingestPullRequest(
       path: diffPath,
       error: formatError(error),
     });
+  }
+
+  if (parsedPullRequest && !hasPathError(result, metaPath) && result.paths.includes(metaPath)) {
+    // Write indexes after the canonical record write resolves so failed writes
+    // do not leak into the lightweight directory indexes.
+    const updated = parsedPullRequest.updatedAt || parsedPullRequest.createdAt || '';
+    const pullIndex = buildRepoPullsIndexFile(
+      trimmedOwner,
+      trimmedRepo,
+      upsertRecordIndexRow(
+        await readRecordIndexRows(vfs, githubRepoPullsIndexPath(trimmedOwner, trimmedRepo)),
+        {
+          id: String(parsedPullRequest.number),
+          title: parsedPullRequest.title ?? '',
+          updated,
+          number: parsedPullRequest.number,
+          state: parsedPullRequest.state || '',
+        },
+      ),
+    );
+    const issueIndex = buildRepoIssuesIndexFile(
+      trimmedOwner,
+      trimmedRepo,
+      await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo)),
+    );
+    const repoIndex = buildRepoIndexFile(
+      upsertRepoIndexRow(
+        await readRepoIndexRows(vfs),
+        {
+          id: `${trimmedOwner}/${trimmedRepo}`,
+          title: `${trimmedOwner}/${trimmedRepo}`,
+          updated,
+        },
+      ),
+    );
+    const layoutFile = githubLayoutPromptFile();
+
+    await writeTrackedFile(vfs, pullIndex.path, pullIndex.content, result);
+    await writeTrackedFile(vfs, issueIndex.path, issueIndex.content, result);
+    await writeTrackedFile(vfs, repoIndex.path, repoIndex.content, result);
+    await writeTrackedFile(vfs, layoutFile.path, layoutFile.content, result);
   }
 
   return result;
@@ -298,6 +352,10 @@ function serializeMappedFile(mappedFile: PullRequestFileMapping): string {
     null,
     2,
   )}\n`;
+}
+
+function hasPathError(result: IngestResult, path: string): boolean {
+  return result.errors.some((error) => error.path === path);
 }
 
 async function writeTrackedFile(

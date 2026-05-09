@@ -17,6 +17,9 @@ import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event
 import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
 
+export * from './index-emitter.js';
+export * from './layout-prompt.js';
+
 const EMPTY_RESULT: IngestResult = {
   filesWritten: 0,
   filesUpdated: 0,

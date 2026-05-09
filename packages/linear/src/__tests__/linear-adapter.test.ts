@@ -24,15 +24,42 @@ import {
   type RelayFileClientLike,
 } from '../index.js';
 
-function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
+interface RecordingClient extends RelayFileClientLike {
+  files: Map<string, string>;
+  deletedPaths: string[];
+}
+
+function createRecordingClient(initialFiles: Record<string, string> = {}): RecordingClient {
+  const files = new Map(Object.entries(initialFiles));
+  const deletedPaths: string[] = [];
+
   const client: RelayFileClientLike = {
-    async writeFile() {
-      return { created: true };
+    async writeFile({ path, content }) {
+      const existed = files.has(path);
+      files.set(path, content);
+      return existed ? { updated: true } : { created: true };
     },
-    async deleteFile() {
+    async deleteFile({ path }) {
+      files.delete(path);
+      deletedPaths.push(path);
       return undefined;
     },
+    async readFile(workspaceIdOrInput, maybePath) {
+      const path = typeof workspaceIdOrInput === 'string' ? maybePath : workspaceIdOrInput.path;
+      return path ? files.get(path) : undefined;
+    },
   };
+
+  return Object.assign(client, {
+    files,
+    deletedPaths,
+  });
+}
+
+function createAdapter(
+  config: LinearAdapterConfig = {},
+  client: RelayFileClientLike = createRecordingClient(),
+): LinearAdapter {
 
   const provider: ConnectionProvider = {
     name: 'relayfile-test-provider',
@@ -108,6 +135,114 @@ test('LinearAdapter exposes the provider name and supported Linear webhook event
     'roadmap.create',
     'roadmap.update',
     'roadmap.remove',
+  ]);
+});
+
+test('ingestWebhook writes the canonical issue file plus best-effort linear layout and issue index files', async () => {
+  const client = createRecordingClient({
+    '/linear/issues/_index.json': JSON.stringify([
+      {
+        id: 'issue_existing',
+        title: 'Existing issue',
+        updated: '2026-04-08T09:00:00.000Z',
+        identifier: 'ENG-1',
+        state: 'Todo',
+      },
+    ]),
+  });
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.update',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: {
+      id: 'issue_123',
+      identifier: 'ENG-123',
+      title: 'Ship index writes',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+      state: { name: 'In Progress' },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, [
+    '/linear/issues/ship-index-writes--issue_123.json',
+    '/linear/.layout.md',
+    '/linear/issues/_index.json',
+  ]);
+  assert.equal(result.filesWritten, 2);
+  assert.equal(result.filesUpdated, 1);
+  assert.match(client.files.get('/linear/.layout.md') ?? '', /# Linear Mount Layout/);
+  assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
+    {
+      id: 'issue_123',
+      title: 'Ship index writes',
+      updated: '2026-04-09T10:00:00.000Z',
+      identifier: 'ENG-123',
+      state: 'In Progress',
+    },
+    {
+      id: 'issue_existing',
+      title: 'Existing issue',
+      updated: '2026-04-08T09:00:00.000Z',
+      identifier: 'ENG-1',
+      state: 'Todo',
+    },
+  ]);
+});
+
+test('ingestWebhook removes deleted issues from the best-effort linear issue index when reads are available', async () => {
+  const client = createRecordingClient({
+    '/linear/issues/_index.json': JSON.stringify([
+      {
+        id: 'issue_123',
+        title: 'Ship index writes',
+        updated: '2026-04-09T10:00:00.000Z',
+        identifier: 'ENG-123',
+        state: 'In Progress',
+      },
+      {
+        id: 'issue_existing',
+        title: 'Existing issue',
+        updated: '2026-04-08T09:00:00.000Z',
+        identifier: 'ENG-1',
+        state: 'Todo',
+      },
+    ]),
+    '/linear/issues/ship-index-writes--issue_123.json': '{}\n',
+  });
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.remove',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: {
+      id: 'issue_123',
+      title: 'Ship index writes',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, [
+    '/linear/issues/ship-index-writes--issue_123.json',
+    '/linear/.layout.md',
+    '/linear/issues/_index.json',
+  ]);
+  assert.equal(result.filesDeleted, 1);
+  assert.deepEqual(client.deletedPaths, ['/linear/issues/ship-index-writes--issue_123.json']);
+  assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
+    {
+      id: 'issue_existing',
+      title: 'Existing issue',
+      updated: '2026-04-08T09:00:00.000Z',
+      identifier: 'ENG-1',
+      state: 'Todo',
+    },
   ]);
 });
 
