@@ -45,6 +45,70 @@ function listPublishablePackages() {
     .sort();
 }
 
+function readPackage(dir) {
+  return JSON.parse(readFileSync(join(pkgsDir, dir, 'package.json'), 'utf8'));
+}
+
+function dependencyNames(pkg) {
+  return [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ].flatMap((section) => Object.keys(pkg[section] ?? {}));
+}
+
+function sortByInternalDependencies(packageDirs) {
+  const selected = [...new Set(packageDirs)].sort();
+  const selectedSet = new Set(selected);
+  const nameToDir = new Map();
+  const packages = new Map();
+
+  for (const dir of listPublishablePackages()) {
+    const pkg = readPackage(dir);
+    packages.set(dir, pkg);
+    if (pkg.name) {
+      nameToDir.set(pkg.name, dir);
+    }
+  }
+
+  const dependenciesByDir = new Map(
+    selected.map((dir) => {
+      const pkg = packages.get(dir) ?? readPackage(dir);
+      const deps = dependencyNames(pkg)
+        .map((name) => nameToDir.get(name))
+        .filter((depDir) => depDir && selectedSet.has(depDir))
+        .sort();
+      return [dir, deps];
+    }),
+  );
+
+  const sorted = [];
+  const visiting = new Set();
+  const visited = new Set();
+
+  function visit(dir) {
+    if (visited.has(dir)) return;
+    if (visiting.has(dir)) {
+      throw new Error(`Internal dependency cycle includes ${dir}`);
+    }
+
+    visiting.add(dir);
+    for (const depDir of dependenciesByDir.get(dir) ?? []) {
+      visit(depDir);
+    }
+    visiting.delete(dir);
+    visited.add(dir);
+    sorted.push(dir);
+  }
+
+  for (const dir of selected) {
+    visit(dir);
+  }
+
+  return sorted;
+}
+
 async function versionOnNpm(name, version) {
   const url = `https://registry.npmjs.org/${name.replace('/', '%2F')}/${version}`;
   const res = await fetch(url);
@@ -57,7 +121,7 @@ async function resolveMissing() {
   const all = listPublishablePackages();
   const out = [];
   for (const dir of all) {
-    const pkg = JSON.parse(readFileSync(join(pkgsDir, dir, 'package.json'), 'utf8'));
+    const pkg = readPackage(dir);
     const exists = await versionOnNpm(pkg.name, pkg.version);
     if (!exists) out.push(dir);
   }
@@ -111,7 +175,7 @@ async function main() {
     process.exit(1);
   }
 
-  const list = [...out].sort();
+  const list = sortByInternalDependencies([...out]);
   console.error(`Resolved ${list.length} package(s): ${list.join(' ')}`);
   process.stdout.write(`packages=${list.join(' ')}\n`);
 }
