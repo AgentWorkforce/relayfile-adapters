@@ -1,0 +1,852 @@
+version: 1
+title: Relayfile integration scope catalog
+updated: "2026-05-09"
+purpose: >
+  Machine-readable scope inventory for Relayfile adapter evals and app
+  registration. Entries start as pending unless scopes were already provided or
+  verified. The research workflow in
+  workflows/repeatable/research-integration-scopes.ts fills pending entries from
+  Nango and provider documentation.
+
+status_values:
+  verified: Scopes were confirmed from user-provided app config or official docs.
+  needs_review: Candidate scopes are present but need verification before use.
+  pending: Scope research has not been completed.
+  not_applicable: Integration does not use OAuth scopes for Relayfile's app registration.
+
+default_research_sources:
+  - https://nango.dev/docs/integrations/overview
+  - https://nango.dev/api-integrations
+  - https://github.com/NangoHQ/nango/blob/master/packages/providers/providers.yaml
+
+integrations:
+  - slug: airtable
+    display_name: Airtable
+    category: productivity
+    status: implemented
+    package: "@relayfile/adapter-airtable"
+    nango_slug: airtable
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research record/table read/write and webhook requirements."
+
+  - slug: asana
+    display_name: Asana
+    category: project-management
+    status: implemented
+    package: "@relayfile/adapter-asana"
+    nango_slug: asana
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research task/project read/write and webhook requirements."
+
+  - slug: azure-blob
+    display_name: Azure Blob Storage
+    category: storage
+    status: implemented
+    package: "@relayfile/azure-blob"
+    nango_slug: azure-blob-storage
+    auth_model: cloud_iam_or_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Azure app permissions or connection credentials required for blob read/write and Event Grid delivery."
+
+  - slug: box
+    display_name: Box
+    category: storage
+    status: implemented
+    package: "@relayfile/box"
+    nango_slug: box
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research file/folder read, write, and webhook scopes."
+
+  - slug: calendly
+    display_name: Calendly
+    category: scheduling
+    status: implemented
+    package: "@relayfile/adapter-calendly"
+    nango_slug: calendly
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research event and invitee read/write requirements."
+
+  - slug: clickup
+    display_name: ClickUp
+    category: project-management
+    status: implemented
+    package: "@relayfile/adapter-clickup"
+    nango_slug: clickup
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research task/list/space read/write and webhook requirements."
+
+  - slug: dropbox
+    display_name: Dropbox
+    category: storage
+    status: implemented
+    package: "@relayfile/dropbox"
+    nango_slug: dropbox
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research metadata/content read, file write, and webhook requirements."
+
+  - slug: gcs
+    display_name: Google Cloud Storage
+    category: storage
+    status: implemented
+    package: "@relayfile/gcs"
+    nango_slug: google-cloud-storage
+    auth_model: google_oauth_or_service_account
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Google Cloud Storage OAuth scopes or service account IAM roles for object read/write and Pub/Sub notifications."
+
+  - slug: github
+    display_name: GitHub
+    category: dev-tools
+    status: implemented
+    package: "@relayfile/adapter-github"
+    nango_slug: github
+    auth_model: github_app_or_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research GitHub App permissions and OAuth scopes for issues, pull requests, checks, contents, and comments."
+
+  - slug: gitlab
+    display_name: GitLab
+    category: dev-tools
+    status: implemented
+    package: "@relayfile/adapter-gitlab"
+    nango_slug: gitlab
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research merge request, issue, pipeline, and repository read/write scopes."
+
+  - slug: gmail
+    display_name: Gmail
+    category: communication
+    status: implemented
+    package: "@relayfile/gmail"
+    nango_slug: gmail
+    auth_model: google_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research mailbox read, labels, drafts/send, and Gmail Watch requirements."
+
+  - slug: google-calendar
+    display_name: Google Calendar
+    category: scheduling
+    status: implemented
+    package: "@relayfile/adapter-google-calendar"
+    nango_slug: google-calendar
+    auth_model: google_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research event read/write and watch channel requirements."
+
+  - slug: google-drive
+    display_name: Google Drive
+    category: storage
+    status: implemented
+    package: "@relayfile/google-drive"
+    nango_slug: google-drive
+    auth_model: google_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Drive file read/write and Watch API requirements."
+
+  - slug: hubspot
+    display_name: HubSpot
+    category: crm
+    status: implemented
+    package: "@relayfile/adapter-hubspot"
+    nango_slug: hubspot
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research CRM object read/write and webhook app requirements."
+
+  - slug: intercom
+    display_name: Intercom
+    category: support
+    status: implemented
+    package: "@relayfile/adapter-intercom"
+    nango_slug: intercom
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research conversations, contacts, companies, articles, and reply permissions."
+
+  - slug: jira
+    display_name: Jira
+    category: project-management
+    status: implemented
+    package: "@relayfile/adapter-jira"
+    nango_slug: jira
+    auth_model: oauth
+    scope_status: needs_review
+    required_scopes: []
+    candidate_scopes:
+      - read:jira-work
+      - write:jira-work
+      - manage:jira-webhook
+      - offline_access
+    sources:
+      - https://nango.dev/docs/api-integrations/jira
+    notes: "Candidate scopes are for current app registration convenience; verify exact Jira issue/project/sprint/comment and webhook needs before marking verified."
+
+  - slug: linear
+    display_name: Linear
+    category: project-management
+    status: implemented
+    package: "@relayfile/adapter-linear"
+    nango_slug: linear
+    auth_model: oauth
+    scope_status: verified
+    required_scopes:
+      - read
+      - write
+    candidate_scopes: []
+    sources:
+      - user-provided
+    notes: "Provided by user on 2026-05-09."
+
+  - slug: mailgun
+    display_name: Mailgun
+    category: email
+    status: implemented
+    package: "@relayfile/adapter-mailgun"
+    nango_slug: mailgun
+    auth_model: api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research whether Relayfile app registration has scopes; likely API-key/domain-token based."
+
+  - slug: mixpanel
+    display_name: Mixpanel
+    category: analytics
+    status: implemented
+    package: "@relayfile/adapter-mixpanel"
+    nango_slug: mixpanel
+    auth_model: oauth_or_service_account
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research analytics read/export and profile/cohort requirements."
+
+  - slug: notion
+    display_name: Notion
+    category: productivity
+    status: implemented
+    package: "@relayfile/adapter-notion"
+    nango_slug: notion
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research page/database/block/comment read and write capabilities."
+
+  - slug: onedrive
+    display_name: OneDrive
+    category: storage
+    status: implemented
+    package: "@relayfile/onedrive"
+    nango_slug: one-drive
+    auth_model: microsoft_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Microsoft Graph file read/write and subscription permissions."
+
+  - slug: pipedrive
+    display_name: Pipedrive
+    category: crm
+    status: implemented
+    package: "@relayfile/adapter-pipedrive"
+    nango_slug: pipedrive
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research deals/persons/organizations/activities read/write scopes."
+
+  - slug: postgres
+    display_name: Postgres
+    category: database
+    status: implemented
+    package: "@relayfile/postgres"
+    nango_slug:
+    auth_model: database_credentials
+    scope_status: not_applicable
+    required_scopes: []
+    candidate_scopes: []
+    sources:
+      - local-adapter
+    notes: "No OAuth app scopes; eval should capture DB grants/roles separately."
+
+  - slug: redis
+    display_name: Redis
+    category: database
+    status: implemented
+    package: "@relayfile/redis"
+    nango_slug:
+    auth_model: database_credentials
+    scope_status: not_applicable
+    required_scopes: []
+    candidate_scopes: []
+    sources:
+      - local-adapter
+    notes: "No OAuth app scopes; eval should capture Redis ACL categories/commands separately if needed."
+
+  - slug: s3
+    display_name: Amazon S3
+    category: storage
+    status: implemented
+    package: "@relayfile/s3"
+    nango_slug:
+    auth_model: aws_iam
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research AWS IAM actions for object read/write, bucket listing, and SQS event source integration."
+
+  - slug: salesforce
+    display_name: Salesforce
+    category: crm
+    status: implemented
+    package: "@relayfile/adapter-salesforce"
+    nango_slug: salesforce
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research sObject read/write, refresh token/offline access, and webhook/outbound event needs."
+
+  - slug: segment
+    display_name: Segment
+    category: analytics
+    status: implemented
+    package: "@relayfile/adapter-segment"
+    nango_slug: segment
+    auth_model: oauth_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research source/destination/tracking API permissions."
+
+  - slug: sendgrid
+    display_name: SendGrid
+    category: email
+    status: implemented
+    package: "@relayfile/adapter-sendgrid"
+    nango_slug: sendgrid
+    auth_model: api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research API key scopes for mail send, templates, contacts, and event webhooks."
+
+  - slug: sharepoint
+    display_name: SharePoint
+    category: storage
+    status: implemented
+    package: "@relayfile/sharepoint"
+    nango_slug: sharepoint-online
+    auth_model: microsoft_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Microsoft Graph sites/files read/write and subscription permissions."
+
+  - slug: shopify
+    display_name: Shopify
+    category: commerce
+    status: implemented
+    package: "@relayfile/adapter-shopify"
+    nango_slug: shopify
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research products, orders, customers, fulfillments, and webhook scopes."
+
+  - slug: slack
+    display_name: Slack
+    category: communication
+    status: implemented
+    package: "@relayfile/adapter-slack"
+    nango_slug: slack
+    auth_model: oauth
+    scope_status: verified
+    required_scopes:
+      - channels:history
+      - channels:read
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
+      - team:read
+      - users:read
+      - users:read.email
+      - chat:write
+    candidate_scopes: []
+    sources:
+      - user-provided-screenshot
+    notes: "Provided by user screenshot on 2026-05-09."
+
+  - slug: stripe
+    display_name: Stripe
+    category: payment
+    status: implemented
+    package: "@relayfile/adapter-stripe"
+    nango_slug: stripe
+    auth_model: oauth_or_restricted_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research connected account OAuth or restricted key permissions for customers, invoices, subscriptions, charges, and refunds."
+
+  - slug: teams
+    display_name: Microsoft Teams
+    category: communication
+    status: implemented
+    package: "@relayfile/adapter-teams"
+    nango_slug: microsoft-teams
+    auth_model: microsoft_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Microsoft Graph channel/chat/message read/write and subscription permissions."
+
+  - slug: zendesk
+    display_name: Zendesk
+    category: support
+    status: implemented
+    package: "@relayfile/adapter-zendesk"
+    nango_slug: zendesk
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research tickets/users/organizations read/write and webhook requirements."
+
+  - slug: confluence
+    display_name: Confluence
+    category: knowledge-base
+    status: gap
+    package:
+    nango_slug: confluence
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "High-priority gap; research page/content read/write and comment permissions."
+
+  - slug: google-docs
+    display_name: Google Docs
+    category: productivity
+    status: gap
+    package:
+    nango_slug: google-docs
+    auth_model: google_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "High-priority gap; research document read/write scopes and Drive coupling."
+
+  - slug: google-sheets
+    display_name: Google Sheets
+    category: productivity
+    status: gap
+    package:
+    nango_slug: google-sheet
+    auth_model: google_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "High-priority gap; research spreadsheet read/write scopes and Drive coupling."
+
+  - slug: freshdesk
+    display_name: Freshdesk
+    category: support
+    status: gap
+    package:
+    nango_slug: freshdesk
+    auth_model: oauth_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "High-priority support gap; research tickets/contacts/companies read/write."
+
+  - slug: service-now
+    display_name: ServiceNow
+    category: support
+    status: gap
+    package:
+    nango_slug: servicenow
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "High-priority ITSM gap; verify Nango slug and table/API scopes."
+
+  - slug: pagerduty
+    display_name: PagerDuty
+    category: support
+    status: gap
+    package:
+    nango_slug: pagerduty
+    auth_model: oauth_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Incident gap; research incidents, services, escalation policies, and webhook scopes."
+
+  - slug: monday
+    display_name: Monday.com
+    category: project-management
+    status: gap
+    package:
+    nango_slug: monday
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Project management gap; research boards/items/users/updates read/write scopes."
+
+  - slug: discord
+    display_name: Discord
+    category: communication
+    status: gap
+    package:
+    nango_slug: discord
+    auth_model: oauth_or_bot_token
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Communication gap; research bot OAuth scopes, gateway intents, and message read/write limitations."
+
+  - slug: outlook
+    display_name: Outlook / Exchange
+    category: communication
+    status: gap
+    package:
+    nango_slug: outlook
+    auth_model: microsoft_oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Email gap; research Microsoft Graph mail read/write/send and subscription permissions."
+
+  - slug: figma
+    display_name: Figma
+    category: design
+    status: gap
+    package:
+    nango_slug: figma
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Design gap; research files, comments, projects, and webhook requirements."
+
+  - slug: coda
+    display_name: Coda
+    category: productivity
+    status: gap
+    package:
+    nango_slug: coda
+    auth_model: oauth_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Doc-database gap; research docs, tables, rows, pages, and permissions."
+
+  - slug: trello
+    display_name: Trello
+    category: project-management
+    status: gap
+    package:
+    nango_slug: trello
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Project gap; research board/card/list/comment read/write."
+
+  - slug: miro
+    display_name: Miro
+    category: design
+    status: gap
+    package:
+    nango_slug: miro
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Whiteboard gap; research boards/items/comments read/write and webhook requirements."
+
+  - slug: freshsales
+    display_name: Freshsales
+    category: crm
+    status: gap
+    package:
+    nango_slug: freshsales
+    auth_model: oauth_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "CRM gap; research contacts/accounts/deals read/write permissions."
+
+  - slug: telegram
+    display_name: Telegram
+    category: communication
+    status: gap
+    package:
+    nango_slug:
+    auth_model: bot_token
+    scope_status: not_applicable
+    required_scopes: []
+    candidate_scopes: []
+    sources:
+      - local-priority-doc
+    notes: "Telegram bot integrations do not use OAuth scopes; eval should capture bot permissions and privacy mode instead."
+
+  - slug: mongodb-atlas
+    display_name: MongoDB Atlas
+    category: database
+    status: gap
+    package:
+    nango_slug:
+    auth_model: api_key_or_database_credentials
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Atlas API roles, Data API keys, and trigger/function permissions."
+
+  - slug: cloudflare-r2
+    display_name: Cloudflare R2
+    category: storage
+    status: gap
+    package:
+    nango_slug:
+    auth_model: api_token
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Cloudflare API token permissions for R2 buckets, Queues, and Worker bridge."
+
+  - slug: supabase-storage
+    display_name: Supabase Storage
+    category: storage
+    status: gap
+    package:
+    nango_slug:
+    auth_model: api_key_or_service_role
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Storage API keys, service role requirements, and webhook availability."
+
+  - slug: nextcloud
+    display_name: Nextcloud
+    category: storage
+    status: gap
+    package:
+    nango_slug: next-cloud-ocs
+    auth_model: oauth_or_basic
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research WebDAV/OCS auth and file read/write requirements."
+
+  - slug: smartsheet
+    display_name: Smartsheet
+    category: productivity
+    status: gap
+    package:
+    nango_slug: smartsheet
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research sheets/rows/attachments read/write scopes."
+
+  - slug: snowflake
+    display_name: Snowflake
+    category: analytics
+    status: gap
+    package:
+    nango_slug: snowflake
+    auth_model: oauth_or_key_pair
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research OAuth scopes/roles or warehouse/database grants for read-heavy evals."
+
+  - slug: bigquery
+    display_name: BigQuery
+    category: analytics
+    status: gap
+    package:
+    nango_slug: google-bigquery
+    auth_model: google_oauth_or_service_account
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research BigQuery OAuth scopes and dataset/table IAM roles."
+
+  - slug: twilio
+    display_name: Twilio
+    category: communication
+    status: gap
+    package:
+    nango_slug: twilio
+    auth_model: api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research API key permissions for SMS/voice transactional workflows."
+
+  - slug: typeform
+    display_name: Typeform
+    category: productivity
+    status: gap
+    package:
+    nango_slug: typeform
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research forms/responses/webhook scopes."
+
+  - slug: webflow
+    display_name: Webflow
+    category: cms
+    status: gap
+    package:
+    nango_slug: webflow
+    auth_model: oauth
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research CMS items, sites, pages, assets, and publish scopes."
+
+  - slug: convex
+    display_name: Convex
+    category: database
+    status: gap
+    package:
+    nango_slug:
+    auth_model: deploy_key_or_api_key
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research deploy/API credentials and whether scope-like permissions exist."
+
+  - slug: hugging-face-buckets
+    display_name: Hugging Face Buckets
+    category: storage
+    status: gap
+    package:
+    nango_slug:
+    auth_model: access_token
+    scope_status: pending
+    required_scopes: []
+    candidate_scopes: []
+    sources: []
+    notes: "Research Hugging Face token roles/scopes for bucket/object read/write."
+
+  - slug: sftp-ftp
+    display_name: SFTP / FTP
+    category: storage
+    status: gap
+    package:
+    nango_slug:
+    auth_model: connection_credentials
+    scope_status: not_applicable
+    required_scopes: []
+    candidate_scopes: []
+    sources:
+      - local-priority-doc
+    notes: "No OAuth app scopes; eval should capture host/user/path permissions separately."
