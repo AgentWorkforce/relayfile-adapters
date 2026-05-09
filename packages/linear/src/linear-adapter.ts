@@ -7,6 +7,7 @@ import {
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearCyclePath,
+  linearIssueByStatePath,
   linearIssuePath,
   linearMilestonePath,
   linearProjectPath,
@@ -178,16 +179,35 @@ export class LinearAdapter extends IntegrationAdapter {
       );
       const content = this.renderContent(workspaceId, normalized, false);
       const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
+      const aliasErrorPath = inferIssueStateAliasErrorPath(normalized);
 
       if (this.isRemoveEvent(normalized)) {
+        const deletePaths = [path];
+        let filesDeleted = 0;
+        let filesWritten = 0;
+        let filesUpdated = 0;
+        const aliasPath = resolveIssueStateAliasPath(normalized.payload);
+        const previousAliasPath = resolvePreviousIssueStateAliasPath(normalized.payload);
+
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path });
+          filesDeleted += 1;
+
+          for (const candidatePath of uniqueStrings([aliasPath, previousAliasPath])) {
+            if (!candidatePath) {
+              continue;
+            }
+            await this.client.deleteFile({ workspaceId, path: candidatePath });
+            deletePaths.push(candidatePath);
+            filesDeleted += 1;
+          }
+
           const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
           return {
-            filesWritten: auxiliary.filesWritten,
-            filesUpdated: auxiliary.filesUpdated,
-            filesDeleted: 1,
-            paths: [path, ...auxiliary.paths],
+            filesWritten: filesWritten + auxiliary.filesWritten,
+            filesUpdated: filesUpdated + auxiliary.filesUpdated,
+            filesDeleted,
+            paths: [...deletePaths, ...auxiliary.paths],
             errors: auxiliary.errors,
           };
         }
@@ -201,12 +221,34 @@ export class LinearAdapter extends IntegrationAdapter {
         });
 
         const counts = inferWriteCounts(normalized, deleteResult, true);
+        filesDeleted += counts.filesDeleted;
+        filesWritten += counts.filesWritten;
+        filesUpdated += counts.filesUpdated;
+
+        for (const candidatePath of uniqueStrings([aliasPath, previousAliasPath])) {
+          if (!candidatePath) {
+            continue;
+          }
+          const aliasDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: candidatePath,
+            content: this.renderContent(workspaceId, normalized, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const aliasCounts = inferWriteCounts(normalized, aliasDeleteResult, true);
+          deletePaths.push(candidatePath);
+          filesDeleted += aliasCounts.filesDeleted;
+          filesWritten += aliasCounts.filesWritten;
+          filesUpdated += aliasCounts.filesUpdated;
+        }
+
         const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
         return {
-          filesWritten: counts.filesWritten + auxiliary.filesWritten,
-          filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
-          filesDeleted: counts.filesDeleted,
-          paths: [path, ...auxiliary.paths],
+          filesWritten: filesWritten + auxiliary.filesWritten,
+          filesUpdated: filesUpdated + auxiliary.filesUpdated,
+          filesDeleted,
+          paths: [...deletePaths, ...auxiliary.paths],
           errors: auxiliary.errors,
         };
       }
@@ -222,13 +264,61 @@ export class LinearAdapter extends IntegrationAdapter {
 
       const counts = inferWriteCounts(normalized, writeResult, false);
       const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, false);
-      return {
+      const result: IngestResult = {
         filesWritten: counts.filesWritten + auxiliary.filesWritten,
         filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
         filesDeleted: 0,
         paths: [path, ...auxiliary.paths],
         errors: auxiliary.errors,
       };
+
+      if (normalized.objectType !== 'issue') {
+        return result;
+      }
+
+      const previousAliasPath = resolvePreviousIssueStateAliasPath(normalized.payload);
+      const aliasPath = resolveIssueStateAliasPath(normalized.payload);
+      if (previousAliasPath && previousAliasPath !== aliasPath) {
+        if (this.client.deleteFile) {
+          await this.client.deleteFile({ workspaceId, path: previousAliasPath });
+          result.filesDeleted += 1;
+        } else {
+          const previousDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: previousAliasPath,
+            content: this.renderContent(workspaceId, normalized, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const previousCounts = inferWriteCounts(normalized, previousDeleteResult, true);
+          result.filesWritten += previousCounts.filesWritten;
+          result.filesUpdated += previousCounts.filesUpdated;
+          result.filesDeleted += previousCounts.filesDeleted;
+        }
+        result.paths.push(previousAliasPath);
+      }
+
+      if (!aliasPath) {
+        result.errors.push({
+          path: aliasErrorPath,
+          error: 'Linear issue is missing state_name or identifier for by-state alias emission.',
+        });
+        return result;
+      }
+
+      const aliasWriteResult = await this.client.writeFile({
+        workspaceId,
+        path: aliasPath,
+        content,
+        contentType: JSON_CONTENT_TYPE,
+        semantics,
+      });
+      const aliasCounts = inferWriteCounts(normalized, aliasWriteResult, false);
+      result.filesWritten += aliasCounts.filesWritten;
+      result.filesUpdated += aliasCounts.filesUpdated;
+      result.paths.push(aliasPath);
+
+      return result;
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
       return {
@@ -949,10 +1039,8 @@ function inferWriteCounts(
   deleted: boolean
 ): Pick<IngestResult, 'filesDeleted' | 'filesUpdated' | 'filesWritten'> {
   if (deleted) {
-    if (writeResult?.status === 'created' || writeResult?.created) {
-      return { filesWritten: 1, filesUpdated: 0, filesDeleted: 0 };
-    }
-    return { filesWritten: 0, filesUpdated: 1, filesDeleted: 0 };
+    void writeResult;
+    return { filesWritten: 0, filesUpdated: 0, filesDeleted: 1 };
   }
 
   if (writeResult?.created || writeResult?.status === 'created') {
@@ -997,6 +1085,38 @@ function inferFallbackPath(event: NormalizedWebhook | LinearWebhookPayload): str
   } catch {
     return '';
   }
+}
+
+function resolveIssueStateAliasPath(payload: Record<string, unknown>): string | undefined {
+  const stateName = asString(payload.state_name);
+  const identifier = asString(payload.identifier);
+  if (!stateName || !identifier) {
+    return undefined;
+  }
+  return linearIssueByStatePath(stateName, identifier);
+}
+
+function resolvePreviousIssueStateAliasPath(payload: Record<string, unknown>): string | undefined {
+  const previousData = getRecord(getRecord(payload._webhook)?.previousData);
+  if (!previousData) {
+    return undefined;
+  }
+
+  const stateName = asString(previousData.state_name);
+  const identifier = asString(previousData.identifier) ?? asString(payload.identifier);
+  if (!stateName || !identifier) {
+    return undefined;
+  }
+
+  return linearIssueByStatePath(stateName, identifier);
+}
+
+function inferIssueStateAliasErrorPath(event: NormalizedWebhook): string {
+  const identifier = asString(event.payload.identifier);
+  if (identifier) {
+    return `/linear/issues/by-state/<missing-state>/${encodeURIComponent(identifier)}.json`;
+  }
+  return '/linear/issues/by-state/<missing-state>/<missing-identifier>.json';
 }
 
 function extractPayloadId(value: unknown): string | undefined {
@@ -1267,8 +1387,9 @@ function asLinearReferenceIds(value: unknown): string[] {
     .filter((entry): entry is string => entry !== undefined);
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function mapPriorityLabel(priority: number): string {

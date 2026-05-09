@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 export const LINEAR_PATH_ROOT = '/linear';
+export const LINEAR_CANONICAL_STATES = ['Todo', 'In Progress', 'Done', 'Backlog', 'Canceled'] as const;
 
 export const LINEAR_OBJECT_TYPES = [
   'comment',
@@ -77,6 +78,13 @@ const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
 
 const LINEAR_PUBLIC_IDENTIFIER_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/u;
 const MAX_HUMAN_READABLE_LENGTH = 80;
+const CANONICAL_STATE_SLUGS: Readonly<Record<(typeof LINEAR_CANONICAL_STATES)[number], string>> = {
+  Todo: 'todo',
+  'In Progress': 'in-progress',
+  Done: 'done',
+  Backlog: 'backlog',
+  Canceled: 'canceled',
+};
 
 function assertNonEmptySegment(value: string, label: string): string {
   const trimmed = value.trim();
@@ -164,6 +172,43 @@ export function parseNameWithId(filename: string): ParseNameWithIdResult {
   };
 }
 
+export function slugifyStateName(stateName: string): string {
+  const trimmed = assertNonEmptySegment(stateName, 'state name');
+  const canonicalSlug = CANONICAL_STATE_SLUGS[trimmed as (typeof LINEAR_CANONICAL_STATES)[number]];
+  if (canonicalSlug) {
+    return canonicalSlug;
+  }
+
+  let slug = '';
+  let previousWasSeparator = false;
+  for (const character of trimmed.normalize('NFC').toLowerCase()) {
+    if (/\s/u.test(character)) {
+      if (!previousWasSeparator && slug.length > 0) {
+        slug += '-';
+      }
+      previousWasSeparator = true;
+      continue;
+    }
+
+    previousWasSeparator = false;
+    if (/[a-z0-9]/u.test(character)) {
+      slug += character;
+      continue;
+    }
+
+    if (character === '-') {
+      slug += '%2D';
+      continue;
+    }
+
+    slug += encodeURIComponent(character);
+  }
+
+  // Symbol-only state names are rejected so callers surface an ingest error
+  // instead of emitting an ambiguous empty by-state directory.
+  return assertNonEmptySegment(slug, 'state slug');
+}
+
 export function normalizeLinearObjectType(objectType: string): LinearPathObjectType {
   const normalized = objectType.trim().toLowerCase();
   const mapped = OBJECT_TYPE_ALIASES[normalized];
@@ -199,6 +244,10 @@ export function linearIssuePath(
 
 export function linearIssuesIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/issues/_index.json`;
+}
+
+export function linearIssueByStatePath(stateName: string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
 }
 
 export function linearCommentPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
