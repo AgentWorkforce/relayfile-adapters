@@ -1,0 +1,6 @@
+{
+  "endpointUrl": "https://example.com/hooks/azure",
+  "includedEventTypes": [
+    "Microsoft.Storage.BlobCreated"
+  ]
+}

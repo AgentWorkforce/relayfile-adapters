@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "bucket",
+    "name"
+  ],
+  "properties": {
+    "bucket": {
+      "type": "string",
+      "description": "GCS bucket name."
+    },
+    "name": {
+      "type": "string",
+      "description": "Object name."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Object content type."
+    },
+    "size": {
+      "type": "number",
+      "description": "Object size in bytes."
+    },
+    "md5Hash": {
+      "type": "string",
+      "description": "Object MD5 hash."
+    },
+    "crc32c": {
+      "type": "string",
+      "description": "Object CRC32C checksum."
+    },
+    "generation": {
+      "type": "string",
+      "description": "Object generation."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Object custom metadata.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded object content."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "bucket",
+    "topic"
+  ],
+  "properties": {
+    "bucket": {
+      "type": "string",
+      "description": "Bucket id."
+    },
+    "topic": {
+      "type": "string",
+      "description": "Pub/Sub topic."
+    },
+    "eventTypes": {
+      "type": "array",
+      "description": "Notification event types.",
+      "items": {
+        "enum": [
+          "OBJECT_FINALIZE",
+          "OBJECT_METADATA_UPDATE",
+          "OBJECT_DELETE",
+          "OBJECT_ARCHIVE"
+        ],
+        "description": "GCS notification event type."
+      }
+    },
+    "payloadFormat": {
+      "enum": [
+        "JSON_API_V1"
+      ],
+      "description": "GCS payload format."
+    },
+    "objectNamePrefix": {
+      "type": "string",
+      "description": "Object name prefix filter."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

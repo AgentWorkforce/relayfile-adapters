@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "db"
+  ],
+  "properties": {
+    "db": {
+      "type": "integer",
+      "description": "Redis database number."
+    },
+    "pattern": {
+      "type": "string",
+      "description": "Keyspace notification pattern."
+    },
+    "events": {
+      "type": "array",
+      "description": "Redis events to observe.",
+      "items": {
+        "enum": [
+          "set",
+          "del",
+          "expired",
+          "hset",
+          "lpush",
+          "sadd",
+          "zadd"
+        ],
+        "description": "Redis keyspace event."
+      }
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

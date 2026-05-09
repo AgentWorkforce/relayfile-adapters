@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "key",
+    "type",
+    "value"
+  ],
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Redis key."
+    },
+    "db": {
+      "type": "integer",
+      "description": "Redis database number."
+    },
+    "type": {
+      "enum": [
+        "string",
+        "hash",
+        "list",
+        "set",
+        "zset",
+        "json"
+      ],
+      "description": "Redis value type."
+    },
+    "value": {
+      "type": "object",
+      "description": "Redis value for structured types.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "ttlSeconds": {
+      "type": "integer",
+      "description": "Optional TTL in seconds."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

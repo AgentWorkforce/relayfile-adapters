@@ -9,9 +9,20 @@ on:
         type: choice
         options:
           - all
+          - azure-blob
+          - box
           - core
+          - dropbox
+          - gcs
+          - gmail
           - github
           - gitlab
+          - google-drive
+          - onedrive
+          - postgres
+          - redis
+          - s3
+          - sharepoint
           - teams
           - slack
           - linear
@@ -96,7 +107,7 @@ jobs:
             # Keep this list in sync with the `package` input options above and
             # the directories under packages/. See AGENTS.md → "Adding a new
             # adapter package" for the checklist that gates new entries here.
-            echo "packages=core github gitlab teams slack linear mailgun mixpanel notion hubspot salesforce pipedrive jira asana airtable calendly shopify clickup intercom zendesk segment sendgrid stripe" >> "$GITHUB_OUTPUT"
+            echo "packages=azure-blob box core dropbox gcs gmail github gitlab google-drive onedrive postgres redis s3 sharepoint teams slack linear mailgun mixpanel notion hubspot salesforce pipedrive jira asana airtable calendly shopify clickup intercom zendesk segment sendgrid stripe" >> "$GITHUB_OUTPUT"
           else
             echo "packages=${{ github.event.inputs.package }}" >> "$GITHUB_OUTPUT"
           fi

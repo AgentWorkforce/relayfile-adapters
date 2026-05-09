@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "cursor"
+  ],
+  "properties": {
+    "cursor": {
+      "type": "string",
+      "description": "Dropbox list_folder cursor."
+    },
+    "accountId": {
+      "type": "string",
+      "description": "Dropbox account id."
+    },
+    "path": {
+      "type": "string",
+      "description": "Watched Dropbox path."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}
