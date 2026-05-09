@@ -162,6 +162,7 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
       identifier: 'ENG-123',
       title: 'Ship index writes',
       updatedAt: '2026-04-09T10:00:00.000Z',
+      state_name: 'In Progress',
       state: { name: 'In Progress' },
     },
   });
@@ -171,8 +172,9 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
     '/linear/issues/ENG-123__issue_123.json',
     '/linear/LAYOUT.md',
     '/linear/issues/_index.json',
+    '/linear/issues/by-state/in-progress/ENG-123.json',
   ]);
-  assert.equal(result.filesWritten, 2);
+  assert.equal(result.filesWritten, 3);
   assert.equal(result.filesUpdated, 1);
   assert.match(client.files.get('/linear/LAYOUT.md') ?? '', /# Linear Mount Layout/);
   // PR 2's alias-emitter writes `_index.json` with `{ rows: [...] }` shape
@@ -694,6 +696,7 @@ test('ingestWebhook bootstraps the issue index on first ingest when no _index.js
       identifier: 'ENG-7',
       title: 'First ingest after fresh install',
       updatedAt: '2026-04-09T10:00:00.000Z',
+      state_name: 'Backlog',
       state: { name: 'Backlog' },
     },
   });
