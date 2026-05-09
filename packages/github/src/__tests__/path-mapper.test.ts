@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import {
   computeGitHubPath,
   encodeGitHubPathSegment,
+  githubAliasRepoPrefix,
+  githubByIdAliasPath,
+  githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
   githubIssuePath,
@@ -89,6 +92,10 @@ describe('path-mapper', () => {
       assert.equal(githubRepoPrefix('octocat', 'hello-world'), '/github/repos/octocat/hello-world');
     });
 
+    it('githubAliasRepoPrefix uses a double underscore between owner and repo', () => {
+      assert.equal(githubAliasRepoPrefix('octocat', 'hello-world'), '/github/repos/octocat__hello-world');
+    });
+
     it('githubRepoPrefix encodes special chars', () => {
       assert.equal(githubRepoPrefix('my org', 'my repo'), '/github/repos/my%20org/my%20repo');
     });
@@ -139,6 +146,17 @@ describe('path-mapper', () => {
       assert.equal(
         githubCommitPath('octocat', 'hello-world', 'abc123'),
         '/github/repos/octocat/hello-world/commits/abc123/metadata.json',
+      );
+    });
+
+    it('maps alias paths under the combined repo segment', () => {
+      assert.equal(
+        githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7),
+        '/github/repos/octocat__hello-world/issues/by-title/shared-title.json',
+      );
+      assert.equal(
+        githubByIdAliasPath('octocat', 'hello-world', 'pulls', 42),
+        '/github/repos/octocat__hello-world/pulls/by-id/42.json',
       );
     });
   });

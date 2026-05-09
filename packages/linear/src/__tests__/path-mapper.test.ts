@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   computeLinearPath,
+  linearByIdAliasPath,
+  linearByTitleAliasPath,
   normalizeLinearObjectType,
   normalizeNangoLinearModel,
   tryNormalizeLinearObjectType,
@@ -75,6 +77,17 @@ describe('linear path-mapper', () => {
       assert.equal(
         computeLinearPath('LinearUser', 'usr_123'),
         '/linear/users/usr_123.json',
+      );
+    });
+
+    it('maps alias paths for issue and project scopes', () => {
+      assert.equal(
+        linearByTitleAliasPath('/linear/issues', 'Cafe roadmap', 'issue-1'),
+        '/linear/issues/by-title/cafe-roadmap.json',
+      );
+      assert.equal(
+        linearByIdAliasPath('/linear/issues', 'AGE-8'),
+        '/linear/issues/by-id/AGE-8.json',
       );
     });
   });

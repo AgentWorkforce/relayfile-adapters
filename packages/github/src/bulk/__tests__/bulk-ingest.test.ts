@@ -646,10 +646,14 @@ describe('bulk ingest', () => {
     );
 
     assert.deepStrictEqual(result.errors, []);
+    // The PR 2 alias artifacts (by-id, by-title, alias `_index.json`) are
+    // written to the VFS as side effects but aren't tracked in `result`,
+    // so result counts stay at the canonical 246 while writes.size includes
+    // the 3 alias files for a total of 249.
     assert.strictEqual(result.filesWritten, 246);
     assert.strictEqual(result.filesUpdated, 0);
     assert.strictEqual(result.paths.length, 246);
-    assert.strictEqual(writes.size, 246);
+    assert.strictEqual(writes.size, 249);
     assert.strictEqual(provider.proxy.mock.calls.length, 244);
   });
 });

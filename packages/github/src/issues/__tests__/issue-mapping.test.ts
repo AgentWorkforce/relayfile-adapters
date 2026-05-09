@@ -262,9 +262,12 @@ describe('issue mapping', () => {
       vfs,
     );
 
-    assert.strictEqual(writeFile.mock.calls.length, 7);
+    assert.strictEqual(writeFile.mock.calls.length, 10);
     assert.deepStrictEqual(Array.from(writes.keys()), [
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
+      '/github/repos/octocat__hello-world/issues/_index.json',
+      '/github/repos/octocat__hello-world/issues/by-id/10.json',
+      '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
       '/github/repos/octocat/hello-world/issues/_index.json',
@@ -290,6 +293,9 @@ describe('issue mapping', () => {
     const comment7001 = JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json') ?? '');
     assert.strictEqual(comment7001.id, 7001);
     assert.strictEqual(comment7001.author.login, 'monalisa');
+    // PR 2's alias artifacts (`<owner>__<repo>` prefix) are written to the
+    // VFS as side-effect duplicates and don't show up in `result.paths` —
+    // only canonical and PR 1 layout/index writes are tracked there.
     assert.deepStrictEqual(result, {
       filesWritten: 7,
       filesUpdated: 0,

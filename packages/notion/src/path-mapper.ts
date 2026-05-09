@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { NOTION_PATH_ROOT } from './types.js';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 /**
  * Canonical Notion filenames use `<slug>__<id>.<ext>` when a human-readable
@@ -77,6 +78,19 @@ function slugify(value: string): string {
 
 function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8);
+}
+
+const NOTION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// `idSuffix` dehyphenates a canonical Notion UUID (8-4-4-4-12) into a
+// 32-char hex string for use in `by-id` aliases. Non-UUID ids fall through
+// unchanged so synthetic test ids and unusual fixtures still alias.
+// `writeback.extractNotionId` reverses this when resolving alias paths.
+function idSuffix(id: string): string {
+  if (NOTION_UUID_PATTERN.test(id)) {
+    return id.replace(/-/g, '').toLowerCase();
+  }
+  return id;
 }
 
 function currentNamingScope(): NamingScope | undefined {
@@ -237,6 +251,29 @@ export function notionDatabasePagesCollectionPath(databaseId: string, databaseTi
 
 export function notionDatabasePagesIndexPath(databaseId: string, databaseTitle?: string): string {
   return `${notionDatabasePagesCollectionPath(databaseId, databaseTitle)}/_index.json`;
+}
+
+export function notionStandalonePagesCollectionPath(): string {
+  return `${NOTION_PATH_ROOT}/pages`;
+}
+
+export function notionByTitleAliasPath(
+  parentScope: string,
+  title: string,
+  id: string,
+  colliding = false,
+): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    throw new Error('Notion alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  return `${parentScope}/by-title/${assertSegment(filename, 'alias title')}.json`;
+}
+
+export function notionByIdAliasPath(parentScope: string, id: string): string {
+  return `${parentScope}/by-id/${assertSegment(idSuffix(id), 'alias id')}.json`;
 }
 
 export function notionDiscoveryManifestPath(): string {
