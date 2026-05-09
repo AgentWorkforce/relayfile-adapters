@@ -2,7 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
-import { JiraAdapter, type RelayFileClientLike, type WriteFileInput } from '../jira-adapter.js';
+import {
+  JiraAdapter,
+  sanitizeJiraRecordForStorage,
+  type RelayFileClientLike,
+  type WriteFileInput,
+} from '../jira-adapter.js';
 import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
 import { ReadOnlyFieldError, resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
@@ -203,6 +208,17 @@ describe('JiraAdapter', () => {
     assert.equal(client.writes[0]?.content.includes('ada@example.com'), false);
     assert.equal(client.writes[0]?.content.includes('Ada Lovelace'), false);
     assert.equal(client.writes[0]?.content.includes('acct-1'), false);
+  });
+
+  it('returns an object when sanitizing a root Jira user profile record', () => {
+    assert.deepEqual(
+      sanitizeJiraRecordForStorage({
+        accountId: 'acct-1',
+        displayName: 'Ada Lovelace',
+        emailAddress: 'ada@example.com',
+      }),
+      {},
+    );
   });
 
   it('computes deterministic path mappings for all primary object types', () => {

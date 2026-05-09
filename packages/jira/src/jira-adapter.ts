@@ -153,7 +153,8 @@ function redactJiraPersonalDataValue(value: unknown, parentKey?: string): unknow
 }
 
 export function sanitizeJiraRecordForStorage(payload: Record<string, unknown>): Record<string, unknown> {
-  return redactJiraPersonalDataValue(payload) as Record<string, unknown>;
+  const result = redactJiraPersonalDataValue(payload);
+  return isRecord(result) ? result : {};
 }
 
 export class JiraAdapter extends IntegrationAdapter {
@@ -592,6 +593,8 @@ function applyUserProperties(
   prefix: string,
   user: JiraUser,
 ): void {
+  // Atlassian account profile fields are deliberately excluded from storage and
+  // semantics so Relayfile does not retain reportable Jira personal data.
   void properties;
   void relations;
   void prefix;
