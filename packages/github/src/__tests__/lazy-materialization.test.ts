@@ -209,9 +209,20 @@ async function maybeDelay(delayMs: number | undefined): Promise<void> {
 }
 
 describe('GitHub lazy materialization', () => {
-  it('lazy defaults to true and initial sync writes only the repos index plus root marker', async () => {
+  it('lazy defaults to false and initial sync writes full repo subtrees', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider);
+
+    await adapter.sync('workspace-1');
+
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/metadata.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
+  });
+
+  it('lazy true initial sync writes only the repos index plus root marker', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
 
@@ -227,7 +238,7 @@ describe('GitHub lazy materialization', () => {
 
   it('materializeRepo populates only one repo subtree and leaves the others untouched', async () => {
     const provider = new RecordingProvider();
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
     const result = await adapter.materializeRepo('workspace-1', 'octocat', 'repo-a');
@@ -260,7 +271,7 @@ describe('GitHub lazy materialization', () => {
 
   it('materializeRepo is idempotent for an already materialized repo', async () => {
     const provider = new RecordingProvider();
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
     await adapter.materializeRepo('workspace-1', 'octocat', 'repo-a');
@@ -270,7 +281,7 @@ describe('GitHub lazy materialization', () => {
     assert.ok(second.filesUpdated > 0);
   });
 
-  it('lazy false sync still writes full repo subtrees', async () => {
+  it('lazy false sync writes full repo subtrees', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider, {
       repo: 'repo-a',
@@ -286,7 +297,7 @@ describe('GitHub lazy materialization', () => {
 
   it('lazy sync with zero accessible repos writes an empty root index', async () => {
     const provider = new RecordingProvider({ repos: [] });
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
 
@@ -298,7 +309,7 @@ describe('GitHub lazy materialization', () => {
 
   it('materializeRepo repairs a missing cached root index entry before writing the repo subtree', async () => {
     const provider = new RecordingProvider({ repos: [] });
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
     await adapter.materializeRepo('workspace-1', 'octocat', 'repo-a');
@@ -328,7 +339,7 @@ describe('GitHub lazy materialization', () => {
 
   it('parallel materializeRepo calls share one in-flight fetch and return the same repo paths', async () => {
     const provider = new RecordingProvider({ delayMs: 5 });
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
     provider.requests.length = 0;
@@ -346,7 +357,7 @@ describe('GitHub lazy materialization', () => {
 
   it('materializeRepo writes metadata plus empty issue and pull indexes for repos with no synced content', async () => {
     const provider = new RecordingProvider();
-    const adapter = createAdapter(provider);
+    const adapter = createAdapter(provider, { lazy: true });
 
     await adapter.sync('workspace-1');
     const result = await adapter.materializeRepo('workspace-1', 'octocat', 'repo-b');

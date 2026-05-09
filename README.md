@@ -35,6 +35,8 @@ Every adapter exposes the same navigation primitives so an agent never has to me
 - **`<integration>/LAYOUT.md`** — markdown guide describing the integration's tree shape, written by the adapter itself.
 - **Alias trees** — `by-title/`, `by-id/`, `by-name/`, and `by-state/` mirror canonical entries under semantic keys for direct lookup without traversing the canonical hierarchy.
 
+GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces.
+
 That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
 
 1. Relayfile detects the file write

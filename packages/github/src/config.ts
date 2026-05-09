@@ -16,7 +16,7 @@ export const DEFAULT_CONFIG: GitHubAdapterConfig = {
   baseUrl: 'https://api.github.com',
   defaultBranch: 'main',
   fetchFileContents: true,
-  lazy: true,
+  lazy: false,
   maxFileSizeBytes: 1024 * 1024,
   supportedEvents: [...DEFAULT_SUPPORTED_EVENTS],
 };
