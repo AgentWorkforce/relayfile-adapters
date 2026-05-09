@@ -1039,10 +1039,8 @@ function inferWriteCounts(
   deleted: boolean
 ): Pick<IngestResult, 'filesDeleted' | 'filesUpdated' | 'filesWritten'> {
   if (deleted) {
-    if (writeResult?.status === 'created' || writeResult?.created) {
-      return { filesWritten: 1, filesUpdated: 0, filesDeleted: 0 };
-    }
-    return { filesWritten: 0, filesUpdated: 1, filesDeleted: 0 };
+    void writeResult;
+    return { filesWritten: 0, filesUpdated: 0, filesDeleted: 1 };
   }
 
   if (writeResult?.created || writeResult?.status === 'created') {

@@ -47,6 +47,11 @@ describe('package barrel', () => {
     }
   });
 
+  it('exports materializeRepo without leaking syncGitHubWorkspace', () => {
+    assert.strictEqual(typeof (barrel as Record<string, unknown>).materializeRepo, 'function');
+    assert.strictEqual('syncGitHubWorkspace' in barrel, false);
+  });
+
   it('barrel-imported builders return well-formed GitHubOperation values', () => {
     const ref = { owner: 'AgentWorkforce', repo: 'cloud' };
 

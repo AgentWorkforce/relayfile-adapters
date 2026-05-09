@@ -35,6 +35,18 @@ class RecordingClient implements RelayFileClientLike {
   }
 }
 
+class TombstoneOnlyClient implements RelayFileClientLike {
+  readonly writes: WriteFileInput[] = [];
+  readonly files = new Map<string, WriteFileInput>();
+
+  async writeFile(input: WriteFileInput): Promise<WriteFileResult> {
+    const existed = this.files.has(input.path);
+    this.writes.push(input);
+    this.files.set(input.path, input);
+    return existed ? { updated: true } : { created: true };
+  }
+}
+
 function createProvider(): ConnectionProvider {
   return {
     name: 'relayfile-test-provider',
@@ -51,7 +63,7 @@ function createProvider(): ConnectionProvider {
   };
 }
 
-function createAdapter(client: RecordingClient, config: LinearAdapterConfig = {}): LinearAdapter {
+function createAdapter(client: RelayFileClientLike, config: LinearAdapterConfig = {}): LinearAdapter {
   return new LinearAdapter(client, createProvider(), config);
 }
 
@@ -191,6 +203,45 @@ test('Linear issue remove deletes the canonical file and every known by-state al
   assert.deepStrictEqual(client.deletes.sort(), [aliasPath, canonicalPath].sort());
   assert.strictEqual(result.filesDeleted, 2);
   assert.deepStrictEqual(result.errors, []);
+});
+
+test('Linear issue remove falls back to tombstone writes when deleteFile is unavailable', async () => {
+  const client = new TombstoneOnlyClient();
+  const adapter = createAdapter(client);
+  const canonicalPath = linearIssuePath('issue_123', 'Ship state aliases');
+  const aliasPath = linearIssueByStatePath('Todo', 'ENG-123');
+
+  await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload(),
+  });
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.remove',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({
+      _webhook: {
+        action: 'remove',
+        previousData: {
+          identifier: 'ENG-123',
+          state_name: 'Todo',
+        },
+      },
+    }),
+  });
+
+  assert.strictEqual(client.writes.length, 4);
+  assert.strictEqual(JSON.parse(client.files.get(canonicalPath)?.content as string).deleted, true);
+  assert.strictEqual(JSON.parse(client.files.get(aliasPath)?.content as string).deleted, true);
+  assert.strictEqual(result.filesDeleted, 2);
+  assert.strictEqual(result.filesWritten, 0);
+  assert.strictEqual(result.filesUpdated, 0);
+  assert.deepStrictEqual(result.paths.sort(), [aliasPath, canonicalPath].sort());
 });
 
 test('Linear issue state transitions delete the old by-state alias before writing the new one', async () => {

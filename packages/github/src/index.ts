@@ -345,7 +345,7 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
 
 export * from './config.js';
 export * from './adapter.js';
-export * from './lazy.js';
+export { materializeRepo } from './lazy.js';
 export * from './operations.js';
 export * from './path-mapper.js';
 export * from './types.js';

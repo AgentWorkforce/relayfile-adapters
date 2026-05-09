@@ -204,6 +204,8 @@ export function slugifyStateName(stateName: string): string {
     slug += encodeURIComponent(character);
   }
 
+  // Symbol-only state names are rejected so callers surface an ingest error
+  // instead of emitting an ambiguous empty by-state directory.
   return assertNonEmptySegment(slug, 'state slug');
 }
 

@@ -61,7 +61,6 @@ export async function syncGitHubWorkspace(
   inFlight: Map<string, Promise<MaterializeResult>>,
   options: SyncOptions = {},
 ): Promise<SyncResult> {
-  void workspaceId;
   const repos = await resolveRepos(provider, config);
   const vfs = requireVfsProvider(provider);
   const rootMarkerResult = await writeTextFile(vfs, ROOT_DIR_MARKER_PATH, '');
