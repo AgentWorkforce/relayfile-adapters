@@ -286,7 +286,7 @@ function idPatternFor(adapterSlug, resourcePath) {
   // Editors: when adjusting an idPattern in resources.ts, mirror the change
   // here — the discovery generator overwrites resources.ts on regeneration.
   if (adapterSlug === 'linear') {
-    return pattern('^(?:(?:[A-Za-z0-9_.~-]+(?:--|__))?[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'notion') {
     return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');

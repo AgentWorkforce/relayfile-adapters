@@ -56,11 +56,15 @@ function formatUuid(hex32: string): string {
 // covers database pages), so `classifyWrite` returns null for them. Tier-0
 // canonicity is checked inline against the same forms the page idPattern
 // accepts: dehyphenated 32-hex, canonical 8-4-4-4-12, or either form prefixed
-// by a `<slug>(?:--|__)`.
+// by a `<slug>(?:--|__)`. We also recognize the legacy `<slug>(?:--|__)<8-hex>`
+// form so it routes through `extractNotionId`, which throws a clear "re-sync
+// required" message instead of falling through to a generic "no rule matched".
 const STANDALONE_PAGE_CANONICAL = /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const STANDALONE_PAGE_LEGACY_8HEX = /(?:--|__)[0-9a-f]{8}$/i;
 
 function isCanonicalStandalonePageSegment(segment: string): boolean {
-  return STANDALONE_PAGE_CANONICAL.test(decodeURIComponent(segment));
+  const decoded = decodeURIComponent(segment);
+  return STANDALONE_PAGE_CANONICAL.test(decoded) || STANDALONE_PAGE_LEGACY_8HEX.test(decoded);
 }
 
 /**

@@ -39,9 +39,11 @@ export function resolveWritebackRequest(path: string, content: string): ZendeskW
     }
   }
 
-  // Organizations are not yet declared as a resource; keep ad-hoc routing.
+  // Organizations are not yet declared as a resource; keep ad-hoc routing
+  // but mirror classifyWrite's canonical-id gate so draft filenames don't
+  // silently route to PUT.
   const organizationUpdateMatch = normalized.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
-  if (organizationUpdateMatch?.[1]) {
+  if (organizationUpdateMatch?.[1] && ZENDESK_ORG_CANONICAL_ID.test(decodeURIComponent(organizationUpdateMatch[1]))) {
     return buildOrganizationUpdateRequest(decodeURIComponent(organizationUpdateMatch[1]), content);
   }
 
@@ -74,9 +76,10 @@ export function resolveDeleteRequest(path: string): ZendeskWritebackRequest {
     }
   }
 
-  // Organizations are not yet declared as a resource; keep ad-hoc routing.
+  // Organizations are not yet declared as a resource; gate on the same
+  // canonical-id rule so draft deletes don't silently call DELETE.
   const orgMatch = normalized.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
-  if (orgMatch?.[1]) {
+  if (orgMatch?.[1] && ZENDESK_ORG_CANONICAL_ID.test(decodeURIComponent(orgMatch[1]))) {
     return {
       action: 'delete_organization',
       method: 'DELETE',
@@ -86,6 +89,10 @@ export function resolveDeleteRequest(path: string): ZendeskWritebackRequest {
 
   throw new Error(`No Zendesk delete writeback rule matched ${path}`);
 }
+
+// Zendesk org ids are numeric (matches the zendesk discovery convention used
+// for tickets/users). Drafts use any non-numeric filename.
+const ZENDESK_ORG_CANONICAL_ID = /^\d+$/;
 
 function buildTicketCommentRequest(ticketId: string, content: string): ZendeskWritebackRequest {
   const parsed = safeParseJson(content);

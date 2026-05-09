@@ -49,6 +49,25 @@ describe('writeback rule matching', () => {
     });
   });
 
+  it('surfaces the helpful "re-sync required" error for legacy 8-hex slugged standalone paths', () => {
+    // Pins a CodeRabbit Review finding: the canonical-id gate previously
+    // rejected legacy <slug>(?:--|__)<8-hex> paths as drafts, dropping the
+    // helpful error from extractNotionId. The gate now also recognizes the
+    // legacy form so it flows into extractNotionId, which throws.
+    assert.throws(
+      () => resolveDeleteRequest('/notion/pages/release-notes--deadbeef.json'),
+      /legacy 8-char id suffix/,
+    );
+    assert.throws(
+      () =>
+        resolveWritebackRequest(
+          '/notion/pages/release-notes__deadbeef.json',
+          '{"properties":{}}',
+        ),
+      /legacy 8-char id suffix/,
+    );
+  });
+
   it('rejects standalone-page draft delete (no canonical id) instead of archiving', () => {
     // Pins a Devin Review finding: standalone notion pages aren't declared
     // as a resource, so classifyWrite returns null and the delete resolver

@@ -66,8 +66,8 @@ Use the status surface before retrying a write. For example, if a create fails b
 | HubSpot | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/hubspot/contacts/<draft>.json` |
 | Intercom | `^[A-Za-z0-9_-]+$` | `/intercom/conversations/<draft>.json` |
 | Jira | comments: `^(?:[A-Za-z0-9_.~-]+--)?\d+$`; issues/projects: bare `KEY-123` or `\d+`, slug-prefixed forms also canonical | `/jira/issues/<draft>.json` |
-| Linear | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?[0-9a-f]{32}$` (or canonical UUID) | `/linear/issues/<draft>.json` |
-| Notion | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?[0-9a-f]{32}$` (or canonical UUID) | `/notion/databases/<databaseId>/pages/<draft>.json` |
+| Linear | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?(?:[0-9a-f]{32}\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$` — canonical filename is bare or slug-prefixed, dehyphenated 32-hex or canonical UUID | `/linear/issues/<draft>.json` |
+| Notion | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?(?:[0-9a-f]{32}\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$` — canonical filename is bare or slug-prefixed, dehyphenated 32-hex or canonical UUID | `/notion/databases/<databaseId>/pages/<draft>.json` |
 | Pipedrive | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/pipedrive/deals/<draft>.json` |
 | Salesforce | `^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$` | `/salesforce/accounts/<draft>.json` |
 | Slack | `^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$` | `/slack/channels/<channelId>/messages/<draft>.json` |

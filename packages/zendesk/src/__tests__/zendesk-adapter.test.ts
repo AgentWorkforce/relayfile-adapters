@@ -257,6 +257,18 @@ test('path mapping stays deterministic for supported Zendesk VFS objects', () =>
       ),
     (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
+
+  // Pins a CodeRabbit Review finding: organizations aren't a declared resource,
+  // so classifyWrite never gates them. Without an inline canonical-id check,
+  // /zendesk/organizations/draft-org.json would silently PUT to a draft id.
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/organizations/draft-org.json', '{}'),
+    /No Zendesk writeback rule matched/,
+  );
+  assert.throws(
+    () => resolveDeleteRequest('/zendesk/organizations/draft-org.json'),
+    /No Zendesk delete writeback rule matched/,
+  );
 });
 
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {
