@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/onedrive",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "OneDrive storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",

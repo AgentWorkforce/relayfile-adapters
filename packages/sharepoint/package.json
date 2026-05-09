@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/sharepoint",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "SharePoint storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",

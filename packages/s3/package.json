@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/s3",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Amazon S3 storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
