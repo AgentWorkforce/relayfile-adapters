@@ -53,6 +53,8 @@ export interface LinearUser {
   admin?: boolean;
   avatarUrl?: string;
   avatar_url?: string;
+  createdAt?: string;
+  created_at?: string;
   updatedAt?: string;
   updated_at?: string;
   url?: string;

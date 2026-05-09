@@ -16,15 +16,26 @@ Agents don't use adapters, providers, or even the SDK. They read and write files
 
 ```bash
 # Agent reads a PR — it's a file on disk
-cat /relayfile/github/repos/acme/api/pulls/42/metadata.json
+cat /relayfile/github/repos/acme/api/pulls/42__bump-deps/meta.json
 
 # Agent writes a review — it writes a file
 echo '{"body": "LGTM! Ship it.", "event": "APPROVE"}' \
-  > /relayfile/github/repos/acme/api/pulls/42/reviews/agent-review.json
+  > /relayfile/github/repos/acme/api/pulls/42__bump-deps/reviews/agent-review.json
 
 # Done. The review is now posted to GitHub.
 # The agent didn't import anything, call any API, or authenticate.
 ```
+
+### Self-describing trees
+
+Every adapter exposes the same navigation primitives so an agent never has to memorize paths:
+
+- **`<sanitized-name>__<id>` filenames** — recover the id from the last `__`-separated segment (GitHub PR/issue dirs are `<number>__<slug>`, id-leading per the GitHub convention).
+- **`_index.json` per directory** — sortable, deterministic listings of every entity in the directory.
+- **`<integration>/LAYOUT.md`** — markdown guide describing the integration's tree shape, written by the adapter itself.
+- **Alias trees** — `by-title/`, `by-id/`, `by-name/`, and `by-state/` mirror canonical entries under semantic keys for direct lookup without traversing the canonical hierarchy.
+
+GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces.
 
 That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
 
@@ -106,10 +117,10 @@ For agents using the SDK programmatically (e.g., in a Node.js agent framework):
 
 ```ts
 // Read
-const pr = await relayfile.getFile(workspaceId, "/github/repos/acme/api/pulls/42/metadata.json");
+const pr = await relayfile.getFile(workspaceId, "/github/repos/acme/api/pulls/42__bump-deps/meta.json");
 
 // Write — triggers the review on GitHub automatically
-await relayfile.putFile(workspaceId, "/github/repos/acme/api/pulls/42/reviews/agent-review.json", {
+await relayfile.putFile(workspaceId, "/github/repos/acme/api/pulls/42__bump-deps/reviews/agent-review.json", {
   content: JSON.stringify({ body: "LGTM!", event: "APPROVE" }),
 });
 ```
@@ -203,7 +214,7 @@ import type { IntegrationAdapter, WebhookInput } from "@relayfile/sdk";
 
 export class MyAdapter implements IntegrationAdapter {
   computePath(objectType: string, objectId: string, context?: Record<string, string>): string {
-    return `/myservice/${objectType}/${objectId}/metadata.json`;
+    return `/myservice/${objectType}/${objectId}/meta.json`;
   }
 
   normalizeWebhook(payload: unknown, headers?: Record<string, string>): WebhookInput {

@@ -22,12 +22,13 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 function extractNotionId(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  // slug--<32-hex>: reverse the path-mapper encoding to canonical UUID.
-  const slugged32 = /--([0-9a-f]{32})$/i.exec(decoded);
+  // <slug>__<32-hex> (current convention) or legacy <slug>--<32-hex>: reverse
+  // the path-mapper encoding to canonical UUID.
+  const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32) return formatUuid(slugged32[1]);
 
-  // slug--<8-hex>: legacy form, can't be reversed losslessly.
-  if (/--[0-9a-f]{8}$/i.test(decoded)) {
+  // Legacy <slug>--<8-hex>: form can't be reversed losslessly.
+  if (/(?:--|__)[0-9a-f]{8}$/i.test(decoded)) {
     throw new Error(
       `Notion path "${segment}" uses a legacy 8-char id suffix that cannot be ` +
         `losslessly resolved. Run \`relayfile pull\` to re-sync paths.`,

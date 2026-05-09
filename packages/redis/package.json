@@ -1,0 +1,66 @@
+{
+  "name": "@relayfile/redis",
+  "version": "0.1.0",
+  "description": "Redis storage bridge adapter for Relayfile",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    },
+    "./writeback": {
+      "types": "./dist/writeback.d.ts",
+      "import": "./dist/writeback.js",
+      "default": "./dist/writeback.js"
+    },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js",
+      "default": "./dist/resources.js"
+    }
+  },
+  "files": [
+    "dist",
+    "discovery"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "lint": "tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [
+    "relayfile",
+    "storage-bridge",
+    "redis"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/redis"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@relayfile/adapter-core": "^0.1.1"
+  }
+}

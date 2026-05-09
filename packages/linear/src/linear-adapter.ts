@@ -3,7 +3,11 @@ export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile
 
 import {
   computeLinearPath,
+  LINEAR_PATH_ROOT,
+  linearByIdAliasPath,
+  linearByTitleAliasPath,
   linearCyclePath,
+  linearIssueByStatePath,
   linearIssuePath,
   linearMilestonePath,
   linearProjectPath,
@@ -12,6 +16,18 @@ import {
   linearUserPath,
   normalizeLinearObjectType,
 } from './path-mapper.js';
+import { buildLinearIndexFile, type LinearIndexBucket } from './index-emitter.js';
+import { linearLayoutPromptFile } from './layout-prompt.js';
+import {
+  getLinearCommentHumanReadable,
+  getLinearIssueHumanReadable,
+  type LinearBaseIndexRow,
+  type LinearIssueIndexRow,
+  linearCommentIndexRow,
+  linearIssueIndexRow,
+  linearTeamIndexRow,
+  linearUserIndexRow,
+} from './queries.js';
 import { LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   LinearAdapterConfig,
@@ -77,9 +93,22 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content?: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  readFile?(
+    inputOrWorkspaceId: ReadFileInput | string,
+    path?: string,
+  ): Promise<ReadFileResult | string | undefined> | ReadFileResult | string | undefined;
 }
 
 export abstract class IntegrationAdapter {
@@ -146,18 +175,40 @@ export class LinearAdapter extends IntegrationAdapter {
       const path = computeLinearPath(
         normalized.objectType,
         normalized.objectId,
-        readIssueTitle(normalized.objectType, normalized.payload),
+        readPathHumanReadable(normalized.objectType, normalized.payload),
       );
+      const content = this.renderContent(workspaceId, normalized, false);
+      const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
+      const aliasErrorPath = inferIssueStateAliasErrorPath(normalized);
 
       if (this.isRemoveEvent(normalized)) {
+        const deletePaths = [path];
+        let filesDeleted = 0;
+        let filesWritten = 0;
+        let filesUpdated = 0;
+        const aliasPath = resolveIssueStateAliasPath(normalized.payload);
+        const previousAliasPath = resolvePreviousIssueStateAliasPath(normalized.payload);
+
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path });
+          filesDeleted += 1;
+
+          for (const candidatePath of uniqueStrings([aliasPath, previousAliasPath])) {
+            if (!candidatePath) {
+              continue;
+            }
+            await this.client.deleteFile({ workspaceId, path: candidatePath });
+            deletePaths.push(candidatePath);
+            filesDeleted += 1;
+          }
+
+          const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
           return {
-            filesWritten: 0,
-            filesUpdated: 0,
-            filesDeleted: 1,
-            paths: [path],
-            errors: [],
+            filesWritten: filesWritten + auxiliary.filesWritten,
+            filesUpdated: filesUpdated + auxiliary.filesUpdated,
+            filesDeleted,
+            paths: [...deletePaths, ...auxiliary.paths],
+            errors: auxiliary.errors,
           };
         }
 
@@ -166,35 +217,108 @@ export class LinearAdapter extends IntegrationAdapter {
           path,
           content: this.renderContent(workspaceId, normalized, true),
           contentType: JSON_CONTENT_TYPE,
-          semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+          semantics,
         });
 
         const counts = inferWriteCounts(normalized, deleteResult, true);
+        filesDeleted += counts.filesDeleted;
+        filesWritten += counts.filesWritten;
+        filesUpdated += counts.filesUpdated;
+
+        for (const candidatePath of uniqueStrings([aliasPath, previousAliasPath])) {
+          if (!candidatePath) {
+            continue;
+          }
+          const aliasDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: candidatePath,
+            content: this.renderContent(workspaceId, normalized, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const aliasCounts = inferWriteCounts(normalized, aliasDeleteResult, true);
+          deletePaths.push(candidatePath);
+          filesDeleted += aliasCounts.filesDeleted;
+          filesWritten += aliasCounts.filesWritten;
+          filesUpdated += aliasCounts.filesUpdated;
+        }
+
+        const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
         return {
-          filesWritten: counts.filesWritten,
-          filesUpdated: counts.filesUpdated,
-          filesDeleted: counts.filesDeleted,
-          paths: [path],
-          errors: [],
+          filesWritten: filesWritten + auxiliary.filesWritten,
+          filesUpdated: filesUpdated + auxiliary.filesUpdated,
+          filesDeleted,
+          paths: [...deletePaths, ...auxiliary.paths],
+          errors: auxiliary.errors,
         };
       }
 
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, false),
+        content,
         contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+        semantics,
       });
+      await writeLinearAliases(this.client, workspaceId, normalized, path, content, semantics);
 
       const counts = inferWriteCounts(normalized, writeResult, false);
-      return {
-        filesWritten: counts.filesWritten,
-        filesUpdated: counts.filesUpdated,
+      const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, false);
+      const result: IngestResult = {
+        filesWritten: counts.filesWritten + auxiliary.filesWritten,
+        filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
         filesDeleted: 0,
-        paths: [path],
-        errors: [],
+        paths: [path, ...auxiliary.paths],
+        errors: auxiliary.errors,
       };
+
+      if (normalized.objectType !== 'issue') {
+        return result;
+      }
+
+      const previousAliasPath = resolvePreviousIssueStateAliasPath(normalized.payload);
+      const aliasPath = resolveIssueStateAliasPath(normalized.payload);
+      if (previousAliasPath && previousAliasPath !== aliasPath) {
+        if (this.client.deleteFile) {
+          await this.client.deleteFile({ workspaceId, path: previousAliasPath });
+          result.filesDeleted += 1;
+        } else {
+          const previousDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: previousAliasPath,
+            content: this.renderContent(workspaceId, normalized, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const previousCounts = inferWriteCounts(normalized, previousDeleteResult, true);
+          result.filesWritten += previousCounts.filesWritten;
+          result.filesUpdated += previousCounts.filesUpdated;
+          result.filesDeleted += previousCounts.filesDeleted;
+        }
+        result.paths.push(previousAliasPath);
+      }
+
+      if (!aliasPath) {
+        result.errors.push({
+          path: aliasErrorPath,
+          error: 'Linear issue is missing state_name or identifier for by-state alias emission.',
+        });
+        return result;
+      }
+
+      const aliasWriteResult = await this.client.writeFile({
+        workspaceId,
+        path: aliasPath,
+        content,
+        contentType: JSON_CONTENT_TYPE,
+        semantics,
+      });
+      const aliasCounts = inferWriteCounts(normalized, aliasWriteResult, false);
+      result.filesWritten += aliasCounts.filesWritten;
+      result.filesUpdated += aliasCounts.filesUpdated;
+      result.paths.push(aliasPath);
+
+      return result;
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
       return {
@@ -333,6 +457,94 @@ export class LinearAdapter extends IntegrationAdapter {
       payload: event.payload,
     });
   }
+
+  private async writeAuxiliaryFiles(
+    workspaceId: string,
+    event: NormalizedWebhook,
+    deleted: boolean,
+  ): Promise<Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'>> {
+    const result: Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'> = {
+      filesWritten: 0,
+      filesUpdated: 0,
+      paths: [],
+      errors: [],
+    };
+
+    const layoutFile = linearLayoutPromptFile();
+    await this.recordAuxiliaryWrite(result, workspaceId, layoutFile.path, layoutFile.content, layoutFile.contentType);
+
+    const bucket = bucketForObjectType(event.objectType);
+    if (!bucket) {
+      return result;
+    }
+
+    const existingRows = await this.readIndexRows(workspaceId, buildIndexPathForBucket(bucket));
+    if (!existingRows) {
+      return result;
+    }
+
+    const nextRows = deleted
+      ? existingRows.filter((row) => row.id !== event.objectId)
+      : upsertLinearIndexRow(existingRows, buildIndexRow(bucket, event));
+    const indexFile = buildIndexFileForBucket(bucket, nextRows);
+    await this.recordAuxiliaryWrite(
+      result,
+      workspaceId,
+      indexFile.path,
+      indexFile.content,
+      indexFile.contentType,
+    );
+    return result;
+  }
+
+  private async readIndexRows(
+    workspaceId: string,
+    path: string,
+  ): Promise<Array<LinearBaseIndexRow | LinearIssueIndexRow> | undefined> {
+    const content = await readClientFile(this.client, workspaceId, path);
+    if (content === READ_NOT_AVAILABLE) {
+      // No reader on the client — we can't reconcile, so skip the auxiliary write entirely.
+      return undefined;
+    }
+    if (content === undefined) {
+      // Reader ran but the index is missing/empty/malformed. Bootstrap with an empty
+      // array so the first ingest writes the index instead of getting stuck.
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      return Array.isArray(parsed) ? parsed as Array<LinearBaseIndexRow | LinearIssueIndexRow> : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async recordAuxiliaryWrite(
+    result: Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'>,
+    workspaceId: string,
+    path: string,
+    content: string,
+    contentType: string,
+  ): Promise<void> {
+    try {
+      const writeResult = await this.client.writeFile({
+        workspaceId,
+        path,
+        content,
+        contentType,
+      });
+      const counts = inferAuxiliaryWriteCounts(writeResult);
+      result.filesWritten += counts.filesWritten;
+      result.filesUpdated += counts.filesUpdated;
+      result.paths.push(path);
+    } catch (error) {
+      result.errors.push({
+        path,
+        error: toErrorMessage(error),
+      });
+    }
+  }
 }
 
 function applyIssueSemantics(
@@ -419,13 +631,13 @@ function applyIssueSemantics(
   }
 
   if (issue.parent?.id) {
-    relations.add(linearIssuePath(issue.parent.id));
+    relations.add(buildLinearIssueReferencePath(issue.parent));
     addStringProperty(properties, 'linear.parent_id', issue.parent.id);
   }
 
   for (const child of issue.children ?? []) {
     if (child.id) {
-      relations.add(linearIssuePath(child.id));
+      relations.add(buildLinearIssueReferencePath(child));
     }
   }
 
@@ -450,12 +662,15 @@ function applyIssueSemantics(
   addFirstStringProperty(properties, 'linear.team_name', properties['linear.team_name'], issue.team_name);
 }
 
-function readIssueTitle(objectType: string, payload: Record<string, unknown>): string | undefined {
-  if (normalizeLinearObjectType(objectType) !== 'issue') {
-    return undefined;
+function readPathHumanReadable(objectType: string, payload: Record<string, unknown>): string | undefined {
+  switch (normalizeLinearObjectType(objectType)) {
+    case 'issue':
+      return getLinearIssueHumanReadable(buildLinearIssueHumanReadableInput(payload));
+    case 'comment':
+      return getLinearCommentHumanReadable(buildLinearCommentHumanReadableInput(payload));
+    default:
+      return undefined;
   }
-
-  return asString(payload.title);
 }
 
 function applyCommentSemantics(
@@ -489,7 +704,7 @@ function applyCommentSemantics(
   addFirstStringProperty(properties, 'linear.author_email', properties['linear.author_email'], comment.user_email, comment.author_email);
 
   if (comment.issue?.id) {
-    relations.add(linearIssuePath(comment.issue.id));
+    relations.add(buildLinearIssueReferencePath(comment.issue));
     addStringProperty(properties, 'linear.issue_id', comment.issue.id);
     addStringProperty(properties, 'linear.issue_identifier', comment.issue.identifier);
     addStringProperty(properties, 'linear.issue_title', comment.issue.title);
@@ -497,7 +712,17 @@ function applyCommentSemantics(
   }
   const issueId = asString(comment.issue_id);
   if (issueId) {
-    relations.add(linearIssuePath(issueId));
+    relations.add(
+      linearIssuePath(
+        issueId,
+        getLinearIssueHumanReadable(
+          buildLinearIssueHumanReadableInput({
+            identifier: comment.issue_identifier,
+            title: comment.issue_title,
+          }),
+        ),
+      ),
+    );
     addStringProperty(properties, 'linear.issue_id', issueId);
   }
   addFirstStringProperty(properties, 'linear.issue_identifier', properties['linear.issue_identifier'], comment.issue_identifier);
@@ -543,6 +768,43 @@ function applyProjectSemantics(
       relations.add(linearTeamPath(teamId));
     }
   }
+}
+
+function buildLinearIssueReferencePath(issue: {
+  id: string;
+  identifier?: string | null;
+  title?: string | null;
+}): string {
+  return linearIssuePath(issue.id, getLinearIssueHumanReadable(issue));
+}
+
+function buildLinearIssueHumanReadableInput(record: Record<string, unknown>): {
+  identifier?: string | null;
+  title?: string | null;
+} {
+  const identifier = asString(record.identifier);
+  const title = asString(record.title);
+  return {
+    ...(identifier ? { identifier } : {}),
+    ...(title ? { title } : {}),
+  };
+}
+
+function buildLinearCommentIssueInput(issue: Record<string, unknown> | undefined): { identifier?: string | null } | undefined {
+  const identifier = asString(issue?.identifier);
+  return identifier ? { identifier } : undefined;
+}
+
+function buildLinearCommentHumanReadableInput(record: Record<string, unknown>): {
+  body?: string | null;
+  issue?: { identifier?: string | null } | null;
+} {
+  const body = asString(record.body);
+  const issue = buildLinearCommentIssueInput(getRecord(record.issue));
+  return {
+    ...(body ? { body } : {}),
+    ...(issue ? { issue } : {}),
+  };
 }
 
 function applyCycleSemantics(properties: Record<string, string>, payload: LinearRecord): void {
@@ -668,16 +930,117 @@ function mergeLinearPayload(event: LinearWebhookPayload): Record<string, unknown
   };
 }
 
+function bucketForObjectType(objectType: string): LinearIndexBucket | undefined {
+  switch (normalizeLinearObjectType(objectType)) {
+    case 'issue':
+      return 'issues';
+    case 'comment':
+      return 'comments';
+    case 'team':
+      return 'teams';
+    case 'user':
+      return 'users';
+    default:
+      return undefined;
+  }
+}
+
+function buildIndexRow(
+  bucket: LinearIndexBucket,
+  event: NormalizedWebhook,
+): LinearBaseIndexRow | LinearIssueIndexRow {
+  const payload = {
+    ...event.payload,
+    id: event.objectId,
+  };
+
+  switch (bucket) {
+    case 'issues':
+      return linearIssueIndexRow(payload as unknown as Parameters<typeof linearIssueIndexRow>[0]);
+    case 'comments':
+      return linearCommentIndexRow(payload as unknown as Parameters<typeof linearCommentIndexRow>[0]);
+    case 'teams':
+      return linearTeamIndexRow(payload as unknown as Parameters<typeof linearTeamIndexRow>[0]);
+    case 'users':
+      return linearUserIndexRow(payload as unknown as Parameters<typeof linearUserIndexRow>[0]);
+  }
+}
+
+function buildIndexFileForBucket(
+  bucket: LinearIndexBucket,
+  rows: Array<LinearBaseIndexRow | LinearIssueIndexRow>,
+) {
+  switch (bucket) {
+    case 'issues':
+      return buildLinearIndexFile('issues', rows as LinearIssueIndexRow[]);
+    case 'comments':
+      return buildLinearIndexFile('comments', rows as LinearBaseIndexRow[]);
+    case 'teams':
+      return buildLinearIndexFile('teams', rows as LinearBaseIndexRow[]);
+    case 'users':
+      return buildLinearIndexFile('users', rows as LinearBaseIndexRow[]);
+  }
+}
+
+function buildIndexPathForBucket(bucket: LinearIndexBucket): string {
+  return buildIndexFileForBucket(bucket, []).path;
+}
+
+function upsertLinearIndexRow<T extends { id: string }>(rows: T[], row: T): T[] {
+  return [...rows.filter((existing) => existing.id !== row.id), row];
+}
+
+// `READ_NOT_AVAILABLE` is returned when the client cannot read at all (no
+// `readFile` method). `undefined` means the call ran but the file is missing
+// or the response was malformed. Callers use this distinction to decide
+// whether to skip auxiliary writes (no readFile) or bootstrap an empty index
+// (file missing on first ingest).
+const READ_NOT_AVAILABLE = Symbol('readNotAvailable');
+
+async function readClientFile(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  path: string,
+): Promise<string | undefined | typeof READ_NOT_AVAILABLE> {
+  if (!client.readFile) {
+    return READ_NOT_AVAILABLE;
+  }
+
+  try {
+    const value =
+      client.readFile.length >= 2
+        ? await client.readFile(workspaceId, path)
+        : await client.readFile({ workspaceId, path });
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (value && typeof value === 'object' && typeof value.content === 'string') {
+      return value.content;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function inferAuxiliaryWriteCounts(
+  writeResult: WriteFileResult | void,
+): Pick<IngestResult, 'filesWritten' | 'filesUpdated'> {
+  if (writeResult?.created || writeResult?.status === 'created') {
+    return { filesWritten: 1, filesUpdated: 0 };
+  }
+  return { filesWritten: 0, filesUpdated: 1 };
+}
+
 function inferWriteCounts(
   event: NormalizedWebhook,
   writeResult: WriteFileResult | void,
   deleted: boolean
 ): Pick<IngestResult, 'filesDeleted' | 'filesUpdated' | 'filesWritten'> {
   if (deleted) {
-    if (writeResult?.status === 'created' || writeResult?.created) {
-      return { filesWritten: 1, filesUpdated: 0, filesDeleted: 0 };
-    }
-    return { filesWritten: 0, filesUpdated: 1, filesDeleted: 0 };
+    void writeResult;
+    return { filesWritten: 0, filesUpdated: 0, filesDeleted: 1 };
   }
 
   if (writeResult?.created || writeResult?.status === 'created') {
@@ -722,6 +1085,38 @@ function inferFallbackPath(event: NormalizedWebhook | LinearWebhookPayload): str
   } catch {
     return '';
   }
+}
+
+function resolveIssueStateAliasPath(payload: Record<string, unknown>): string | undefined {
+  const stateName = asString(payload.state_name);
+  const identifier = asString(payload.identifier);
+  if (!stateName || !identifier) {
+    return undefined;
+  }
+  return linearIssueByStatePath(stateName, identifier);
+}
+
+function resolvePreviousIssueStateAliasPath(payload: Record<string, unknown>): string | undefined {
+  const previousData = getRecord(getRecord(payload._webhook)?.previousData);
+  if (!previousData) {
+    return undefined;
+  }
+
+  const stateName = asString(previousData.state_name);
+  const identifier = asString(previousData.identifier) ?? asString(payload.identifier);
+  if (!stateName || !identifier) {
+    return undefined;
+  }
+
+  return linearIssueByStatePath(stateName, identifier);
+}
+
+function inferIssueStateAliasErrorPath(event: NormalizedWebhook): string {
+  const identifier = asString(event.payload.identifier);
+  if (identifier) {
+    return `/linear/issues/by-state/<missing-state>/${encodeURIComponent(identifier)}.json`;
+  }
+  return '/linear/issues/by-state/<missing-state>/<missing-identifier>.json';
 }
 
 function extractPayloadId(value: unknown): string | undefined {
@@ -802,6 +1197,127 @@ function stableJson(value: unknown): string {
   return `${JSON.stringify(sortJson(value), null, 2)}\n`;
 }
 
+interface LinearIndexRow {
+  file: string;
+  title: string;
+}
+
+async function writeLinearAliases(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  event: NormalizedWebhook,
+  canonicalPath: string,
+  content: string,
+  semantics: FileSemantics,
+): Promise<void> {
+  // duplicate write — the adapter only has a file-write interface, so aliases store the canonical bytes verbatim.
+  const normalizedType = normalizeLinearObjectType(event.objectType);
+  if (normalizedType !== 'issue' && normalizedType !== 'project') {
+    return;
+  }
+
+  const scope = normalizedType === 'issue' ? `${LINEAR_PATH_ROOT}/issues` : `${LINEAR_PATH_ROOT}/projects`;
+  const title = normalizedType === 'issue' ? asString(event.payload.title) : asString(event.payload.name);
+  const byId = normalizedType === 'issue'
+    ? asString(event.payload.identifier) ?? event.objectId
+    : event.objectId;
+
+  await writeLinearIndex(client, workspaceId, scope);
+  await writeLinearFile(client, workspaceId, linearByIdAliasPath(scope, byId), content, semantics);
+
+  if (!title) {
+    return;
+  }
+
+  const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
+  const existingBaseContent = await readLinearFile(client, baseAliasPath);
+  const aliasPath =
+    existingBaseContent !== undefined && existingBaseContent !== content
+      ? linearByTitleAliasPath(scope, title, event.objectId, true)
+      : baseAliasPath;
+
+  // TODO(issue #106): remove stale by-title aliases when a record title changes on re-ingest; this wave only writes the current alias.
+  await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
+}
+
+async function writeLinearIndex(client: RelayFileClientLike, workspaceId: string, scope: string): Promise<void> {
+  const indexPath = `${scope}/_index.json`;
+  const rows = mergeLinearIndexRows(await readLinearFile(client, indexPath), [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ]);
+  await writeLinearFile(
+    client,
+    workspaceId,
+    indexPath,
+    stableJson({ rows }),
+    undefined,
+  );
+}
+
+function mergeLinearIndexRows(existingContent: string | undefined, requiredRows: LinearIndexRow[]): LinearIndexRow[] {
+  const rows = new Map<string, LinearIndexRow>();
+
+  for (const row of parseLinearIndexRows(existingContent)) {
+    rows.set(row.file, row);
+  }
+
+  for (const row of requiredRows) {
+    rows.set(row.file, row);
+  }
+
+  return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function parseLinearIndexRows(existingContent: string | undefined): LinearIndexRow[] {
+  if (!existingContent) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<LinearIndexRow>> };
+    return Array.isArray(parsed.rows)
+      ? parsed.rows.filter((row): row is LinearIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeLinearFile(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  path: string,
+  content: string,
+  semantics?: FileSemantics,
+): Promise<void> {
+  await client.writeFile({
+    workspaceId,
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+    ...(semantics ? { semantics } : {}),
+  });
+}
+
+async function readLinearFile(client: RelayFileClientLike, path: string): Promise<string | undefined> {
+  const reader = (client as unknown as Record<string, unknown>).readFile;
+  if (typeof reader !== 'function') {
+    return undefined;
+  }
+
+  try {
+    const value = await reader.call(client, path);
+    return typeof value === 'string'
+      ? value
+      : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
+        ? value.content
+        : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function sortJson(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sortJson);
@@ -871,8 +1387,9 @@ function asLinearReferenceIds(value: unknown): string[] {
     .filter((entry): entry is string => entry !== undefined);
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function mapPriorityLabel(priority: number): string {

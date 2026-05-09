@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "Bucket",
+    "Key"
+  ],
+  "properties": {
+    "Bucket": {
+      "type": "string",
+      "description": "S3 bucket name."
+    },
+    "Key": {
+      "type": "string",
+      "description": "S3 object key."
+    },
+    "ContentType": {
+      "type": "string",
+      "description": "Object content type."
+    },
+    "ContentLength": {
+      "type": "number",
+      "description": "Object content length."
+    },
+    "ETag": {
+      "type": "string",
+      "description": "S3 entity tag."
+    },
+    "Metadata": {
+      "type": "object",
+      "description": "S3 object metadata.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "BodyBase64": {
+      "type": "string",
+      "description": "Base64 encoded object body."
+    },
+    "StorageClass": {
+      "type": "string",
+      "description": "S3 storage class."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

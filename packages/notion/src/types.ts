@@ -348,8 +348,15 @@ export interface NotionNormalizedComment {
   richText: NotionRichText[];
 }
 
+export interface NotionAliasMetadata {
+  scopePath: string;
+  title?: string;
+  id: string;
+}
+
 export interface NotionVfsFile extends BulkWriteFile {
   path: string;
+  aliasMetadata?: NotionAliasMetadata;
   semantics?: FileSemantics;
 }
 

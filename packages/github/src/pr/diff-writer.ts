@@ -2,7 +2,20 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
+import {
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
+  upsertRecordIndexRow,
+  upsertRepoIndexRow,
+} from '../index-emitter.js';
+import {
+  atomicUpsertRecordIndex,
+  atomicUpsertRepoIndex,
+} from '../atomic-index.js';
+import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
 import { parsePullRequest, type PullRequestMetadata } from './parser.js';
 
@@ -71,6 +84,7 @@ export async function ingestPullRequest(
   const trimmedRepo = requireNonEmpty(repo, 'repo');
   const prNumber = requirePositiveInteger(number, 'number');
   const result = createEmptyIngestResult();
+  let metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json');
 
   let parsedPullRequest: PullRequestMetadata | null = null;
   try {
@@ -83,12 +97,19 @@ export async function ingestPullRequest(
   }
 
   if (parsedPullRequest) {
-    await writeTrackedFile(
+    metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title);
+    const metaContent = serializeJson(parsedPullRequest);
+    const metaWritten = await writeTrackedFile(
       vfs,
-      buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title),
-      serializeJson(parsedPullRequest),
+      metaPath,
+      metaContent,
       result,
     );
+    // Skip alias duplicates when meta.json failed to write — pointing aliases
+    // at a missing canonical file would create dangling references.
+    if (metaWritten) {
+      await writePullRequestAliases(vfs, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest.title, metaContent);
+    }
   }
 
   let mappedFiles: PullRequestFileMapping[] = [];
@@ -131,7 +152,57 @@ export async function ingestPullRequest(
     });
   }
 
+  if (parsedPullRequest && !hasPathError(result, metaPath) && result.paths.includes(metaPath)) {
+    // Write indexes after the canonical record write resolves so failed writes
+    // do not leak into the lightweight directory indexes.
+    const updated = parsedPullRequest.updatedAt || parsedPullRequest.createdAt || '';
+    const layoutFile = githubLayoutPromptFile();
+
+    // Atomic CAS upserts — concurrent ingestions for the same repo can read
+    // the same baseline rows otherwise and silently drop one another's
+    // additions on the second write (issue #106 / CodeRabbit follow-up).
+    const pullIndexResult = await atomicUpsertRecordIndex(
+      vfs,
+      githubRepoPullsIndexPath(trimmedOwner, trimmedRepo),
+      (rows) =>
+        upsertRecordIndexRow(rows, {
+          id: String(parsedPullRequest.number),
+          title: parsedPullRequest.title ?? '',
+          updated,
+          number: parsedPullRequest.number,
+          state: parsedPullRequest.state || '',
+        }),
+      (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
+    );
+    const issueIndexResult = await atomicUpsertRecordIndex(
+      vfs,
+      githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo),
+      (rows) => rows,
+      (rows) => buildRepoIssuesIndexFile(trimmedOwner, trimmedRepo, rows).content,
+    );
+    const repoIndexResult = await atomicUpsertRepoIndex(vfs, (rows) =>
+      upsertRepoIndexRow(rows, {
+        id: `${trimmedOwner}/${trimmedRepo}`,
+        title: `${trimmedOwner}/${trimmedRepo}`,
+        updated,
+      }),
+    );
+
+    mergeIntoResult(result, pullIndexResult);
+    mergeIntoResult(result, issueIndexResult);
+    mergeIntoResult(result, repoIndexResult);
+    await writeTrackedFile(vfs, layoutFile.path, layoutFile.content, result);
+  }
+
   return result;
+}
+
+function mergeIntoResult(result: IngestResult, partial: IngestResult): void {
+  result.filesWritten += partial.filesWritten;
+  result.filesUpdated += partial.filesUpdated;
+  result.filesDeleted += partial.filesDeleted;
+  result.paths.push(...partial.paths);
+  result.errors.push(...partial.errors);
 }
 
 function assertSuccessfulResponse(response: ProxyResponse, context: string): void {
@@ -282,7 +353,7 @@ async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise
   await writer.call(vfs, path, content);
 }
 
-function serializeJson(value: PullRequestMetadata): string {
+function serializeJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
@@ -300,12 +371,16 @@ function serializeMappedFile(mappedFile: PullRequestFileMapping): string {
   )}\n`;
 }
 
+function hasPathError(result: IngestResult, path: string): boolean {
+  return result.errors.some((error) => error.path === path);
+}
+
 async function writeTrackedFile(
   vfs: VfsLike,
   path: string,
   content: string,
   result: IngestResult,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const existed = await pathExists(vfs, path);
     await runVfsWrite(vfs, path, content);
@@ -316,10 +391,133 @@ async function writeTrackedFile(
     } else {
       result.filesWritten += 1;
     }
+    return true;
   } catch (error) {
     result.errors.push({
       path,
       error: formatError(error),
     });
+    return false;
   }
+}
+
+interface GitHubIndexRow {
+  file: string;
+  title: string;
+}
+
+async function writePullRequestAliases(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  number: number,
+  title: string,
+  content: string,
+): Promise<void> {
+  // duplicate write — the VFS interface only supports file writes, so aliases store the canonical bytes verbatim.
+  if (!owner || !repo) {
+    return;
+  }
+
+  const scope = `/github/repos/${encodeURIComponent(owner)}__${encodeURIComponent(repo)}/pulls`;
+  await writeGitHubIndex(vfs, scope);
+  await runVfsWrite(vfs, githubByIdAliasPath(owner, repo, 'pulls', number), content);
+
+  if (!title.trim()) {
+    return;
+  }
+
+  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'pulls', title, number);
+  const aliasPath = await resolveAliasPath(
+    vfs,
+    baseAliasPath,
+    githubByTitleAliasPath(owner, repo, 'pulls', title, number, true),
+    content,
+  );
+  // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.
+  await runVfsWrite(vfs, aliasPath, content);
+}
+
+async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
+  const indexPath = `${scope}/_index.json`;
+  const rows = mergeGitHubIndexRows(await readVfsContent(vfs, indexPath), [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ]);
+  await runVfsWrite(vfs, indexPath, `${JSON.stringify({ rows }, null, 2)}\n`);
+}
+
+function mergeGitHubIndexRows(existingContent: string | undefined, requiredRows: GitHubIndexRow[]): GitHubIndexRow[] {
+  const rows = new Map<string, GitHubIndexRow>();
+
+  for (const row of parseGitHubIndexRows(existingContent)) {
+    rows.set(row.file, row);
+  }
+
+  for (const row of requiredRows) {
+    rows.set(row.file, row);
+  }
+
+  return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function parseGitHubIndexRows(existingContent: string | undefined): GitHubIndexRow[] {
+  if (!existingContent) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<GitHubIndexRow>> };
+    return Array.isArray(parsed.rows)
+      ? parsed.rows.filter((row): row is GitHubIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function resolveAliasPath(
+  vfs: VfsLike,
+  baseAliasPath: string,
+  collisionAliasPath: string,
+  content: string,
+): Promise<string> {
+  const exists = await pathExists(vfs, baseAliasPath);
+  if (!exists) {
+    return baseAliasPath;
+  }
+
+  const existing = await readVfsContent(vfs, baseAliasPath);
+  return existing === undefined || existing !== content ? collisionAliasPath : baseAliasPath;
+}
+
+async function readVfsContent(vfs: VfsLike, path: string): Promise<string | undefined> {
+  if (typeof vfs.readFile === 'function') {
+    try {
+      const value = await vfs.readFile(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.read === 'function') {
+    try {
+      const value = await vfs.read(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.get === 'function') {
+    try {
+      const value = await vfs.get(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
 }

@@ -361,6 +361,117 @@ export const adapters = [
       endpoint('/zendesk/users/new.json', 'Create Zendesk user', 'Creates a Zendesk user.', ['name'], zendeskUserProps(), { name: 'Ada Lovelace', email: 'ada@example.com' }),
     ],
   },
+  {
+    slug: 'azure-blob',
+    title: 'Azure Blob Storage adapter',
+    overview: 'The Azure Blob Storage adapter exposes blobs and Event Grid subscriptions with file-native writeback discovery.',
+    readPaths: [['/azure/<account>/<container>/<blob>', 'Azure blob content.']],
+    endpoints: [
+      endpoint('/azure-blob/blobs/new.json', 'Create Azure blob', 'Uploads a blob.', ['account', 'container', 'name'], { account: str('Azure account.'), container: str('Container.'), name: str('Blob name.'), contentBase64: str('Base64 content.') }, { account: 'acct', container: 'invoices', name: '2026/may.csv', contentBase64: 'aWQsdG90YWwKMSw0Mg==' }),
+      endpoint('/azure-blob/event-subscriptions/new.json', 'Create Azure Event Grid subscription', 'Creates a storage Event Grid subscription.', ['endpointUrl'], { endpointUrl: str('Webhook endpoint URL.'), includedEventTypes: arr(str('Azure event type.'), 'Included event types.') }, { endpointUrl: 'https://example.com/hooks/azure' }),
+    ],
+  },
+  {
+    slug: 'box',
+    title: 'Box adapter',
+    overview: 'The Box adapter exposes files and webhook subscriptions with file-native writeback discovery.',
+    readPaths: [['/box/<account>/<path>', 'Box file content.']],
+    endpoints: [
+      endpoint('/box/files/new.json', 'Create Box file', 'Uploads a Box file.', ['name'], { name: str('File name.'), parent: obj('Parent folder.'), contentBase64: str('Base64 content.') }, { name: 'Contract.pdf', parent: { id: '0' } }),
+      endpoint('/box/webhooks/new.json', 'Create Box webhook', 'Creates a Box webhook.', ['target', 'triggers', 'address'], { target: obj('Webhook target.'), triggers: arr(str('Trigger.'), 'Triggers.'), address: str('Webhook address.') }, { target: { id: '12345', type: 'folder' }, triggers: ['FILE.UPLOADED'], address: 'https://example.com/hooks/box' }),
+    ],
+  },
+  {
+    slug: 'dropbox',
+    title: 'Dropbox adapter',
+    overview: 'The Dropbox adapter exposes file entries and list_folder cursors with file-native writeback discovery.',
+    readPaths: [['/dropbox/<account>/<path>', 'Dropbox file content.']],
+    endpoints: [
+      endpoint('/dropbox/files/new.json', 'Create Dropbox file', 'Uploads a Dropbox file.', ['path_display'], { path_display: str('Dropbox display path.'), contentBase64: str('Base64 content.'), mode: str('Upload mode.') }, { path_display: '/Team/Notes.md' }),
+      endpoint('/dropbox/cursors/new.json', 'Create Dropbox cursor', 'Stores a list_folder cursor.', ['cursor'], { cursor: str('Dropbox cursor.'), accountId: str('Account id.') }, { cursor: 'cursor-2' }),
+    ],
+  },
+  {
+    slug: 'gcs',
+    title: 'Google Cloud Storage adapter',
+    overview: 'The GCS adapter exposes objects and Pub/Sub notification configs with file-native writeback discovery.',
+    readPaths: [['/gcs/<bucket>/<object>', 'GCS object content.']],
+    endpoints: [
+      endpoint('/gcs/objects/new.json', 'Create GCS object', 'Uploads a GCS object.', ['bucket', 'name'], { bucket: str('Bucket.'), name: str('Object name.'), contentBase64: str('Base64 content.') }, { bucket: 'rf-archive', name: 'reports/q2.json' }),
+      endpoint('/gcs/notifications/new.json', 'Create GCS notification', 'Creates a bucket notification.', ['bucket', 'topic'], { bucket: str('Bucket.'), topic: str('Pub/Sub topic.') }, { bucket: 'rf-archive', topic: 'projects/example/topics/gcs' }),
+    ],
+  },
+  {
+    slug: 'gmail',
+    title: 'Gmail adapter',
+    overview: 'The Gmail adapter exposes threads, drafts, and watches with file-native writeback discovery.',
+    readPaths: [['/gmail/<account>/threads/<threadId>.json', 'Gmail thread records.']],
+    endpoints: [
+      endpoint('/gmail/threads/new.json', 'Create Gmail thread marker', 'Creates or updates a Gmail thread record.', ['id'], { id: str('Thread id.'), labelIds: arr(str('Label id.'), 'Labels.') }, { id: 'thread-1' }),
+      endpoint('/gmail/drafts/new.json', 'Create Gmail draft', 'Creates a Gmail draft.', ['message'], { message: obj('Draft message.') }, { message: { raw: 'RnJvbTogbWVAZXhhbXBsZS5jb20K' } }),
+      endpoint('/gmail/watches/new.json', 'Create Gmail watch', 'Starts a Gmail watch.', ['topicName'], { topicName: str('Pub/Sub topic.'), labelIds: arr(str('Label id.'), 'Labels.') }, { topicName: 'projects/example/topics/gmail' }),
+    ],
+  },
+  {
+    slug: 'google-drive',
+    title: 'Google Drive adapter',
+    overview: 'The Google Drive adapter exposes files and watch channels with file-native writeback discovery.',
+    readPaths: [['/google-drive/<account>/<path>', 'Drive file content.']],
+    endpoints: [
+      endpoint('/google-drive/files/new.json', 'Create Google Drive file', 'Creates a Drive file.', ['name'], { name: str('File name.'), mimeType: str('MIME type.'), parents: arr(str('Parent id.'), 'Parents.') }, { name: 'Roadmap.pdf', mimeType: 'application/pdf' }),
+      endpoint('/google-drive/channels/new.json', 'Create Google Drive watch channel', 'Creates a Drive watch channel.', ['resourceId', 'address'], { resourceId: str('Resource id.'), address: str('Webhook address.'), type: str('Channel type.') }, { resourceId: 'file_123', address: 'https://example.com/hooks/drive' }),
+    ],
+  },
+  {
+    slug: 'onedrive',
+    title: 'OneDrive adapter',
+    overview: 'The OneDrive adapter exposes drive items and Graph subscriptions with file-native writeback discovery.',
+    readPaths: [['/onedrive/<account>/<path>', 'OneDrive file content.']],
+    endpoints: [
+      endpoint('/onedrive/items/new.json', 'Create OneDrive item', 'Creates or updates a drive item.', ['name'], { name: str('Item name.'), contentBase64: str('Base64 content.') }, { name: 'Budget.xlsx' }),
+      endpoint('/onedrive/subscriptions/new.json', 'Create OneDrive subscription', 'Creates a Graph subscription.', ['resource', 'changeType', 'notificationUrl', 'expirationDateTime'], { resource: str('Graph resource.'), changeType: str('Graph change type.'), notificationUrl: str('Notification URL.'), expirationDateTime: str('Expiration.') }, { resource: 'me/drive/root', changeType: 'updated', notificationUrl: 'https://example.com/hooks/graph', expirationDateTime: '2026-05-10T00:00:00.000Z' }),
+    ],
+  },
+  {
+    slug: 'postgres',
+    title: 'Postgres adapter',
+    overview: 'The Postgres adapter exposes rows and LISTEN channels with file-native writeback discovery.',
+    readPaths: [['/postgres/<db>/<schema>/<table>/<pk>.json', 'Postgres row records.']],
+    endpoints: [
+      endpoint('/postgres/rows/new.json', 'Create Postgres row', 'Creates a row.', ['_op', 'primaryKey', 'row'], { _op: str('Operation.'), primaryKey: str('Primary key column.'), row: obj('Row values.') }, { _op: 'insert', primaryKey: 'id', row: { title: 'Bridge plan' } }),
+      endpoint('/postgres/listeners/new.json', 'Create Postgres listener', 'Registers a LISTEN channel.', ['channel'], { channel: str('LISTEN channel.'), table: str('Table.') }, { channel: 'relayfile_storage_events' }),
+    ],
+  },
+  {
+    slug: 'redis',
+    title: 'Redis adapter',
+    overview: 'The Redis adapter exposes keys and keyspace listeners with file-native writeback discovery.',
+    readPaths: [['/redis/<db>/<key>.json', 'Redis key records.']],
+    endpoints: [
+      endpoint('/redis/keys/new.json', 'Create Redis key', 'Writes a Redis key.', ['key', 'type', 'value'], { key: str('Redis key.'), type: str('Value type.'), value: obj('Value.') }, { key: 'session:43', type: 'hash', value: { userId: 'u2' } }),
+      endpoint('/redis/listeners/new.json', 'Create Redis listener', 'Registers a keyspace listener.', ['db'], { db: int('Redis database.'), pattern: str('Pattern.') }, { db: 0, pattern: '__keyspace@0__:*' }),
+    ],
+  },
+  {
+    slug: 's3',
+    title: 'Amazon S3 adapter',
+    overview: 'The S3 adapter exposes objects and SQS notification queues with file-native writeback discovery.',
+    readPaths: [['/s3/<bucket>/<key>', 'S3 object content.']],
+    endpoints: [
+      endpoint('/s3/objects/new.json', 'Create S3 object', 'Uploads an S3 object.', ['Bucket', 'Key'], { Bucket: str('Bucket.'), Key: str('Object key.'), BodyBase64: str('Base64 body.') }, { Bucket: 'rf-bucket', Key: 'logs/app.log' }),
+      endpoint('/s3/queues/new.json', 'Create S3 queue notification', 'Creates an S3 queue notification config.', ['QueueUrl'], { QueueUrl: str('SQS Queue URL.'), Bucket: str('Bucket.') }, { QueueUrl: 'https://sqs.us-east-1.amazonaws.com/123/queue', Bucket: 'rf-bucket' }),
+    ],
+  },
+  {
+    slug: 'sharepoint',
+    title: 'SharePoint adapter',
+    overview: 'The SharePoint adapter exposes drive items and Graph subscriptions with file-native writeback discovery.',
+    readPaths: [['/sharepoint/<siteId>/<driveId>/<path>', 'SharePoint file content.']],
+    endpoints: [
+      endpoint('/sharepoint/items/new.json', 'Create SharePoint item', 'Creates or updates a drive item.', ['name'], { name: str('Item name.'), contentBase64: str('Base64 content.') }, { name: 'Plan.docx' }),
+      endpoint('/sharepoint/subscriptions/new.json', 'Create SharePoint subscription', 'Creates a Graph subscription.', ['resource', 'changeType', 'notificationUrl', 'expirationDateTime'], { resource: str('Graph resource.'), changeType: str('Graph change type.'), notificationUrl: str('Notification URL.'), expirationDateTime: str('Expiration.') }, { resource: 'sites/site-a/drives/drive-a/root', changeType: 'updated', notificationUrl: 'https://example.com/hooks/graph', expirationDateTime: '2026-05-10T00:00:00.000Z' }),
+    ],
+  },
 ];
 
 function endpoint(path, title, description, required, properties, example, schemaExtra = {}) {

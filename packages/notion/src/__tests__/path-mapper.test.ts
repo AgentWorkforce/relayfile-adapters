@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import {
   computePath,
   normalizeNangoNotionModel,
+  notionByIdAliasPath,
+  notionByTitleAliasPath,
   notionDatabaseBlockPath,
   notionDatabaseMetadataPath,
   notionDatabasePageCommentsPath,
   notionDatabasePageContentPath,
   notionDatabasePagePath,
+  notionStandalonePagesCollectionPath,
   notionStandalonePageCommentsPath,
   notionStandalonePageContentPath,
   notionStandalonePagePath,
@@ -31,6 +34,18 @@ describe('path mapping', () => {
     assert.strictEqual(notionStandalonePagePath('page-1'), '/notion/pages/page-1.json');
     assert.strictEqual(notionStandalonePageContentPath('page-1'), '/notion/pages/page-1/content.md');
     assert.strictEqual(notionStandalonePageCommentsPath('page-1'), '/notion/pages/page-1/comments.json');
+  });
+
+  it('maps standalone alias paths', () => {
+    assert.strictEqual(notionStandalonePagesCollectionPath(), '/notion/pages');
+    assert.strictEqual(
+      notionByTitleAliasPath('/notion/pages', 'Cafe roadmap', 'page-1'),
+      '/notion/pages/by-title/cafe-roadmap.json',
+    );
+    assert.strictEqual(
+      notionByIdAliasPath('/notion/pages', '11111111-1111-1111-1111-111111111111'),
+      '/notion/pages/by-id/11111111111111111111111111111111.json',
+    );
   });
 
   describe('normalizeNangoNotionModel', () => {

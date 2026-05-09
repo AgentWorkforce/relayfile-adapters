@@ -18,6 +18,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "tests/storage-bridge/**/*.test.ts",
     "tests/runtime/**/*.test.ts",
     "tests/spec/**/*.test.ts"
   ],

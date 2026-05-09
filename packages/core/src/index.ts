@@ -19,3 +19,4 @@ export * from "./docs/generator.js";
 export * from "./docs/mapping-generator.js";
 export * from "./docs/change-detector.js";
 export * from "./docs/updater.js";
+export * from "./storage-bridge/index.js";

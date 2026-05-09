@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-pipedrive",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Pipedrive adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "directory": "packages/pipedrive"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.1.19"
+    "@relayfile/adapter-core": "^0.2.0"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

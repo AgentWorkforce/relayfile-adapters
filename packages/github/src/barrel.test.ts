@@ -7,9 +7,13 @@ import assert from 'node:assert/strict';
 // future change that quietly drops them from the barrel again.
 import * as barrel from './index.js';
 import {
+  buildRepoIndexFile,
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
   getPull,
   getPullDiff,
   getRepository,
+  githubLayoutPromptFile,
   listIssues,
   listOrgs,
   listPullRequests,
@@ -23,11 +27,15 @@ describe('package barrel', () => {
       'getPull',
       'getPullDiff',
       'getRepository',
+      'githubLayoutPromptFile',
       'listIssues',
       'listOrgs',
       'listPullRequests',
       'searchIssues',
       'searchRepos',
+      'buildRepoIndexFile',
+      'buildRepoIssuesIndexFile',
+      'buildRepoPullsIndexFile',
     ] as const;
 
     for (const name of expected) {
@@ -37,6 +45,11 @@ describe('package barrel', () => {
         `expected ${name} to be re-exported from the package barrel`,
       );
     }
+  });
+
+  it('exports materializeRepo without leaking syncGitHubWorkspace', () => {
+    assert.strictEqual(typeof (barrel as Record<string, unknown>).materializeRepo, 'function');
+    assert.strictEqual('syncGitHubWorkspace' in barrel, false);
   });
 
   it('barrel-imported builders return well-formed GitHubOperation values', () => {
@@ -55,5 +68,16 @@ describe('package barrel', () => {
       assert.ok(op.method, 'operation.method is set');
       assert.ok(typeof op.path === 'string' && op.path.length > 0, 'operation.path is set');
     }
+
+    assert.equal(githubLayoutPromptFile().path, '/github/LAYOUT.md');
+    assert.equal(buildRepoIndexFile([]).path, '/github/repos/_index.json');
+    assert.equal(
+      buildRepoIssuesIndexFile(ref.owner, ref.repo, []).path,
+      '/github/repos/AgentWorkforce/cloud/issues/_index.json',
+    );
+    assert.equal(
+      buildRepoPullsIndexFile(ref.owner, ref.repo, []).path,
+      '/github/repos/AgentWorkforce/cloud/pulls/_index.json',
+    );
   });
 });

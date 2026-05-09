@@ -7,6 +7,8 @@ import {
   type WritebackStatusCode,
 } from "./writeback-status.js";
 
+export type AdapterResourceOperation = "create" | "update" | "delete";
+
 export interface AdapterResourceConfig {
   readonly name: string;
   readonly path: string;
@@ -14,6 +16,7 @@ export interface AdapterResourceConfig {
   readonly idPattern: RegExp;
   readonly schema: string;
   readonly createExample: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
 
 export type FileNativeWritebackKind = "patch" | "create" | "delete";

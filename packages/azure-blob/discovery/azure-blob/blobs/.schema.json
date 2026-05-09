@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "account",
+    "container",
+    "name"
+  ],
+  "properties": {
+    "account": {
+      "type": "string",
+      "description": "Azure Storage account name."
+    },
+    "container": {
+      "type": "string",
+      "description": "Blob container name."
+    },
+    "name": {
+      "type": "string",
+      "description": "Blob name."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Blob content type."
+    },
+    "contentLength": {
+      "type": "number",
+      "description": "Blob content length."
+    },
+    "eTag": {
+      "type": "string",
+      "description": "Blob entity tag."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Blob metadata.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded blob content."
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

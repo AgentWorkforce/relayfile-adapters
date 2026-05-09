@@ -160,6 +160,7 @@ export interface GitHubAdapterConfig {
   baseUrl: string;
   defaultBranch: string;
   fetchFileContents: boolean;
+  lazy?: boolean;
   maxFileSizeBytes: number;
   supportedEvents: string[];
   owner?: string;
@@ -195,6 +196,11 @@ export interface IngestResult {
   filesDeleted: number;
   paths: string[];
   errors: IngestError[];
+}
+
+export interface MaterializeResult extends IngestResult {
+  owner: string;
+  repo: string;
 }
 
 export interface SyncOptions {

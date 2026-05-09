@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "channel"
+  ],
+  "properties": {
+    "channel": {
+      "type": "string",
+      "description": "Postgres LISTEN channel."
+    },
+    "schema": {
+      "type": "string",
+      "description": "Watched schema."
+    },
+    "table": {
+      "type": "string",
+      "description": "Watched table."
+    },
+    "primaryKey": {
+      "type": "string",
+      "description": "Primary key column emitted by trigger."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

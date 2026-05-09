@@ -77,10 +77,10 @@ export function resolveDeleteRequest(path: string): LinearWritebackRequest {
 function extractLinearId(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  const slugged32 = /--([0-9a-f]{32})$/i.exec(decoded);
+  const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32?.[1]) return formatUuid(slugged32[1]);
 
-  if (/--[0-9a-f]{8}$/i.test(decoded)) {
+  if (/(?:--|__)[0-9a-f]{8}$/i.test(decoded)) {
     throw new Error(
       `Linear path "${segment}" uses a legacy 8-char id suffix that cannot be ` +
         `losslessly resolved. Run \`relayfile pull\` to re-sync paths.`,

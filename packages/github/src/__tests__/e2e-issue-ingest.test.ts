@@ -133,7 +133,7 @@ test('GitHubAdapter ingests an issue and its comments into the VFS', async () =>
     result.paths.includes(metaPath),
     true,
   );
-  assert.equal(result.paths.every((path) => path.includes('/issues/10--track-adapter-issue-ingestion-coverage')), true);
+  assert.equal(result.paths.every((path) => path.includes('/issues/10__track-adapter-issue-ingestion-coverage')), true);
   assert.equal(result.paths.some((path) => path.includes('/pulls/10/')), false);
   assert.equal(provider.requests.some((request) => request.endpoint.includes('/pulls/10')), false);
 });
@@ -404,14 +404,18 @@ function readJsonFile(vfs: MemoryVfs, path: string): JsonObject {
   return expectObject(JSON.parse(raw), `VFS JSON file ${path}`);
 }
 
+function issueSlugSuffix(title?: string): string {
+  if (!title) return '';
+  const normalized = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return normalized ? `__${normalized}` : '';
+}
+
 function issueMetaPath(owner: string, repo: string, number: number, title?: string): string {
-  const slug = title ? `--${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
-  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/meta.json`;
+  return `/github/repos/${owner}/${repo}/issues/${number}${issueSlugSuffix(title)}/meta.json`;
 }
 
 function issueCommentsPath(owner: string, repo: string, number: number, title?: string): string {
-  const slug = title ? `--${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}` : '';
-  return `/github/repos/${owner}/${repo}/issues/${number}${slug}/comments/`;
+  return `/github/repos/${owner}/${repo}/issues/${number}${issueSlugSuffix(title)}/comments/`;
 }
 
 function absoluteIssuePath(owner: string, repo: string, relativePath: string): string {

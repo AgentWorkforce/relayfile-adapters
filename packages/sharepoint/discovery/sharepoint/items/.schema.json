@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "description": "SharePoint drive item name."
+    },
+    "eTag": {
+      "type": "string",
+      "description": "Graph entity tag."
+    },
+    "cTag": {
+      "type": "string",
+      "description": "Graph content tag."
+    },
+    "size": {
+      "type": "number",
+      "description": "Item size in bytes."
+    },
+    "lastModifiedDateTime": {
+      "type": "string",
+      "description": "Last modified timestamp."
+    },
+    "parentReference": {
+      "type": "object",
+      "description": "Graph parent drive reference.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "file": {
+      "type": "object",
+      "description": "Graph file facet.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {
+        "mimeType": {
+          "type": "string",
+          "description": "File MIME type."
+        }
+      }
+    },
+    "folder": {
+      "type": "object",
+      "description": "Graph folder facet.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "webUrl": {
+      "type": "string",
+      "description": "Graph web URL."
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded item content."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Upload content type."
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

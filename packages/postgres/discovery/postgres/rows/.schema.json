@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "_op",
+    "primaryKey",
+    "row"
+  ],
+  "properties": {
+    "_op": {
+      "enum": [
+        "insert",
+        "update",
+        "delete"
+      ],
+      "description": "Requested row write operation."
+    },
+    "primaryKey": {
+      "type": "string",
+      "description": "Primary key column name."
+    },
+    "primaryKeyValue": {
+      "type": "string",
+      "description": "Primary key value for updates and deletes."
+    },
+    "row": {
+      "type": "object",
+      "description": "Database row values keyed by column name.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "db": {
+      "type": "string",
+      "description": "Database name."
+    },
+    "schema": {
+      "type": "string",
+      "description": "Postgres schema name."
+    },
+    "table": {
+      "type": "string",
+      "description": "Postgres table name."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}
