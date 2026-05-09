@@ -53,14 +53,13 @@ function readPackage(dir) {
 function dependencyNames(pkg) {
   return [
     'dependencies',
-    'devDependencies',
     'peerDependencies',
     'optionalDependencies',
   ].flatMap((section) => Object.keys(pkg[section] ?? {}));
 }
 
 function sortByInternalDependencies(packageDirs) {
-  const selected = [...new Set(packageDirs)].sort();
+  let selected = [...new Set(packageDirs)].sort();
   const selectedSet = new Set(selected);
   const nameToDir = new Map();
   const packages = new Map();
@@ -72,6 +71,21 @@ function sortByInternalDependencies(packageDirs) {
       nameToDir.set(pkg.name, dir);
     }
   }
+
+  const queue = [...selected];
+  while (queue.length > 0) {
+    const dir = queue.shift();
+    const pkg = packages.get(dir) ?? readPackage(dir);
+
+    for (const name of dependencyNames(pkg)) {
+      const depDir = nameToDir.get(name);
+      if (!depDir || selectedSet.has(depDir)) continue;
+
+      selectedSet.add(depDir);
+      queue.push(depDir);
+    }
+  }
+  selected = [...selectedSet].sort();
 
   const dependenciesByDir = new Map(
     selected.map((dir) => {

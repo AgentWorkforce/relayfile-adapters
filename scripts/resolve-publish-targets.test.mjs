@@ -52,3 +52,16 @@ test('explicit mixed package input is topologically sorted', async () => {
 
   assert.deepEqual(list, ['core', 'github']);
 });
+
+test('group aliases include required internal dependencies', async () => {
+  const list = await resolveTargets('storage');
+
+  assertBefore(list, 'core', 'azure-blob');
+  assertBefore(list, 'core', 'sharepoint');
+});
+
+test('explicit package input includes required internal dependencies', async () => {
+  const list = await resolveTargets('github');
+
+  assert.deepEqual(list, ['core', 'github']);
+});
