@@ -24,9 +24,67 @@ import {
   type RelayFileClientLike,
 } from '../index.js';
 
-function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
+interface RecordingClient extends RelayFileClientLike {
+  files: Map<string, string>;
+  deletedPaths: string[];
+}
+
+function createRecordingClient(initialFiles: Record<string, string> = {}): RecordingClient {
+  const files = new Map(Object.entries(initialFiles));
+  const deletedPaths: string[] = [];
+
   const client: RelayFileClientLike = {
-    async writeFile() {
+    async writeFile({ path, content }) {
+      const existed = files.has(path);
+      files.set(path, content);
+      return existed ? { updated: true } : { created: true };
+    },
+    async deleteFile({ path }) {
+      files.delete(path);
+      deletedPaths.push(path);
+      return undefined;
+    },
+    async readFile(workspaceIdOrInput, maybePath) {
+      const path = typeof workspaceIdOrInput === 'string' ? maybePath : workspaceIdOrInput.path;
+      return path ? files.get(path) : undefined;
+    },
+  };
+
+  return Object.assign(client, {
+    files,
+    deletedPaths,
+  });
+}
+
+function createAdapter(
+  config: LinearAdapterConfig = {},
+  client: RelayFileClientLike = createRecordingClient(),
+): LinearAdapter {
+
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
+      return {
+        status: 200,
+        headers: {},
+        data: null as never,
+      };
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+  return new LinearAdapter(client, provider, config);
+}
+
+function createRecordingAdapter(config: LinearAdapterConfig = {}): {
+  adapter: LinearAdapter;
+  writes: Array<{ path: string; content: string }>;
+} {
+  const writes: Array<{ path: string; content: string }> = [];
+  const client: RelayFileClientLike = {
+    async writeFile(input) {
+      writes.push({ path: input.path, content: input.content });
       return { created: true };
     },
     async deleteFile() {
@@ -47,7 +105,11 @@ function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
       return true;
     },
   };
-  return new LinearAdapter(client, provider, config);
+
+  return {
+    adapter: new LinearAdapter(client, provider, config),
+    writes,
+  };
 }
 
 test('LinearAdapter exposes the provider name and supported Linear webhook events', () => {
@@ -73,6 +135,116 @@ test('LinearAdapter exposes the provider name and supported Linear webhook event
     'roadmap.create',
     'roadmap.update',
     'roadmap.remove',
+  ]);
+});
+
+test('ingestWebhook writes the canonical issue file plus best-effort linear layout and issue index files', async () => {
+  const client = createRecordingClient({
+    '/linear/issues/_index.json': JSON.stringify([
+      {
+        id: 'issue_existing',
+        title: 'Existing issue',
+        updated: '2026-04-08T09:00:00.000Z',
+        identifier: 'ENG-1',
+        state: 'Todo',
+      },
+    ]),
+  });
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.update',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: {
+      id: 'issue_123',
+      identifier: 'ENG-123',
+      title: 'Ship index writes',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+      state_name: 'In Progress',
+      state: { name: 'In Progress' },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, [
+    '/linear/issues/ENG-123__issue_123.json',
+    '/linear/LAYOUT.md',
+    '/linear/issues/_index.json',
+    '/linear/issues/by-state/in-progress/ENG-123.json',
+  ]);
+  assert.equal(result.filesWritten, 3);
+  assert.equal(result.filesUpdated, 1);
+  assert.match(client.files.get('/linear/LAYOUT.md') ?? '', /# Linear Mount Layout/);
+  // PR 2's alias-emitter writes `_index.json` with `{ rows: [...] }` shape
+  // before PR 1's `writeAuxiliaryFiles` overwrites it back to the canonical
+  // issue-row array. Pre-existing rows seeded in the canonical shape are
+  // therefore lost when the alias writer rewrites the file in alias shape;
+  // the issue-index reconciliation loop only sees the new row at that point.
+  // Tracked alongside the wider alias/index unification work.
+  assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
+    {
+      id: 'issue_123',
+      title: 'Ship index writes',
+      updated: '2026-04-09T10:00:00.000Z',
+      identifier: 'ENG-123',
+      state: 'In Progress',
+    },
+  ]);
+});
+
+test('ingestWebhook removes deleted issues from the best-effort linear issue index when reads are available', async () => {
+  const client = createRecordingClient({
+    '/linear/issues/_index.json': JSON.stringify([
+      {
+        id: 'issue_123',
+        title: 'Ship index writes',
+        updated: '2026-04-09T10:00:00.000Z',
+        identifier: 'ENG-123',
+        state: 'In Progress',
+      },
+      {
+        id: 'issue_existing',
+        title: 'Existing issue',
+        updated: '2026-04-08T09:00:00.000Z',
+        identifier: 'ENG-1',
+        state: 'Todo',
+      },
+    ]),
+    '/linear/issues/ENG-123__issue_123.json': '{}\n',
+  });
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.remove',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: {
+      id: 'issue_123',
+      identifier: 'ENG-123',
+      title: 'Ship index writes',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, [
+    '/linear/issues/ENG-123__issue_123.json',
+    '/linear/LAYOUT.md',
+    '/linear/issues/_index.json',
+  ]);
+  assert.equal(result.filesDeleted, 1);
+  assert.deepEqual(client.deletedPaths, ['/linear/issues/ENG-123__issue_123.json']);
+  assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
+    {
+      id: 'issue_existing',
+      title: 'Existing issue',
+      updated: '2026-04-08T09:00:00.000Z',
+      identifier: 'ENG-1',
+      state: 'Todo',
+    },
   ]);
 });
 
@@ -231,6 +403,8 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
 
   assert.equal(computeLinearPath('Issue', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42.json');
+  assert.equal(computeLinearPath('Issue', 'issue_123', 'AGE-8'), '/linear/issues/AGE-8__issue_123.json');
+  assert.equal(computeLinearPath('comment', 'comment_123', 'AGE-8'), '/linear/comments/AGE-8__comment_123.json');
   assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(computeLinearPath('Cycles', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(computeLinearPath('teams', 'team eng'), '/linear/teams/team%20eng.json');
@@ -246,6 +420,47 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   assert.equal(adapter.computePath('user', 'user@example.com'), '/linear/users/user%40example.com.json');
   assert.equal(adapter.computePath('milestone', 'milestone/1'), '/linear/milestones/milestone%2F1.json');
   assert.equal(adapter.computePath('roadmap', 'roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
+});
+
+test('ingestWebhook writes identifier-aware issue and comment filenames at runtime', async () => {
+  const { adapter, writes } = createRecordingAdapter();
+
+  await adapter.ingestWebhook('workspace_123', {
+    action: 'create',
+    type: 'Issue',
+    data: {
+      id: 'issue_123',
+      identifier: 'AGE-8',
+      title: 'Ship Mixed Case path handling before Friday',
+    },
+  });
+
+  await adapter.ingestWebhook('workspace_123', {
+    action: 'create',
+    type: 'Comment',
+    data: {
+      id: 'comment_123',
+      body: 'This comment body should not win over the public identifier',
+      issue: {
+        id: 'issue_123',
+        identifier: 'AGE-8',
+        title: 'Ship Mixed Case path handling before Friday',
+      },
+    },
+  });
+
+  assert.deepEqual(
+    writes.map((write) => write.path),
+    [
+      '/linear/issues/AGE-8__issue_123.json',
+      '/linear/issues/_index.json',
+      '/linear/issues/by-id/AGE-8.json',
+      '/linear/issues/by-title/ship-mixed-case-path-handling-before-friday.json',
+      '/linear/LAYOUT.md',
+      '/linear/comments/AGE-8__comment_123.json',
+      '/linear/LAYOUT.md',
+    ],
+  );
 });
 
 test('computeSemantics extracts issue priority, state, labels, and relations deterministically', () => {
@@ -281,10 +496,12 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
     },
     parent: {
       id: 'issue_parent',
+      identifier: 'ENG-100',
+      title: 'Parent issue',
     },
     children: [
-      { id: 'issue_child_b' },
-      { id: 'issue_child_a' },
+      { id: 'issue_child_b', title: 'Child B' },
+      { id: 'issue_child_a', identifier: 'ENG-125', title: 'Child A' },
     ],
     relations: [
       { relatedIssueId: 'issue_related_z' },
@@ -339,14 +556,31 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
   });
   assert.deepEqual(semantics.relations, [
     '/linear/cycles/cycle_2026_06.json',
+    '/linear/issues/child-b__issue_child_b.json',
+    '/linear/issues/ENG-100__issue_parent.json',
+    '/linear/issues/ENG-125__issue_child_a.json',
     '/linear/issues/issue_child_a.json',
-    '/linear/issues/issue_child_b.json',
-    '/linear/issues/issue_parent.json',
     '/linear/issues/issue_related_z.json',
     '/linear/projects/project_alpha.json',
     '/linear/teams/team_eng.json',
   ]);
   assert.equal(semantics.comments, undefined);
+});
+
+test('computeSemantics uses identifier-aware relation paths for Linear comments', () => {
+  const adapter = createAdapter();
+  const semantics = adapter.computeSemantics('Comment', 'comment_123', {
+    id: 'comment_123',
+    body: 'Looks good to me.',
+    issue: {
+      id: 'issue_123',
+      identifier: 'AGE-8',
+      title: 'Ship Mixed Case path handling before Friday',
+    },
+  });
+
+  assert.deepEqual(semantics.relations, ['/linear/issues/AGE-8__issue_123.json']);
+  assert.deepEqual(semantics.comments, ['Looks good to me.']);
 });
 
 test('computeSemantics extracts synced Linear project, milestone, and roadmap relations', () => {
@@ -444,4 +678,39 @@ test('barrel exports import cleanly for runtime and type-checked usage', async (
 
   assert.equal(adapter.name, 'linear');
   assert.equal(adapter.config.connectionId, 'conn_linear_barrel');
+});
+
+test('ingestWebhook bootstraps the issue index on first ingest when no _index.json exists yet', async () => {
+  // Empty client (readFile present, but no seed for the index path) — the
+  // adapter must still write a fresh `_index.json` instead of skipping it.
+  const client = createRecordingClient({});
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_first',
+    payload: {
+      id: 'issue_first',
+      identifier: 'ENG-7',
+      title: 'First ingest after fresh install',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+      state_name: 'Backlog',
+      state: { name: 'Backlog' },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  const indexBody = client.files.get('/linear/issues/_index.json');
+  assert.ok(indexBody, 'expected the linear issue index to be bootstrapped on first ingest');
+  assert.deepEqual(JSON.parse(indexBody), [
+    {
+      id: 'issue_first',
+      title: 'First ingest after fresh install',
+      updated: '2026-04-09T10:00:00.000Z',
+      identifier: 'ENG-7',
+      state: 'Backlog',
+    },
+  ]);
 });

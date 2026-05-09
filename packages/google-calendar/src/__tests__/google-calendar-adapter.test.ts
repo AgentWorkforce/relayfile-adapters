@@ -6,12 +6,12 @@ import {
   computeGoogleCalendarPath,
   googleCalendarCalendarPath,
   googleCalendarEventPath,
-  googleCalendarWritebackResources,
   ingestGoogleCalendarEvents,
   listGoogleCalendarEventChanges,
   normalizeGoogleCalendarWebhook,
   registerGoogleCalendarWatch,
   renewGoogleCalendarWatch,
+  resources as googleCalendarResources,
   resolveGoogleCalendarWritebackRequest,
   stopGoogleCalendarWatch,
   type ConnectionProvider,
@@ -302,10 +302,11 @@ test('watch helpers register, renew, and stop channels via provider proxy', asyn
 });
 
 test('resource discovery describes Google Calendar event writeback metadata', () => {
-  const [events] = googleCalendarWritebackResources;
+  const [events] = googleCalendarResources;
   assert.equal(events?.name, 'events');
-  assert.equal(events?.schemaPath, 'discovery/events.schema.json');
-  assert.equal(events?.createExamplePath, 'discovery/events.create.example.json');
-  assert.equal(events?.idPattern, '^[a-v0-9]{5,1024}$');
-  assert.deepEqual(events?.operations.map((operation) => operation.method), ['POST', 'PATCH', 'DELETE']);
+  assert.equal(events?.path, '/google-calendar/calendars/{calendarId}/events');
+  assert.equal(events?.schema, 'discovery/google-calendar/calendars/{calendarId}/events/.schema.json');
+  assert.equal(events?.createExample, 'discovery/google-calendar/calendars/{calendarId}/events/.create.example.json');
+  assert.equal(events?.idPattern.source, '^[a-v0-9]{5,1024}$');
+  assert.equal(events?.pathPattern.test('/google-calendar/calendars/primary/events/abcde.json'), true);
 });

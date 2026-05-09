@@ -1,4 +1,11 @@
-import { notionDatabasePageContentPath, notionDatabasePagePath, notionStandalonePageContentPath, notionStandalonePagePath } from '../path-mapper.js';
+import {
+  notionDatabasePageContentPath,
+  notionDatabasePagePath,
+  notionDatabasePagesCollectionPath,
+  notionStandalonePageContentPath,
+  notionStandalonePagePath,
+  notionStandalonePagesCollectionPath,
+} from '../path-mapper.js';
 import { fetchBlockChildrenRecursively, buildBlockFiles } from '../content/blocks.js';
 import { resolvePageMarkdown } from '../content/markdown.js';
 import { buildCommentsFile, listComments } from '../comments/ingestion.js';
@@ -33,6 +40,7 @@ export async function ingestPageArtifacts(
   page: NotionPage,
   context: { databaseId?: string; databaseTitle?: string } = {},
 ): Promise<NotionVfsFile[]> {
+  const explicitTitle = readPageTitle(page);
   const normalized = normalizePage(page);
   const pageId = page.id;
   const path = context.databaseId
@@ -49,6 +57,13 @@ export async function ingestPageArtifacts(
       path,
       contentType: 'application/json; charset=utf-8',
       content: `${JSON.stringify(normalized, null, 2)}\n`,
+      aliasMetadata: {
+        scopePath: context.databaseId
+          ? notionDatabasePagesCollectionPath(context.databaseId, context.databaseTitle)
+          : notionStandalonePagesCollectionPath(),
+        title: explicitTitle,
+        id: pageId,
+      },
       semantics: buildPageSemantics(page, context.databaseId),
     },
     {
@@ -82,12 +97,17 @@ export async function ingestPageArtifacts(
 }
 
 export function findPageTitle(page: NotionPage): string {
+  return readPageTitle(page) ?? page.id;
+}
+
+function readPageTitle(page: NotionPage): string | undefined {
   for (const property of Object.values(page.properties)) {
     if (property.type === 'title') {
-      return richTextToPlainText(property.title);
+      const title = richTextToPlainText(property.title).trim();
+      return title || undefined;
     }
   }
-  return page.id;
+  return undefined;
 }
 
 function buildPageSemantics(page: NotionPage, databaseId?: string): FileSemantics {

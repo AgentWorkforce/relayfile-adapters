@@ -1,0 +1,4 @@
+{
+  "bucket": "rf-archive",
+  "topic": "projects/example/topics/gcs"
+}

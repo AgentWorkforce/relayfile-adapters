@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Drive file name."
+    },
+    "mimeType": {
+      "type": "string",
+      "description": "Drive MIME type."
+    },
+    "parents": {
+      "type": "array",
+      "description": "Drive parent folder ids.",
+      "items": {
+        "type": "string",
+        "description": "Parent folder id."
+      }
+    },
+    "description": {
+      "type": "string",
+      "description": "Drive file description."
+    },
+    "properties": {
+      "type": "object",
+      "description": "Public custom properties.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "appProperties": {
+      "type": "object",
+      "description": "Private app properties.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "starred": {
+      "type": "boolean",
+      "description": "Whether the file is starred."
+    },
+    "trashed": {
+      "type": "boolean",
+      "description": "Whether the file is trashed."
+    },
+    "webViewLink": {
+      "type": "string",
+      "description": "Drive web view URL."
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded file content."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Upload content type."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional Drive metadata.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

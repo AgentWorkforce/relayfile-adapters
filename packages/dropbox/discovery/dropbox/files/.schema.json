@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "path_display"
+  ],
+  "properties": {
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "name": {
+      "type": "string",
+      "description": "File name."
+    },
+    "path_lower": {
+      "type": "string",
+      "description": "Lowercase Dropbox path."
+    },
+    "path_display": {
+      "type": "string",
+      "description": "Display Dropbox path."
+    },
+    "client_modified": {
+      "type": "string",
+      "description": "Client modified timestamp."
+    },
+    "server_modified": {
+      "type": "string",
+      "description": "Server modified timestamp."
+    },
+    "rev": {
+      "type": "string",
+      "description": "Dropbox revision."
+    },
+    "size": {
+      "type": "number",
+      "description": "File size in bytes."
+    },
+    "is_downloadable": {
+      "type": "boolean",
+      "description": "Whether file can be downloaded."
+    },
+    "content_hash": {
+      "type": "string",
+      "description": "Dropbox content hash."
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded file content."
+    },
+    "mode": {
+      "enum": [
+        "add",
+        "overwrite",
+        "update"
+      ],
+      "description": "Dropbox upload mode."
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

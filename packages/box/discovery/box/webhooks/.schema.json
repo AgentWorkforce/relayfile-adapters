@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "target",
+    "triggers",
+    "address"
+  ],
+  "properties": {
+    "target": {
+      "type": "object",
+      "description": "Box webhook target.",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Target id."
+        },
+        "type": {
+          "enum": [
+            "file",
+            "folder"
+          ],
+          "description": "Target type."
+        }
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Box webhook triggers.",
+      "items": {
+        "enum": [
+          "FILE.UPLOADED",
+          "FILE.PREVIEWED",
+          "FILE.DOWNLOADED",
+          "FILE.TRASHED",
+          "FILE.DELETED",
+          "FILE.RESTORED",
+          "FILE.COPIED",
+          "FILE.MOVED",
+          "FILE.LOCKED",
+          "FILE.UNLOCKED",
+          "FILE.RENAMED",
+          "COMMENT.CREATED",
+          "COMMENT.UPDATED",
+          "COMMENT.DELETED",
+          "TASK_ASSIGNMENT.CREATED",
+          "TASK_ASSIGNMENT.UPDATED"
+        ],
+        "description": "Box webhook trigger."
+      }
+    },
+    "address": {
+      "type": "string",
+      "description": "Webhook notification URL."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

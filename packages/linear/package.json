@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-linear",
-  "version": "0.1.21",
+  "version": "0.2.0",
   "description": "Linear adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -28,7 +28,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "discovery"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

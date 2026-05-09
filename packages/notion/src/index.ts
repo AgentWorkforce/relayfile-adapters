@@ -9,6 +9,8 @@ export * from './content/renderer.js';
 export * from './databases/ingestion.js';
 export * from './databases/query.js';
 export * from './discovery/index.js';
+export * from './index-emitter.js';
+export * from './layout-prompt.js';
 export * from './pages/ingestion.js';
 export * from './pages/properties.js';
 export * from './path-mapper.js';
@@ -34,3 +36,5 @@ export type {
   NotionSearchOptions,
 } from './queries.js';
 export * from './writeback.js';
+
+export * from './resources.js';

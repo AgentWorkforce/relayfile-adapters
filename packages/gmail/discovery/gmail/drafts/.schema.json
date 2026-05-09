@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "message"
+  ],
+  "properties": {
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "message": {
+      "type": "object",
+      "description": "Draft message payload.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {
+        "raw": {
+          "type": "string",
+          "description": "RFC 2822 message encoded as base64url."
+        },
+        "payload": {
+          "type": "object",
+          "description": "Structured Gmail message payload.",
+          "additionalProperties": true,
+          "required": [],
+          "properties": {}
+        },
+        "threadId": {
+          "type": "string",
+          "description": "Thread id for reply drafts."
+        },
+        "labelIds": {
+          "type": "array",
+          "description": "Draft label ids.",
+          "items": {
+            "type": "string",
+            "description": "Gmail label id."
+          }
+        }
+      }
+    },
+    "threadId": {
+      "type": "string",
+      "description": "Thread id."
+    },
+    "labelIds": {
+      "type": "array",
+      "description": "Draft label ids.",
+      "items": {
+        "type": "string",
+        "description": "Gmail label id."
+      }
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

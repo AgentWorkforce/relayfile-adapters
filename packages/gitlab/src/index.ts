@@ -86,3 +86,5 @@ export type {
   WritebackResult,
 } from './types.js';
 export type { GitLabResourceType, ParsedGitLabPath } from './path-mapper.js';
+
+export * from './resources.js';

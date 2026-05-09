@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Box file name."
+    },
+    "parent": {
+      "type": "object",
+      "description": "Parent folder reference.",
+      "additionalProperties": true,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Parent folder id."
+        },
+        "type": {
+          "enum": [
+            "folder"
+          ],
+          "description": "Parent object type."
+        }
+      }
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "type": {
+      "enum": [
+        "file"
+      ],
+      "description": "Box object type."
+    },
+    "etag": {
+      "type": "string",
+      "description": "Box entity tag."
+    },
+    "size": {
+      "type": "number",
+      "description": "File size in bytes."
+    },
+    "sha1": {
+      "type": "string",
+      "description": "File SHA1 fingerprint."
+    },
+    "path_collection": {
+      "type": "object",
+      "description": "Box path collection.",
+      "additionalProperties": true,
+      "required": [],
+      "properties": {}
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 encoded file content."
+    },
+    "contentType": {
+      "type": "string",
+      "description": "Upload content type."
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

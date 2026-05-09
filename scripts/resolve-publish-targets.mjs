@@ -1,0 +1,119 @@
+#!/usr/bin/env node
+// Resolve the `package` workflow_dispatch input into a space-separated list
+// of packages/ directory names to publish. Writes `packages=...` to stdout
+// for capture into $GITHUB_OUTPUT.
+//
+// Accepts:
+//   all                         every non-private workspace package
+//   missing                     only packages whose current version is not on npm
+//   <group>                     a predefined group alias (see GROUPS below)
+//   <name>[,<name>...]          one or more package dir names (comma or whitespace separated)
+//
+// Tokens may be combined; a token may itself be a group alias, so
+// "crm,messaging,slack" expands and de-duplicates correctly.
+
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, '..');
+const pkgsDir = join(repoRoot, 'packages');
+
+const GROUPS = {
+  storage: ['azure-blob', 'box', 'dropbox', 'gcs', 'google-drive', 'onedrive', 's3', 'sharepoint'],
+  messaging: ['gmail', 'slack', 'teams'],
+  devtools: ['github', 'gitlab'],
+  crm: ['hubspot', 'salesforce', 'pipedrive'],
+  pm: ['asana', 'clickup', 'jira', 'linear', 'notion'],
+  support: ['intercom', 'zendesk'],
+  analytics: ['mixpanel', 'segment'],
+  email: ['mailgun', 'sendgrid'],
+  commerce: ['shopify', 'stripe'],
+  db: ['postgres', 'redis'],
+};
+
+function listPublishablePackages() {
+  return readdirSync(pkgsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .filter((d) => existsSync(join(pkgsDir, d.name, 'package.json')))
+    .filter((d) => {
+      const pkg = JSON.parse(readFileSync(join(pkgsDir, d.name, 'package.json'), 'utf8'));
+      return !pkg.private;
+    })
+    .map((d) => d.name)
+    .sort();
+}
+
+async function versionOnNpm(name, version) {
+  const url = `https://registry.npmjs.org/${name.replace('/', '%2F')}/${version}`;
+  const res = await fetch(url);
+  if (res.status === 200) return true;
+  if (res.status === 404) return false;
+  throw new Error(`Unexpected status ${res.status} for ${name}@${version}`);
+}
+
+async function resolveMissing() {
+  const all = listPublishablePackages();
+  const out = [];
+  for (const dir of all) {
+    const pkg = JSON.parse(readFileSync(join(pkgsDir, dir, 'package.json'), 'utf8'));
+    const exists = await versionOnNpm(pkg.name, pkg.version);
+    if (!exists) out.push(dir);
+  }
+  return out;
+}
+
+async function main() {
+  const input = (process.argv[2] || '').trim();
+  if (!input) {
+    console.error('error: empty package input');
+    process.exit(2);
+  }
+
+  const all = listPublishablePackages();
+  const validNames = new Set(all);
+  const tokens = input.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean);
+
+  const out = new Set();
+  const errors = [];
+
+  for (const token of tokens) {
+    if (token === 'all') {
+      all.forEach((p) => out.add(p));
+    } else if (token === 'missing') {
+      const missing = await resolveMissing();
+      missing.forEach((p) => out.add(p));
+    } else if (GROUPS[token]) {
+      GROUPS[token].forEach((p) => {
+        if (!validNames.has(p)) {
+          errors.push(`group "${token}" references unknown package "${p}"`);
+          return;
+        }
+        out.add(p);
+      });
+    } else if (validNames.has(token)) {
+      out.add(token);
+    } else {
+      errors.push(`unknown package or group: "${token}"`);
+    }
+  }
+
+  if (errors.length) {
+    for (const e of errors) console.error(`error: ${e}`);
+    console.error(`valid packages: ${all.join(', ')}`);
+    console.error(`valid groups: ${Object.keys(GROUPS).join(', ')}, all, missing`);
+    process.exit(1);
+  }
+
+  if (out.size === 0) {
+    console.error('error: no packages resolved');
+    process.exit(1);
+  }
+
+  const list = [...out].sort();
+  console.error(`Resolved ${list.length} package(s): ${list.join(' ')}`);
+  process.stdout.write(`packages=${list.join(' ')}\n`);
+}
+
+await main();

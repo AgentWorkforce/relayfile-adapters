@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "resourceId",
+    "address"
+  ],
+  "properties": {
+    "resourceId": {
+      "type": "string",
+      "description": "Drive resource id to watch."
+    },
+    "address": {
+      "type": "string",
+      "description": "Webhook notification URL."
+    },
+    "expiration": {
+      "type": "string",
+      "description": "Channel expiration timestamp."
+    },
+    "token": {
+      "type": "string",
+      "description": "Opaque channel token."
+    },
+    "type": {
+      "enum": [
+        "web_hook"
+      ],
+      "description": "Drive channel delivery type."
+    },
+    "payload": {
+      "type": "boolean",
+      "description": "Whether Drive sends payloads."
+    },
+    "resourceUri": {
+      "type": "string",
+      "description": "Drive resource URI."
+    },
+    "callbackUrl": {
+      "type": "string",
+      "description": "Deprecated alias for address."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

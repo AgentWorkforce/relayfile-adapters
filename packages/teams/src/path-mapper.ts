@@ -134,6 +134,15 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   const normalized = path.replace(/\/+$/, '');
 
   let match =
+    normalized.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/new\.json$/);
+  if (match) {
+    return {
+      objectType: 'reply',
+      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: 'new' },
+    };
+  }
+
+  match =
     normalized.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/);
   if (match) {
     return {
@@ -154,6 +163,14 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
         reactionType: match[4],
         userId: match[5],
       },
+    };
+  }
+
+  match = normalized.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/new\.json$/);
+  if (match) {
+    return {
+      objectType: 'message',
+      parts: { teamId: match[1], channelId: match[2], messageId: 'new' },
     };
   }
 
@@ -186,6 +203,14 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
     return {
       objectType: 'member',
       parts: { teamId: match[1], userId: match[2] },
+    };
+  }
+
+  match = normalized.match(/^\/teams\/chats\/([^/]+)\/messages\/new\.json$/);
+  if (match) {
+    return {
+      objectType: 'chat_message',
+      parts: { chatId: match[1], messageId: 'new' },
     };
   }
 

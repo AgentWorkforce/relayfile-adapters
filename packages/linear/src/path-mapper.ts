@@ -1,4 +1,8 @@
+import { createHash } from 'node:crypto';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+
 export const LINEAR_PATH_ROOT = '/linear';
+export const LINEAR_CANONICAL_STATES = ['Todo', 'In Progress', 'Done', 'Backlog', 'Canceled'] as const;
 
 export const LINEAR_OBJECT_TYPES = [
   'comment',
@@ -12,6 +16,18 @@ export const LINEAR_OBJECT_TYPES = [
 ] as const;
 
 export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
+
+export interface NameWithIdOptions {
+  existingNames?: Set<string>;
+}
+
+// TODO(#106): Thread existingNames through any future multi-record runtime emitters so collision hashes are exercised beyond helper-level tests.
+
+export interface ParseNameWithIdResult {
+  humanReadable: string | null;
+  id: string;
+  ext: string | null;
+}
 
 const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   comment: 'comment',
@@ -60,6 +76,16 @@ const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
   LinearUser: 'user',
 };
 
+const LINEAR_PUBLIC_IDENTIFIER_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/u;
+const MAX_HUMAN_READABLE_LENGTH = 80;
+const CANONICAL_STATE_SLUGS: Readonly<Record<(typeof LINEAR_CANONICAL_STATES)[number], string>> = {
+  Todo: 'todo',
+  'In Progress': 'in-progress',
+  Done: 'done',
+  Backlog: 'backlog',
+  Canceled: 'canceled',
+};
+
 function assertNonEmptySegment(value: string, label: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -73,27 +99,114 @@ export function encodeLinearPathSegment(value: string): string {
 }
 
 function slugify(value: string): string {
-  return value
-    .replace(/[{}]/g, '')
+  const ascii = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7F]+/g, '');
+  const slug = ascii
+    .replace(/^-+|-+$/g, '')
     .replace(/[^a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
+
+  if (slug.length <= MAX_HUMAN_READABLE_LENGTH) {
+    return slug;
+  }
+
+  const truncated = slug.slice(0, MAX_HUMAN_READABLE_LENGTH);
+  const cutIndex = truncated.lastIndexOf('-');
+  const bounded = cutIndex > 0 ? truncated.slice(0, cutIndex) : truncated;
+  return bounded.replace(/^-+|-+$/g, '');
 }
 
-/**
- * Encode an id as a path-safe suffix that can be losslessly reversed.
- * We dehyphenate so the suffix is a single token (no `-` collision with
- * the slug separator) but keep the full id so the round-trip is
- * unambiguous. Truncating to 8 chars (the previous behaviour) breaks
- * writeback resolvers that need the full id to address the resource.
- */
-function idSuffix(id: string): string {
-  return id.replace(/-/g, '');
+function shortHash(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 8);
 }
 
-function titleSegmentWithId(title: string | undefined, id: string): string {
-  const slug = title ? slugify(title) : '';
-  return slug ? `${slug}--${idSuffix(id)}` : encodeLinearPathSegment(id);
+function normalizeHumanReadable(value: string | undefined): string {
+  if (!value) {
+    return '';
+  }
+
+  if (LINEAR_PUBLIC_IDENTIFIER_PATTERN.test(value)) {
+    return value;
+  }
+
+  return slugify(value);
+}
+
+export function nameWithId(humanReadable: string | undefined, id: string, opts: NameWithIdOptions = {}): string {
+  const normalizedId = encodeLinearPathSegment(id);
+  const normalizedHumanReadable = normalizeHumanReadable(humanReadable);
+  if (!normalizedHumanReadable) {
+    return normalizedId;
+  }
+
+  const existingNames = opts.existingNames;
+  const baseName = existingNames?.has(normalizedHumanReadable)
+    ? `${normalizedHumanReadable}-${shortHash(normalizedId)}`
+    : normalizedHumanReadable;
+  existingNames?.add(baseName);
+  return `${baseName}__${normalizedId}`;
+}
+
+// For Linear `<humanReadable>__<id>` segments, `humanReadable` is the leading prefix and `id` is the trailing identifier.
+export function parseNameWithId(filename: string): ParseNameWithIdResult {
+  const extIndex = filename.lastIndexOf('.');
+  const ext = extIndex > 0 && extIndex < filename.length - 1 ? filename.slice(extIndex + 1) : null;
+  const basename = ext ? filename.slice(0, extIndex) : filename;
+  const separatorIndex = basename.lastIndexOf('__');
+
+  if (separatorIndex <= 0 || separatorIndex === basename.length - 2) {
+    return {
+      humanReadable: null,
+      id: basename,
+      ext,
+    };
+  }
+
+  return {
+    humanReadable: basename.slice(0, separatorIndex),
+    id: basename.slice(separatorIndex + 2),
+    ext,
+  };
+}
+
+export function slugifyStateName(stateName: string): string {
+  const trimmed = assertNonEmptySegment(stateName, 'state name');
+  const canonicalSlug = CANONICAL_STATE_SLUGS[trimmed as (typeof LINEAR_CANONICAL_STATES)[number]];
+  if (canonicalSlug) {
+    return canonicalSlug;
+  }
+
+  let slug = '';
+  let previousWasSeparator = false;
+  for (const character of trimmed.normalize('NFC').toLowerCase()) {
+    if (/\s/u.test(character)) {
+      if (!previousWasSeparator && slug.length > 0) {
+        slug += '-';
+      }
+      previousWasSeparator = true;
+      continue;
+    }
+
+    previousWasSeparator = false;
+    if (/[a-z0-9]/u.test(character)) {
+      slug += character;
+      continue;
+    }
+
+    if (character === '-') {
+      slug += '%2D';
+      continue;
+    }
+
+    slug += encodeURIComponent(character);
+  }
+
+  // Symbol-only state names are rejected so callers surface an ingest error
+  // instead of emitting an ambiguous empty by-state directory.
+  return assertNonEmptySegment(slug, 'state slug');
 }
 
 export function normalizeLinearObjectType(objectType: string): LinearPathObjectType {
@@ -119,12 +232,30 @@ export function normalizeNangoLinearModel(model: string): LinearPathObjectType {
   return normalizeLinearObjectType(model);
 }
 
-export function linearIssuePath(issueId: string, title?: string): string {
-  return `${LINEAR_PATH_ROOT}/issues/${titleSegmentWithId(title, issueId)}.json`;
+export function linearIssuePath(
+  issueId: string,
+  identifierOrHumanReadable?: string,
+  title?: string,
+  opts?: NameWithIdOptions,
+): string {
+  const humanReadable = title ? identifierOrHumanReadable ?? title : identifierOrHumanReadable;
+  return `${LINEAR_PATH_ROOT}/issues/${nameWithId(humanReadable, issueId, opts)}.json`;
 }
 
-export function linearCommentPath(commentId: string): string {
-  return `${LINEAR_PATH_ROOT}/comments/${encodeLinearPathSegment(commentId)}.json`;
+export function linearIssuesIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/issues/_index.json`;
+}
+
+export function linearIssueByStatePath(stateName: string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function linearCommentPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
+  return `${LINEAR_PATH_ROOT}/comments/${nameWithId(humanReadable, commentId, opts)}.json`;
+}
+
+export function linearCommentsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/comments/_index.json`;
 }
 
 export function linearProjectPath(projectId: string): string {
@@ -139,8 +270,16 @@ export function linearTeamPath(teamId: string): string {
   return `${LINEAR_PATH_ROOT}/teams/${encodeLinearPathSegment(teamId)}.json`;
 }
 
+export function linearTeamsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/teams/_index.json`;
+}
+
 export function linearUserPath(userId: string): string {
   return `${LINEAR_PATH_ROOT}/users/${encodeLinearPathSegment(userId)}.json`;
+}
+
+export function linearUsersIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/users/_index.json`;
 }
 
 export function linearMilestonePath(milestoneId: string): string {
@@ -151,15 +290,30 @@ export function linearRoadmapPath(roadmapId: string): string {
   return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
 }
 
-export function computeLinearPath(objectType: string, objectId: string, title?: string): string {
+export function linearByTitleAliasPath(scope: string, title: string, id: string, colliding = false): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    // TODO(issue #106): define empty-slug fallback/skip behavior for emoji-only or punctuation-only Linear titles instead of throwing.
+    throw new Error('Linear alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  return `${scope}/by-title/${encodeLinearPathSegment(filename)}.json`;
+}
+
+export function linearByIdAliasPath(scope: string, identifier: string): string {
+  return `${scope}/by-id/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function computeLinearPath(objectType: string, objectId: string, humanReadable?: string): string {
   const normalizedType = normalizeLinearObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');
 
   switch (normalizedType) {
     case 'issue':
-      return linearIssuePath(normalizedId, title);
+      return linearIssuePath(normalizedId, humanReadable);
     case 'comment':
-      return linearCommentPath(normalizedId);
+      return linearCommentPath(normalizedId, humanReadable);
     case 'project':
       return linearProjectPath(normalizedId);
     case 'cycle':

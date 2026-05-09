@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pipedrive deal",
+  "type": "object",
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Deal title."
+    },
+    "value": {
+      "type": "number",
+      "description": "Deal value."
+    },
+    "currency": {
+      "type": "string",
+      "description": "Currency code."
+    },
+    "status": {
+      "enum": [
+        "open",
+        "won",
+        "lost",
+        "deleted"
+      ],
+      "description": "Deal status."
+    },
+    "stage_id": {
+      "type": "integer",
+      "description": "Pipeline stage id."
+    },
+    "pipeline_id": {
+      "type": "integer",
+      "description": "Pipeline id."
+    },
+    "person_id": {
+      "type": "integer",
+      "description": "Linked person id."
+    },
+    "org_id": {
+      "type": "integer",
+      "description": "Linked organization id."
+    },
+    "user_id": {
+      "type": "integer",
+      "description": "Owner user id."
+    },
+    "expected_close_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected close date in YYYY-MM-DD form."
+    },
+    "probability": {
+      "type": "integer",
+      "description": "Deal probability percentage."
+    },
+    "label": {
+      "type": "string",
+      "description": "Deal label."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

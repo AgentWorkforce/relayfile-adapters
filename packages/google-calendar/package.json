@@ -50,7 +50,6 @@
   "files": [
     "dist",
     "discovery",
-    ".adapter.md",
     "README.md"
   ],
   "scripts": {

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveWritebackRequest } from './writeback.js';
+import { ReadOnlyFieldError, resolveWritebackRequest } from './writeback.js';
 
 const PAGE_UUID = '2fd6800c-1c90-80ea-9ec8-fe4a0daa66b8';
 const PAGE_HEX = PAGE_UUID.replace(/-/g, '');
@@ -9,7 +9,7 @@ describe('linear writeback', () => {
   describe('comment create', () => {
     it('creates a comment from plain-text content on a slug-form path', () => {
       const req = resolveWritebackRequest(
-        `/linear/issues/auth-refactor--${PAGE_HEX}/comments/new.json`,
+        `/linear/issues/auth-refactor--${PAGE_HEX}/comments/review-note.json`,
         'looks good, ship it',
       );
       assert.strictEqual(req.action, 'create_comment');
@@ -22,7 +22,7 @@ describe('linear writeback', () => {
 
     it('accepts a JSON object with a body field', () => {
       const req = resolveWritebackRequest(
-        `/linear/issues/auth-refactor--${PAGE_HEX}/comments/new.json`,
+        `/linear/issues/auth-refactor--${PAGE_HEX}/comments/review-note.json`,
         JSON.stringify({ body: 'with metadata', doNotSubscribeToIssue: true }),
       );
       const input = (req.body.variables as {
@@ -36,7 +36,7 @@ describe('linear writeback', () => {
       assert.throws(
         () =>
           resolveWritebackRequest(
-            `/linear/issues/auth-refactor--${PAGE_HEX}/comments/new.json`,
+            `/linear/issues/auth-refactor--${PAGE_HEX}/comments/review-note.json`,
             '{}',
           ),
         /requires a non-empty `body`/,
@@ -47,7 +47,7 @@ describe('linear writeback', () => {
       assert.throws(
         () =>
           resolveWritebackRequest(
-            '/linear/issues/auth-refactor--2fd6800c/comments/new.json',
+            '/linear/issues/auth-refactor--2fd6800c/comments/review-note.json',
             'hi',
           ),
         /legacy 8-char id suffix.*relayfile pull/,
@@ -56,7 +56,7 @@ describe('linear writeback', () => {
 
     it('rejects team-prefixed identifiers with a clear UUID-required message', () => {
       assert.throws(
-        () => resolveWritebackRequest('/linear/issues/PROJ-441/comments/new.json', 'hi'),
+        () => resolveWritebackRequest('/linear/issues/PROJ-441/comments/review-note.json', 'hi'),
         /team-prefixed identifier/,
       );
     });
@@ -65,7 +65,7 @@ describe('linear writeback', () => {
   describe('issue create', () => {
     it('creates an issue from a JSON payload', () => {
       const req = resolveWritebackRequest(
-        '/linear/issues/new.json',
+        '/linear/issues/audit-log-export.json',
         JSON.stringify({ teamId: 'team-1', title: 'Audit log export', priority: 2 }),
       );
       assert.strictEqual(req.action, 'create_issue');
@@ -79,20 +79,17 @@ describe('linear writeback', () => {
 
     it('rejects a missing teamId', () => {
       assert.throws(
-        () => resolveWritebackRequest('/linear/issues/new.json', JSON.stringify({ title: 'x' })),
+        () => resolveWritebackRequest('/linear/issues/audit-log-export.json', JSON.stringify({ title: 'x' })),
         /requires a `teamId`/,
       );
     });
   });
 
   describe('issue update', () => {
-    it('builds an issueUpdate mutation excluding server-managed fields', () => {
+    it('builds an issueUpdate mutation for a canonical id filename', () => {
       const req = resolveWritebackRequest(
         `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
         JSON.stringify({
-          id: 'should-be-stripped',
-          identifier: 'PROJ-441',
-          createdAt: 'should-be-stripped',
           title: 'New title',
           description: 'New description',
         }),
@@ -104,6 +101,17 @@ describe('linear writeback', () => {
         title: 'New title',
         description: 'New description',
       });
+    });
+
+    it('rejects read-only fields instead of silently stripping them', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+            JSON.stringify({ id: 'different', title: 'New title' }),
+          ),
+        (error) => error instanceof ReadOnlyFieldError && error.field === 'id',
+      );
     });
 
     it('drops denormalized synced-read fields that IssueUpdateInput does not accept', () => {
@@ -121,8 +129,6 @@ describe('linear writeback', () => {
       const req = resolveWritebackRequest(
         `/linear/issues/${PAGE_UUID}.json`,
         JSON.stringify({
-          id: PAGE_UUID,
-          identifier: 'PROJ-441',
           title: 'edited title',
           description: 'edited description',
           // Denormalized read-only fields the writeback must NOT forward:
@@ -131,10 +137,6 @@ describe('linear writeback', () => {
           priority_label: 'No priority',
           created_at: '2026-04-03T18:38:27.932Z',
           updated_at: '2026-04-03T18:38:28.177Z',
-          url: 'https://linear.app/x/issue/PROJ-441',
-          // Read-side metadata Linear's webhook normalizer emits:
-          _connection: { provider: 'linear' },
-          _webhook: { action: 'update' },
           descriptionData: '{"type":"doc"}',
         }),
       );
@@ -147,40 +149,22 @@ describe('linear writeback', () => {
       });
     });
 
-    it('unwraps the synced envelope written by LinearAdapter.renderContent', () => {
-      // This is the exact shape an agent sees when it reads a synced
-      // /linear/issues/<id>.json file produced by LinearAdapter.renderContent.
-      // The agent edits payload.title and writes the whole envelope back; the
-      // resolver must NOT forward `provider`, `workspaceId`, etc. into the
-      // GraphQL IssueUpdateInput.
-      const req = resolveWritebackRequest(
-        `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
-        JSON.stringify({
-          provider: 'linear',
-          connectionId: 'conn-1',
-          workspaceId: 'wks-1',
-          eventType: 'issue.updated',
-          objectType: 'issue',
-          objectId: PAGE_UUID,
-          deleted: false,
-          payload: {
-            id: PAGE_UUID,
-            identifier: 'PROJ-441',
-            title: 'Edited title',
-            description: 'Edited description',
-            priority: 1,
-          },
-        }),
+    it('rejects synced envelopes because their metadata fields are read-only', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+            JSON.stringify({
+              provider: 'linear',
+              connectionId: 'conn-1',
+              workspaceId: 'wks-1',
+              payload: {
+                title: 'Edited title',
+              },
+            }),
+          ),
+        (error) => error instanceof ReadOnlyFieldError && error.field === 'provider',
       );
-      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
-      assert.strictEqual(variables.id, PAGE_UUID);
-      // Only mutable fields from payload survive the denylist; envelope
-      // markers (provider, workspaceId, etc.) must not appear.
-      assert.deepStrictEqual(variables.input, {
-        title: 'Edited title',
-        description: 'Edited description',
-        priority: 1,
-      });
     });
   });
 

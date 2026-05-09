@@ -18,6 +18,7 @@ import { parsePullRequest } from '../parser.js';
 interface FixtureProviderOptions {
   diff?: string;
   files?: readonly Record<string, unknown>[];
+  prNumber?: number;
   prPayload?: Record<string, unknown>;
   responses?: Partial<Record<'diff' | 'files' | 'pull', ProxyResponse>>;
 }
@@ -65,9 +66,10 @@ function createPullRequestFixture(prPayload?: Record<string, unknown>) {
 }
 
 function createFixtureProvider(options: FixtureProviderOptions = {}) {
+  const prNumber = options.prNumber ?? 42;
   const proxy = mock.fn(async (request: ProxyRequest): Promise<ProxyResponse> => {
     if (
-      request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
+      request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${prNumber}/files`
     ) {
       return (
         options.responses?.files ?? {
@@ -78,7 +80,7 @@ function createFixtureProvider(options: FixtureProviderOptions = {}) {
       );
     }
 
-    if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
+    if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${prNumber}`) {
       if (request.headers?.Accept === 'application/vnd.github.diff') {
         return (
           options.responses?.diff ?? {
@@ -116,13 +118,15 @@ function createMemoryVfs() {
     writes.set(path, content);
   });
   const exists = mock.fn((path: string) => writes.has(path));
+  const readFile = mock.fn((path: string) => writes.get(path));
 
   const vfs: VfsLike = {
     exists,
+    readFile,
     writeFile,
   };
 
-  return { exists, vfs, writeFile, writes };
+  return { exists, readFile, vfs, writeFile, writes };
 }
 
 describe('pull request ingestion', () => {
@@ -316,25 +320,40 @@ describe('pull request ingestion', () => {
     );
 
     assert.deepStrictEqual(result, {
-      filesWritten: 5,
+      filesWritten: 9,
       filesUpdated: 0,
       filesDeleted: 0,
       paths: [
-        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/meta.json',
-        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/index.ts',
-        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/utils/math.ts',
-        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/README.md',
-        '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/diff.patch',
+        '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json',
+        '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/index.ts',
+        '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/utils/math.ts',
+        '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/README.md',
+        '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/diff.patch',
+        '/github/repos/octocat/hello-world/pulls/_index.json',
+        '/github/repos/octocat/hello-world/issues/_index.json',
+        '/github/repos/_index.json',
+        '/github/LAYOUT.md',
       ],
       errors: [],
     });
-    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/meta.json') ?? '');
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'),
+      [{
+        id: '42',
+        title: mockPRPayload.title,
+        updated: mockPRPayload.updated_at,
+        number: 42,
+        state: mockPRPayload.state,
+      }],
+    );
+    assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'), []);
+    const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json') ?? '');
     assert.strictEqual(meta.number, 42);
     assert.strictEqual(meta.title, mockPRPayload.title);
     assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
     assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
     assert.deepStrictEqual(
-      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/files/src/index.ts') ?? ''),
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/index.ts') ?? ''),
       {
         filename: 'src/index.ts',
         path: 'src/index.ts',
@@ -343,7 +362,7 @@ describe('pull request ingestion', () => {
         deletions: 1,
       },
     );
-    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/diff.patch'), mockDiff);
+    assert.strictEqual(writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/diff.patch'), mockDiff);
   });
 
   it('ingestPullRequest handles API errors gracefully', async () => {
@@ -401,6 +420,89 @@ describe('pull request ingestion', () => {
     });
     assert.strictEqual(writeFile.mock.calls.length, 0);
     assert.strictEqual(writes.size, 0);
+  });
+
+  it('retains existing repo, issue, and pull index rows across repeated pull ingestion', async () => {
+    const { vfs, writes } = createMemoryVfs();
+    writes.set(
+      '/github/repos/octocat/hello-world/issues/_index.json',
+      `${JSON.stringify([
+        {
+          id: '10',
+          title: 'Track adapter issue ingestion coverage',
+          updated: '2026-03-28T07:45:00Z',
+          number: 10,
+          state: 'open',
+        },
+      ])}\n`,
+    );
+
+    await ingestPullRequest(
+      createFixtureProvider().provider,
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      42,
+      vfs,
+    );
+    await ingestPullRequest(
+      createFixtureProvider({
+        prNumber: 43,
+        prPayload: {
+          ...mockPRPayload,
+          number: 43,
+          title: 'Add another pull request fixture',
+          updated_at: '2026-03-30T10:00:00Z',
+          created_at: '2026-03-29T10:00:00Z',
+          html_url: 'https://github.com/octocat/hello-world/pull/43',
+          diff_url: 'https://github.com/octocat/hello-world/pull/43.diff',
+          patch_url: 'https://github.com/octocat/hello-world/pull/43.patch',
+        },
+      }).provider,
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      43,
+      vfs,
+    );
+
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'),
+      [
+        {
+          id: '43',
+          title: 'Add another pull request fixture',
+          updated: '2026-03-30T10:00:00Z',
+          number: 43,
+          state: mockPRPayload.state,
+        },
+        {
+          id: '42',
+          title: mockPRPayload.title,
+          updated: mockPRPayload.updated_at,
+          number: 42,
+          state: mockPRPayload.state,
+        },
+      ],
+    );
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'),
+      [
+        {
+          id: '10',
+          title: 'Track adapter issue ingestion coverage',
+          updated: '2026-03-28T07:45:00Z',
+          number: 10,
+          state: 'open',
+        },
+      ],
+    );
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/_index.json') ?? '[]'),
+      [{
+        id: 'octocat/hello-world',
+        title: 'octocat/hello-world',
+        updated: '2026-03-30T10:00:00Z',
+      }],
+    );
   });
 
   it('buildVFSPath constructs correct paths', () => {
