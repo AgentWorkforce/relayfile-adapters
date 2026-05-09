@@ -162,25 +162,22 @@ Versions in `packages/*/package.json` are bumped by the publish phase, not in th
 
 If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
 
-### Adding a new adapter package: update `publish.yml`
+### Adding a new adapter package: discoverable by `publish.yml`
 
-Any PR that introduces a new directory under `packages/` (e.g. a new adapter like `packages/asana/`) **must also update `.github/workflows/publish.yml`** in the same PR. Two places need to stay in sync:
+The publish workflow's "Resolve packages to publish" step delegates to `scripts/resolve-publish-targets.mjs`, which auto-discovers every non-private directory under `packages/` from the filesystem. **A new adapter package needs no manual edits to `.github/workflows/publish.yml` to be publishable** — as long as its `package.json` exists and is not marked `"private": true`, it will be picked up by `package=all`, the `missing` selector, and any group alias that includes its slug.
 
-1. **`inputs.package.options`** — add the new slug to the choice list so it can be selected for one-off publishing.
-2. **The "Resolve packages to publish" step** — add the slug to the space-separated `packages=...` list under the `if "all"` branch so it gets included in `package=all` runs.
+What you _do_ need to do when adding a new adapter:
 
-Without this, the new adapter never publishes to npm. The rest of the test plan can be green and reviewers won't notice — but the package will never appear on the registry, which silently breaks downstream consumers. CI does not verify this; treat it as part of the package-creation checklist.
+1. Ensure the package has a `package.json` with `"private"` unset (or `false`) and a `version` field — otherwise the resolver skips it.
+2. If the new adapter belongs to a category that maps to a `GROUPS` alias in `scripts/resolve-publish-targets.mjs` (e.g. `crm`, `messaging`, `storage`), add its slug to that group so it can be published as part of the group. Adding new group aliases is optional.
 
-Quick sanity check before opening the PR (should print nothing and exit 0):
+Quick sanity check before opening the PR — confirms the resolver sees the new package (should list every non-private slug under `packages/`):
 
 ```bash
-diff \
-  <(ls packages/ | grep -v '^webhook-server$' | sort) \
-  <(sed -n '/^      package:/,/^      version:/p' .github/workflows/publish.yml \
-    | grep -oE '^ *- [a-z-]+' | sed 's/^ *- //' | grep -v '^all$' | sort -u)
+node scripts/resolve-publish-targets.mjs all
 ```
 
-`webhook-server` is intentionally excluded (it's a server, not an npm-published adapter). Any other directory under `packages/` that doesn't appear in `publish.yml` is a forgotten registration.
+If your new adapter is missing from the output, check that `packages/<slug>/package.json` exists and is not marked private.
 
 ### Adapter writeback discovery is required
 

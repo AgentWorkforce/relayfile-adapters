@@ -80,10 +80,18 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
         run: |
           set -euo pipefail
-          for pkg in ${{ steps.resolve.outputs.packages }}; do
-            cd packages/$pkg
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            case "$pkg" in
+              *[!a-zA-Z0-9_-]*)
+                echo "Invalid package slug: $pkg" >&2
+                exit 1
+                ;;
+            esac
+            cd "packages/$pkg"
             if [ "$INPUT_VERSION" != "none" ]; then
               npm version "$INPUT_VERSION" --no-git-tag-version --allow-same-version
             fi
@@ -93,14 +101,14 @@ jobs:
 
             if [ "$INPUT_DRY_RUN" = "true" ]; then
               echo "DRY RUN: $name@$version"
-              npm publish --dry-run --access public --tag "$INPUT_TAG"
+              npm publish --dry-run --access public --tag "$INPUT_TAG" --ignore-scripts
             else
               npm publish --access public --provenance --tag "$INPUT_TAG" --ignore-scripts
               echo "Published $name@$version"
             fi
 
             cd ../..
-          done
+          done < <(printf '%s\n' "$RESOLVED_PACKAGES" | tr ' ,' '\n' | sed '/^$/d')
 
       - name: Commit version bumps
         if: github.event.inputs.dry_run != 'true' && github.event.inputs.version != 'none'
