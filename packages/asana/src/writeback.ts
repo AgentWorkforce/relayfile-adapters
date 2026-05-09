@@ -1,6 +1,6 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { extractAsanaIdFromPathSegment } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 import type { AsanaWritebackRequest, JsonValue } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -11,12 +11,9 @@ const ASANA_API_SECTIONS_ROUTE = '/api/1.0/sections';
 
 export function resolveAsanaWritebackRequest(path: string, content: string): AsanaWritebackRequest {
   const normalizedPath = normalizePath(path);
+  const route = classifyWrite(normalizedPath, resources);
 
-  const taskFile = matchResourceFile(normalizedPath, '/asana/tasks');
-  if (taskFile && !taskFile.canonical) {
-    return buildTaskCreate(content);
-  }
-
+  // Special-case the cross-resource "add task to project" path (not declared as a resource).
   const addToProjectMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\/projects\/([^/]+)\.json$/u);
   if (addToProjectMatch?.[1] && addToProjectMatch[2]) {
     return buildAddTaskToProject(
@@ -26,35 +23,41 @@ export function resolveAsanaWritebackRequest(path: string, content: string): Asa
     );
   }
 
-  const taskUpdateMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
-  if (taskUpdateMatch?.[1] && taskFile?.canonical) {
-    return buildTaskUpdate(extractAsanaIdFromPathSegment(taskUpdateMatch[1]), content);
+  if (route?.resource.path === '/asana/tasks') {
+    if (route.kind === 'create') {
+      return buildTaskCreate(content);
+    }
+    const taskUpdateMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && taskUpdateMatch?.[1]) {
+      return buildTaskUpdate(extractAsanaIdFromPathSegment(taskUpdateMatch[1]), content);
+    }
   }
 
-  const projectFile = matchResourceFile(normalizedPath, '/asana/projects');
-  if (projectFile && !projectFile.canonical) {
-    return buildProjectCreate(content);
+  if (route?.resource.path === '/asana/projects') {
+    if (route.kind === 'create') {
+      return buildProjectCreate(content);
+    }
+    const projectUpdateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && projectUpdateMatch?.[1]) {
+      return buildProjectUpdate(extractAsanaIdFromPathSegment(projectUpdateMatch[1]), content);
+    }
   }
 
-  const projectUpdateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
-  if (projectUpdateMatch?.[1] && projectFile?.canonical) {
-    return buildProjectUpdate(extractAsanaIdFromPathSegment(projectUpdateMatch[1]), content);
+  if (route?.resource.path === '/asana/projects/{projectId}/sections') {
+    const projectSectionCreateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\/sections\/([^/]+)\.json$/u);
+    if (route.kind === 'create' && projectSectionCreateMatch?.[1]) {
+      return buildSectionCreate(extractAsanaIdFromPathSegment(projectSectionCreateMatch[1]), content);
+    }
   }
 
-  const projectSectionFile = matchResourceFile(normalizedPath, '/asana/projects/{projectId}/sections');
-  const projectSectionCreateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\/sections\/([^/]+)\.json$/u);
-  if (projectSectionCreateMatch?.[1] && projectSectionFile && !projectSectionFile.canonical) {
-    return buildSectionCreate(extractAsanaIdFromPathSegment(projectSectionCreateMatch[1]), content);
-  }
-
-  const sectionFile = matchResourceFile(normalizedPath, '/asana/sections');
-  if (sectionFile && !sectionFile.canonical) {
-    return buildSectionCreate(undefined, content);
-  }
-
-  const sectionUpdateMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
-  if (sectionUpdateMatch?.[1] && sectionFile?.canonical) {
-    return buildSectionUpdate(extractAsanaIdFromPathSegment(sectionUpdateMatch[1]), content);
+  if (route?.resource.path === '/asana/sections') {
+    if (route.kind === 'create') {
+      return buildSectionCreate(undefined, content);
+    }
+    const sectionUpdateMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && sectionUpdateMatch?.[1]) {
+      return buildSectionUpdate(extractAsanaIdFromPathSegment(sectionUpdateMatch[1]), content);
+    }
   }
 
   throw new Error(`No Asana writeback rule matched ${path}`);
@@ -62,35 +65,45 @@ export function resolveAsanaWritebackRequest(path: string, content: string): Asa
 
 export function resolveAsanaDeleteRequest(path: string): AsanaWritebackRequest {
   const normalizedPath = normalizePath(path);
-
-  const taskMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
-  if (taskMatch?.[1] && matchResourceFile(normalizedPath, '/asana/tasks')?.canonical) {
-    const taskId = extractAsanaIdFromPathSegment(taskMatch[1]);
-    return {
-      action: 'delete_task',
-      method: 'DELETE',
-      endpoint: `${ASANA_API_TASKS_ROUTE}/${encodeURIComponent(taskId)}`,
-    };
+  const route = classifyWrite(normalizedPath, resources, { fsEvent: 'delete' });
+  if (route?.kind !== 'delete') {
+    throw new Error(`No Asana delete writeback rule matched ${path}`);
   }
 
-  const projectMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
-  if (projectMatch?.[1] && matchResourceFile(normalizedPath, '/asana/projects')?.canonical) {
-    const projectId = extractAsanaIdFromPathSegment(projectMatch[1]);
-    return {
-      action: 'delete_project',
-      method: 'DELETE',
-      endpoint: `${ASANA_API_PROJECTS_ROUTE}/${encodeURIComponent(projectId)}`,
-    };
+  if (route.resource.path === '/asana/tasks') {
+    const taskMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
+    if (taskMatch?.[1]) {
+      const taskId = extractAsanaIdFromPathSegment(taskMatch[1]);
+      return {
+        action: 'delete_task',
+        method: 'DELETE',
+        endpoint: `${ASANA_API_TASKS_ROUTE}/${encodeURIComponent(taskId)}`,
+      };
+    }
   }
 
-  const sectionMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
-  if (sectionMatch?.[1] && matchResourceFile(normalizedPath, '/asana/sections')?.canonical) {
-    const sectionId = extractAsanaIdFromPathSegment(sectionMatch[1]);
-    return {
-      action: 'delete_section',
-      method: 'DELETE',
-      endpoint: `${ASANA_API_SECTIONS_ROUTE}/${encodeURIComponent(sectionId)}`,
-    };
+  if (route.resource.path === '/asana/projects') {
+    const projectMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
+    if (projectMatch?.[1]) {
+      const projectId = extractAsanaIdFromPathSegment(projectMatch[1]);
+      return {
+        action: 'delete_project',
+        method: 'DELETE',
+        endpoint: `${ASANA_API_PROJECTS_ROUTE}/${encodeURIComponent(projectId)}`,
+      };
+    }
+  }
+
+  if (route.resource.path === '/asana/sections') {
+    const sectionMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
+    if (sectionMatch?.[1]) {
+      const sectionId = extractAsanaIdFromPathSegment(sectionMatch[1]);
+      return {
+        action: 'delete_section',
+        method: 'DELETE',
+        endpoint: `${ASANA_API_SECTIONS_ROUTE}/${encodeURIComponent(sectionId)}`,
+      };
+    }
   }
 
   throw new Error(`No Asana delete writeback rule matched ${path}`);
@@ -281,11 +294,6 @@ function normalizePath(path: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-interface ResourceFileMatch {
-  canonical: boolean;
-  id: string;
-}
-
 const READ_ONLY_FIELDS = new Set([
   'id',
   'gid',
@@ -311,24 +319,6 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
       throw new ReadOnlyFieldError(key);
     }
   }
-}
-
-function matchResourceFile(path: string, resourcePath: string): ResourceFileMatch | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): ResourceFileMatch | undefined {
-  const normalized = normalizePath(path);
-  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const segment = normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length);
-  const id = extractAsanaIdFromPathSegment(segment);
-  return { canonical: resource.idPattern.test(id), id };
 }
 
 function parseJsonObject(content: string): Record<string, unknown> {

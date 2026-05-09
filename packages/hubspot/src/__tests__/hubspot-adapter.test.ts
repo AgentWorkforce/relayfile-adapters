@@ -16,6 +16,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface CapturedClient extends RelayFileClientLike {
   deleted: string[];
@@ -275,7 +276,7 @@ test('path mapping stays deterministic for supported HubSpot VFS objects', () =>
   });
   assert.throws(
     () => resolveHubSpotWritebackRequest('/hubspot/contacts/101.json', '{"id":"101","email":"new@example.com"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolveHubSpotWritebackRequest('/hubspot/contacts/draft-contact.json', '{}'),

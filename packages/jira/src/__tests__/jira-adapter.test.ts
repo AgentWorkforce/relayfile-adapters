@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
 import { JiraAdapter, type RelayFileClientLike, type WriteFileInput } from '../jira-adapter.js';
 import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
-import { resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
+import { ReadOnlyFieldError, resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -178,7 +178,7 @@ describe('JiraAdapter', () => {
     });
     assert.throws(
       () => resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"id":"10001","fields":{"summary":"Renamed"}}'),
-      /read-only/,
+      (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
     );
     assert.throws(
       () => resolveJiraWritebackRequest('/jira/issues/draft-issue.json', '{"fields":{"summary":"Missing project"}}'),

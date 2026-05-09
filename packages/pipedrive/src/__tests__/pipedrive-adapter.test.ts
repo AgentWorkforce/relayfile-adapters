@@ -17,6 +17,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface AdapterHarness {
   adapter: PipedriveAdapter;
@@ -255,7 +256,7 @@ test('path mapping stays deterministic for supported Pipedrive VFS objects', () 
   });
   assert.throws(
     () => resolvePipedriveWritebackRequest('/pipedrive/deals/101.json', '{"id":101,"title":"Renamed"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolvePipedriveWritebackRequest('/pipedrive/deals/draft-deal.json', '{"note":"Missing title"}'),

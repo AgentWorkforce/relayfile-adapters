@@ -1,6 +1,6 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GITHUB_API_BASE_URL } from './config.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 import {
   GITHUB_REVIEW_EVENTS,
   GITHUB_REVIEW_SIDES,
@@ -112,12 +112,13 @@ export class GitHubWritebackHandler {
     const [, ownerSegment, repoSegment, prNumberSegment, reviewSegment] = match;
     const prNumber = Number.parseInt(prNumberSegment, 10);
     const reviewId = decodeURIComponent(reviewSegment.replace(/\.json$/, ''));
+    const route = classifyWrite(path, resources);
 
     return {
       owner: decodeURIComponent(ownerSegment),
       repo: decodeURIComponent(repoSegment),
       prNumber,
-      ...(isCanonicalResourcePath(path) ? { reviewId } : {}),
+      ...(route?.kind === 'patch' ? { reviewId } : {}),
     };
   }
 
@@ -275,7 +276,8 @@ export class GitHubWritebackHandler {
 
 export function resolveDeleteRequest(path: string): ProxyRequest {
   const match = path.match(REVIEW_WRITEBACK_PATH);
-  if (!match || !isCanonicalResourcePath(path)) {
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  if (!match || route?.kind !== 'delete') {
     throw new Error(`Unsupported GitHub delete writeback path: ${path}`);
   }
   const [, ownerSegment, repoSegment, prNumberSegment, reviewSegment] = match;
@@ -332,24 +334,6 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
       throw new ReadOnlyFieldError(key);
     }
   }
-}
-
-function isCanonicalResourcePath(path: string): boolean {
-  const resource = resources.find((candidate) => candidate.path === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews');
-  if (!resource) {
-    return false;
-  }
-  const file = matchFile(path, resource);
-  return file?.canonical === true;
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  const normalized = path.endsWith('.json') ? path : `${path}.json`;
-  if (!resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const id = decodeURIComponent(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
 }
 
 function parseAgentComment(value: JsonValue, index: number): AgentComment {

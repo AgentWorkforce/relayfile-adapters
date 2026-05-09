@@ -21,6 +21,7 @@ import {
   shouldRenewSubscription,
   validateClientState,
 } from '../src/index.ts';
+import { ReadOnlyFieldError } from '../src/writeback.ts';
 import type { TeamsChatMessage } from '../src/types.ts';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -268,7 +269,7 @@ describe('writeback routing', () => {
           id: 'message-1',
           text: '<p>Hello</p>',
         }),
-      /read-only/,
+      (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
     );
   });
 });

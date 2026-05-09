@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
+import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
 
 describe('writeback rule matching', () => {
   it('maps page JSON to PATCH /v1/pages/{id}', () => {
@@ -81,7 +81,7 @@ describe('writeback rule matching', () => {
     assert.deepStrictEqual(request.body.parent, { database_id: 'db-1' });
     assert.throws(
       () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page.json', '{"id":"page-1","properties":{}}'),
-      /read-only/,
+      (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
     );
     assert.throws(
       () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page.json', '{}'),

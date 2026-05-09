@@ -1,7 +1,7 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import type { ConnectionProvider, WritebackPathTarget, WritebackResult } from './types.js';
 import { parseGitLabPath } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -24,6 +24,7 @@ export class GitLabWritebackHandler {
       throw new Error(`Unsupported GitLab writeback path: ${path}`);
     }
 
+    const route = classifyWrite(path, resources);
     const isMetadataPath = parsed.subResource === 'metadata.json' || parsed.subResource === undefined;
 
     if (parsed.objectType === 'merge_requests' && isMetadataPath) {
@@ -35,10 +36,11 @@ export class GitLabWritebackHandler {
     }
 
     if (
+      route?.resource.name === 'discussions' &&
       parsed.objectType === 'merge_requests' &&
       parsed.subResource === 'discussions' &&
       parsed.subResourceId &&
-      !isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}/discussions')
+      route.kind === 'create'
     ) {
       return {
         entity: 'merge_request_discussion',
@@ -56,10 +58,11 @@ export class GitLabWritebackHandler {
     }
 
     if (
+      route?.resource.name === 'comments' &&
       parsed.objectType === 'issues' &&
       parsed.subResource === 'comments' &&
       parsed.subResourceId &&
-      !isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/issues/{issueIid}/comments')
+      route.kind === 'create'
     ) {
       return {
         entity: 'issue_note',
@@ -140,13 +143,15 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
   if (!parsed) {
     throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
   }
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
   const projectId = encodeURIComponent(parsed.projectPath);
 
   if (
+    route?.resource.name === 'discussions' &&
+    route.kind === 'delete' &&
     parsed.objectType === 'merge_requests' &&
     parsed.subResource === 'discussions' &&
-    parsed.subResourceId &&
-    isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}/discussions')
+    parsed.subResourceId
   ) {
     return {
       action: 'delete_merge_request_discussion',
@@ -156,10 +161,11 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
   }
 
   if (
+    route?.resource.name === 'comments' &&
+    route.kind === 'delete' &&
     parsed.objectType === 'issues' &&
     parsed.subResource === 'comments' &&
-    parsed.subResourceId &&
-    isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/issues/{issueIid}/comments')
+    parsed.subResourceId
   ) {
     return {
       action: 'delete_issue_note',
@@ -206,20 +212,3 @@ function requireString(payload: Record<string, unknown>, key: string, label: str
   }
 }
 
-function isCanonicalResourcePath(path: string, resourcePath: string): boolean {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return false;
-  }
-  const file = matchFile(path, resource);
-  return file?.canonical === true;
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  const normalized = path.trim();
-  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const id = decodeURIComponent(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
-}

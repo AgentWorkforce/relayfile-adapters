@@ -12,7 +12,7 @@ export const resources = [
     name: "pages",
     path: "/notion/databases/{databaseId}/pages",
     pathPattern: /^\/notion\/databases\/[^\/]+\/pages(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    idPattern: /^(?:[A-Za-z0-9_.~-]+--)?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/.create.example.json",
   },

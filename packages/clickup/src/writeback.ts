@@ -1,6 +1,6 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { extractClickUpIdFromPathSegment } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 import type { ClickUpWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -10,45 +10,52 @@ export const CLICKUP_LIST_ROUTE_ANCHOR = '/api/v2/list';
 
 export function resolveWritebackRequest(path: string, content: string): ClickUpWritebackRequest {
   const normalizedPath = normalizePath(path);
+  const route = classifyWrite(normalizedPath, resources);
 
-  const taskCommentFile = matchResourceFile(normalizedPath, '/clickup/tasks/{taskId}/comments');
-  const taskCommentMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\/comments\/([^/]+)\.json$/u);
-  if (taskCommentMatch?.[1] && taskCommentFile && !taskCommentFile.canonical) {
-    return buildTaskComment(extractClickUpIdFromPathSegment(taskCommentMatch[1]), content);
+  if (route?.resource.path === '/clickup/tasks/{taskId}/comments' && route.kind === 'create') {
+    const taskCommentMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\/comments\/([^/]+)\.json$/u);
+    if (taskCommentMatch?.[1]) {
+      return buildTaskComment(extractClickUpIdFromPathSegment(taskCommentMatch[1]), content);
+    }
   }
 
-  const taskCreateFile = matchResourceFile(normalizedPath, '/clickup/lists/{listId}/tasks');
-  const newTaskMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\/tasks\/([^/]+)\.json$/u);
-  if (newTaskMatch?.[1] && taskCreateFile && !taskCreateFile.canonical) {
-    return buildTaskCreate(extractClickUpIdFromPathSegment(newTaskMatch[1]), content);
+  if (route?.resource.path === '/clickup/lists/{listId}/tasks' && route.kind === 'create') {
+    const newTaskMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\/tasks\/([^/]+)\.json$/u);
+    if (newTaskMatch?.[1]) {
+      return buildTaskCreate(extractClickUpIdFromPathSegment(newTaskMatch[1]), content);
+    }
   }
 
+  if (route?.resource.path === '/clickup/folders/{folderId}/lists' && route.kind === 'create') {
+    const newListMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\/lists\/([^/]+)\.json$/u);
+    if (newListMatch?.[1]) {
+      return buildListCreate(extractClickUpIdFromPathSegment(newListMatch[1]), content);
+    }
+  }
+
+  if (route?.resource.path === '/clickup/spaces/{spaceId}/lists' && route.kind === 'create') {
+    const folderlessListMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/lists\/([^/]+)\.json$/u);
+    if (folderlessListMatch?.[1]) {
+      return buildFolderlessListCreate(extractClickUpIdFromPathSegment(folderlessListMatch[1]), content);
+    }
+  }
+
+  if (route?.resource.path === '/clickup/spaces/{spaceId}/folders' && route.kind === 'create') {
+    const newFolderMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/folders\/([^/]+)\.json$/u);
+    if (newFolderMatch?.[1]) {
+      return buildFolderCreate(extractClickUpIdFromPathSegment(newFolderMatch[1]), content);
+    }
+  }
+
+  // Top-level update endpoints: not declared as resources, so we keep ad-hoc routing.
   const taskUpdateMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\.json$/u);
   if (taskUpdateMatch?.[1]) {
     return buildTaskUpdate(extractClickUpIdFromPathSegment(taskUpdateMatch[1]), content);
   }
 
-  const folderListFile = matchResourceFile(normalizedPath, '/clickup/folders/{folderId}/lists');
-  const newListMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\/lists\/([^/]+)\.json$/u);
-  if (newListMatch?.[1] && folderListFile && !folderListFile.canonical) {
-    return buildListCreate(extractClickUpIdFromPathSegment(newListMatch[1]), content);
-  }
-
-  const spaceListFile = matchResourceFile(normalizedPath, '/clickup/spaces/{spaceId}/lists');
-  const folderlessListMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/lists\/([^/]+)\.json$/u);
-  if (folderlessListMatch?.[1] && spaceListFile && !spaceListFile.canonical) {
-    return buildFolderlessListCreate(extractClickUpIdFromPathSegment(folderlessListMatch[1]), content);
-  }
-
   const listUpdateMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\.json$/u);
   if (listUpdateMatch?.[1]) {
     return buildListUpdate(extractClickUpIdFromPathSegment(listUpdateMatch[1]), content);
-  }
-
-  const spaceFolderFile = matchResourceFile(normalizedPath, '/clickup/spaces/{spaceId}/folders');
-  const newFolderMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/folders\/([^/]+)\.json$/u);
-  if (newFolderMatch?.[1] && spaceFolderFile && !spaceFolderFile.canonical) {
-    return buildFolderCreate(extractClickUpIdFromPathSegment(newFolderMatch[1]), content);
   }
 
   const folderUpdateMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\.json$/u);
@@ -66,9 +73,11 @@ export function resolveWritebackRequest(path: string, content: string): ClickUpW
 
 export function resolveDeleteRequest(path: string): ClickUpWritebackRequest {
   const normalizedPath = normalizePath(path);
-
+  // Top-level tasks/lists/folders are not declared as resources, so we
+  // approximate canonical detection with the same id pattern used by their
+  // parent collections (alphanumeric + underscores, optional slug prefix).
   const taskMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\.json$/u);
-  if (taskMatch?.[1] && isCanonicalTopLevelFile(taskMatch[1], 'tasks')) {
+  if (taskMatch?.[1] && isCanonicalTopLevelFile(taskMatch[1])) {
     return {
       action: 'delete_task',
       method: 'DELETE',
@@ -77,7 +86,7 @@ export function resolveDeleteRequest(path: string): ClickUpWritebackRequest {
   }
 
   const listMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\.json$/u);
-  if (listMatch?.[1] && isCanonicalTopLevelFile(listMatch[1], 'lists')) {
+  if (listMatch?.[1] && isCanonicalTopLevelFile(listMatch[1])) {
     return {
       action: 'delete_list',
       method: 'DELETE',
@@ -86,7 +95,7 @@ export function resolveDeleteRequest(path: string): ClickUpWritebackRequest {
   }
 
   const folderMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\.json$/u);
-  if (folderMatch?.[1] && isCanonicalTopLevelFile(folderMatch[1], 'folders')) {
+  if (folderMatch?.[1] && isCanonicalTopLevelFile(folderMatch[1])) {
     return {
       action: 'delete_folder',
       method: 'DELETE',
@@ -101,7 +110,7 @@ function buildTaskComment(taskId: string, content: string): ClickUpWritebackRequ
   const parsed = safeParseJson(content);
   const body = typeof parsed === 'string' ? parsed.trim() : readString(parseRecord(parsed), 'comment_text');
   if (!body) {
-    throw new Error('comments/new.json writeback requires a non-empty comment_text or plain string body');
+    throw new Error('task comment writeback requires a non-empty comment_text or plain string body');
   }
 
   return {
@@ -307,11 +316,10 @@ const LIST_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
 const FOLDER_CREATE_ALLOWLIST: ReadonlySet<string> = new Set(['name']);
 const FOLDER_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set(['name']);
 const SPACE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set(['color', 'features', 'name', 'private']);
-const TOP_LEVEL_ID_PATTERNS: Readonly<Record<string, RegExp>> = {
-  folders: /^[A-Za-z0-9]+$/,
-  lists: /^[A-Za-z0-9]+$/,
-  tasks: /^[A-Za-z0-9]+$/,
-};
+// Same shape as the declared resource idPattern: bare alphanumeric (with `_`)
+// or `<slug>--<id>` prefix. Used to distinguish canonical top-level files
+// (which support delete + update) from drafts.
+const TOP_LEVEL_ID_PATTERN = /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/;
 const READ_ONLY_FIELDS = new Set([
   'id',
   'custom_id',
@@ -340,32 +348,8 @@ function normalizePath(path: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-interface ResourceFileMatch {
-  canonical: boolean;
-  id: string;
-}
-
-function matchResourceFile(path: string, resourcePath: string): ResourceFileMatch | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): ResourceFileMatch | undefined {
-  const normalized = normalizePath(path);
-  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const segment = normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length);
-  const id = extractClickUpIdFromPathSegment(segment);
-  return { canonical: resource.idPattern.test(id), id };
-}
-
-function isCanonicalTopLevelFile(segment: string, collection: string): boolean {
-  const pattern = TOP_LEVEL_ID_PATTERNS[collection];
-  return pattern ? pattern.test(extractClickUpIdFromPathSegment(segment)) : false;
+function isCanonicalTopLevelFile(segment: string): boolean {
+  return TOP_LEVEL_ID_PATTERN.test(segment);
 }
 
 function unwrapSyncedEnvelope(payload: Record<string, unknown>): Record<string, unknown> {

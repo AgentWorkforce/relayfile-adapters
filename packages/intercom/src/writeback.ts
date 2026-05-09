@@ -1,5 +1,5 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { resources } from './resources.js';
 import type { IntercomWritebackRequest, JsonValue } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -11,16 +11,7 @@ const INTERCOM_COMPANIES_ROUTE = '/companies';
 export function resolveWritebackRequest(path: string, content: string): IntercomWritebackRequest {
   const normalizedPath = normalizePath(path);
 
-  const conversationFile = matchResourceFile(normalizedPath, '/intercom/conversations');
-  if (conversationFile && !conversationFile.canonical) {
-    return {
-      action: 'create_conversation',
-      method: 'POST',
-      endpoint: INTERCOM_CONVERSATIONS_ROUTE,
-      body: readWritablePayload(content),
-    };
-  }
-
+  // Reply endpoint is not a declared resource — keep ad-hoc routing.
   const replyMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\/reply\.json$/);
   if (replyMatch?.[1]) {
     return {
@@ -31,56 +22,67 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
     };
   }
 
-  const conversationMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\.json$/);
-  if (conversationMatch?.[1]) {
-    return {
-      action: 'update_conversation',
-      // Use PUT for updates to conform with Intercom API expectations
-      method: 'PUT',
-      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationMatch[1]}`,
-      body: readWritablePayload(content),
-    };
+  const route = classifyWrite(normalizedPath, resources);
+
+  if (route?.resource.name === 'conversations') {
+    if (route.kind === 'create') {
+      return {
+        action: 'create_conversation',
+        method: 'POST',
+        endpoint: INTERCOM_CONVERSATIONS_ROUTE,
+        body: readWritablePayload(content),
+      };
+    }
+    const conversationMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\.json$/);
+    if (route.kind === 'patch' && conversationMatch?.[1]) {
+      return {
+        action: 'update_conversation',
+        // Use PUT for updates to conform with Intercom API expectations
+        method: 'PUT',
+        endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationMatch[1]}`,
+        body: readWritablePayload(content),
+      };
+    }
   }
 
-  const contactFile = matchResourceFile(normalizedPath, '/intercom/contacts');
-  if (contactFile && !contactFile.canonical) {
-    return {
-      action: 'create_contact',
-      method: 'POST',
-      endpoint: INTERCOM_CONTACTS_ROUTE,
-      body: readWritablePayload(content),
-    };
+  if (route?.resource.name === 'contacts') {
+    if (route.kind === 'create') {
+      return {
+        action: 'create_contact',
+        method: 'POST',
+        endpoint: INTERCOM_CONTACTS_ROUTE,
+        body: readWritablePayload(content),
+      };
+    }
+    const contactMatch = normalizedPath.match(/^\/intercom\/contacts\/([^/]+)\.json$/);
+    if (route.kind === 'patch' && contactMatch?.[1]) {
+      return {
+        action: 'update_contact',
+        method: 'PUT',
+        endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactMatch[1]}`,
+        body: readWritablePayload(content),
+      };
+    }
   }
 
-  const contactMatch = normalizedPath.match(/^\/intercom\/contacts\/([^/]+)\.json$/);
-  if (contactMatch?.[1]) {
-    return {
-      action: 'update_contact',
-      method: 'PUT',
-      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactMatch[1]}`,
-      body: readWritablePayload(content),
-    };
-  }
-
-  const companyFile = matchResourceFile(normalizedPath, '/intercom/companies');
-  if (companyFile && !companyFile.canonical) {
-    return {
-      action: 'create_company',
-      method: 'POST',
-      endpoint: INTERCOM_COMPANIES_ROUTE,
-      body: readWritablePayload(content),
-    };
-  }
-
-  const companyMatch = normalizedPath.match(/^\/intercom\/companies\/([^/]+)\.json$/);
-  if (companyMatch?.[1]) {
-    return {
-      action: 'update_company',
-      // Upsert of a company is performed via POST /companies keyed by company_id
-      method: 'POST',
-      endpoint: `${INTERCOM_COMPANIES_ROUTE}`,
-      body: readWritablePayload(content),
-    };
+  if (route?.resource.name === 'companies') {
+    if (route.kind === 'create') {
+      return {
+        action: 'create_company',
+        method: 'POST',
+        endpoint: INTERCOM_COMPANIES_ROUTE,
+        body: readWritablePayload(content),
+      };
+    }
+    if (route.kind === 'patch') {
+      return {
+        action: 'update_company',
+        // Upsert of a company is performed via POST /companies keyed by company_id
+        method: 'POST',
+        endpoint: `${INTERCOM_COMPANIES_ROUTE}`,
+        body: readWritablePayload(content),
+      };
+    }
   }
 
   throw new Error(`No Intercom writeback rule matched ${path}`);
@@ -88,32 +90,42 @@ export function resolveWritebackRequest(path: string, content: string): Intercom
 
 export function resolveDeleteRequest(path: string): IntercomWritebackRequest {
   const normalizedPath = normalizePath(path);
-
-  const conversationMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\.json$/);
-  if (conversationMatch?.[1] && matchResourceFile(normalizedPath, '/intercom/conversations')?.canonical) {
-    return {
-      action: 'delete_conversation',
-      method: 'DELETE',
-      endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationMatch[1]}`,
-    };
+  const route = classifyWrite(normalizedPath, resources, { fsEvent: 'delete' });
+  if (route?.kind !== 'delete') {
+    throw new Error(`No Intercom delete writeback rule matched ${path}`);
   }
 
-  const contactMatch = normalizedPath.match(/^\/intercom\/contacts\/([^/]+)\.json$/);
-  if (contactMatch?.[1] && matchResourceFile(normalizedPath, '/intercom/contacts')?.canonical) {
-    return {
-      action: 'delete_contact',
-      method: 'DELETE',
-      endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactMatch[1]}`,
-    };
+  if (route.resource.name === 'conversations') {
+    const conversationMatch = normalizedPath.match(/^\/intercom\/conversations\/([^/]+)\.json$/);
+    if (conversationMatch?.[1]) {
+      return {
+        action: 'delete_conversation',
+        method: 'DELETE',
+        endpoint: `${INTERCOM_CONVERSATIONS_ROUTE}/${conversationMatch[1]}`,
+      };
+    }
   }
 
-  const companyMatch = normalizedPath.match(/^\/intercom\/companies\/([^/]+)\.json$/);
-  if (companyMatch?.[1] && matchResourceFile(normalizedPath, '/intercom/companies')?.canonical) {
-    return {
-      action: 'delete_company',
-      method: 'DELETE',
-      endpoint: `${INTERCOM_COMPANIES_ROUTE}/${companyMatch[1]}`,
-    };
+  if (route.resource.name === 'contacts') {
+    const contactMatch = normalizedPath.match(/^\/intercom\/contacts\/([^/]+)\.json$/);
+    if (contactMatch?.[1]) {
+      return {
+        action: 'delete_contact',
+        method: 'DELETE',
+        endpoint: `${INTERCOM_CONTACTS_ROUTE}/${contactMatch[1]}`,
+      };
+    }
+  }
+
+  if (route.resource.name === 'companies') {
+    const companyMatch = normalizedPath.match(/^\/intercom\/companies\/([^/]+)\.json$/);
+    if (companyMatch?.[1]) {
+      return {
+        action: 'delete_company',
+        method: 'DELETE',
+        endpoint: `${INTERCOM_COMPANIES_ROUTE}/${companyMatch[1]}`,
+      };
+    }
   }
 
   throw new Error(`No Intercom delete writeback rule matched ${path}`);
@@ -192,19 +204,3 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
   }
 }
 
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  const normalized = normalizePath(path);
-  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const id = decodeURIComponent(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
-}

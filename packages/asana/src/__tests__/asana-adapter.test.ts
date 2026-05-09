@@ -18,6 +18,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 function createAdapter(config: AsanaAdapterConfig = {}, writes: WriteFileInput[] = []): AsanaAdapter {
   const client: RelayFileClientLike = {
@@ -256,7 +257,7 @@ test('path mapper, read routes, and writeback routes cover primary Asana objects
   });
   assert.throws(
     () => resolveAsanaWritebackRequest('/asana/tasks/12001.json', '{"id":"12001","name":"Renamed"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolveAsanaWritebackRequest('/asana/tasks/draft-task.json', '{"workspace":"workspace_1"}'),

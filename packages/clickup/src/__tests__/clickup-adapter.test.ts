@@ -18,6 +18,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface RecordingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -234,7 +235,7 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
   });
   assert.throws(
     () => resolveWritebackRequest('/clickup/tasks/task_123.json', '{"id":"task_123","name":"Renamed"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolveWritebackRequest('/clickup/lists/list_123/tasks/draft-task.json', '{"description":"Missing name"}'),

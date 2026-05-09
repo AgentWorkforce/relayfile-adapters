@@ -1,10 +1,10 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GRAPH_API_BASE_URL, type TeamsObjectType, type WritebackTarget } from './types.js';
 import {
   makeObjectId,
   parseObjectId,
 } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -124,7 +124,7 @@ export function resolveDeleteRequest(
   path: string,
   apiBaseUrl: string = GRAPH_API_BASE_URL,
 ): WritebackTarget | null {
-  const parsed = parseWritebackPath(path);
+  const parsed = parseWritebackPath(path, 'delete');
   if (!parsed || !parsed.canonical) {
     return null;
   }
@@ -189,57 +189,41 @@ export function resolveWritebackForObject(
   }
 }
 
-function parseWritebackPath(path: string):
+function parseWritebackPath(
+  path: string,
+  fsEvent: 'write' | 'delete' = 'write',
+):
   | { canonical: boolean; objectType: Extract<TeamsObjectType, 'message' | 'reply' | 'chat_message'>; parts: Record<string, string> }
   | null {
+  const route = classifyWrite(path, resources, { fsEvent });
+  if (!route) return null;
+
   const messageMatch = path.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
-  if (messageMatch?.[1] && messageMatch[2] && messageMatch[3]) {
-    const file = matchResourceFile(path, '/teams/{teamId}/channels/{channelId}/messages');
-    if (!file) return null;
+  if (route.resource.path === '/teams/{teamId}/channels/{channelId}/messages' && messageMatch?.[1] && messageMatch[2] && messageMatch[3]) {
     return {
-      canonical: file.canonical,
+      canonical: route.canonical,
       objectType: 'message',
       parts: { teamId: messageMatch[1], channelId: messageMatch[2], messageId: messageMatch[3] },
     };
   }
 
   const replyMatch = path.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/);
-  if (replyMatch?.[1] && replyMatch[2] && replyMatch[3] && replyMatch[4]) {
-    const file = matchResourceFile(path, '/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies');
-    if (!file) return null;
+  if (route.resource.path === '/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies' && replyMatch?.[1] && replyMatch[2] && replyMatch[3] && replyMatch[4]) {
     return {
-      canonical: file.canonical,
+      canonical: route.canonical,
       objectType: 'reply',
       parts: { teamId: replyMatch[1], channelId: replyMatch[2], messageId: replyMatch[3], replyId: replyMatch[4] },
     };
   }
 
   const chatMatch = path.match(/^\/teams\/chats\/([^/]+)\/messages\/([^/]+)\.json$/);
-  if (chatMatch?.[1] && chatMatch[2]) {
-    const file = matchResourceFile(path, '/teams/chats/{chatId}/messages');
-    if (!file) return null;
+  if (route.resource.path === '/teams/chats/{chatId}/messages' && chatMatch?.[1] && chatMatch[2]) {
     return {
-      canonical: file.canonical,
+      canonical: route.canonical,
       objectType: 'chat_message',
       parts: { chatId: chatMatch[1], messageId: chatMatch[2] },
     };
   }
 
   return null;
-}
-
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
-    return undefined;
-  }
-  const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
 }

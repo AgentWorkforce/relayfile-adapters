@@ -1,5 +1,5 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { resources } from './resources.js';
 import type { ZendeskWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -9,33 +9,38 @@ const ZENDESK_USERS_ROUTE = '/api/v2/users';
 const ZENDESK_ORGANIZATIONS_ROUTE = '/api/v2/organizations';
 
 export function resolveWritebackRequest(path: string, content: string): ZendeskWritebackRequest {
-  const commentFile = matchResourceFile(path, '/zendesk/tickets/{ticketId}/comments');
-  const ticketCommentMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\/comments\/([^/]+)\.json$/);
-  if (ticketCommentMatch?.[1] && commentFile && !commentFile.canonical) {
-    return buildTicketCommentRequest(extractZendeskId(ticketCommentMatch[1]), content);
+  const normalized = normalizePath(path);
+  const route = classifyWrite(normalized, resources);
+
+  if (route?.resource.name === 'comments' && route.kind === 'create') {
+    const ticketCommentMatch = normalized.match(/^\/zendesk\/tickets\/([^/]+)\/comments\/([^/]+)\.json$/);
+    if (ticketCommentMatch?.[1]) {
+      return buildTicketCommentRequest(extractZendeskId(ticketCommentMatch[1]), content);
+    }
   }
 
-  const ticketFile = matchResourceFile(path, '/zendesk/tickets');
-  if (ticketFile && !ticketFile.canonical) {
-    return buildTicketCreateRequest(content);
+  if (route?.resource.name === 'tickets') {
+    if (route.kind === 'create') {
+      return buildTicketCreateRequest(content);
+    }
+    const ticketUpdateMatch = normalized.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
+    if (route.kind === 'patch' && ticketUpdateMatch?.[1]) {
+      return buildTicketUpdateRequest(extractZendeskId(ticketUpdateMatch[1]), content);
+    }
   }
 
-  const ticketUpdateMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
-  if (ticketUpdateMatch?.[1] && ticketFile?.canonical) {
-    return buildTicketUpdateRequest(extractZendeskId(ticketUpdateMatch[1]), content);
+  if (route?.resource.name === 'users') {
+    if (route.kind === 'create') {
+      return buildUserCreateRequest(content);
+    }
+    const userUpdateMatch = normalized.match(/^\/zendesk\/users\/([^/]+)\.json$/);
+    if (route.kind === 'patch' && userUpdateMatch?.[1]) {
+      return buildUserUpdateRequest(decodeURIComponent(userUpdateMatch[1]), content);
+    }
   }
 
-  const userFile = matchResourceFile(path, '/zendesk/users');
-  if (userFile && !userFile.canonical) {
-    return buildUserCreateRequest(content);
-  }
-
-  const userUpdateMatch = path.match(/^\/zendesk\/users\/([^/]+)\.json$/);
-  if (userUpdateMatch?.[1] && userFile?.canonical) {
-    return buildUserUpdateRequest(decodeURIComponent(userUpdateMatch[1]), content);
-  }
-
-  const organizationUpdateMatch = path.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
+  // Organizations are not yet declared as a resource; keep ad-hoc routing.
+  const organizationUpdateMatch = normalized.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
   if (organizationUpdateMatch?.[1]) {
     return buildOrganizationUpdateRequest(decodeURIComponent(organizationUpdateMatch[1]), content);
   }
@@ -44,25 +49,33 @@ export function resolveWritebackRequest(path: string, content: string): ZendeskW
 }
 
 export function resolveDeleteRequest(path: string): ZendeskWritebackRequest {
-  const ticketMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
-  if (ticketMatch?.[1] && matchResourceFile(path, '/zendesk/tickets')?.canonical) {
-    return {
-      action: 'delete_ticket',
-      method: 'DELETE',
-      endpoint: `${ZENDESK_TICKETS_ROUTE}/${extractZendeskId(ticketMatch[1])}.json`,
-    };
+  const normalized = normalizePath(path);
+  const route = classifyWrite(normalized, resources, { fsEvent: 'delete' });
+
+  if (route?.resource.name === 'tickets') {
+    const ticketMatch = normalized.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
+    if (ticketMatch?.[1]) {
+      return {
+        action: 'delete_ticket',
+        method: 'DELETE',
+        endpoint: `${ZENDESK_TICKETS_ROUTE}/${extractZendeskId(ticketMatch[1])}.json`,
+      };
+    }
   }
 
-  const userMatch = path.match(/^\/zendesk\/users\/([^/]+)\.json$/);
-  if (userMatch?.[1] && matchResourceFile(path, '/zendesk/users')?.canonical) {
-    return {
-      action: 'delete_user',
-      method: 'DELETE',
-      endpoint: `${ZENDESK_USERS_ROUTE}/${decodeURIComponent(userMatch[1])}.json`,
-    };
+  if (route?.resource.name === 'users') {
+    const userMatch = normalized.match(/^\/zendesk\/users\/([^/]+)\.json$/);
+    if (userMatch?.[1]) {
+      return {
+        action: 'delete_user',
+        method: 'DELETE',
+        endpoint: `${ZENDESK_USERS_ROUTE}/${decodeURIComponent(userMatch[1])}.json`,
+      };
+    }
   }
 
-  const orgMatch = path.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
+  // Organizations are not yet declared as a resource; keep ad-hoc routing.
+  const orgMatch = normalized.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
   if (orgMatch?.[1]) {
     return {
       action: 'delete_organization',
@@ -82,11 +95,11 @@ function buildTicketCommentRequest(ticketId: string, content: string): ZendeskWr
       ? readObject(parsed, 'comment') ?? parsed
       : parsed;
   if (!isRecord(comment)) {
-    throw new Error('tickets/<id>/comments/new.json writeback expects a comment object or plain string');
+    throw new Error('ticket comment create writeback expects a comment object or plain string');
   }
   const body = readString(comment, 'body') ?? readString(comment, 'html_body');
   if (!body) {
-    throw new Error('tickets/<id>/comments/new.json writeback requires a non-empty comment body');
+    throw new Error('ticket comment create writeback requires a non-empty comment body');
   }
   return {
     action: 'add_ticket_comment',
@@ -110,7 +123,7 @@ function buildTicketCreateRequest(content: string): ZendeskWritebackRequest {
   const ticket = readObject(payload, 'ticket') ?? payload;
   const subject = readString(ticket, 'subject');
   if (!subject) {
-    throw new Error('tickets/new.json writeback requires a `subject`');
+    throw new Error('ticket create writeback requires a `subject`');
   }
   return {
     action: 'create_ticket',
@@ -126,7 +139,7 @@ function buildTicketUpdateRequest(ticketId: string, content: string): ZendeskWri
   rejectReadOnlyFields(source);
   const ticket = pickTicketFields(source, false);
   if (Object.keys(ticket).length === 0) {
-    throw new Error('tickets/<id>.json update writeback requires at least one mutable ticket field');
+    throw new Error('ticket update writeback requires at least one mutable ticket field');
   }
   return {
     action: 'update_ticket',
@@ -142,7 +155,7 @@ function buildUserCreateRequest(content: string): ZendeskWritebackRequest {
   const user = readObject(payload, 'user') ?? payload;
   const name = readString(user, 'name');
   if (!name) {
-    throw new Error('users/new.json writeback requires a `name`');
+    throw new Error('user create writeback requires a `name`');
   }
   return {
     action: 'create_user',
@@ -158,7 +171,7 @@ function buildUserUpdateRequest(userId: string, content: string): ZendeskWriteba
   rejectReadOnlyFields(source);
   const user = pickUserFields(source, false);
   if (Object.keys(user).length === 0) {
-    throw new Error('users/<id>.json update writeback requires at least one mutable user field');
+    throw new Error('user update writeback requires at least one mutable user field');
   }
   return {
     action: 'update_user',
@@ -175,7 +188,7 @@ function buildOrganizationUpdateRequest(organizationId: string, content: string)
     : readObject(payload, 'organization') ?? payload;
   const organization = pickOrganizationFields(source);
   if (Object.keys(organization).length === 0) {
-    throw new Error('organizations/<id>.json update writeback requires at least one mutable organization field');
+    throw new Error('organization update writeback requires at least one mutable organization field');
   }
   return {
     action: 'update_organization',
@@ -208,20 +221,12 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
   }
 }
 
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
+function normalizePath(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    throw new Error('Zendesk writeback path must be a non-empty string');
   }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
-    return undefined;
-  }
-  const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 const TICKET_FIELDS = new Set([

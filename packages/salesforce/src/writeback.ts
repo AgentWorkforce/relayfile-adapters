@@ -1,6 +1,6 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { decodeSalesforcePathSegment, pathObjectTypeFromCollection } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 import type { SalesforceWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -57,15 +57,15 @@ export function resolveWritebackRequest(
   method: 'PATCH' | 'POST' | 'PUT' = 'PATCH',
 ): SalesforceWritebackRequest {
   const normalizedPath = normalizePath(path);
+  const route = classifyWrite(normalizedPath, resources);
 
   const itemMatch = normalizedPath.match(/^\/salesforce\/([^/]+)\/([^/]+)\.json$/);
-  if (itemMatch?.[1] && itemMatch[2]) {
+  if (route && itemMatch?.[1] && itemMatch[2]) {
     const objectType = pathObjectTypeFromCollection(itemMatch[1]);
     if (!objectType) {
       throw new Error(`No Salesforce writeback rule matched ${path}`);
     }
-    const file = matchResourceFile(normalizedPath, `/salesforce/${itemMatch[1]}`);
-    if (file && !file.canonical) {
+    if (route.kind === 'create') {
       const body = parseJsonObject(content);
       rejectReadOnlyFields(body);
       return {
@@ -75,19 +75,18 @@ export function resolveWritebackRequest(
         body,
       };
     }
-    if (!file?.canonical) {
-      throw new Error(`No Salesforce writeback rule matched ${path}`);
+    if (route.kind === 'patch') {
+      const objectId = decodeSalesforcePathSegment(itemMatch[2]);
+      const body = unwrapSyncedEnvelope(parseJsonObject(content));
+      rejectReadOnlyFields(body);
+      const writeMethod = method === 'PUT' ? 'PUT' : 'PATCH';
+      return {
+        action: writeMethod === 'PUT' ? REPLACE_ACTIONS[objectType] : UPDATE_ACTIONS[objectType],
+        method: writeMethod,
+        endpoint: `${ROUTES[objectType]}/${encodeURIComponent(objectId)}`,
+        body,
+      };
     }
-    const objectId = decodeSalesforcePathSegment(itemMatch[2]);
-    const body = unwrapSyncedEnvelope(parseJsonObject(content));
-    rejectReadOnlyFields(body);
-    const writeMethod = method === 'PUT' ? 'PUT' : 'PATCH';
-    return {
-      action: writeMethod === 'PUT' ? REPLACE_ACTIONS[objectType] : UPDATE_ACTIONS[objectType],
-      method: writeMethod,
-      endpoint: `${ROUTES[objectType]}/${encodeURIComponent(objectId)}`,
-      body,
-    };
   }
 
   throw new Error(`No Salesforce writeback rule matched ${path}`);
@@ -95,11 +94,11 @@ export function resolveWritebackRequest(
 
 export function resolveDeleteRequest(path: string): SalesforceWritebackRequest {
   const normalizedPath = normalizePath(path);
+  const route = classifyWrite(normalizedPath, resources, { fsEvent: 'delete' });
   const itemMatch = normalizedPath.match(/^\/salesforce\/([^/]+)\/([^/]+)\.json$/);
-  if (itemMatch?.[1] && itemMatch[2]) {
+  if (route?.kind === 'delete' && itemMatch?.[1] && itemMatch[2]) {
     const objectType = pathObjectTypeFromCollection(itemMatch[1]);
-    const file = matchResourceFile(normalizedPath, `/salesforce/${itemMatch[1]}`);
-    if (objectType && file?.canonical) {
+    if (objectType) {
       return {
         action: DELETE_ACTIONS[objectType],
         method: 'DELETE',
@@ -170,23 +169,6 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
       throw new ReadOnlyFieldError(key);
     }
   }
-}
-
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  const normalized = normalizePath(path);
-  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
-    return undefined;
-  }
-  const id = decodeSalesforcePathSegment(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

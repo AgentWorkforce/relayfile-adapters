@@ -17,6 +17,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface RecordedClient extends RelayFileClientLike {
   deleted: Array<{ path: string; workspaceId: string }>;
@@ -325,7 +326,7 @@ test('writeback resolver maps Intercom edit paths to REST mutations', () => {
   });
   assert.throws(
     () => resolveWritebackRequest('/intercom/contacts/contact_123.json', '{"id":"contact_123","email":"new@example.com"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolveWritebackRequest('/intercom/contacts/draft.contact.json', '[]'),

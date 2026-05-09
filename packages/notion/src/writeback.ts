@@ -1,7 +1,7 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { DEFAULT_NOTION_MARKDOWN_API_VERSION } from './types.js';
 import { deserializePropertyMap } from './pages/properties.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 import type { JsonValue, NotionWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -61,21 +61,21 @@ function formatUuid(hex32: string): string {
  *   - PATCH /notion/pages/<slug>--<id>/content.md                  → page markdown (top-level)
  *   - POST  /notion/databases/<db>/pages/<slug>--<id>/comments.json → comment create
  *   - POST  /notion/pages/<slug>--<id>/comments.json               → comment create (top-level)
- *   - POST  /notion/databases/<db>/pages/new.json                   → create page in database
+ *   - POST  /notion/databases/<db>/pages/<draft>.json               → create page in database
  *   - POST  /notion/databases/<db>/pages                            → create page in database
  *
  * Throws when no rule matches the path.
  */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
-  const databasePageFile = matchResourceFile(path, '/notion/databases/{databaseId}/pages');
-  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
-  if (createDatabasePageMatch && databasePageFile && !databasePageFile.canonical) {
-    return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
-  }
-
+  const route = classifyWrite(path, resources);
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
-  if (databasePageMatch) {
-    return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
+  if (route?.resource.name === 'pages' && databasePageMatch) {
+    if (route.kind === 'create') {
+      return buildCreatePageWriteback(extractNotionId(databasePageMatch[1]), content);
+    }
+    if (route.kind === 'patch') {
+      return buildPagePropertiesWriteback(extractNotionId(databasePageMatch[2]), content);
+    }
   }
 
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
@@ -107,8 +107,9 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
 }
 
 export function resolveDeleteRequest(path: string): NotionWritebackRequest {
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
-  if (databasePageMatch?.[2] && matchResourceFile(path, '/notion/databases/{databaseId}/pages')?.canonical) {
+  if (route?.resource.name === 'pages' && route.kind === 'delete' && databasePageMatch?.[2]) {
     return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
   }
 
@@ -340,18 +341,3 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
   }
 }
 
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
-    return undefined;
-  }
-  const id = extractNotionId(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
-}

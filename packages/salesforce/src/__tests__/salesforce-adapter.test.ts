@@ -19,6 +19,7 @@ import {
   type SalesforceAdapterConfig,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
   deleted: string[];
@@ -275,11 +276,11 @@ test('read and writeback route resolution maps VFS paths to Salesforce REST requ
   });
   assert.throws(
     () => resolveWritebackRequest('/salesforce/contacts/003000000000000AAA.json', '{"Id":"003000000000000AAA","Title":"CEO"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'Id',
   );
   assert.throws(
     () => resolveWritebackRequest('/salesforce/accounts/draft-account.json', '{"Id":"001000000000000AAA","Name":"Acme"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'Id',
   );
   assert.deepEqual(resolveDeleteRequest('/salesforce/accounts/001000000000000AAA.json'), {
     action: 'delete_account',

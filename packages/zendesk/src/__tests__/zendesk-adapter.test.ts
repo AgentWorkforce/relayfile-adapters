@@ -16,6 +16,7 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+import { ReadOnlyFieldError } from '../writeback.js';
 
 function createProvider(): ConnectionProvider {
   return {
@@ -209,7 +210,7 @@ test('path mapping stays deterministic for supported Zendesk VFS objects', () =>
   });
   assert.throws(
     () => resolveWritebackRequest('/zendesk/tickets/123.json', '{"id":"123","subject":"Renamed"}'),
-    /read-only/,
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
   );
   assert.throws(
     () => resolveWritebackRequest('/zendesk/tickets/draft-ticket.json', '{"description":"Missing subject"}'),

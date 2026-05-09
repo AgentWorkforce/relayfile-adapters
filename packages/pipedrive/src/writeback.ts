@@ -1,6 +1,6 @@
-import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { extractPipedriveIdFromPathSegment } from './path-mapper.js';
-import { resources, type AdapterResourceConfig } from './resources.js';
+import { resources } from './resources.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -79,65 +79,70 @@ const ACTIVITY_MUTABLE_FIELDS = new Set([
 
 export function resolvePipedriveWritebackRequest(path: string, content: string): PipedriveWritebackRequest {
   const normalized = normalizePath(path);
+  const route = classifyWrite(normalized, resources);
 
-  if (isDraftResourcePath(normalized, '/pipedrive/deals')) {
-    return createRequest('create_deal', PIPEDRIVE_DEALS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), DEAL_MUTABLE_FIELDS));
+  if (route?.resource.name === 'deals') {
+    if (route.kind === 'create') {
+      return createRequest('create_deal', PIPEDRIVE_DEALS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), DEAL_MUTABLE_FIELDS));
+    }
+    const dealMatch = normalized.match(/^\/pipedrive\/deals\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && dealMatch?.[1]) {
+      return updateRequest(
+        'update_deal',
+        `${PIPEDRIVE_DEALS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(dealMatch[1])}`,
+        pickUpdateBody(parseJsonObject(content), DEAL_MUTABLE_FIELDS),
+      );
+    }
   }
 
-  if (isDraftResourcePath(normalized, '/pipedrive/persons')) {
-    return createRequest('create_person', PIPEDRIVE_PERSONS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), PERSON_MUTABLE_FIELDS));
+  if (route?.resource.name === 'persons') {
+    if (route.kind === 'create') {
+      return createRequest('create_person', PIPEDRIVE_PERSONS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), PERSON_MUTABLE_FIELDS));
+    }
+    const personMatch = normalized.match(/^\/pipedrive\/persons\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && personMatch?.[1]) {
+      return updateRequest(
+        'update_person',
+        `${PIPEDRIVE_PERSONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(personMatch[1])}`,
+        pickUpdateBody(parseJsonObject(content), PERSON_MUTABLE_FIELDS),
+      );
+    }
   }
 
-  if (isDraftResourcePath(normalized, '/pipedrive/organizations')) {
-    return createRequest(
-      'create_organization',
-      PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE,
-      pickCreateBody(parseJsonObject(content), ORGANIZATION_MUTABLE_FIELDS),
-    );
+  if (route?.resource.name === 'organizations') {
+    if (route.kind === 'create') {
+      return createRequest(
+        'create_organization',
+        PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE,
+        pickCreateBody(parseJsonObject(content), ORGANIZATION_MUTABLE_FIELDS),
+      );
+    }
+    const organizationMatch = normalized.match(/^\/pipedrive\/organizations\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && organizationMatch?.[1]) {
+      return updateRequest(
+        'update_organization',
+        `${PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(organizationMatch[1])}`,
+        pickUpdateBody(parseJsonObject(content), ORGANIZATION_MUTABLE_FIELDS),
+      );
+    }
   }
 
-  if (isDraftResourcePath(normalized, '/pipedrive/activities')) {
-    return createRequest(
-      'create_activity',
-      PIPEDRIVE_ACTIVITY_WRITE_ROUTE,
-      pickCreateBody(parseJsonObject(content), ACTIVITY_MUTABLE_FIELDS),
-    );
-  }
-
-  const dealMatch = normalized.match(/^\/pipedrive\/deals\/([^/]+)\.json$/u);
-  if (dealMatch?.[1]) {
-    return updateRequest(
-      'update_deal',
-      `${PIPEDRIVE_DEALS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(dealMatch[1])}`,
-      pickUpdateBody(parseJsonObject(content), DEAL_MUTABLE_FIELDS),
-    );
-  }
-
-  const personMatch = normalized.match(/^\/pipedrive\/persons\/([^/]+)\.json$/u);
-  if (personMatch?.[1]) {
-    return updateRequest(
-      'update_person',
-      `${PIPEDRIVE_PERSONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(personMatch[1])}`,
-      pickUpdateBody(parseJsonObject(content), PERSON_MUTABLE_FIELDS),
-    );
-  }
-
-  const organizationMatch = normalized.match(/^\/pipedrive\/organizations\/([^/]+)\.json$/u);
-  if (organizationMatch?.[1]) {
-    return updateRequest(
-      'update_organization',
-      `${PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(organizationMatch[1])}`,
-      pickUpdateBody(parseJsonObject(content), ORGANIZATION_MUTABLE_FIELDS),
-    );
-  }
-
-  const activityMatch = normalized.match(/^\/pipedrive\/activities\/([^/]+)\.json$/u);
-  if (activityMatch?.[1]) {
-    return updateRequest(
-      'update_activity',
-      `${PIPEDRIVE_ACTIVITY_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(activityMatch[1])}`,
-      pickUpdateBody(parseJsonObject(content), ACTIVITY_MUTABLE_FIELDS),
-    );
+  if (route?.resource.name === 'activities') {
+    if (route.kind === 'create') {
+      return createRequest(
+        'create_activity',
+        PIPEDRIVE_ACTIVITY_WRITE_ROUTE,
+        pickCreateBody(parseJsonObject(content), ACTIVITY_MUTABLE_FIELDS),
+      );
+    }
+    const activityMatch = normalized.match(/^\/pipedrive\/activities\/([^/]+)\.json$/u);
+    if (route.kind === 'patch' && activityMatch?.[1]) {
+      return updateRequest(
+        'update_activity',
+        `${PIPEDRIVE_ACTIVITY_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(activityMatch[1])}`,
+        pickUpdateBody(parseJsonObject(content), ACTIVITY_MUTABLE_FIELDS),
+      );
+    }
   }
 
   throw new Error(`No Pipedrive writeback rule matched ${path}`);
@@ -145,22 +150,34 @@ export function resolvePipedriveWritebackRequest(path: string, content: string):
 
 export function resolvePipedriveDeleteRequest(path: string): PipedriveWritebackRequest {
   const normalized = normalizePath(path);
+  const route = classifyWrite(normalized, resources, { fsEvent: 'delete' });
+  if (!route) {
+    throw new Error(`No Pipedrive delete writeback rule matched ${path}`);
+  }
 
-  const dealMatch = normalized.match(/^\/pipedrive\/deals\/([^/]+)\.json$/u);
-  if (dealMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/deals')) {
-    return deleteRequest('delete_deal', `${PIPEDRIVE_DEALS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(dealMatch[1])}`);
+  if (route.resource.name === 'deals') {
+    const dealMatch = normalized.match(/^\/pipedrive\/deals\/([^/]+)\.json$/u);
+    if (dealMatch?.[1]) {
+      return deleteRequest('delete_deal', `${PIPEDRIVE_DEALS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(dealMatch[1])}`);
+    }
   }
-  const personMatch = normalized.match(/^\/pipedrive\/persons\/([^/]+)\.json$/u);
-  if (personMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/persons')) {
-    return deleteRequest('delete_person', `${PIPEDRIVE_PERSONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(personMatch[1])}`);
+  if (route.resource.name === 'persons') {
+    const personMatch = normalized.match(/^\/pipedrive\/persons\/([^/]+)\.json$/u);
+    if (personMatch?.[1]) {
+      return deleteRequest('delete_person', `${PIPEDRIVE_PERSONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(personMatch[1])}`);
+    }
   }
-  const organizationMatch = normalized.match(/^\/pipedrive\/organizations\/([^/]+)\.json$/u);
-  if (organizationMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/organizations')) {
-    return deleteRequest('delete_organization', `${PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(organizationMatch[1])}`);
+  if (route.resource.name === 'organizations') {
+    const organizationMatch = normalized.match(/^\/pipedrive\/organizations\/([^/]+)\.json$/u);
+    if (organizationMatch?.[1]) {
+      return deleteRequest('delete_organization', `${PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(organizationMatch[1])}`);
+    }
   }
-  const activityMatch = normalized.match(/^\/pipedrive\/activities\/([^/]+)\.json$/u);
-  if (activityMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/activities')) {
-    return deleteRequest('delete_activity', `${PIPEDRIVE_ACTIVITY_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(activityMatch[1])}`);
+  if (route.resource.name === 'activities') {
+    const activityMatch = normalized.match(/^\/pipedrive\/activities\/([^/]+)\.json$/u);
+    if (activityMatch?.[1]) {
+      return deleteRequest('delete_activity', `${PIPEDRIVE_ACTIVITY_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(activityMatch[1])}`);
+    }
   }
 
   throw new Error(`No Pipedrive delete writeback rule matched ${path}`);
@@ -278,31 +295,6 @@ const READ_ONLY_FIELDS = new Set([
   '_webhook',
   '_connection',
 ]);
-
-function isDraftResourcePath(path: string, resourcePath: string): boolean {
-  const file = matchResourceFile(path, resourcePath);
-  return file !== undefined && !file.canonical;
-}
-
-function isCanonicalResourcePath(path: string, resourcePath: string): boolean {
-  return matchResourceFile(path, resourcePath)?.canonical === true;
-}
-
-function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
-  const resource = resources.find((candidate) => candidate.path === resourcePath);
-  if (!resource) {
-    return undefined;
-  }
-  return matchFile(path, resource);
-}
-
-function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
-  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
-    return undefined;
-  }
-  const id = extractPipedriveIdFromPathSegment(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
-  return { canonical: resource.idPattern.test(id), id };
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

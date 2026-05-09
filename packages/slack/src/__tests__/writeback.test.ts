@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
+import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
 
 describe('slack writeback', () => {
   describe('post_message', () => {
@@ -92,7 +92,7 @@ describe('slack writeback', () => {
             '/slack/channels/general/messages/draft@message.json',
             JSON.stringify({ id: '1762445678.001234', text: 'Hello' }),
           ),
-        /read-only/,
+        (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
       );
     });
   });

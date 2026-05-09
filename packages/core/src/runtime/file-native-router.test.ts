@@ -305,6 +305,53 @@ test("executeFileNativeWriteback routes canonical deletes without schema validat
   ]);
 });
 
+test("executeFileNativeWriteback bypasses validation for schema-less create/patch resources", async () => {
+  clearWritebackStatus();
+  const emptySchema: JsonSchema = {};
+
+  const create = await executeFileNativeWriteback({
+    path: "/linear/issues/draft.json",
+    content: JSON.stringify({ anything: "goes", id: "still-allowed-no-schema" }),
+    resources,
+    loadSchema: () => emptySchema,
+    now: () => new Date("2026-05-09T10:00:00.000Z"),
+    resolveWritebackRequest(path) {
+      assert.equal(path, "/linear/issues/draft.json");
+      return {
+        action: "create_issue",
+        method: "POST",
+        endpoint: "/issues",
+        body: { title: "from draft" },
+      };
+    },
+  });
+  assert.equal(create.ok, true);
+  if (create.ok) {
+    assert.equal(create.route.kind, "create");
+  }
+
+  const patch = await executeFileNativeWriteback({
+    path: `/linear/issues/${issueId}.json`,
+    content: JSON.stringify({ anything: "goes", id: "still-allowed-no-schema" }),
+    resources,
+    loadSchema: () => emptySchema,
+    now: () => new Date("2026-05-09T10:00:01.000Z"),
+    resolveWritebackRequest(path) {
+      assert.equal(path, `/linear/issues/${issueId}.json`);
+      return {
+        action: "update_issue",
+        method: "PUT",
+        endpoint: `/issues/${issueId}`,
+        body: { anything: "goes" },
+      };
+    },
+  });
+  assert.equal(patch.ok, true);
+  if (patch.ok) {
+    assert.equal(patch.route.kind, "patch");
+  }
+});
+
 function issueSchema(): JsonSchema {
   return {
     type: "object",
