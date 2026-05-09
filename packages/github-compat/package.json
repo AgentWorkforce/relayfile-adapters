@@ -1,0 +1,8 @@
+{
+  "name": "@relayfile/github",
+  "private": true,
+  "scripts": {
+    "test": "node ../../scripts/pnpm-compat-runner.mjs github test",
+    "typecheck": "node ../../scripts/pnpm-compat-runner.mjs github typecheck"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@relayfile/linear",
+  "private": true,
+  "scripts": {
+    "test": "node ../../scripts/pnpm-compat-runner.mjs linear test",
+    "typecheck": "node ../../scripts/pnpm-compat-runner.mjs linear typecheck"
+  }
+}
