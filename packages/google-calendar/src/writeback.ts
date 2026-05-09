@@ -14,6 +14,10 @@ export function resolveGoogleCalendarWritebackRequest(path: string, content: str
     const eventId = extractGoogleCalendarIdFromPathSegment(updateMatch[2]);
     const parsed = parsePayload(content);
     const eventPayload = isRecord(parsed.payload) ? parsed.payload : parsed;
+    const payloadId = readString(eventPayload.id) ?? readString(parsed.objectId);
+    if (payloadId && payloadId !== eventId) {
+      throw new Error('events/<id>.json writeback payload id must match path event id');
+    }
     if (shouldCreateEvent(eventId, parsed, eventPayload)) {
       return buildCreateEvent(calendarId, eventPayload);
     }
@@ -112,7 +116,7 @@ function shouldCreateEvent(
   eventPayload: Record<string, unknown>,
 ): boolean {
   const payloadId = readString(eventPayload.id) ?? readString(rawPayload.objectId);
-  if (payloadId && payloadId === pathEventId) return false;
+  if (payloadId) return false;
   return Boolean(
     eventPayload.start &&
       eventPayload.end &&

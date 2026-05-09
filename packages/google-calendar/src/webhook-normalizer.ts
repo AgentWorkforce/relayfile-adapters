@@ -11,8 +11,8 @@ export function normalizeGoogleCalendarWebhook(
   options: { connectionId?: string; providerConfigKey?: string; calendarId?: string } = {},
 ): GoogleCalendarNormalizedWebhook {
   const normalizedHeaders = {
-    ...normalizeHeaders(headers),
     ...normalizeHeaders(extractForwardedHeaders(payload)),
+    ...normalizeHeaders(headers),
   };
   const payloadRecord = isRecord(payload) ? payload : {};
   const resourceState = normalizedHeaders['x-goog-resource-state'] ?? 'unknown';

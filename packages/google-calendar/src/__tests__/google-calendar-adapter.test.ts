@@ -116,6 +116,20 @@ test('webhook normalizer reads Nango forwarded Google Calendar headers', () => {
   assert.equal(normalized.shouldSync, true);
 });
 
+test('webhook normalizer prefers direct headers over forwarded payload headers', () => {
+  const normalized = normalizeGoogleCalendarWebhook({
+    payload: {
+      'x-goog-resource-state': 'exists',
+      'x-goog-resource-uri': 'https://www.googleapis.com/calendar/v3/calendars/forwarded/events?alt=json',
+    },
+  }, {
+    'x-goog-resource-uri': 'https://www.googleapis.com/calendar/v3/calendars/direct/events?alt=json',
+  });
+
+  assert.equal(normalized.objectId, 'direct');
+  assert.equal(normalized.headers['x-goog-resource-uri'], 'https://www.googleapis.com/calendar/v3/calendars/direct/events?alt=json');
+});
+
 test('webhook normalizer treats sync and not_exists states as reconciliation signals', () => {
   const syncEvent = normalizeGoogleCalendarWebhook({}, {
     'x-goog-resource-state': 'sync',
@@ -261,6 +275,16 @@ test('writeback resolves create, update, and delete event routes', () => {
     method: 'DELETE',
     endpoint: '/calendar/v3/calendars/primary/events/evt_1',
   });
+});
+
+test('writeback rejects mismatched event ids before routing an update', () => {
+  assert.throws(
+    () => resolveGoogleCalendarWritebackRequest(
+      '/google-calendar/calendars/primary/events/evt_1.json',
+      JSON.stringify({ id: 'evt_2', summary: 'Wrong event' }),
+    ),
+    /payload id must match path event id/u,
+  );
 });
 
 test('watch helpers register, renew, and stop channels via provider proxy', async () => {

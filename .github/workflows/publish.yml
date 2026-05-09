@@ -8,8 +8,8 @@ on:
           Package(s) to publish. Accepts:
             • all
             • missing (only versions not yet on npm)
-            • a group alias: storage, messaging, devtools, crm, pm, support, analytics, email, commerce, db
-            • one or more package dir names, comma- or space-separated (e.g. "slack,linear" or "github gitlab")
+            • a group alias: storage, messaging, calendar, devtools, crm, pm, support, analytics, email, commerce, db
+            • one or more package dir names, comma- or space-separated (e.g. "google-calendar", "slack,linear", or "github gitlab")
         required: true
         type: string
         default: "all"
