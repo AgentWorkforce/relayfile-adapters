@@ -143,11 +143,15 @@ export interface HubSpotWritebackRequest {
     | 'create_contact'
     | 'create_deal'
     | 'create_ticket'
+    | 'delete_company'
+    | 'delete_contact'
+    | 'delete_deal'
+    | 'delete_ticket'
     | 'update_company'
     | 'update_contact'
     | 'update_deal'
     | 'update_ticket';
   body?: Record<string, unknown>;
   endpoint: string;
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
 }

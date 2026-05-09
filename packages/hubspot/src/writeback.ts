@@ -1,4 +1,8 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { HubSpotObjectType, HubSpotWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 export const HUBSPOT_WRITEBACK_CONTACTS_ROUTE = '/crm/v3/objects/contacts';
 export const HUBSPOT_WRITEBACK_COMPANIES_ROUTE = '/crm/v3/objects/companies';
@@ -24,6 +28,13 @@ const UPDATE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWriteback
   contact: 'update_contact',
   deal: 'update_deal',
   ticket: 'update_ticket',
+};
+
+const DELETE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWritebackRequest['action']>> = {
+  company: 'delete_company',
+  contact: 'delete_contact',
+  deal: 'delete_deal',
+  ticket: 'delete_ticket',
 };
 
 const ASSOCIATE_ACTION_BY_TYPE: Readonly<Record<HubSpotObjectType, HubSpotWritebackRequest['action']>> = {
@@ -57,6 +68,19 @@ export function resolveHubSpotWritebackRequest(path: string, content: string): H
   }
 
   return buildUpdateRequest(parsed.objectType, parsed.objectId, content);
+}
+
+export function resolveHubSpotDeleteRequest(path: string): HubSpotWritebackRequest {
+  const parsed = parseWritebackPath(path);
+  if (!parsed.objectId || !isCanonicalResourcePath(path, parsed.objectType)) {
+    throw new Error(`No HubSpot delete writeback rule matched ${path}`);
+  }
+
+  return {
+    action: DELETE_ACTION_BY_TYPE[parsed.objectType],
+    endpoint: `${ROUTE_BY_TYPE[parsed.objectType]}/${encodeURIComponent(parsed.objectId)}`,
+    method: 'DELETE',
+  };
 }
 
 function buildCreateRequest(objectType: HubSpotObjectType, content: string): HubSpotWritebackRequest {
@@ -102,10 +126,6 @@ function buildAssociationRequest(parsed: {
 
 function parseWritebackPath(path: string): ParsedWritebackPath {
   const trimmed = path.trim();
-  if (trimmed === '/hubspot/contacts/new.json') return { objectType: 'contact' };
-  if (trimmed === '/hubspot/companies/new.json') return { objectType: 'company' };
-  if (trimmed === '/hubspot/deals/new.json') return { objectType: 'deal' };
-  if (trimmed === '/hubspot/tickets/new.json') return { objectType: 'ticket' };
 
   const association = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\/associations\/([^/]+)\/([^/]+)\.json$/u.exec(trimmed);
   if (association?.[1] && association[2] && association[3] && association[4]) {
@@ -119,9 +139,14 @@ function parseWritebackPath(path: string): ParsedWritebackPath {
 
   const update = /^\/hubspot\/(contacts|companies|deals|tickets)\/([^/]+)\.json$/u.exec(trimmed);
   if (update?.[1] && update[2]) {
+    const objectType = objectTypeFromCollection(update[1]);
+    const objectId = decodeURIComponent(update[2]);
+    if (!isCanonicalResourcePath(trimmed, objectType)) {
+      return { objectType };
+    }
     return {
-      objectId: decodeURIComponent(update[2]),
-      objectType: objectTypeFromCollection(update[1]),
+      objectId,
+      objectType,
     };
   }
 
@@ -137,6 +162,9 @@ function readPropertiesPayload(content: string): Record<string, unknown> {
 function sanitizeProperties(properties: Record<string, unknown>): Record<string, unknown> {
   const sanitized: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(properties)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
     if (isWritablePropertyKey(key) && value !== undefined) {
       sanitized[key] = value;
     }
@@ -157,6 +185,59 @@ function isWritablePropertyKey(key: string): boolean {
     !key.startsWith('_') &&
     !key.startsWith('hubspot.')
   );
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'archived',
+  'archivedAt',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function isCanonicalResourcePath(path: string, objectType: HubSpotObjectType): boolean {
+  const collection = collectionFromObjectType(objectType);
+  const match = matchResourceFile(path, `/hubspot/${collection}`);
+  return match?.canonical === true;
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  const normalized = path.trim();
+  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
+    return undefined;
+  }
+  const id = decodeURIComponent(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
+}
+
+function collectionFromObjectType(objectType: HubSpotObjectType): string {
+  switch (objectType) {
+    case 'company':
+      return 'companies';
+    case 'contact':
+      return 'contacts';
+    case 'deal':
+      return 'deals';
+    case 'ticket':
+      return 'tickets';
+  }
 }
 
 function parseJsonObject(content: string): Record<string, unknown> {

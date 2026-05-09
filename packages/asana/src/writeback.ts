@@ -1,5 +1,9 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import { extractAsanaIdFromPathSegment } from './path-mapper.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { AsanaWritebackRequest, JsonValue } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 const ASANA_API_TASKS_ROUTE = '/api/1.0/tasks';
 const ASANA_API_PROJECTS_ROUTE = '/api/1.0/projects';
@@ -8,7 +12,8 @@ const ASANA_API_SECTIONS_ROUTE = '/api/1.0/sections';
 export function resolveAsanaWritebackRequest(path: string, content: string): AsanaWritebackRequest {
   const normalizedPath = normalizePath(path);
 
-  if (normalizedPath === '/asana/tasks/new.json' || normalizedPath === '/asana/tasks/') {
+  const taskFile = matchResourceFile(normalizedPath, '/asana/tasks');
+  if (taskFile && !taskFile.canonical) {
     return buildTaskCreate(content);
   }
 
@@ -22,41 +27,81 @@ export function resolveAsanaWritebackRequest(path: string, content: string): Asa
   }
 
   const taskUpdateMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
-  if (taskUpdateMatch?.[1]) {
+  if (taskUpdateMatch?.[1] && taskFile?.canonical) {
     return buildTaskUpdate(extractAsanaIdFromPathSegment(taskUpdateMatch[1]), content);
   }
 
-  if (normalizedPath === '/asana/projects/new.json' || normalizedPath === '/asana/projects/') {
+  const projectFile = matchResourceFile(normalizedPath, '/asana/projects');
+  if (projectFile && !projectFile.canonical) {
     return buildProjectCreate(content);
   }
 
   const projectUpdateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
-  if (projectUpdateMatch?.[1]) {
+  if (projectUpdateMatch?.[1] && projectFile?.canonical) {
     return buildProjectUpdate(extractAsanaIdFromPathSegment(projectUpdateMatch[1]), content);
   }
 
-  const projectSectionCreateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\/sections\/new\.json$/u);
-  if (projectSectionCreateMatch?.[1]) {
+  const projectSectionFile = matchResourceFile(normalizedPath, '/asana/projects/{projectId}/sections');
+  const projectSectionCreateMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\/sections\/([^/]+)\.json$/u);
+  if (projectSectionCreateMatch?.[1] && projectSectionFile && !projectSectionFile.canonical) {
     return buildSectionCreate(extractAsanaIdFromPathSegment(projectSectionCreateMatch[1]), content);
   }
 
-  if (normalizedPath === '/asana/sections/new.json' || normalizedPath === '/asana/sections/') {
+  const sectionFile = matchResourceFile(normalizedPath, '/asana/sections');
+  if (sectionFile && !sectionFile.canonical) {
     return buildSectionCreate(undefined, content);
   }
 
   const sectionUpdateMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
-  if (sectionUpdateMatch?.[1]) {
+  if (sectionUpdateMatch?.[1] && sectionFile?.canonical) {
     return buildSectionUpdate(extractAsanaIdFromPathSegment(sectionUpdateMatch[1]), content);
   }
 
   throw new Error(`No Asana writeback rule matched ${path}`);
 }
 
+export function resolveAsanaDeleteRequest(path: string): AsanaWritebackRequest {
+  const normalizedPath = normalizePath(path);
+
+  const taskMatch = normalizedPath.match(/^\/asana\/tasks\/([^/]+)\.json$/u);
+  if (taskMatch?.[1] && matchResourceFile(normalizedPath, '/asana/tasks')?.canonical) {
+    const taskId = extractAsanaIdFromPathSegment(taskMatch[1]);
+    return {
+      action: 'delete_task',
+      method: 'DELETE',
+      endpoint: `${ASANA_API_TASKS_ROUTE}/${encodeURIComponent(taskId)}`,
+    };
+  }
+
+  const projectMatch = normalizedPath.match(/^\/asana\/projects\/([^/]+)\.json$/u);
+  if (projectMatch?.[1] && matchResourceFile(normalizedPath, '/asana/projects')?.canonical) {
+    const projectId = extractAsanaIdFromPathSegment(projectMatch[1]);
+    return {
+      action: 'delete_project',
+      method: 'DELETE',
+      endpoint: `${ASANA_API_PROJECTS_ROUTE}/${encodeURIComponent(projectId)}`,
+    };
+  }
+
+  const sectionMatch = normalizedPath.match(/^\/asana\/sections\/([^/]+)\.json$/u);
+  if (sectionMatch?.[1] && matchResourceFile(normalizedPath, '/asana/sections')?.canonical) {
+    const sectionId = extractAsanaIdFromPathSegment(sectionMatch[1]);
+    return {
+      action: 'delete_section',
+      method: 'DELETE',
+      endpoint: `${ASANA_API_SECTIONS_ROUTE}/${encodeURIComponent(sectionId)}`,
+    };
+  }
+
+  throw new Error(`No Asana delete writeback rule matched ${path}`);
+}
+
 function buildTaskCreate(content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('tasks/new.json writeback requires a non-empty `name`');
+    throw new Error('tasks/<draft>.json writeback requires a non-empty `name`');
   }
 
   const data: Record<string, unknown> = { name };
@@ -86,6 +131,7 @@ function buildTaskCreate(content: string): AsanaWritebackRequest {
 
 function buildTaskUpdate(taskId: string, content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const data = pickAllowed(payload, [
     'actual_time_minutes',
     'assignee',
@@ -119,9 +165,10 @@ function buildTaskUpdate(taskId: string, content: string): AsanaWritebackRequest
 
 function buildProjectCreate(content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('projects/new.json writeback requires a non-empty `name`');
+    throw new Error('projects/<draft>.json writeback requires a non-empty `name`');
   }
 
   const data: Record<string, unknown> = { name };
@@ -146,6 +193,7 @@ function buildProjectCreate(content: string): AsanaWritebackRequest {
 
 function buildProjectUpdate(projectId: string, content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const data = pickAllowed(payload, [
     'archived',
     'color',
@@ -176,15 +224,16 @@ function buildProjectUpdate(projectId: string, content: string): AsanaWritebackR
 
 function buildSectionCreate(projectId: string | undefined, content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('sections/new.json writeback requires a non-empty `name`');
+    throw new Error('sections/<draft>.json writeback requires a non-empty `name`');
   }
 
   const explicitProject = readString(payload, 'project');
   const resolvedProjectId = projectId ?? explicitProject;
   if (!resolvedProjectId) {
-    throw new Error('sections/new.json writeback requires a project id in the path or `project` field');
+    throw new Error('sections/<draft>.json writeback requires a project id in the path or `project` field');
   }
 
   return {
@@ -197,6 +246,7 @@ function buildSectionCreate(projectId: string | undefined, content: string): Asa
 
 function buildSectionUpdate(sectionId: string, content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
     throw new Error('sections/<id>.json update writeback requires a non-empty `name`');
@@ -212,6 +262,7 @@ function buildSectionUpdate(sectionId: string, content: string): AsanaWritebackR
 
 function buildAddTaskToProject(taskId: string, projectId: string, content: string): AsanaWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObjectOrEmpty(content));
+  rejectReadOnlyFields(payload);
   const data: Record<string, unknown> = { project: projectId };
   copyString(payload, data, 'section');
   copyString(payload, data, 'insert_before');
@@ -228,6 +279,56 @@ function buildAddTaskToProject(taskId: string, projectId: string, content: strin
 function normalizePath(path: string): string {
   const trimmed = path.trim();
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+interface ResourceFileMatch {
+  canonical: boolean;
+  id: string;
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'gid',
+  'createdAt',
+  'created_at',
+  'modified_at',
+  'updatedAt',
+  'url',
+  'permalink_url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+
+function matchResourceFile(path: string, resourcePath: string): ResourceFileMatch | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): ResourceFileMatch | undefined {
+  const normalized = normalizePath(path);
+  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
+    return undefined;
+  }
+  const segment = normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length);
+  const id = extractAsanaIdFromPathSegment(segment);
+  return { canonical: resource.idPattern.test(id), id };
 }
 
 function parseJsonObject(content: string): Record<string, unknown> {

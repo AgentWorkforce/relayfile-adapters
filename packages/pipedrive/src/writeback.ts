@@ -1,6 +1,10 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import { extractPipedriveIdFromPathSegment } from './path-mapper.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
 
-export type PipedriveWritebackMethod = 'PATCH' | 'POST' | 'PUT';
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
+
+export type PipedriveWritebackMethod = 'DELETE' | 'PATCH' | 'POST' | 'PUT';
 
 export interface PipedriveWritebackRequest {
   action:
@@ -8,13 +12,17 @@ export interface PipedriveWritebackRequest {
     | 'create_deal'
     | 'create_organization'
     | 'create_person'
+    | 'delete_activity'
+    | 'delete_deal'
+    | 'delete_organization'
+    | 'delete_person'
     | 'update_activity'
     | 'update_deal'
     | 'update_organization'
     | 'update_person';
   method: PipedriveWritebackMethod;
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export const PIPEDRIVE_DEALS_WRITE_ROUTE = '/v1/deals';
@@ -72,15 +80,15 @@ const ACTIVITY_MUTABLE_FIELDS = new Set([
 export function resolvePipedriveWritebackRequest(path: string, content: string): PipedriveWritebackRequest {
   const normalized = normalizePath(path);
 
-  if (normalized === '/pipedrive/deals/new.json') {
+  if (isDraftResourcePath(normalized, '/pipedrive/deals')) {
     return createRequest('create_deal', PIPEDRIVE_DEALS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), DEAL_MUTABLE_FIELDS));
   }
 
-  if (normalized === '/pipedrive/persons/new.json') {
+  if (isDraftResourcePath(normalized, '/pipedrive/persons')) {
     return createRequest('create_person', PIPEDRIVE_PERSONS_WRITE_ROUTE, pickCreateBody(parseJsonObject(content), PERSON_MUTABLE_FIELDS));
   }
 
-  if (normalized === '/pipedrive/organizations/new.json') {
+  if (isDraftResourcePath(normalized, '/pipedrive/organizations')) {
     return createRequest(
       'create_organization',
       PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE,
@@ -88,7 +96,7 @@ export function resolvePipedriveWritebackRequest(path: string, content: string):
     );
   }
 
-  if (normalized === '/pipedrive/activities/new.json') {
+  if (isDraftResourcePath(normalized, '/pipedrive/activities')) {
     return createRequest(
       'create_activity',
       PIPEDRIVE_ACTIVITY_WRITE_ROUTE,
@@ -135,6 +143,29 @@ export function resolvePipedriveWritebackRequest(path: string, content: string):
   throw new Error(`No Pipedrive writeback rule matched ${path}`);
 }
 
+export function resolvePipedriveDeleteRequest(path: string): PipedriveWritebackRequest {
+  const normalized = normalizePath(path);
+
+  const dealMatch = normalized.match(/^\/pipedrive\/deals\/([^/]+)\.json$/u);
+  if (dealMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/deals')) {
+    return deleteRequest('delete_deal', `${PIPEDRIVE_DEALS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(dealMatch[1])}`);
+  }
+  const personMatch = normalized.match(/^\/pipedrive\/persons\/([^/]+)\.json$/u);
+  if (personMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/persons')) {
+    return deleteRequest('delete_person', `${PIPEDRIVE_PERSONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(personMatch[1])}`);
+  }
+  const organizationMatch = normalized.match(/^\/pipedrive\/organizations\/([^/]+)\.json$/u);
+  if (organizationMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/organizations')) {
+    return deleteRequest('delete_organization', `${PIPEDRIVE_ORGANIZATIONS_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(organizationMatch[1])}`);
+  }
+  const activityMatch = normalized.match(/^\/pipedrive\/activities\/([^/]+)\.json$/u);
+  if (activityMatch?.[1] && isCanonicalResourcePath(normalized, '/pipedrive/activities')) {
+    return deleteRequest('delete_activity', `${PIPEDRIVE_ACTIVITY_WRITE_ROUTE}/${extractPipedriveIdFromPathSegment(activityMatch[1])}`);
+  }
+
+  throw new Error(`No Pipedrive delete writeback rule matched ${path}`);
+}
+
 function createRequest(
   action: PipedriveWritebackRequest['action'],
   endpoint: string,
@@ -158,6 +189,17 @@ function updateRequest(
     method: 'PUT',
     endpoint,
     body,
+  };
+}
+
+function deleteRequest(
+  action: PipedriveWritebackRequest['action'],
+  endpoint: string,
+): PipedriveWritebackRequest {
+  return {
+    action,
+    method: 'DELETE',
+    endpoint,
   };
 }
 
@@ -211,10 +253,55 @@ function pickUpdateBody(source: Record<string, unknown>, allowlist: Set<string>)
 function pickAllowed(source: Record<string, unknown>, allowlist: Set<string>): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
     if (!allowlist.has(key) || value === undefined) continue;
     body[key] = value;
   }
   return body;
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'add_time',
+  'update_time',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function isDraftResourcePath(path: string, resourcePath: string): boolean {
+  const file = matchResourceFile(path, resourcePath);
+  return file !== undefined && !file.canonical;
+}
+
+function isCanonicalResourcePath(path: string, resourcePath: string): boolean {
+  return matchResourceFile(path, resourcePath)?.canonical === true;
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
+    return undefined;
+  }
+  const id = extractPipedriveIdFromPathSegment(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

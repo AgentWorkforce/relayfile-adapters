@@ -56,6 +56,11 @@ export interface SalesforceWritebackRequest {
     | 'create_opportunity'
     | 'create_lead'
     | 'create_case'
+    | 'delete_account'
+    | 'delete_contact'
+    | 'delete_opportunity'
+    | 'delete_lead'
+    | 'delete_case'
     | 'update_account'
     | 'update_contact'
     | 'update_opportunity'
@@ -66,9 +71,9 @@ export interface SalesforceWritebackRequest {
     | 'replace_opportunity'
     | 'replace_lead'
     | 'replace_case';
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export interface SalesforceUserReference {

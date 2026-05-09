@@ -36,13 +36,16 @@ export interface IntercomWritebackRequest {
     | 'create_company'
     | 'create_contact'
     | 'create_conversation'
+    | 'delete_company'
+    | 'delete_contact'
+    | 'delete_conversation'
     | 'reply_conversation'
     | 'update_company'
     | 'update_contact'
     | 'update_conversation';
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export interface IntercomReadRequest {

@@ -22,7 +22,7 @@ export type JsonObject = { [key: string]: JsonValue };
  * `/graphql` with `{ query, variables }`.
  */
 export interface LinearWritebackRequest {
-  action: 'create_comment' | 'create_issue' | 'update_issue';
+  action: 'create_comment' | 'create_issue' | 'delete_issue' | 'update_issue';
   method: 'POST';
   endpoint: '/graphql';
   body: {

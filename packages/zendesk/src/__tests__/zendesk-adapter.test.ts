@@ -5,6 +5,8 @@ import {
   ZendeskAdapter,
   computeZendeskPath,
   normalizeZendeskWebhook,
+  resolveDeleteRequest,
+  resolveWritebackRequest,
   zendeskOrganizationPath,
   zendeskTicketPath,
   zendeskUserPath,
@@ -192,6 +194,36 @@ test('path mapping stays deterministic for supported Zendesk VFS objects', () =>
   assert.equal(adapter.computePath('ticket', '123', 'Cannot log in'), '/zendesk/tickets/123.json');
   assert.equal(adapter.computePath('user', '456'), '/zendesk/users/456.json');
   assert.equal(adapter.computePath('organization', '789'), '/zendesk/organizations/789.json');
+
+  assert.deepEqual(resolveWritebackRequest('/zendesk/tickets/draft-ticket.json', '{"subject":"New ticket"}'), {
+    action: 'create_ticket',
+    method: 'POST',
+    endpoint: '/api/v2/tickets.json',
+    body: { ticket: { subject: 'New ticket' } },
+  });
+  assert.deepEqual(resolveWritebackRequest('/zendesk/tickets/123.json', '{"subject":"Renamed"}'), {
+    action: 'update_ticket',
+    method: 'PUT',
+    endpoint: '/api/v2/tickets/123.json',
+    body: { ticket: { subject: 'Renamed' } },
+  });
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/tickets/123.json', '{"id":"123","subject":"Renamed"}'),
+    /read-only/,
+  );
+  assert.throws(
+    () => resolveWritebackRequest('/zendesk/tickets/draft-ticket.json', '{"description":"Missing subject"}'),
+    /requires a `subject`/,
+  );
+  assert.deepEqual(resolveDeleteRequest('/zendesk/tickets/123.json'), {
+    action: 'delete_ticket',
+    method: 'DELETE',
+    endpoint: '/api/v2/tickets/123.json',
+  });
+  assert.throws(
+    () => resolveDeleteRequest('/zendesk/tickets/draft-ticket.json'),
+    /No Zendesk delete writeback rule matched/,
+  );
 });
 
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {

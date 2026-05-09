@@ -15,9 +15,9 @@ export interface SlackAdapterConfig {
  * (`/api/<method>`) that accepts a JSON body.
  */
 export interface SlackWritebackRequest {
-  action: 'post_message' | 'reply_in_thread' | 'add_reaction';
+  action: 'post_message' | 'reply_in_thread' | 'add_reaction' | 'delete_message' | 'remove_reaction';
   method: 'POST';
-  endpoint: '/api/chat.postMessage' | '/api/reactions.add';
+  endpoint: '/api/chat.delete' | '/api/chat.postMessage' | '/api/reactions.add' | '/api/reactions.remove';
   body: Record<string, unknown>;
 }
 

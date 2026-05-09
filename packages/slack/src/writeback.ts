@@ -1,4 +1,8 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { SlackWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 type JsonPrimitive = boolean | number | null | string;
 type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
@@ -25,22 +29,30 @@ type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
  * recover the canonical `1234567890.001234` form Slack expects.
  */
 export function resolveWritebackRequest(path: string, content: string): SlackWritebackRequest {
-  const newMessageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/new\.json$/);
-  if (newMessageMatch?.[1]) {
+  const messageFile = matchResourceFile(path, '/slack/channels/{channelId}/messages');
+  const newMessageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+  if (newMessageMatch?.[1] && messageFile && !messageFile.canonical) {
     return buildPostMessage(newMessageMatch[1], undefined, content);
   }
 
+  const messagePatchMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+  if (messagePatchMatch?.[1] && messagePatchMatch[2] && messageFile?.canonical) {
+    return buildPostMessage(messagePatchMatch[1], extractMessageTimestamp(messagePatchMatch[2]), content);
+  }
+
+  const replyFile = matchResourceFile(path, '/slack/channels/{channelId}/messages/{messageTs}/replies');
   const replyMatch = path.match(
-    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/new\.json$/,
+    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/,
   );
-  if (replyMatch?.[1] && replyMatch?.[2]) {
+  if (replyMatch?.[1] && replyMatch?.[2] && replyFile && !replyFile.canonical) {
     return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content);
   }
 
+  const reactionFile = matchResourceFile(path, '/slack/channels/{channelId}/messages/{messageTs}/reactions');
   const reactionMatch = path.match(
-    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/new\.json$/,
+    /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/([^/]+)\.json$/,
   );
-  if (reactionMatch?.[1] && reactionMatch?.[2]) {
+  if (reactionMatch?.[1] && reactionMatch?.[2] && reactionFile && !reactionFile.canonical) {
     return buildAddReaction(
       reactionMatch[1],
       extractMessageTimestamp(reactionMatch[2]),
@@ -49,6 +61,34 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
   }
 
   throw new Error(`No Slack writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): SlackWritebackRequest {
+  const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+  if (messageMatch?.[1] && messageMatch[2] && matchResourceFile(path, '/slack/channels/{channelId}/messages')?.canonical) {
+    return buildDeleteMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]));
+  }
+
+  const replyMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/);
+  if (replyMatch?.[1] && replyMatch[3] && matchResourceFile(path, '/slack/channels/{channelId}/messages/{messageTs}/replies')?.canonical) {
+    return buildDeleteMessage(replyMatch[1], extractMessageTimestamp(replyMatch[3]));
+  }
+
+  const reactionMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/reactions\/([^/]+)\.json$/);
+  if (reactionMatch?.[1] && reactionMatch[2] && reactionMatch[3] && matchResourceFile(path, '/slack/channels/{channelId}/messages/{messageTs}/reactions')?.canonical) {
+    return {
+      action: 'remove_reaction',
+      method: 'POST',
+      endpoint: '/api/reactions.remove',
+      body: {
+        channel: extractSlackChannel(reactionMatch[1]),
+        timestamp: extractMessageTimestamp(reactionMatch[2]),
+        name: decodeURIComponent(reactionMatch[3]).split('--')[0],
+      },
+    };
+  }
+
+  throw new Error(`No Slack delete writeback rule matched ${path}`);
 }
 
 /* ------------------------------------------------------------------ *
@@ -144,6 +184,7 @@ function buildPostMessage(
   if (!isRecord(parsed)) {
     throw new Error('messages/new.json writeback expects a JSON object or plain string');
   }
+  rejectReadOnlyFields(parsed);
 
   const text = readString(parsed, 'text');
   const blocks = Array.isArray(parsed.blocks) ? parsed.blocks : undefined;
@@ -205,6 +246,18 @@ function buildPostMessage(
   };
 }
 
+function buildDeleteMessage(channelSegment: string, tsSegment: string): SlackWritebackRequest {
+  return {
+    action: 'delete_message',
+    method: 'POST',
+    endpoint: '/api/chat.delete',
+    body: {
+      channel: extractSlackChannel(channelSegment),
+      ts: tsSegment,
+    },
+  };
+}
+
 /**
  * Build a `reactions.add` request. Accepts:
  *   - a plain string: the emoji name (with or without surrounding colons,
@@ -249,6 +302,46 @@ function buildAddReaction(
       name,
     },
   };
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'ts',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
+    return undefined;
+  }
+  const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }
 
 /* ------------------------------------------------------------------ *

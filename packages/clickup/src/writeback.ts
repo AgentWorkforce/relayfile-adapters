@@ -1,5 +1,9 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import { extractClickUpIdFromPathSegment } from './path-mapper.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { ClickUpWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 export const CLICKUP_TASK_ROUTE_ANCHOR = '/api/v2/task';
 export const CLICKUP_LIST_ROUTE_ANCHOR = '/api/v2/list';
@@ -7,13 +11,15 @@ export const CLICKUP_LIST_ROUTE_ANCHOR = '/api/v2/list';
 export function resolveWritebackRequest(path: string, content: string): ClickUpWritebackRequest {
   const normalizedPath = normalizePath(path);
 
-  const taskCommentMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\/comments\/new\.json$/u);
-  if (taskCommentMatch?.[1]) {
+  const taskCommentFile = matchResourceFile(normalizedPath, '/clickup/tasks/{taskId}/comments');
+  const taskCommentMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\/comments\/([^/]+)\.json$/u);
+  if (taskCommentMatch?.[1] && taskCommentFile && !taskCommentFile.canonical) {
     return buildTaskComment(extractClickUpIdFromPathSegment(taskCommentMatch[1]), content);
   }
 
-  const newTaskMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\/tasks\/new\.json$/u);
-  if (newTaskMatch?.[1]) {
+  const taskCreateFile = matchResourceFile(normalizedPath, '/clickup/lists/{listId}/tasks');
+  const newTaskMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\/tasks\/([^/]+)\.json$/u);
+  if (newTaskMatch?.[1] && taskCreateFile && !taskCreateFile.canonical) {
     return buildTaskCreate(extractClickUpIdFromPathSegment(newTaskMatch[1]), content);
   }
 
@@ -22,13 +28,15 @@ export function resolveWritebackRequest(path: string, content: string): ClickUpW
     return buildTaskUpdate(extractClickUpIdFromPathSegment(taskUpdateMatch[1]), content);
   }
 
-  const newListMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\/lists\/new\.json$/u);
-  if (newListMatch?.[1]) {
+  const folderListFile = matchResourceFile(normalizedPath, '/clickup/folders/{folderId}/lists');
+  const newListMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\/lists\/([^/]+)\.json$/u);
+  if (newListMatch?.[1] && folderListFile && !folderListFile.canonical) {
     return buildListCreate(extractClickUpIdFromPathSegment(newListMatch[1]), content);
   }
 
-  const folderlessListMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/lists\/new\.json$/u);
-  if (folderlessListMatch?.[1]) {
+  const spaceListFile = matchResourceFile(normalizedPath, '/clickup/spaces/{spaceId}/lists');
+  const folderlessListMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/lists\/([^/]+)\.json$/u);
+  if (folderlessListMatch?.[1] && spaceListFile && !spaceListFile.canonical) {
     return buildFolderlessListCreate(extractClickUpIdFromPathSegment(folderlessListMatch[1]), content);
   }
 
@@ -37,8 +45,9 @@ export function resolveWritebackRequest(path: string, content: string): ClickUpW
     return buildListUpdate(extractClickUpIdFromPathSegment(listUpdateMatch[1]), content);
   }
 
-  const newFolderMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/folders\/new\.json$/u);
-  if (newFolderMatch?.[1]) {
+  const spaceFolderFile = matchResourceFile(normalizedPath, '/clickup/spaces/{spaceId}/folders');
+  const newFolderMatch = normalizedPath.match(/^\/clickup\/spaces\/([^/]+)\/folders\/([^/]+)\.json$/u);
+  if (newFolderMatch?.[1] && spaceFolderFile && !spaceFolderFile.canonical) {
     return buildFolderCreate(extractClickUpIdFromPathSegment(newFolderMatch[1]), content);
   }
 
@@ -53,6 +62,39 @@ export function resolveWritebackRequest(path: string, content: string): ClickUpW
   }
 
   throw new Error(`No ClickUp writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): ClickUpWritebackRequest {
+  const normalizedPath = normalizePath(path);
+
+  const taskMatch = normalizedPath.match(/^\/clickup\/tasks\/([^/]+)\.json$/u);
+  if (taskMatch?.[1] && isCanonicalTopLevelFile(taskMatch[1], 'tasks')) {
+    return {
+      action: 'delete_task',
+      method: 'DELETE',
+      endpoint: `${CLICKUP_TASK_ROUTE_ANCHOR}/${extractClickUpIdFromPathSegment(taskMatch[1])}`,
+    };
+  }
+
+  const listMatch = normalizedPath.match(/^\/clickup\/lists\/([^/]+)\.json$/u);
+  if (listMatch?.[1] && isCanonicalTopLevelFile(listMatch[1], 'lists')) {
+    return {
+      action: 'delete_list',
+      method: 'DELETE',
+      endpoint: `${CLICKUP_LIST_ROUTE_ANCHOR}/${extractClickUpIdFromPathSegment(listMatch[1])}`,
+    };
+  }
+
+  const folderMatch = normalizedPath.match(/^\/clickup\/folders\/([^/]+)\.json$/u);
+  if (folderMatch?.[1] && isCanonicalTopLevelFile(folderMatch[1], 'folders')) {
+    return {
+      action: 'delete_folder',
+      method: 'DELETE',
+      endpoint: `/api/v2/folder/${extractClickUpIdFromPathSegment(folderMatch[1])}`,
+    };
+  }
+
+  throw new Error(`No ClickUp delete writeback rule matched ${path}`);
 }
 
 function buildTaskComment(taskId: string, content: string): ClickUpWritebackRequest {
@@ -72,9 +114,10 @@ function buildTaskComment(taskId: string, content: string): ClickUpWritebackRequ
 
 function buildTaskCreate(listId: string, content: string): ClickUpWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('tasks/new.json writeback requires a `name`');
+    throw new Error('tasks/<draft>.json writeback requires a `name`');
   }
 
   return {
@@ -87,6 +130,7 @@ function buildTaskCreate(listId: string, content: string): ClickUpWritebackReque
 
 function buildTaskUpdate(taskId: string, content: string): ClickUpWritebackRequest {
   const payload = unwrapSyncedEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const body = pickAllowed(payload, TASK_UPDATE_ALLOWLIST);
   if (Object.keys(body).length === 0) {
     throw new Error('task update writeback has no editable ClickUp fields');
@@ -102,9 +146,10 @@ function buildTaskUpdate(taskId: string, content: string): ClickUpWritebackReque
 
 function buildListCreate(folderId: string, content: string): ClickUpWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('lists/new.json writeback requires a `name`');
+    throw new Error('lists/<draft>.json writeback requires a `name`');
   }
 
   return {
@@ -117,9 +162,10 @@ function buildListCreate(folderId: string, content: string): ClickUpWritebackReq
 
 function buildFolderlessListCreate(spaceId: string, content: string): ClickUpWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('lists/new.json writeback requires a `name`');
+    throw new Error('lists/<draft>.json writeback requires a `name`');
   }
 
   return {
@@ -132,6 +178,7 @@ function buildFolderlessListCreate(spaceId: string, content: string): ClickUpWri
 
 function buildListUpdate(listId: string, content: string): ClickUpWritebackRequest {
   const payload = unwrapSyncedEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const body = pickAllowed(payload, LIST_UPDATE_ALLOWLIST);
   if (Object.keys(body).length === 0) {
     throw new Error('list update writeback has no editable ClickUp fields');
@@ -147,9 +194,10 @@ function buildListUpdate(listId: string, content: string): ClickUpWritebackReque
 
 function buildFolderCreate(spaceId: string, content: string): ClickUpWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const name = readString(payload, 'name');
   if (!name) {
-    throw new Error('folders/new.json writeback requires a `name`');
+    throw new Error('folders/<draft>.json writeback requires a `name`');
   }
 
   return {
@@ -162,6 +210,7 @@ function buildFolderCreate(spaceId: string, content: string): ClickUpWritebackRe
 
 function buildFolderUpdate(folderId: string, content: string): ClickUpWritebackRequest {
   const payload = unwrapSyncedEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const body = pickAllowed(payload, FOLDER_UPDATE_ALLOWLIST);
   if (Object.keys(body).length === 0) {
     throw new Error('folder update writeback has no editable ClickUp fields');
@@ -177,6 +226,7 @@ function buildFolderUpdate(folderId: string, content: string): ClickUpWritebackR
 
 function buildSpaceUpdate(spaceId: string, content: string): ClickUpWritebackRequest {
   const payload = unwrapSyncedEnvelope(parseJsonObject(content));
+  rejectReadOnlyFields(payload);
   const body = pickAllowed(payload, SPACE_UPDATE_ALLOWLIST);
   if (Object.keys(body).length === 0) {
     throw new Error('space update writeback has no editable ClickUp fields');
@@ -257,6 +307,28 @@ const LIST_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
 const FOLDER_CREATE_ALLOWLIST: ReadonlySet<string> = new Set(['name']);
 const FOLDER_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set(['name']);
 const SPACE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set(['color', 'features', 'name', 'private']);
+const TOP_LEVEL_ID_PATTERNS: Readonly<Record<string, RegExp>> = {
+  folders: /^[A-Za-z0-9]+$/,
+  lists: /^[A-Za-z0-9]+$/,
+  tasks: /^[A-Za-z0-9]+$/,
+};
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'custom_id',
+  'date_created',
+  'date_updated',
+  'date_closed',
+  'date_done',
+  'url',
+  'creator',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
 
 const ENVELOPE_MARKER_KEYS = ['provider', 'objectType', 'objectId', 'workspaceId'] as const;
 
@@ -266,6 +338,34 @@ function normalizePath(path: string): string {
     throw new Error('ClickUp writeback path must be a non-empty string');
   }
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+interface ResourceFileMatch {
+  canonical: boolean;
+  id: string;
+}
+
+function matchResourceFile(path: string, resourcePath: string): ResourceFileMatch | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): ResourceFileMatch | undefined {
+  const normalized = normalizePath(path);
+  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
+    return undefined;
+  }
+  const segment = normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length);
+  const id = extractClickUpIdFromPathSegment(segment);
+  return { canonical: resource.idPattern.test(id), id };
+}
+
+function isCanonicalTopLevelFile(segment: string, collection: string): boolean {
+  const pattern = TOP_LEVEL_ID_PATTERNS[collection];
+  return pattern ? pattern.test(extractClickUpIdFromPathSegment(segment)) : false;
 }
 
 function unwrapSyncedEnvelope(payload: Record<string, unknown>): Record<string, unknown> {
@@ -292,6 +392,14 @@ function pickAllowed(
 function parseJsonObject(content: string): Record<string, unknown> {
   const parsed = safeParseJson(content);
   return parseRecord(parsed);
+}
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
 }
 
 function parseRecord(value: unknown): Record<string, unknown> {

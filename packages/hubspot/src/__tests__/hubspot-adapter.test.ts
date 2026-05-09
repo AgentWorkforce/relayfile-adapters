@@ -8,6 +8,8 @@ import {
   hubSpotContactPath,
   hubSpotDealPath,
   hubSpotTicketPath,
+  resolveHubSpotDeleteRequest,
+  resolveHubSpotWritebackRequest,
   type ConnectionProvider,
   type ProxyRequest,
   type ProxyResponse,
@@ -258,4 +260,34 @@ test('path mapping stays deterministic for supported HubSpot VFS objects', () =>
   assert.equal(computeHubSpotPath('tickets', '401'), '/hubspot/tickets/401.json');
   assert.equal(adapter.computePath('HubSpotContact', '101'), '/hubspot/contacts/101.json');
   assert.equal(adapter.computePath('HubSpotCompany', '201'), '/hubspot/companies/201.json');
+
+  assert.deepEqual(resolveHubSpotWritebackRequest('/hubspot/contacts/draft-contact.json', '{"email":"ada@example.com"}'), {
+    action: 'create_contact',
+    body: { properties: { email: 'ada@example.com' } },
+    endpoint: '/crm/v3/objects/contacts',
+    method: 'POST',
+  });
+  assert.deepEqual(resolveHubSpotWritebackRequest('/hubspot/contacts/101.json', '{"email":"new@example.com"}'), {
+    action: 'update_contact',
+    body: { properties: { email: 'new@example.com' } },
+    endpoint: '/crm/v3/objects/contacts/101',
+    method: 'PATCH',
+  });
+  assert.throws(
+    () => resolveHubSpotWritebackRequest('/hubspot/contacts/101.json', '{"id":"101","email":"new@example.com"}'),
+    /read-only/,
+  );
+  assert.throws(
+    () => resolveHubSpotWritebackRequest('/hubspot/contacts/draft-contact.json', '{}'),
+    /requires at least one writable property/,
+  );
+  assert.deepEqual(resolveHubSpotDeleteRequest('/hubspot/contacts/101.json'), {
+    action: 'delete_contact',
+    endpoint: '/crm/v3/objects/contacts/101',
+    method: 'DELETE',
+  });
+  assert.throws(
+    () => resolveHubSpotDeleteRequest('/hubspot/contacts/draft-contact.json'),
+    /No HubSpot delete writeback rule matched/,
+  );
 });

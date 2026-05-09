@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GitHubWritebackHandler } from './writeback.js';
+import { GitHubWritebackHandler, resolveDeleteRequest } from './writeback.js';
 import type {
   GitHubRequestProvider,
   JsonObject,
@@ -79,7 +79,7 @@ describe('writeback', () => {
   it('extractWritebackTarget parses owner, repo, and pull request number from relayfile path', () => {
     const { handler } = createHandler();
     const target = handler.extractWritebackTarget(
-      '/github/repos/openai/relayfile/pulls/42/reviews/agent-reviewer.json',
+      '/github/repos/openai/relayfile/pulls/42/reviews/draft@review.json',
     );
 
     assert.deepStrictEqual(target, {
@@ -93,7 +93,7 @@ describe('writeback', () => {
     const { handler, provider } = createHandler();
     const result = await handler.handleWriteback(
       'workspace-1',
-      '/github/repos/acme/widgets/pulls/7/reviews/agent-42.json',
+      '/github/repos/acme/widgets/pulls/7/reviews/draft@review.json',
       JSON.stringify({
         event: 'COMMENT',
         body: 'Automated review summary.',
@@ -126,7 +126,7 @@ describe('writeback', () => {
     const { handler, provider } = createHandler();
     const result = await handler.writeBack(
       'workspace-1',
-      '/github/repos/acme/widgets/pulls/12/reviews/agent-99.json',
+      '/github/repos/acme/widgets/pulls/12/reviews/draft@review.json',
       JSON.stringify({
         event: 'COMMENT',
         body: 'Adapter-level writeBack submission.',
@@ -150,7 +150,7 @@ describe('writeback', () => {
     const { handler } = createHandler();
     const result = await handler.handleWriteback(
       'workspace-1',
-      '/github/repos/acme/widgets/pulls/7/reviews/agent-42.json',
+      '/github/repos/acme/widgets/pulls/7/reviews/draft@review.json',
       '{not valid json',
     );
 
@@ -183,7 +183,7 @@ describe('writeback', () => {
 
     const result = await handler.handleWriteback(
       'workspace-1',
-      '/github/repos/acme/widgets/pulls/7/reviews/agent-42.json',
+      '/github/repos/acme/widgets/pulls/7/reviews/draft@review.json',
       JSON.stringify({
         event: 'COMMENT',
         body: 'summary',
@@ -194,5 +194,48 @@ describe('writeback', () => {
     assert.strictEqual(result.success, false);
     assert.ok((result.error ?? '').match(/422/));
     assert.ok((result.error ?? '').match(/outdated/));
+  });
+
+  it('updates and deletes canonical review ids', async () => {
+    const { handler, provider } = createHandler((request) => ({
+      status: request.method === 'PATCH' ? 200 : 204,
+      headers: {},
+      data: { id: 991 } satisfies JsonObject,
+    }));
+
+    const update = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7/reviews/991.json',
+      JSON.stringify({ body: 'Updated review body.' }),
+    );
+
+    assert.strictEqual(update.success, true);
+    assert.strictEqual(provider.requests[0]?.method, 'PATCH');
+    assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/7/reviews/991');
+    assert.equal(
+      handler.extractWritebackTarget('/github/repos/acme/widgets/pulls/7/reviews/draft@review.json').reviewId,
+      undefined,
+    );
+    const readOnly = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7/reviews/991.json',
+      JSON.stringify({ id: 991, body: 'Nope' }),
+    );
+    assert.strictEqual(readOnly.success, false);
+    assert.match(readOnly.error ?? '', /read-only/);
+    assert.deepStrictEqual(resolveDeleteRequest('/github/repos/acme/widgets/pulls/7/reviews/991.json'), {
+      method: 'DELETE',
+      baseUrl: 'https://api.github.com',
+      endpoint: '/repos/acme/widgets/pulls/7/reviews/991',
+      connectionId: '',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    assert.throws(
+      () => resolveDeleteRequest('/github/repos/acme/widgets/pulls/7/reviews/draft@review.json'),
+      /Unsupported GitHub delete writeback path/,
+    );
   });
 });

@@ -9,6 +9,7 @@ import {
   asanaWorkspacePath,
   computeAsanaPath,
   resolveAsanaReadRequest,
+  resolveAsanaDeleteRequest,
   resolveAsanaWritebackRequest,
   type AsanaAdapterConfig,
   type ConnectionProvider,
@@ -241,16 +242,33 @@ test('path mapper, read routes, and writeback routes cover primary Asana objects
   assert.deepEqual(resolveAsanaReadRequest('/asana/tasks/ship--12001.json').endpoint, '/api/1.0/tasks/12001');
   assert.deepEqual(resolveAsanaReadRequest('/asana/projects/adapters--project_1.json').endpoint, '/api/1.0/projects/project_1');
 
-  assert.deepEqual(resolveAsanaWritebackRequest('/asana/tasks/new.json', '{"name":"New task","workspace":"workspace_1"}'), {
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/tasks/draft-task.json', '{"name":"New task","workspace":"workspace_1"}'), {
     action: 'create_task',
     method: 'POST',
     endpoint: '/api/1.0/tasks',
     body: { data: { name: 'New task', workspace: 'workspace_1' } },
   });
-  assert.deepEqual(resolveAsanaWritebackRequest('/asana/projects/adapters--project_1.json', '{"name":"Renamed"}'), {
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/projects/12002.json', '{"name":"Renamed"}'), {
     action: 'update_project',
     method: 'PUT',
-    endpoint: '/api/1.0/projects/project_1',
+    endpoint: '/api/1.0/projects/12002',
     body: { data: { name: 'Renamed' } },
   });
+  assert.throws(
+    () => resolveAsanaWritebackRequest('/asana/tasks/12001.json', '{"id":"12001","name":"Renamed"}'),
+    /read-only/,
+  );
+  assert.throws(
+    () => resolveAsanaWritebackRequest('/asana/tasks/draft-task.json', '{"workspace":"workspace_1"}'),
+    /requires a non-empty `name`/,
+  );
+  assert.deepEqual(resolveAsanaDeleteRequest('/asana/tasks/12001.json'), {
+    action: 'delete_task',
+    method: 'DELETE',
+    endpoint: '/api/1.0/tasks/12001',
+  });
+  assert.throws(
+    () => resolveAsanaDeleteRequest('/asana/tasks/draft-task.json'),
+    /No Asana delete writeback rule matched/,
+  );
 });

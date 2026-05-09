@@ -7,6 +7,7 @@ import {
   intercomCompanyPath,
   intercomContactPath,
   intercomConversationPath,
+  resolveDeleteRequest,
   resolveReadRequest,
   resolveWritebackRequest,
   type ConnectionProvider,
@@ -314,4 +315,29 @@ test('writeback resolver maps Intercom edit paths to REST mutations', () => {
       email: 'new@example.com',
     },
   });
+  assert.deepEqual(resolveWritebackRequest('/intercom/contacts/draft.contact.json', '{"email":"ada@example.com"}'), {
+    action: 'create_contact',
+    method: 'POST',
+    endpoint: '/contacts',
+    body: {
+      email: 'ada@example.com',
+    },
+  });
+  assert.throws(
+    () => resolveWritebackRequest('/intercom/contacts/contact_123.json', '{"id":"contact_123","email":"new@example.com"}'),
+    /read-only/,
+  );
+  assert.throws(
+    () => resolveWritebackRequest('/intercom/contacts/draft.contact.json', '[]'),
+    /Expected JSON object payload/,
+  );
+  assert.deepEqual(resolveDeleteRequest('/intercom/contacts/contact_123.json'), {
+    action: 'delete_contact',
+    method: 'DELETE',
+    endpoint: '/contacts/contact_123',
+  });
+  assert.throws(
+    () => resolveDeleteRequest('/intercom/contacts/draft.contact.json'),
+    /No Intercom delete writeback rule matched/,
+  );
 });

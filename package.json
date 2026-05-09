@@ -11,6 +11,7 @@
     "build": "npx turbo build",
     "test": "npm run test:writeback-discovery && npx turbo test",
     "test:writeback-discovery": "node scripts/verify-writeback-discovery.mjs",
+    "test:writeback-e2e": "node scripts/verify-file-native-writeback-e2e.mjs",
     "typecheck": "npx turbo typecheck"
   },
   "devDependencies": {

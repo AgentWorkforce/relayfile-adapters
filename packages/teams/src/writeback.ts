@@ -1,9 +1,12 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import { GRAPH_API_BASE_URL, type TeamsObjectType, type WritebackTarget } from './types.js';
 import {
   makeObjectId,
   parseObjectId,
-  parseTeamsPath,
 } from './path-mapper.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 function normalizeWritebackContent(content: unknown): string {
   if (typeof content === 'string') {
@@ -15,6 +18,7 @@ function normalizeWritebackContent(content: unknown): string {
   }
 
   const record = content as Record<string, unknown>;
+  rejectReadOnlyFields(record);
   const body = record.body;
   if (typeof body === 'string') {
     return body;
@@ -37,12 +41,15 @@ export function resolveWriteback(
   content: unknown,
   apiBaseUrl: string = GRAPH_API_BASE_URL,
 ): WritebackTarget | null {
-  const parsed = parseTeamsPath(path);
+  const parsed = parseWritebackPath(path);
   if (!parsed) {
     return null;
   }
 
   const messageContent = normalizeWritebackContent(content);
+  if (!messageContent.trim()) {
+    throw new Error('Teams message writeback requires `body.content`, `text`, or `content`');
+  }
   const objectId = makeObjectId(parsed.objectType, parsed.parts);
 
   switch (parsed.objectType) {
@@ -90,6 +97,66 @@ export function resolveWriteback(
   }
 }
 
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+
+export function resolveDeleteRequest(
+  path: string,
+  apiBaseUrl: string = GRAPH_API_BASE_URL,
+): WritebackTarget | null {
+  const parsed = parseWritebackPath(path);
+  if (!parsed || !parsed.canonical) {
+    return null;
+  }
+  const objectId = makeObjectId(parsed.objectType, parsed.parts);
+
+  switch (parsed.objectType) {
+    case 'message':
+      return {
+        objectType: 'message',
+        objectId,
+        method: 'DELETE',
+        url: `${apiBaseUrl}/teams/${parsed.parts.teamId}/channels/${parsed.parts.channelId}/messages/${parsed.parts.messageId}`,
+      };
+    case 'reply':
+      return {
+        objectType: 'reply',
+        objectId,
+        method: 'DELETE',
+        url: `${apiBaseUrl}/teams/${parsed.parts.teamId}/channels/${parsed.parts.channelId}/messages/${parsed.parts.messageId}/replies/${parsed.parts.replyId}`,
+      };
+    case 'chat_message':
+      return {
+        objectType: 'chat_message',
+        objectId,
+        method: 'DELETE',
+        url: `${apiBaseUrl}/chats/${parsed.parts.chatId}/messages/${parsed.parts.messageId}`,
+      };
+    default:
+      return null;
+  }
+}
+
 export function resolveWritebackForObject(
   objectType: Extract<TeamsObjectType, 'message' | 'reply' | 'chat_message'>,
   objectId: string,
@@ -120,4 +187,59 @@ export function resolveWritebackForObject(
     default:
       return null;
   }
+}
+
+function parseWritebackPath(path: string):
+  | { canonical: boolean; objectType: Extract<TeamsObjectType, 'message' | 'reply' | 'chat_message'>; parts: Record<string, string> }
+  | null {
+  const messageMatch = path.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+  if (messageMatch?.[1] && messageMatch[2] && messageMatch[3]) {
+    const file = matchResourceFile(path, '/teams/{teamId}/channels/{channelId}/messages');
+    if (!file) return null;
+    return {
+      canonical: file.canonical,
+      objectType: 'message',
+      parts: { teamId: messageMatch[1], channelId: messageMatch[2], messageId: messageMatch[3] },
+    };
+  }
+
+  const replyMatch = path.match(/^\/teams\/([^/]+)\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/);
+  if (replyMatch?.[1] && replyMatch[2] && replyMatch[3] && replyMatch[4]) {
+    const file = matchResourceFile(path, '/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies');
+    if (!file) return null;
+    return {
+      canonical: file.canonical,
+      objectType: 'reply',
+      parts: { teamId: replyMatch[1], channelId: replyMatch[2], messageId: replyMatch[3], replyId: replyMatch[4] },
+    };
+  }
+
+  const chatMatch = path.match(/^\/teams\/chats\/([^/]+)\/messages\/([^/]+)\.json$/);
+  if (chatMatch?.[1] && chatMatch[2]) {
+    const file = matchResourceFile(path, '/teams/chats/{chatId}/messages');
+    if (!file) return null;
+    return {
+      canonical: file.canonical,
+      objectType: 'chat_message',
+      parts: { chatId: chatMatch[1], messageId: chatMatch[2] },
+    };
+  }
+
+  return null;
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
+    return undefined;
+  }
+  const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }

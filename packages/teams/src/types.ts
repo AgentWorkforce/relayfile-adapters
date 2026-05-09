@@ -275,9 +275,9 @@ export interface GraphJsonRequestOptions {
 export interface WritebackTarget {
   objectType: 'message' | 'reply' | 'chat_message';
   objectId: string;
-  method: 'POST';
+  method: 'DELETE' | 'PATCH' | 'POST';
   url: string;
-  body: {
+  body?: {
     body: {
       contentType: 'html';
       content: string;

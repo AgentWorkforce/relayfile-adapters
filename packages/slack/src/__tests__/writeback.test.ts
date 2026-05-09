@@ -1,12 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveWritebackRequest } from '../writeback.js';
+import { resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
 
 describe('slack writeback', () => {
   describe('post_message', () => {
     it('posts a plain-string body to a channel-name slug path', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/new.json',
+        '/slack/channels/customer-success/messages/draft@message.json',
         'Hello team!',
       );
       assert.strictEqual(req.action, 'post_message');
@@ -16,7 +16,7 @@ describe('slack writeback', () => {
 
     it('uses raw channel id when the segment matches Slack id shape', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/C01ABC1234/messages/new.json',
+        '/slack/channels/C01ABC1234/messages/draft@message.json',
         'Hello team!',
       );
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
@@ -27,7 +27,7 @@ describe('slack writeback', () => {
       // recover the canonical id even when the slug is lossy (e.g. names with
       // underscores that slugify into hyphens).
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success--C01ABC1234/messages/new.json',
+        '/slack/channels/customer-success--C01ABC1234/messages/draft@message.json',
         'Hello team!',
       );
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
@@ -37,7 +37,7 @@ describe('slack writeback', () => {
       // Escape hatch when the path uses a lossy slug — agent passes the
       // canonical id (or a different channel entirely) in the JSON payload.
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/new.json',
+        '/slack/channels/customer-success/messages/draft@message.json',
         JSON.stringify({ text: 'hi', channel: 'C01ABC1234' }),
       );
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
@@ -46,7 +46,7 @@ describe('slack writeback', () => {
     it('forwards JSON object payload with text, blocks, attachments, and overrides', () => {
       const blocks = [{ type: 'section', text: { type: 'mrkdwn', text: '*hi*' } }];
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/new.json',
+        '/slack/channels/customer-success/messages/draft@message.json',
         JSON.stringify({
           text: 'fallback',
           blocks,
@@ -69,7 +69,7 @@ describe('slack writeback', () => {
 
     it('rejects an empty body', () => {
       assert.throws(
-        () => resolveWritebackRequest('/slack/channels/general/messages/new.json', ''),
+        () => resolveWritebackRequest('/slack/channels/general/messages/draft@message.json', ''),
         /requires a non-empty body/,
       );
     });
@@ -78,10 +78,21 @@ describe('slack writeback', () => {
       assert.throws(
         () =>
           resolveWritebackRequest(
-            '/slack/channels/general/messages/new.json',
+            '/slack/channels/general/messages/draft@message.json',
             JSON.stringify({ username: 'NoBody' }),
           ),
         /requires `text`, `blocks`, or `attachments`/,
+      );
+    });
+
+    it('rejects read-only fields in JSON payloads', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/slack/channels/general/messages/draft@message.json',
+            JSON.stringify({ id: '1762445678.001234', text: 'Hello' }),
+          ),
+        /read-only/,
       );
     });
   });
@@ -89,7 +100,7 @@ describe('slack writeback', () => {
   describe('reply_in_thread', () => {
     it('reverses the tsToken (underscore → dot) and sets thread_ts', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/1762445678_001234/replies/new.json',
+        '/slack/channels/customer-success/messages/1762445678_001234/replies/draft@reply.json',
         'Following up here.',
       );
       assert.strictEqual(req.action, 'reply_in_thread');
@@ -102,7 +113,7 @@ describe('slack writeback', () => {
 
     it('handles subjectSlug--tsToken message segment', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/onboarding-acme--1762445678_001234/replies/new.json',
+        '/slack/channels/customer-success/messages/onboarding-acme--1762445678_001234/replies/draft@reply.json',
         'Reply body.',
       );
       assert.strictEqual(
@@ -113,16 +124,16 @@ describe('slack writeback', () => {
 
     it('honors reply_broadcast on thread replies only', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/1762445678_001234/replies/new.json',
+        '/slack/channels/general/messages/1762445678_001234/replies/draft@reply.json',
         JSON.stringify({ text: 'announce', reply_broadcast: true }),
       );
       assert.strictEqual((req.body as { reply_broadcast: boolean }).reply_broadcast, true);
     });
 
     it('honors reply_broadcast when thread_ts comes from payload (top-level route)', () => {
-      // top-level messages/new.json route + payload thread_ts → still a reply
+      // top-level messages/draft@message.json route + payload thread_ts → still a reply
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/new.json',
+        '/slack/channels/general/messages/draft@message.json',
         JSON.stringify({
           text: 'announce',
           thread_ts: '1762445678.001234',
@@ -136,7 +147,7 @@ describe('slack writeback', () => {
 
     it('does not set reply_broadcast on a top-level message with no thread context', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/new.json',
+        '/slack/channels/general/messages/draft@message.json',
         JSON.stringify({ text: 'plain', reply_broadcast: true }),
       );
       assert.strictEqual(req.action, 'post_message');
@@ -147,7 +158,7 @@ describe('slack writeback', () => {
   describe('add_reaction', () => {
     it('accepts a bare emoji name', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        '/slack/channels/general/messages/1762445678_001234/reactions/draft@reaction.json',
         'eyes',
       );
       assert.strictEqual(req.action, 'add_reaction');
@@ -161,7 +172,7 @@ describe('slack writeback', () => {
 
     it('strips surrounding colons from the emoji name', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        '/slack/channels/general/messages/1762445678_001234/reactions/draft@reaction.json',
         ':white_check_mark:',
       );
       assert.strictEqual((req.body as { name: string }).name, 'white_check_mark');
@@ -169,7 +180,7 @@ describe('slack writeback', () => {
 
     it('accepts JSON {name} payload', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+        '/slack/channels/general/messages/1762445678_001234/reactions/draft@reaction.json',
         JSON.stringify({ name: 'rocket' }),
       );
       assert.strictEqual((req.body as { name: string }).name, 'rocket');
@@ -179,7 +190,7 @@ describe('slack writeback', () => {
       assert.throws(
         () =>
           resolveWritebackRequest(
-            '/slack/channels/general/messages/1762445678_001234/reactions/new.json',
+            '/slack/channels/general/messages/1762445678_001234/reactions/draft@reaction.json',
             JSON.stringify({}),
           ),
         /requires `name`/,
@@ -188,7 +199,7 @@ describe('slack writeback', () => {
 
     it('extracts canonical channel id from <slug>--<id> reaction path', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success--C01ABC1234/messages/1762445678_001234/reactions/new.json',
+        '/slack/channels/customer-success--C01ABC1234/messages/1762445678_001234/reactions/draft@reaction.json',
         'eyes',
       );
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
@@ -196,7 +207,7 @@ describe('slack writeback', () => {
 
     it('honors `channel` payload override on reactions', () => {
       const req = resolveWritebackRequest(
-        '/slack/channels/customer-success/messages/1762445678_001234/reactions/new.json',
+        '/slack/channels/customer-success/messages/1762445678_001234/reactions/draft@reaction.json',
         JSON.stringify({ name: 'rocket', channel: 'C01ABC1234' }),
       );
       assert.strictEqual((req.body as { channel: string }).channel, 'C01ABC1234');
@@ -208,6 +219,40 @@ describe('slack writeback', () => {
       assert.throws(
         () => resolveWritebackRequest('/slack/users/U01ABC.json', '{}'),
         /No Slack writeback rule matched/,
+      );
+    });
+  });
+
+  describe('delete', () => {
+    it('maps canonical messages and reactions to Slack delete calls', () => {
+      assert.deepStrictEqual(
+        resolveDeleteRequest('/slack/channels/general/messages/1762445678_001234.json'),
+        {
+          action: 'delete_message',
+          method: 'POST',
+          endpoint: '/api/chat.delete',
+          body: {
+            channel: '#general',
+            ts: '1762445678.001234',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        resolveDeleteRequest('/slack/channels/general/messages/1762445678_001234/reactions/eyes.json'),
+        {
+          action: 'remove_reaction',
+          method: 'POST',
+          endpoint: '/api/reactions.remove',
+          body: {
+            channel: '#general',
+            timestamp: '1762445678.001234',
+            name: 'eyes',
+          },
+        },
+      );
+      assert.throws(
+        () => resolveDeleteRequest('/slack/channels/general/messages/draft@message.json'),
+        /No Slack delete writeback rule matched/,
       );
     });
   });

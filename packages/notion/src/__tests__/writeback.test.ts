@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveWritebackRequest } from '../writeback.js';
+import { resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
 
 describe('writeback rule matching', () => {
   it('maps page JSON to PATCH /v1/pages/{id}', () => {
     const request = resolveWritebackRequest(
-      '/notion/databases/db-1/pages/page-1.json',
+      '/notion/databases/db-1/pages/00000000-0000-0000-0000-000000000001.json',
       JSON.stringify({
         properties: {
           Name: {
@@ -20,7 +20,7 @@ describe('writeback rule matching', () => {
     assert.deepStrictEqual(request, {
       action: 'update_page_properties',
       method: 'PATCH',
-      endpoint: '/v1/pages/page-1',
+      endpoint: '/v1/pages/00000000-0000-0000-0000-000000000001',
       body: {
         properties: {
           Name: {
@@ -61,9 +61,9 @@ describe('writeback rule matching', () => {
     });
   });
 
-  it('maps database page new.json templates to page creation', () => {
+  it('maps database page draft templates to page creation', () => {
     const request = resolveWritebackRequest(
-      '/notion/databases/db-1/pages/new.json',
+      '/notion/databases/db-1/pages/draft-page.json',
       JSON.stringify({
         properties: {
           Name: {
@@ -79,5 +79,23 @@ describe('writeback rule matching', () => {
     assert.strictEqual(request.method, 'POST');
     assert.strictEqual(request.endpoint, '/v1/pages');
     assert.deepStrictEqual(request.body.parent, { database_id: 'db-1' });
+    assert.throws(
+      () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page.json', '{"id":"page-1","properties":{}}'),
+      /read-only/,
+    );
+    assert.throws(
+      () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page.json', '{}'),
+      /must include a properties object/,
+    );
+    assert.deepStrictEqual(resolveDeleteRequest('/notion/databases/db-1/pages/00000000-0000-0000-0000-000000000001.json'), {
+      action: 'delete_page',
+      method: 'PATCH',
+      endpoint: '/v1/pages/00000000-0000-0000-0000-000000000001',
+      body: { archived: true },
+    });
+    assert.throws(
+      () => resolveDeleteRequest('/notion/databases/db-1/pages/draft-page.json'),
+      /No Notion delete writeback rule matched/,
+    );
   });
 });

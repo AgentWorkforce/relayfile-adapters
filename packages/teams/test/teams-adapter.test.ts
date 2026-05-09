@@ -16,6 +16,7 @@ import {
   processNotifications,
   renewSubscription,
   deleteSubscription,
+  resolveDeleteRequest,
   resolveWriteback,
   shouldRenewSubscription,
   validateClientState,
@@ -226,26 +227,49 @@ describe('writeback routing', () => {
     assert.strictEqual(chatResult?.objectId, 'chat-1:message-1');
     assert.strictEqual(chatResult?.url, 'https://graph.microsoft.com/v1.0/chats/chat-1/messages');
 
-    const newMessageResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/new.json', {
+    const newMessageResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/draft@message.json', {
       text: '<p>Hello new team message</p>',
     });
     assert.strictEqual(newMessageResult?.objectType, 'message');
-    assert.strictEqual(newMessageResult?.objectId, 'team-1:channel-1:new');
+    assert.strictEqual(newMessageResult?.objectId, 'team-1:channel-1:draft@message');
     assert.strictEqual(newMessageResult?.url, 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages');
 
-    const newReplyResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1/replies/new.json', {
+    const newReplyResult = resolveWriteback('/teams/team-1/channels/channel-1/messages/message-1/replies/draft@reply.json', {
       text: '<p>Hello new thread reply</p>',
     });
     assert.strictEqual(newReplyResult?.objectType, 'reply');
-    assert.strictEqual(newReplyResult?.objectId, 'team-1:channel-1:message-1:new');
+    assert.strictEqual(newReplyResult?.objectId, 'team-1:channel-1:message-1:draft@reply');
     assert.strictEqual(newReplyResult?.url, 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages/message-1/replies');
 
-    const newChatMessageResult = resolveWriteback('/teams/chats/chat-1/messages/new.json', {
+    const newChatMessageResult = resolveWriteback('/teams/chats/chat-1/messages/draft@chat.json', {
       text: '<p>Hello new chat message</p>',
     });
     assert.strictEqual(newChatMessageResult?.objectType, 'chat_message');
-    assert.strictEqual(newChatMessageResult?.objectId, 'chat-1:new');
+    assert.strictEqual(newChatMessageResult?.objectId, 'chat-1:draft@chat');
     assert.strictEqual(newChatMessageResult?.url, 'https://graph.microsoft.com/v1.0/chats/chat-1/messages');
+
+    assert.deepStrictEqual(resolveDeleteRequest('/teams/team-1/channels/channel-1/messages/message-1.json'), {
+      objectType: 'message',
+      objectId: 'team-1:channel-1:message-1',
+      method: 'DELETE',
+      url: 'https://graph.microsoft.com/v1.0/teams/team-1/channels/channel-1/messages/message-1',
+    });
+    assert.strictEqual(resolveDeleteRequest('/teams/team-1/channels/channel-1/messages/draft@message.json'), null);
+  });
+
+  it('rejects missing message content and read-only fields', () => {
+    assert.throws(
+      () => resolveWriteback('/teams/team-1/channels/channel-1/messages/draft@message.json', {}),
+      /requires `body.content`, `text`, or `content`/,
+    );
+    assert.throws(
+      () =>
+        resolveWriteback('/teams/team-1/channels/channel-1/messages/draft@message.json', {
+          id: 'message-1',
+          text: '<p>Hello</p>',
+        }),
+      /read-only/,
+    );
   });
 });
 

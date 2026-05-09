@@ -25,7 +25,7 @@ export {
 } from './notification/validator.js';
 export { decryptNotificationContent } from './notification/decryptor.js';
 export { processNotifications } from './notification/handler.js';
-export { resolveWriteback, resolveWritebackForObject } from './writeback.js';
+export { resolveDeleteRequest, resolveWriteback, resolveWritebackForObject } from './writeback.js';
 export { materializeChannel, materializeTab, materializeTeam } from './channels/ingestion.js';
 export {
   extractMessageRelations,

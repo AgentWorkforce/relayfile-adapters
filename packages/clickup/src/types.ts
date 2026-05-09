@@ -33,14 +33,17 @@ export interface ClickUpWritebackRequest {
     | 'create_folder'
     | 'create_list'
     | 'create_task'
+    | 'delete_folder'
+    | 'delete_list'
+    | 'delete_task'
     | 'update_folder'
     | 'update_list'
     | 'update_space'
     | 'update_task'
     | 'task_comment';
-  method: 'PATCH' | 'POST' | 'PUT';
+  method: 'DELETE' | 'PATCH' | 'POST' | 'PUT';
   endpoint: string;
-  body: Record<string, unknown>;
+  body?: Record<string, unknown>;
 }
 
 export interface ClickUpUser {

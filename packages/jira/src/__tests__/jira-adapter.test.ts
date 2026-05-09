@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
 import { JiraAdapter, type RelayFileClientLike, type WriteFileInput } from '../jira-adapter.js';
 import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
+import { resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -158,6 +159,40 @@ describe('JiraAdapter', () => {
     // generated without the parent issue ref); nested form is preferred.
     assert.equal(computeJiraPath('comment', '9001'), '/jira/comments/9001.json');
     assert.equal(computeJiraPath('comment', '9001', 'ENG-42'), '/jira/issues/ENG-42/comments/9001.json');
+  });
+
+  it('maps file-native writeback routes for create, patch, validation, and delete', () => {
+    assert.deepEqual(resolveJiraWritebackRequest('/jira/issues/draft-issue.json', JSON.stringify({
+      fields: { project: { key: 'ENG' }, summary: 'New issue', issuetype: { name: 'Task' } },
+    })), {
+      action: 'create_issue',
+      method: 'POST',
+      endpoint: '/rest/api/3/issue',
+      body: { fields: { project: { key: 'ENG' }, summary: 'New issue', issuetype: { name: 'Task' } } },
+    });
+    assert.deepEqual(resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"fields":{"summary":"Renamed"}}'), {
+      action: 'update_issue',
+      method: 'PUT',
+      endpoint: '/rest/api/3/issue/ENG-42',
+      body: { fields: { summary: 'Renamed' } },
+    });
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"id":"10001","fields":{"summary":"Renamed"}}'),
+      /read-only/,
+    );
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/issues/draft-issue.json', '{"fields":{"summary":"Missing project"}}'),
+      /requires fields.project/,
+    );
+    assert.deepEqual(resolveJiraDeleteRequest('/jira/issues/ENG-42.json'), {
+      action: 'delete_issue',
+      method: 'DELETE',
+      endpoint: '/rest/api/3/issue/ENG-42',
+    });
+    assert.throws(
+      () => resolveJiraDeleteRequest('/jira/issues/draft-issue.json'),
+      /No Jira delete writeback rule matched/,
+    );
   });
 
   it('deletes files for deleted events when deleteFile is available', async () => {

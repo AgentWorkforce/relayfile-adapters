@@ -1,4 +1,8 @@
+import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { resources } from './resources.js';
 import type { JsonValue, LinearWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 /**
  * Resolve a relayfile writeback into a Linear GraphQL mutation request.
@@ -12,24 +16,44 @@ import type { JsonValue, LinearWritebackRequest } from './types.js';
  * suffix to recover the canonical UUID Linear's API requires.
  */
 export function resolveWritebackRequest(path: string, content: string): LinearWritebackRequest {
+  const route = classifyWrite(path, resources);
+
   // Comment on an existing issue.
   const newCommentMatch = path.match(/^\/linear\/issues\/([^/]+)\/comments\/([^/]+)\.json$/);
-  if (newCommentMatch?.[1] && newCommentMatch[2] && !isCanonicalLinearIdSegment(newCommentMatch[2])) {
+  if (newCommentMatch?.[1] && newCommentMatch[2] && route?.resource.name === 'comments' && route.kind === 'create') {
     return buildCommentCreate(extractLinearId(newCommentMatch[1]), content);
   }
 
   // Create a brand-new issue from any non-canonical filename.
   const issueFileMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
-  if (issueFileMatch?.[1] && !isCanonicalLinearIdSegment(issueFileMatch[1])) {
+  if (issueFileMatch?.[1] && route?.resource.name === 'issues' && route.kind === 'create') {
     return buildIssueCreate(content);
   }
 
   // Update an existing issue's metadata.
-  if (issueFileMatch?.[1]) {
+  if (issueFileMatch?.[1] && route?.resource.name === 'issues' && route.kind === 'patch') {
     return buildIssueUpdate(extractLinearId(issueFileMatch[1]), content);
   }
 
   throw new Error(`No Linear writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): LinearWritebackRequest {
+  const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  const issueFileMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
+  if (!issueFileMatch?.[1] || route?.resource.name !== 'issues' || route.kind !== 'delete') {
+    throw new Error(`No Linear delete writeback rule matched ${path}`);
+  }
+
+  return {
+    action: 'delete_issue',
+    method: 'POST',
+    endpoint: '/graphql',
+    body: {
+      query: ISSUE_DELETE_MUTATION,
+      variables: { id: extractLinearId(issueFileMatch[1]) },
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -77,15 +101,6 @@ function extractLinearId(segment: string): string {
   return decoded;
 }
 
-function isCanonicalLinearIdSegment(segment: string): boolean {
-  const decoded = decodeURIComponent(segment);
-  return (
-    /--[0-9a-f]{32}$/i.test(decoded) ||
-    /^[0-9a-f]{32}$/i.test(decoded) ||
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded)
-  );
-}
-
 /**
  * Reformat a 32-char hex string back to canonical UUID `8-4-4-4-12` form.
  * Inverse of the dehyphenation done by `path-mapper.idSuffix()`.
@@ -116,6 +131,12 @@ const ISSUE_UPDATE_MUTATION = `mutation RelayfileIssueUpdate($id: String!, $inpu
   issueUpdate(id: $id, input: $input) {
     success
     issue { id identifier url }
+  }
+}`;
+
+const ISSUE_DELETE_MUTATION = `mutation RelayfileIssueDelete($id: String!) {
+  issueDelete(id: $id) {
+    success
   }
 }`;
 
@@ -242,16 +263,6 @@ const READ_ONLY_FIELDS = new Set([
   '_webhook',
   '_connection',
 ]);
-
-export class ReadOnlyFieldError extends Error {
-  readonly field: string;
-
-  constructor(field: string) {
-    super(`Field "${field}" is read-only and cannot be written`);
-    this.name = 'ReadOnlyFieldError';
-    this.field = field;
-  }
-}
 
 function looksLikeSyncedEnvelope(payload: Record<string, unknown>): boolean {
   if (!isRecord(payload.payload)) return false;

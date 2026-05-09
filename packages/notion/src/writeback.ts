@@ -1,6 +1,10 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import { DEFAULT_NOTION_MARKDOWN_API_VERSION } from './types.js';
 import { deserializePropertyMap } from './pages/properties.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { JsonValue, NotionWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 /**
  * Extract a Notion id from a path segment.
@@ -63,8 +67,9 @@ function formatUuid(hex32: string): string {
  * Throws when no rule matches the path.
  */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
-  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages(?:\/new\.json)?\/?$/);
-  if (createDatabasePageMatch) {
+  const databasePageFile = matchResourceFile(path, '/notion/databases/{databaseId}/pages');
+  const createDatabasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
+  if (createDatabasePageMatch && databasePageFile && !databasePageFile.canonical) {
     return buildCreatePageWriteback(extractNotionId(createDatabasePageMatch[1]), content);
   }
 
@@ -101,6 +106,20 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   throw new Error(`No Notion writeback rule matched ${path}`);
 }
 
+export function resolveDeleteRequest(path: string): NotionWritebackRequest {
+  const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
+  if (databasePageMatch?.[2] && matchResourceFile(path, '/notion/databases/{databaseId}/pages')?.canonical) {
+    return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
+  }
+
+  const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
+  if (standalonePageMatch?.[1]) {
+    return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
+  }
+
+  throw new Error(`No Notion delete writeback rule matched ${path}`);
+}
+
 /**
  * Build a `PATCH /v1/pages/{id}` request to update a page's properties,
  * archived flag, icon, or cover. The payload must include a `properties`
@@ -108,6 +127,7 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
  */
 function buildPagePropertiesWriteback(pageId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
+  rejectReadOnlyFields(payload);
   const properties = extractSerializedProperties(payload);
   return {
     action: 'update_page_properties',
@@ -205,6 +225,7 @@ function buildCommentWriteback(pageId: string, content: string): NotionWriteback
  */
 function buildCreatePageWriteback(databaseId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
+  rejectReadOnlyFields(payload);
   const properties = extractSerializedProperties(payload);
   const children = Array.isArray(payload.children) ? payload.children : undefined;
   const markdown = typeof payload.markdown === 'string' ? payload.markdown : undefined;
@@ -219,6 +240,17 @@ function buildCreatePageWriteback(databaseId: string, content: string): NotionWr
       properties,
       children,
       markdown,
+    },
+  };
+}
+
+function buildArchivePageWriteback(pageId: string): NotionWritebackRequest {
+  return {
+    action: 'delete_page',
+    method: 'PATCH',
+    endpoint: `/v1/pages/${encodeURIComponent(pageId)}`,
+    body: {
+      archived: true,
     },
   };
 }
@@ -281,4 +313,45 @@ function readBoolean(record: Record<string, unknown>, key: string): boolean | un
 /** Type guard: is the value a non-array, non-null object? */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'created_time',
+  'last_edited_time',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
+    return undefined;
+  }
+  const id = extractNotionId(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }

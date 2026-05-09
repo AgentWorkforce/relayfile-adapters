@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReadOnlyFieldError, resolveWritebackRequest } from './writeback.js';
+import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from './writeback.js';
 
 const PAGE_UUID = '2fd6800c-1c90-80ea-9ec8-fe4a0daa66b8';
 const PAGE_HEX = PAGE_UUID.replace(/-/g, '');
@@ -164,6 +164,24 @@ describe('linear writeback', () => {
             }),
           ),
         (error) => error instanceof ReadOnlyFieldError && error.field === 'provider',
+      );
+    });
+  });
+
+  describe('issue delete', () => {
+    it('builds an issueDelete mutation for a canonical id filename', () => {
+      const req = resolveDeleteRequest(`/linear/issues/auth-refactor--${PAGE_HEX}.json`);
+
+      assert.strictEqual(req.action, 'delete_issue');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.deepStrictEqual(req.body.variables, { id: PAGE_UUID });
+    });
+
+    it('rejects delete writebacks for draft filenames', () => {
+      assert.throws(
+        () => resolveDeleteRequest('/linear/issues/audit-log-export.json'),
+        /No Linear delete writeback rule matched/,
       );
     });
   });

@@ -1,30 +1,37 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
+import { resources, type AdapterResourceConfig } from './resources.js';
 import type { ZendeskWritebackRequest } from './types.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 const ZENDESK_TICKETS_ROUTE = '/api/v2/tickets';
 const ZENDESK_USERS_ROUTE = '/api/v2/users';
 const ZENDESK_ORGANIZATIONS_ROUTE = '/api/v2/organizations';
 
 export function resolveWritebackRequest(path: string, content: string): ZendeskWritebackRequest {
-  const ticketCommentMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\/comments\/new\.json$/);
-  if (ticketCommentMatch?.[1]) {
+  const commentFile = matchResourceFile(path, '/zendesk/tickets/{ticketId}/comments');
+  const ticketCommentMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\/comments\/([^/]+)\.json$/);
+  if (ticketCommentMatch?.[1] && commentFile && !commentFile.canonical) {
     return buildTicketCommentRequest(extractZendeskId(ticketCommentMatch[1]), content);
   }
 
-  if (path === '/zendesk/tickets/new.json' || path === '/zendesk/tickets/') {
+  const ticketFile = matchResourceFile(path, '/zendesk/tickets');
+  if (ticketFile && !ticketFile.canonical) {
     return buildTicketCreateRequest(content);
   }
 
   const ticketUpdateMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
-  if (ticketUpdateMatch?.[1]) {
+  if (ticketUpdateMatch?.[1] && ticketFile?.canonical) {
     return buildTicketUpdateRequest(extractZendeskId(ticketUpdateMatch[1]), content);
   }
 
-  if (path === '/zendesk/users/new.json' || path === '/zendesk/users/') {
+  const userFile = matchResourceFile(path, '/zendesk/users');
+  if (userFile && !userFile.canonical) {
     return buildUserCreateRequest(content);
   }
 
   const userUpdateMatch = path.match(/^\/zendesk\/users\/([^/]+)\.json$/);
-  if (userUpdateMatch?.[1]) {
+  if (userUpdateMatch?.[1] && userFile?.canonical) {
     return buildUserUpdateRequest(decodeURIComponent(userUpdateMatch[1]), content);
   }
 
@@ -34,6 +41,37 @@ export function resolveWritebackRequest(path: string, content: string): ZendeskW
   }
 
   throw new Error(`No Zendesk writeback rule matched ${path}`);
+}
+
+export function resolveDeleteRequest(path: string): ZendeskWritebackRequest {
+  const ticketMatch = path.match(/^\/zendesk\/tickets\/([^/]+)\.json$/);
+  if (ticketMatch?.[1] && matchResourceFile(path, '/zendesk/tickets')?.canonical) {
+    return {
+      action: 'delete_ticket',
+      method: 'DELETE',
+      endpoint: `${ZENDESK_TICKETS_ROUTE}/${extractZendeskId(ticketMatch[1])}.json`,
+    };
+  }
+
+  const userMatch = path.match(/^\/zendesk\/users\/([^/]+)\.json$/);
+  if (userMatch?.[1] && matchResourceFile(path, '/zendesk/users')?.canonical) {
+    return {
+      action: 'delete_user',
+      method: 'DELETE',
+      endpoint: `${ZENDESK_USERS_ROUTE}/${decodeURIComponent(userMatch[1])}.json`,
+    };
+  }
+
+  const orgMatch = path.match(/^\/zendesk\/organizations\/([^/]+)\.json$/);
+  if (orgMatch?.[1]) {
+    return {
+      action: 'delete_organization',
+      method: 'DELETE',
+      endpoint: `${ZENDESK_ORGANIZATIONS_ROUTE}/${decodeURIComponent(orgMatch[1])}.json`,
+    };
+  }
+
+  throw new Error(`No Zendesk delete writeback rule matched ${path}`);
 }
 
 function buildTicketCommentRequest(ticketId: string, content: string): ZendeskWritebackRequest {
@@ -68,6 +106,7 @@ function buildTicketCommentRequest(ticketId: string, content: string): ZendeskWr
 
 function buildTicketCreateRequest(content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const ticket = readObject(payload, 'ticket') ?? payload;
   const subject = readString(ticket, 'subject');
   if (!subject) {
@@ -84,6 +123,7 @@ function buildTicketCreateRequest(content: string): ZendeskWritebackRequest {
 function buildTicketUpdateRequest(ticketId: string, content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
   const source = looksLikeSyncedEnvelope(payload) ? readObject(payload, 'payload') ?? payload : readObject(payload, 'ticket') ?? payload;
+  rejectReadOnlyFields(source);
   const ticket = pickTicketFields(source, false);
   if (Object.keys(ticket).length === 0) {
     throw new Error('tickets/<id>.json update writeback requires at least one mutable ticket field');
@@ -98,6 +138,7 @@ function buildTicketUpdateRequest(ticketId: string, content: string): ZendeskWri
 
 function buildUserCreateRequest(content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
   const user = readObject(payload, 'user') ?? payload;
   const name = readString(user, 'name');
   if (!name) {
@@ -114,6 +155,7 @@ function buildUserCreateRequest(content: string): ZendeskWritebackRequest {
 function buildUserUpdateRequest(userId: string, content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
   const source = looksLikeSyncedEnvelope(payload) ? readObject(payload, 'payload') ?? payload : readObject(payload, 'user') ?? payload;
+  rejectReadOnlyFields(source);
   const user = pickUserFields(source, false);
   if (Object.keys(user).length === 0) {
     throw new Error('users/<id>.json update writeback requires at least one mutable user field');
@@ -141,6 +183,45 @@ function buildOrganizationUpdateRequest(organizationId: string, content: string)
     endpoint: `${ZENDESK_ORGANIZATIONS_ROUTE}/${organizationId}.json`,
     body: { organization },
   };
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+  for (const key of Object.keys(payload)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+}
+
+function matchResourceFile(path: string, resourcePath: string): { canonical: boolean; id: string } | undefined {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return undefined;
+  }
+  return matchFile(path, resource);
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  if (!path.endsWith('.json') || !resource.pathPattern.test(path)) {
+    return undefined;
+  }
+  const id = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }
 
 const TICKET_FIELDS = new Set([

@@ -51,7 +51,7 @@ function renderAdapterReadme(adapter) {
     '|---|---|',
     '| Read | `cat <id>.json` |',
     '| Edit | Write a partial JSON object to `<id>.json`. Only included mutable fields PATCH; fields marked `readOnly` in `.schema.json` are rejected. |',
-    '| Create | Write JSON to any non-canonical filename such as `draft-title.json`. The adapter creates the record at `<real-id>.json` and rewrites the draft as `{ "created": "<real-id>", "path": "<resource>/<real-id>.json", "url": "<provider-url>" }`. |',
+    '| Create | Write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at `<real-id>.json` and rewrites the draft as `{ "created": "<real-id>", "path": "<resource>/<real-id>.json", "url": "<provider-url>" }`. |',
     '| Delete | `rm <id>.json` for canonical ids. |',
     '',
     '## ID Patterns',
@@ -280,7 +280,10 @@ function pathPatternSourceFor(resourcePath) {
 }
 
 function idPatternFor(adapterSlug, resourcePath) {
-  if (adapterSlug === 'linear' || adapterSlug === 'notion') {
+  if (adapterSlug === 'linear') {
+    return pattern('^(?:(?:[A-Za-z0-9_.~-]+--)?[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+  }
+  if (adapterSlug === 'notion') {
     return pattern('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', 'i');
   }
   if (adapterSlug === 'slack') {

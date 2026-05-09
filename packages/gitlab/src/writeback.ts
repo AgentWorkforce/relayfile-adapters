@@ -1,5 +1,16 @@
+import { ReadOnlyFieldError } from '@relayfile/adapter-core';
 import type { ConnectionProvider, WritebackPathTarget, WritebackResult } from './types.js';
 import { parseGitLabPath } from './path-mapper.js';
+import { resources, type AdapterResourceConfig } from './resources.js';
+
+export { ReadOnlyFieldError } from '@relayfile/adapter-core';
+
+export interface GitLabWritebackRequest {
+  action: 'delete_issue_note' | 'delete_merge_request_discussion';
+  method: 'DELETE';
+  endpoint: string;
+  body?: Record<string, unknown>;
+}
 
 export class GitLabWritebackHandler {
   constructor(
@@ -23,7 +34,12 @@ export class GitLabWritebackHandler {
       };
     }
 
-    if (parsed.objectType === 'merge_requests' && parsed.subResource === 'discussions' && parsed.subResourceId === 'new') {
+    if (
+      parsed.objectType === 'merge_requests' &&
+      parsed.subResource === 'discussions' &&
+      parsed.subResourceId &&
+      !isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}/discussions')
+    ) {
       return {
         entity: 'merge_request_discussion',
         projectPath: parsed.projectPath,
@@ -39,7 +55,12 @@ export class GitLabWritebackHandler {
       };
     }
 
-    if (parsed.objectType === 'issues' && parsed.subResource === 'comments' && parsed.subResourceId === 'new') {
+    if (
+      parsed.objectType === 'issues' &&
+      parsed.subResource === 'comments' &&
+      parsed.subResourceId &&
+      !isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/issues/{issueIid}/comments')
+    ) {
       return {
         entity: 'issue_note',
         projectPath: parsed.projectPath,
@@ -50,10 +71,14 @@ export class GitLabWritebackHandler {
     throw new Error(`Unsupported GitLab writeback path: ${path}`);
   }
 
+  resolveDeleteRequest(path: string): GitLabWritebackRequest {
+    return resolveDeleteRequest(path);
+  }
+
   async writeBack(workspaceId: string, path: string, content: string): Promise<WritebackResult> {
     try {
       const target = this.extractWritebackTarget(path);
-      const body = JSON.parse(content) as Record<string, unknown>;
+      const body = readWritablePayload(content);
       const projectId = encodeURIComponent(target.projectPath);
 
       let endpoint = '';
@@ -65,6 +90,7 @@ export class GitLabWritebackHandler {
           method = 'PUT';
           break;
         case 'merge_request_discussion':
+          requireString(body, 'body', 'merge request discussion');
           endpoint = `/api/v4/projects/${projectId}/merge_requests/${target.resourceId}/discussions`;
           method = 'POST';
           break;
@@ -73,6 +99,7 @@ export class GitLabWritebackHandler {
           method = 'PUT';
           break;
         case 'issue_note':
+          requireString(body, 'body', 'issue note');
           endpoint = `/api/v4/projects/${projectId}/issues/${target.resourceId}/notes`;
           method = 'POST';
           break;
@@ -106,4 +133,93 @@ export class GitLabWritebackHandler {
       };
     }
   }
+}
+
+export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
+  const parsed = parseGitLabPath(path);
+  if (!parsed) {
+    throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
+  }
+  const projectId = encodeURIComponent(parsed.projectPath);
+
+  if (
+    parsed.objectType === 'merge_requests' &&
+    parsed.subResource === 'discussions' &&
+    parsed.subResourceId &&
+    isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}/discussions')
+  ) {
+    return {
+      action: 'delete_merge_request_discussion',
+      method: 'DELETE',
+      endpoint: `/api/v4/projects/${projectId}/merge_requests/${parsed.objectId}/discussions/${encodeURIComponent(parsed.subResourceId)}`,
+    };
+  }
+
+  if (
+    parsed.objectType === 'issues' &&
+    parsed.subResource === 'comments' &&
+    parsed.subResourceId &&
+    isCanonicalResourcePath(path, '/gitlab/projects/{projectPath}/issues/{issueIid}/comments')
+  ) {
+    return {
+      action: 'delete_issue_note',
+      method: 'DELETE',
+      endpoint: `/api/v4/projects/${projectId}/issues/${parsed.objectId}/notes/${encodeURIComponent(parsed.subResourceId)}`,
+    };
+  }
+
+  throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
+}
+
+const READ_ONLY_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'url',
+  'identifier',
+  'provider',
+  'objectType',
+  'objectId',
+  'workspaceId',
+  'connectionId',
+  '_webhook',
+  '_connection',
+]);
+
+function readWritablePayload(content: string): Record<string, unknown> {
+  const payload = JSON.parse(content) as unknown;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error('GitLab writeback payload must be a JSON object');
+  }
+  const record = payload as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (READ_ONLY_FIELDS.has(key)) {
+      throw new ReadOnlyFieldError(key);
+    }
+  }
+  return record;
+}
+
+function requireString(payload: Record<string, unknown>, key: string, label: string): void {
+  if (typeof payload[key] !== 'string' || payload[key].trim() === '') {
+    throw new Error(`GitLab ${label} create writeback requires \`${key}\``);
+  }
+}
+
+function isCanonicalResourcePath(path: string, resourcePath: string): boolean {
+  const resource = resources.find((candidate) => candidate.path === resourcePath);
+  if (!resource) {
+    return false;
+  }
+  const file = matchFile(path, resource);
+  return file?.canonical === true;
+}
+
+function matchFile(path: string, resource: AdapterResourceConfig): { canonical: boolean; id: string } | undefined {
+  const normalized = path.trim();
+  if (!normalized.endsWith('.json') || !resource.pathPattern.test(normalized)) {
+    return undefined;
+  }
+  const id = decodeURIComponent(normalized.slice(normalized.lastIndexOf('/') + 1, -'.json'.length));
+  return { canonical: resource.idPattern.test(id), id };
 }

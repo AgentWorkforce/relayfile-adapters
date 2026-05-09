@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   SalesforceAdapter,
   computeSalesforcePath,
+  resolveDeleteRequest,
   resolveReadRequest,
   resolveWritebackRequest,
   salesforceAccountPath,
@@ -260,16 +261,33 @@ test('read and writeback route resolution maps VFS paths to Salesforce REST requ
     query: { q: 'SELECT Id, FirstName, LastName, Email FROM Contact' },
   });
 
-  assert.deepEqual(resolveWritebackRequest('/salesforce/accounts/new.json', '{"Name":"Acme"}'), {
+  assert.deepEqual(resolveWritebackRequest('/salesforce/accounts/draft-account.json', '{"Name":"Acme"}'), {
     action: 'create_account',
     method: 'POST',
     endpoint: '/services/data/v62.0/sobjects/Account',
     body: { Name: 'Acme' },
   });
-  assert.deepEqual(resolveWritebackRequest('/salesforce/contacts/003A.json', '{"Title":"CEO"}'), {
+  assert.deepEqual(resolveWritebackRequest('/salesforce/contacts/003000000000000AAA.json', '{"Title":"CEO"}'), {
     action: 'update_contact',
     method: 'PATCH',
-    endpoint: '/services/data/v62.0/sobjects/Contact/003A',
+    endpoint: '/services/data/v62.0/sobjects/Contact/003000000000000AAA',
     body: { Title: 'CEO' },
   });
+  assert.throws(
+    () => resolveWritebackRequest('/salesforce/contacts/003000000000000AAA.json', '{"Id":"003000000000000AAA","Title":"CEO"}'),
+    /read-only/,
+  );
+  assert.throws(
+    () => resolveWritebackRequest('/salesforce/accounts/draft-account.json', '{"Id":"001000000000000AAA","Name":"Acme"}'),
+    /read-only/,
+  );
+  assert.deepEqual(resolveDeleteRequest('/salesforce/accounts/001000000000000AAA.json'), {
+    action: 'delete_account',
+    method: 'DELETE',
+    endpoint: '/services/data/v62.0/sobjects/Account/001000000000000AAA',
+  });
+  assert.throws(
+    () => resolveDeleteRequest('/salesforce/accounts/draft-account.json'),
+    /No Salesforce delete writeback rule matched/,
+  );
 });
