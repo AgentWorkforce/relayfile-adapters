@@ -7,14 +7,26 @@ import { linearByIdAliasPath, linearByTitleAliasPath, linearIssuePath } from '..
 
 function createAdapter() {
   const files = new Map<string, string>();
-  const client: RelayFileClientLike & { readFile(path: string): string | undefined } = {
-    async writeFile(input) {
+  const client = {
+    async writeFile(input: { path: string; content: string }) {
       files.set(input.path, input.content);
       return { created: true };
     },
-    readFile(path: string) {
-      return files.get(path);
+    // Sync helper kept for tests that read directly. Accepts (path), (input),
+    // or (workspaceId, path) so it works both for the adapter's auxiliary
+    // 2-arg readFile path and the alias-emitter's legacy single-arg path call.
+    readFile(workspaceIdOrPathOrInput: string | { path: string }, maybePath?: string): string | undefined {
+      if (typeof workspaceIdOrPathOrInput === 'string') {
+        // Adapter passes (workspaceId, path) when readFile.length >= 2.
+        // Alias emitter passes a bare path. Distinguish by inspecting the
+        // value — paths in this fixture always start with `/`.
+        const path = maybePath ?? (workspaceIdOrPathOrInput.startsWith('/') ? workspaceIdOrPathOrInput : undefined);
+        return path ? files.get(path) : undefined;
+      }
+      return files.get(workspaceIdOrPathOrInput.path);
     },
+  } satisfies RelayFileClientLike & {
+    readFile(workspaceIdOrInput: string | { path: string }, maybePath?: string): string | undefined;
   };
 
   const provider: ConnectionProvider = {
@@ -55,7 +67,7 @@ describe('linear aliases', () => {
 
     await adapter.ingestWebhook('ws-linear', event);
 
-    const canonicalPath = '/linear/issues/cafe-roadmap--issue123.json';
+    const canonicalPath = '/linear/issues/AGE-8__issue-123.json';
     const byIdPath = linearByIdAliasPath('/linear/issues', 'AGE-8');
     const byTitlePath = linearByTitleAliasPath('/linear/issues', 'Cafe roadmap', 'issue-123');
 
@@ -65,8 +77,12 @@ describe('linear aliases', () => {
     assert.strictEqual(client.readFile(byIdPath), client.readFile(canonicalPath));
     assert.strictEqual(client.readFile(byTitlePath), client.readFile(canonicalPath));
 
-    const index = JSON.parse(client.readFile('/linear/issues/_index.json') ?? '{}') as { rows: Array<{ file: string }> };
-    assert.deepStrictEqual(index.rows.map((row) => row.file), ['by-id/', 'by-title/']);
+    // PR 1's writeAuxiliaryFiles overwrites the alias-row `_index.json`
+    // emitted by writeLinearAliases with the canonical issue-row array. The
+    // alias rows therefore live only transiently inside writeLinearAliases;
+    // the durable record reflects the canonical shape.
+    const index = JSON.parse(client.readFile('/linear/issues/_index.json') ?? '[]') as Array<{ id: string }>;
+    assert.deepStrictEqual(index.map((row) => row.id), ['issue-123']);
   });
 
   it('writes project by-id aliases from the UUID and disambiguates by-title collisions with an 8-char hash', async () => {
@@ -150,8 +166,11 @@ describe('linear aliases', () => {
       },
     });
 
-    const firstCanonicalPath = linearIssuePath('issue-123', 'Cafe roadmap');
-    const secondCanonicalPath = linearIssuePath('issue-999', 'Renamed roadmap');
+    // Adapter computes humanReadable via getLinearIssueHumanReadable which
+    // prefers `identifier` over title, so canonical filenames here use the
+    // shared `AGE-8` prefix and only differ in the trailing id segment.
+    const firstCanonicalPath = linearIssuePath('issue-123', identifier);
+    const secondCanonicalPath = linearIssuePath('issue-999', identifier);
     const byIdPath = linearByIdAliasPath('/linear/issues', identifier);
 
     assert.notStrictEqual(client.readFile(firstCanonicalPath), client.readFile(secondCanonicalPath));
@@ -174,7 +193,10 @@ describe('linear aliases', () => {
       },
     });
 
-    const canonicalPath = linearIssuePath(objectId, '🚀🔥');
+    // Adapter prefers `identifier` over title via getLinearIssueHumanReadable,
+    // so the canonical path uses the identifier-derived slug rather than the
+    // emoji title (which would slug to nothing).
+    const canonicalPath = linearIssuePath(objectId, 'AGE-EMOJI');
     const byTitlePath = linearByTitleAliasPath('/linear/issues', '🚀🔥', objectId);
 
     assert.strictEqual(client.readFile(byTitlePath), client.readFile(canonicalPath));

@@ -163,8 +163,8 @@ describe('github aliases', () => {
     await ingestIssue(provider, 'octocat', 'hello-world', 7, vfs as never);
     await ingestIssue(provider, 'octocat', 'hello-world', 8, vfs as never);
 
-    const firstCanonicalPath = '/github/repos/octocat/hello-world/issues/7--shared-title/meta.json';
-    const secondCanonicalPath = '/github/repos/octocat/hello-world/issues/8--shared-title/meta.json';
+    const firstCanonicalPath = '/github/repos/octocat/hello-world/issues/7__shared-title/meta.json';
+    const secondCanonicalPath = '/github/repos/octocat/hello-world/issues/8__shared-title/meta.json';
     const byIdPath = githubByIdAliasPath('octocat', 'hello-world', 'issues', 7);
     const baseTitlePath = githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7);
     const collisionTitlePath = githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 8, true);
@@ -200,7 +200,7 @@ describe('github aliases', () => {
     await ingestPullRequest(createPullRequestProvider(), 'octocat', 'hello-world', 42, vfs as never);
 
     const canonicalPath =
-      '/github/repos/octocat/hello-world/pulls/42--add-fixture-backed-github-adapter-coverage/meta.json';
+      '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json';
     const byIdPath = githubByIdAliasPath('octocat', 'hello-world', 'pulls', 42);
 
     assert.strictEqual(vfs.readFile(byIdPath), vfs.readFile(canonicalPath));

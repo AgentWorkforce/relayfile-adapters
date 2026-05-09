@@ -98,13 +98,17 @@ export async function ingestPullRequest(
   if (parsedPullRequest) {
     metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title);
     const metaContent = serializeJson(parsedPullRequest);
-    await writeTrackedFile(
+    const metaWritten = await writeTrackedFile(
       vfs,
       metaPath,
       metaContent,
       result,
     );
-    await writePullRequestAliases(vfs, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest.title, metaContent);
+    // Skip alias duplicates when meta.json failed to write — pointing aliases
+    // at a missing canonical file would create dangling references.
+    if (metaWritten) {
+      await writePullRequestAliases(vfs, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest.title, metaContent);
+    }
   }
 
   let mappedFiles: PullRequestFileMapping[] = [];
@@ -366,7 +370,7 @@ async function writeTrackedFile(
   path: string,
   content: string,
   result: IngestResult,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const existed = await pathExists(vfs, path);
     await runVfsWrite(vfs, path, content);
@@ -377,11 +381,13 @@ async function writeTrackedFile(
     } else {
       result.filesWritten += 1;
     }
+    return true;
   } catch (error) {
     result.errors.push({
       path,
       error: formatError(error),
     });
+    return false;
   }
 }
 

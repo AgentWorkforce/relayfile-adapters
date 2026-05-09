@@ -80,6 +80,19 @@ function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8);
 }
 
+const NOTION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// `idSuffix` dehyphenates a canonical Notion UUID (8-4-4-4-12) into a
+// 32-char hex string for use in `by-id` aliases. Non-UUID ids fall through
+// unchanged so synthetic test ids and unusual fixtures still alias.
+// `writeback.extractNotionId` reverses this when resolving alias paths.
+function idSuffix(id: string): string {
+  if (NOTION_UUID_PATTERN.test(id)) {
+    return id.replace(/-/g, '').toLowerCase();
+  }
+  return id;
+}
+
 function currentNamingScope(): NamingScope | undefined {
   return namingScopeStorage.getStore();
 }

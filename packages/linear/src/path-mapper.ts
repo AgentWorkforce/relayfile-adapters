@@ -241,9 +241,6 @@ export function linearRoadmapPath(roadmapId: string): string {
   return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
 }
 
-<<<<<<< HEAD
-export function computeLinearPath(objectType: string, objectId: string, humanReadable?: string): string {
-=======
 export function linearByTitleAliasPath(scope: string, title: string, id: string, colliding = false): string {
   const slug = slugifyAlias(title);
   if (!slug) {
@@ -259,8 +256,7 @@ export function linearByIdAliasPath(scope: string, identifier: string): string {
   return `${scope}/by-id/${encodeLinearPathSegment(identifier)}.json`;
 }
 
-export function computeLinearPath(objectType: string, objectId: string, title?: string): string {
->>>>>>> e19ffb6 (fix: align adapter alias slug contract)
+export function computeLinearPath(objectType: string, objectId: string, humanReadable?: string): string {
   const normalizedType = normalizeLinearObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');
 
