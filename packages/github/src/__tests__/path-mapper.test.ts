@@ -103,14 +103,14 @@ describe('path-mapper', () => {
     it('githubPullRequestPath', () => {
       assert.equal(
         githubPullRequestPath('octocat', 'hello-world', '42'),
-        '/github/repos/octocat/hello-world/pulls/42/metadata.json',
+        '/github/repos/octocat/hello-world/pulls/42/meta.json',
       );
     });
 
     it('githubIssuePath', () => {
       assert.equal(
         githubIssuePath('octocat', 'hello-world', '7'),
-        '/github/repos/octocat/hello-world/issues/7/metadata.json',
+        '/github/repos/octocat/hello-world/issues/7/meta.json',
       );
     });
 
@@ -147,14 +147,14 @@ describe('path-mapper', () => {
     it('computes pull_request path with context', () => {
       assert.equal(
         computeGitHubPath('pull_request', '42', { owner: 'octocat', repo: 'hello-world' }),
-        '/github/repos/octocat/hello-world/pulls/42/metadata.json',
+        '/github/repos/octocat/hello-world/pulls/42/meta.json',
       );
     });
 
     it('computes issue path with context', () => {
       assert.equal(
         computeGitHubPath('issue', '7', { owner: 'octocat', repo: 'hello-world' }),
-        '/github/repos/octocat/hello-world/issues/7/metadata.json',
+        '/github/repos/octocat/hello-world/issues/7/meta.json',
       );
     });
 
@@ -210,11 +210,11 @@ describe('path-mapper', () => {
     it('normalizes object type aliases', () => {
       assert.equal(
         computeGitHubPath('pr', '42', { owner: 'o', repo: 'r' }),
-        '/github/repos/o/r/pulls/42/metadata.json',
+        '/github/repos/o/r/pulls/42/meta.json',
       );
       assert.equal(
         computeGitHubPath('pulls', '42', { owner: 'o', repo: 'r' }),
-        '/github/repos/o/r/pulls/42/metadata.json',
+        '/github/repos/o/r/pulls/42/meta.json',
       );
     });
 

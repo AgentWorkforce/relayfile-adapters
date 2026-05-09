@@ -3,18 +3,21 @@ import { ingestDatabaseArtifacts } from './databases/ingestion.js';
 import { ingestPageArtifacts, retrievePage } from './pages/ingestion.js';
 import type { NotionApiClient } from './client.js';
 import type { NotionVfsFile } from './types.js';
+import { withNotionNamingScope } from './path-mapper.js';
 
 export async function collectWorkspaceFiles(client: NotionApiClient): Promise<NotionVfsFile[]> {
   const files: NotionVfsFile[] = [];
 
   for (const databaseId of client.config.databaseIds ?? []) {
-    files.push(...(await ingestDatabaseArtifacts(client, databaseId)));
+    files.push(...(await withNotionNamingScope(() => ingestDatabaseArtifacts(client, databaseId))));
   }
 
-  for (const pageId of client.config.pageIds ?? []) {
-    const page = await retrievePage(client, pageId);
-    files.push(...(await ingestPageArtifacts(client, page)));
-  }
+  await withNotionNamingScope(async () => {
+    for (const pageId of client.config.pageIds ?? []) {
+      const page = await retrievePage(client, pageId);
+      files.push(...(await ingestPageArtifacts(client, page)));
+    }
+  });
 
   return files;
 }

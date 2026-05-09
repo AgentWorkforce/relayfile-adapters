@@ -6,7 +6,7 @@ adapter:
     openapi: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml
 webhooks:
   pull_request:
-    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{number}}/metadata.json
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{number}}/meta.json
     extract:
       - action
       - number
@@ -17,11 +17,11 @@ webhooks:
   push:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
   issues:
-    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/metadata.json
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
 resources:
   pull_request:
     endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}
-    path: /github/repos/{{owner}}/{{repo}}/pulls/{{number}}/metadata.json
+    path: /github/repos/{{owner}}/{{repo}}/pulls/{{number}}/meta.json
   pull_request_files:
     endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}/files
     path: /github/repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/files/{{filename}}

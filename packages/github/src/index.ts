@@ -82,9 +82,9 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
     switch (objectType) {
       case 'pull_request':
-        return `${repoPrefix}/pulls/${objectId}/metadata.json`;
+        return `${repoPrefix}/pulls/${objectId}/meta.json`;
       case 'issue':
-        return `${repoPrefix}/issues/${objectId}/metadata.json`;
+        return `${repoPrefix}/issues/${objectId}/meta.json`;
       case 'review':
         return `${repoPrefix}/reviews/${objectId}.json`;
       case 'check_run':

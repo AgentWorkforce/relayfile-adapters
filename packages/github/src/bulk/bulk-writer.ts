@@ -1,5 +1,6 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { githubPullRequestRoot } from '../path-mapper.js';
 import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
 import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
@@ -57,9 +58,10 @@ export async function bulkWriteToVFS(
   owner: string,
   repo: string,
   prNumber: number,
+  title?: string,
 ): Promise<BulkWriteResult> {
   const startedAt = Date.now();
-  const basePath = buildPullRequestRoot(owner, repo, prNumber);
+  const basePath = buildPullRequestRoot(owner, repo, prNumber, title);
   const result: BulkWriteResultInternal = {
     filesWritten: 0,
     filesUpdated: 0,
@@ -149,15 +151,15 @@ export async function bulkIngestPR(
   const [metaWrite, diffWrite, bulkWrite] = await Promise.all([
     writeJsonFile(
       vfs,
-      `${buildPullRequestRoot(trimmedOwner, trimmedRepo, prNumber)}/meta.json`,
+      `${buildPullRequestRoot(trimmedOwner, trimmedRepo, prNumber, metadata.title)}/meta.json`,
       metadata,
     ),
     writeTextFile(
       vfs,
-      `${buildPullRequestRoot(trimmedOwner, trimmedRepo, prNumber)}/diff.patch`,
+      `${buildPullRequestRoot(trimmedOwner, trimmedRepo, prNumber, metadata.title)}/diff.patch`,
       diff,
     ),
-    bulkWriteToVFS(batchResult.fetched, vfs, trimmedOwner, trimmedRepo, prNumber),
+    bulkWriteToVFS(batchResult.fetched, vfs, trimmedOwner, trimmedRepo, prNumber, metadata.title),
   ]);
 
   await updateMetadataCache(options.metadataCache, {
@@ -178,7 +180,7 @@ export async function bulkIngestPR(
 
   for (const error of batchResult.errors) {
     aggregated.errors.push({
-      path: buildContentPath(trimmedOwner, trimmedRepo, prNumber, error.variant, error.path),
+      path: buildContentPath(trimmedOwner, trimmedRepo, prNumber, error.variant, error.path, metadata.title),
       error: error.error,
     });
   }
@@ -471,8 +473,8 @@ function readLabels(value: JsonValue | undefined): PullRequestMetadata['labels']
   });
 }
 
-function buildPullRequestRoot(owner: string, repo: string, prNumber: number): string {
-  return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}`;
+function buildPullRequestRoot(owner: string, repo: string, prNumber: number, title?: string): string {
+  return githubPullRequestRoot(owner, repo, prNumber, title);
 }
 
 function buildContentPath(
@@ -481,9 +483,10 @@ function buildContentPath(
   prNumber: number,
   variant: 'base' | 'head',
   path: string,
+  title?: string,
 ): string {
   const relativePath = normalizeRepoPath(path);
-  const basePath = buildPullRequestRoot(owner, repo, prNumber);
+  const basePath = buildPullRequestRoot(owner, repo, prNumber, title);
   return variant === 'base'
     ? `${basePath}/base/${relativePath}`
     : `${basePath}/files/${relativePath}`;

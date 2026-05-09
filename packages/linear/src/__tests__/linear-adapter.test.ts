@@ -50,6 +50,41 @@ function createAdapter(config: LinearAdapterConfig = {}): LinearAdapter {
   return new LinearAdapter(client, provider, config);
 }
 
+function createRecordingAdapter(config: LinearAdapterConfig = {}): {
+  adapter: LinearAdapter;
+  writes: Array<{ path: string; content: string }>;
+} {
+  const writes: Array<{ path: string; content: string }> = [];
+  const client: RelayFileClientLike = {
+    async writeFile(input) {
+      writes.push({ path: input.path, content: input.content });
+      return { created: true };
+    },
+    async deleteFile() {
+      return undefined;
+    },
+  };
+
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
+      return {
+        status: 200,
+        headers: {},
+        data: null as never,
+      };
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+
+  return {
+    adapter: new LinearAdapter(client, provider, config),
+    writes,
+  };
+}
+
 test('LinearAdapter exposes the provider name and supported Linear webhook events', () => {
   const adapter = createAdapter();
 
@@ -231,6 +266,8 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
 
   assert.equal(computeLinearPath('Issue', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42.json');
+  assert.equal(computeLinearPath('Issue', 'issue_123', 'AGE-8'), '/linear/issues/AGE-8__issue_123.json');
+  assert.equal(computeLinearPath('comment', 'comment_123', 'AGE-8'), '/linear/comments/AGE-8__comment_123.json');
   assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(computeLinearPath('Cycles', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(computeLinearPath('teams', 'team eng'), '/linear/teams/team%20eng.json');
@@ -246,6 +283,42 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   assert.equal(adapter.computePath('user', 'user@example.com'), '/linear/users/user%40example.com.json');
   assert.equal(adapter.computePath('milestone', 'milestone/1'), '/linear/milestones/milestone%2F1.json');
   assert.equal(adapter.computePath('roadmap', 'roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
+});
+
+test('ingestWebhook writes identifier-aware issue and comment filenames at runtime', async () => {
+  const { adapter, writes } = createRecordingAdapter();
+
+  await adapter.ingestWebhook('workspace_123', {
+    action: 'create',
+    type: 'Issue',
+    data: {
+      id: 'issue_123',
+      identifier: 'AGE-8',
+      title: 'Ship Mixed Case path handling before Friday',
+    },
+  });
+
+  await adapter.ingestWebhook('workspace_123', {
+    action: 'create',
+    type: 'Comment',
+    data: {
+      id: 'comment_123',
+      body: 'This comment body should not win over the public identifier',
+      issue: {
+        id: 'issue_123',
+        identifier: 'AGE-8',
+        title: 'Ship Mixed Case path handling before Friday',
+      },
+    },
+  });
+
+  assert.deepEqual(
+    writes.map((write) => write.path),
+    [
+      '/linear/issues/AGE-8__issue_123.json',
+      '/linear/comments/AGE-8__comment_123.json',
+    ],
+  );
 });
 
 test('computeSemantics extracts issue priority, state, labels, and relations deterministically', () => {
@@ -281,10 +354,12 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
     },
     parent: {
       id: 'issue_parent',
+      identifier: 'ENG-100',
+      title: 'Parent issue',
     },
     children: [
-      { id: 'issue_child_b' },
-      { id: 'issue_child_a' },
+      { id: 'issue_child_b', title: 'Child B' },
+      { id: 'issue_child_a', identifier: 'ENG-125', title: 'Child A' },
     ],
     relations: [
       { relatedIssueId: 'issue_related_z' },
@@ -339,14 +414,31 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
   });
   assert.deepEqual(semantics.relations, [
     '/linear/cycles/cycle_2026_06.json',
+    '/linear/issues/child-b__issue_child_b.json',
+    '/linear/issues/ENG-100__issue_parent.json',
+    '/linear/issues/ENG-125__issue_child_a.json',
     '/linear/issues/issue_child_a.json',
-    '/linear/issues/issue_child_b.json',
-    '/linear/issues/issue_parent.json',
     '/linear/issues/issue_related_z.json',
     '/linear/projects/project_alpha.json',
     '/linear/teams/team_eng.json',
   ]);
   assert.equal(semantics.comments, undefined);
+});
+
+test('computeSemantics uses identifier-aware relation paths for Linear comments', () => {
+  const adapter = createAdapter();
+  const semantics = adapter.computeSemantics('Comment', 'comment_123', {
+    id: 'comment_123',
+    body: 'Looks good to me.',
+    issue: {
+      id: 'issue_123',
+      identifier: 'AGE-8',
+      title: 'Ship Mixed Case path handling before Friday',
+    },
+  });
+
+  assert.deepEqual(semantics.relations, ['/linear/issues/AGE-8__issue_123.json']);
+  assert.deepEqual(semantics.comments, ['Looks good to me.']);
 });
 
 test('computeSemantics extracts synced Linear project, milestone, and roadmap relations', () => {

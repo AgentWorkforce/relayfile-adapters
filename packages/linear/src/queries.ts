@@ -473,6 +473,20 @@ export interface LinearGraphqlResponse<T> {
   errors?: Array<{ message?: string; path?: string[] }>;
 }
 
+export function getLinearIssueHumanReadable(issue: {
+  identifier?: string | null;
+  title?: string | null;
+}): string | undefined {
+  return normalizeString(issue.identifier ?? undefined) ?? normalizeString(issue.title ?? undefined);
+}
+
+export function getLinearCommentHumanReadable(comment: {
+  body?: string | null;
+  issue?: { identifier?: string | null } | null;
+}): string | undefined {
+  return normalizeString(comment.issue?.identifier ?? undefined) ?? normalizeString(comment.body ?? undefined);
+}
+
 function normalizeString(value: string | undefined): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
