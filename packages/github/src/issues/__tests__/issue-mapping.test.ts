@@ -83,11 +83,17 @@ function createMemoryVfs() {
     writes.set(path, content);
     return { created: true as const };
   });
+  const exists = mock.fn((path: string) => writes.has(path));
+  const readFile = mock.fn((path: string) => writes.get(path));
 
   return {
+    exists,
+    readFile,
     writes,
     writeFile,
     vfs: {
+      exists,
+      readFile,
       writeFile,
     },
   };
@@ -256,12 +262,27 @@ describe('issue mapping', () => {
       vfs,
     );
 
-    assert.strictEqual(writeFile.mock.calls.length, 3);
+    assert.strictEqual(writeFile.mock.calls.length, 7);
     assert.deepStrictEqual(Array.from(writes.keys()), [
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
+      '/github/repos/octocat/hello-world/issues/_index.json',
+      '/github/repos/octocat/hello-world/pulls/_index.json',
+      '/github/repos/_index.json',
+      '/github/LAYOUT.md',
     ]);
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'),
+      [{
+        id: '10',
+        title: 'Track adapter issue ingestion coverage',
+        updated: '2026-03-28T07:45:00Z',
+        number: 10,
+        state: 'open',
+      }],
+    );
+    assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'), []);
     const meta = JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json') ?? '');
     assert.strictEqual(meta.number, 10);
     assert.strictEqual(meta.title, 'Track adapter issue ingestion coverage');
@@ -270,13 +291,17 @@ describe('issue mapping', () => {
     assert.strictEqual(comment7001.id, 7001);
     assert.strictEqual(comment7001.author.login, 'monalisa');
     assert.deepStrictEqual(result, {
-      filesWritten: 3,
+      filesWritten: 7,
       filesUpdated: 0,
       filesDeleted: 0,
       paths: [
         '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
         '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
         '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
+        '/github/repos/octocat/hello-world/issues/_index.json',
+        '/github/repos/octocat/hello-world/pulls/_index.json',
+        '/github/repos/_index.json',
+        '/github/LAYOUT.md',
       ],
       errors: [],
     });
@@ -314,6 +339,53 @@ describe('issue mapping', () => {
       ],
       errors: [],
     });
+  });
+
+  it('retains existing repo and issue index rows across repeated issue ingestion', async () => {
+    const { writes, vfs } = createMemoryVfs();
+    const firstProvider = createFixtureProvider();
+    const secondProvider = createFixtureProvider({
+      issue: {
+        ...cloneFixture(mockIssuePayload),
+        number: 11,
+        title: 'Add a second issue fixture',
+        created_at: '2026-03-26T10:00:00Z',
+        updated_at: '2026-03-29T07:45:00Z',
+      } as JsonObject,
+      issueComments: [],
+    });
+
+    await ingestIssue(firstProvider.provider, mockRepoContext.owner, mockRepoContext.repo, 10, vfs);
+    await ingestIssue(secondProvider.provider, mockRepoContext.owner, mockRepoContext.repo, 11, vfs);
+
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'),
+      [
+        {
+          id: '11',
+          title: 'Add a second issue fixture',
+          updated: '2026-03-29T07:45:00Z',
+          number: 11,
+          state: 'open',
+        },
+        {
+          id: '10',
+          title: 'Track adapter issue ingestion coverage',
+          updated: '2026-03-28T07:45:00Z',
+          number: 10,
+          state: 'open',
+        },
+      ],
+    );
+    assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'), []);
+    assert.deepStrictEqual(
+      JSON.parse(writes.get('/github/repos/_index.json') ?? '[]'),
+      [{
+        id: 'octocat/hello-world',
+        title: 'octocat/hello-world',
+        updated: '2026-03-29T07:45:00Z',
+      }],
+    );
   });
 
   it('VFS paths are correct', () => {

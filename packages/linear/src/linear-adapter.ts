@@ -12,7 +12,18 @@ import {
   linearUserPath,
   normalizeLinearObjectType,
 } from './path-mapper.js';
-import { getLinearCommentHumanReadable, getLinearIssueHumanReadable } from './queries.js';
+import { buildLinearIndexFile, type LinearIndexBucket } from './index-emitter.js';
+import { linearLayoutPromptFile } from './layout-prompt.js';
+import {
+  getLinearCommentHumanReadable,
+  getLinearIssueHumanReadable,
+  type LinearBaseIndexRow,
+  type LinearIssueIndexRow,
+  linearCommentIndexRow,
+  linearIssueIndexRow,
+  linearTeamIndexRow,
+  linearUserIndexRow,
+} from './queries.js';
 import { LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   LinearAdapterConfig,
@@ -78,9 +89,22 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content?: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  readFile?(
+    inputOrWorkspaceId: ReadFileInput | string,
+    path?: string,
+  ): Promise<ReadFileResult | string | undefined> | ReadFileResult | string | undefined;
 }
 
 export abstract class IntegrationAdapter {
@@ -153,12 +177,13 @@ export class LinearAdapter extends IntegrationAdapter {
       if (this.isRemoveEvent(normalized)) {
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path });
+          const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
           return {
-            filesWritten: 0,
-            filesUpdated: 0,
+            filesWritten: auxiliary.filesWritten,
+            filesUpdated: auxiliary.filesUpdated,
             filesDeleted: 1,
-            paths: [path],
-            errors: [],
+            paths: [path, ...auxiliary.paths],
+            errors: auxiliary.errors,
           };
         }
 
@@ -171,12 +196,13 @@ export class LinearAdapter extends IntegrationAdapter {
         });
 
         const counts = inferWriteCounts(normalized, deleteResult, true);
+        const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
         return {
-          filesWritten: counts.filesWritten,
-          filesUpdated: counts.filesUpdated,
+          filesWritten: counts.filesWritten + auxiliary.filesWritten,
+          filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
           filesDeleted: counts.filesDeleted,
-          paths: [path],
-          errors: [],
+          paths: [path, ...auxiliary.paths],
+          errors: auxiliary.errors,
         };
       }
 
@@ -189,12 +215,13 @@ export class LinearAdapter extends IntegrationAdapter {
       });
 
       const counts = inferWriteCounts(normalized, writeResult, false);
+      const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, false);
       return {
-        filesWritten: counts.filesWritten,
-        filesUpdated: counts.filesUpdated,
+        filesWritten: counts.filesWritten + auxiliary.filesWritten,
+        filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
         filesDeleted: 0,
-        paths: [path],
-        errors: [],
+        paths: [path, ...auxiliary.paths],
+        errors: auxiliary.errors,
       };
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
@@ -333,6 +360,94 @@ export class LinearAdapter extends IntegrationAdapter {
       deleted,
       payload: event.payload,
     });
+  }
+
+  private async writeAuxiliaryFiles(
+    workspaceId: string,
+    event: NormalizedWebhook,
+    deleted: boolean,
+  ): Promise<Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'>> {
+    const result: Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'> = {
+      filesWritten: 0,
+      filesUpdated: 0,
+      paths: [],
+      errors: [],
+    };
+
+    const layoutFile = linearLayoutPromptFile();
+    await this.recordAuxiliaryWrite(result, workspaceId, layoutFile.path, layoutFile.content, layoutFile.contentType);
+
+    const bucket = bucketForObjectType(event.objectType);
+    if (!bucket) {
+      return result;
+    }
+
+    const existingRows = await this.readIndexRows(workspaceId, buildIndexPathForBucket(bucket));
+    if (!existingRows) {
+      return result;
+    }
+
+    const nextRows = deleted
+      ? existingRows.filter((row) => row.id !== event.objectId)
+      : upsertLinearIndexRow(existingRows, buildIndexRow(bucket, event));
+    const indexFile = buildIndexFileForBucket(bucket, nextRows);
+    await this.recordAuxiliaryWrite(
+      result,
+      workspaceId,
+      indexFile.path,
+      indexFile.content,
+      indexFile.contentType,
+    );
+    return result;
+  }
+
+  private async readIndexRows(
+    workspaceId: string,
+    path: string,
+  ): Promise<Array<LinearBaseIndexRow | LinearIssueIndexRow> | undefined> {
+    const content = await readClientFile(this.client, workspaceId, path);
+    if (content === READ_NOT_AVAILABLE) {
+      // No reader on the client — we can't reconcile, so skip the auxiliary write entirely.
+      return undefined;
+    }
+    if (content === undefined) {
+      // Reader ran but the index is missing/empty/malformed. Bootstrap with an empty
+      // array so the first ingest writes the index instead of getting stuck.
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(content) as unknown;
+      return Array.isArray(parsed) ? parsed as Array<LinearBaseIndexRow | LinearIssueIndexRow> : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async recordAuxiliaryWrite(
+    result: Pick<IngestResult, 'filesWritten' | 'filesUpdated' | 'paths' | 'errors'>,
+    workspaceId: string,
+    path: string,
+    content: string,
+    contentType: string,
+  ): Promise<void> {
+    try {
+      const writeResult = await this.client.writeFile({
+        workspaceId,
+        path,
+        content,
+        contentType,
+      });
+      const counts = inferAuxiliaryWriteCounts(writeResult);
+      result.filesWritten += counts.filesWritten;
+      result.filesUpdated += counts.filesUpdated;
+      result.paths.push(path);
+    } catch (error) {
+      result.errors.push({
+        path,
+        error: toErrorMessage(error),
+      });
+    }
   }
 }
 
@@ -717,6 +832,109 @@ function mergeLinearPayload(event: LinearWebhookPayload): Record<string, unknown
       url: asString(event.url),
     }),
   };
+}
+
+function bucketForObjectType(objectType: string): LinearIndexBucket | undefined {
+  switch (normalizeLinearObjectType(objectType)) {
+    case 'issue':
+      return 'issues';
+    case 'comment':
+      return 'comments';
+    case 'team':
+      return 'teams';
+    case 'user':
+      return 'users';
+    default:
+      return undefined;
+  }
+}
+
+function buildIndexRow(
+  bucket: LinearIndexBucket,
+  event: NormalizedWebhook,
+): LinearBaseIndexRow | LinearIssueIndexRow {
+  const payload = {
+    ...event.payload,
+    id: event.objectId,
+  };
+
+  switch (bucket) {
+    case 'issues':
+      return linearIssueIndexRow(payload as unknown as Parameters<typeof linearIssueIndexRow>[0]);
+    case 'comments':
+      return linearCommentIndexRow(payload as unknown as Parameters<typeof linearCommentIndexRow>[0]);
+    case 'teams':
+      return linearTeamIndexRow(payload as unknown as Parameters<typeof linearTeamIndexRow>[0]);
+    case 'users':
+      return linearUserIndexRow(payload as unknown as Parameters<typeof linearUserIndexRow>[0]);
+  }
+}
+
+function buildIndexFileForBucket(
+  bucket: LinearIndexBucket,
+  rows: Array<LinearBaseIndexRow | LinearIssueIndexRow>,
+) {
+  switch (bucket) {
+    case 'issues':
+      return buildLinearIndexFile('issues', rows as LinearIssueIndexRow[]);
+    case 'comments':
+      return buildLinearIndexFile('comments', rows as LinearBaseIndexRow[]);
+    case 'teams':
+      return buildLinearIndexFile('teams', rows as LinearBaseIndexRow[]);
+    case 'users':
+      return buildLinearIndexFile('users', rows as LinearBaseIndexRow[]);
+  }
+}
+
+function buildIndexPathForBucket(bucket: LinearIndexBucket): string {
+  return buildIndexFileForBucket(bucket, []).path;
+}
+
+function upsertLinearIndexRow<T extends { id: string }>(rows: T[], row: T): T[] {
+  return [...rows.filter((existing) => existing.id !== row.id), row];
+}
+
+// `READ_NOT_AVAILABLE` is returned when the client cannot read at all (no
+// `readFile` method). `undefined` means the call ran but the file is missing
+// or the response was malformed. Callers use this distinction to decide
+// whether to skip auxiliary writes (no readFile) or bootstrap an empty index
+// (file missing on first ingest).
+const READ_NOT_AVAILABLE = Symbol('readNotAvailable');
+
+async function readClientFile(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  path: string,
+): Promise<string | undefined | typeof READ_NOT_AVAILABLE> {
+  if (!client.readFile) {
+    return READ_NOT_AVAILABLE;
+  }
+
+  try {
+    const value =
+      client.readFile.length >= 2
+        ? await client.readFile(workspaceId, path)
+        : await client.readFile({ workspaceId, path });
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (value && typeof value === 'object' && typeof value.content === 'string') {
+      return value.content;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
+function inferAuxiliaryWriteCounts(
+  writeResult: WriteFileResult | void,
+): Pick<IngestResult, 'filesWritten' | 'filesUpdated'> {
+  if (writeResult?.created || writeResult?.status === 'created') {
+    return { filesWritten: 1, filesUpdated: 0 };
+  }
+  return { filesWritten: 0, filesUpdated: 1 };
 }
 
 function inferWriteCounts(

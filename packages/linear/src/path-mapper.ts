@@ -196,8 +196,16 @@ export function linearIssuePath(
   return `${LINEAR_PATH_ROOT}/issues/${nameWithId(humanReadable, issueId, opts)}.json`;
 }
 
+export function linearIssuesIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/issues/_index.json`;
+}
+
 export function linearCommentPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
   return `${LINEAR_PATH_ROOT}/comments/${nameWithId(humanReadable, commentId, opts)}.json`;
+}
+
+export function linearCommentsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/comments/_index.json`;
 }
 
 export function linearProjectPath(projectId: string): string {
@@ -212,8 +220,16 @@ export function linearTeamPath(teamId: string): string {
   return `${LINEAR_PATH_ROOT}/teams/${encodeLinearPathSegment(teamId)}.json`;
 }
 
+export function linearTeamsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/teams/_index.json`;
+}
+
 export function linearUserPath(userId: string): string {
   return `${LINEAR_PATH_ROOT}/users/${encodeLinearPathSegment(userId)}.json`;
+}
+
+export function linearUsersIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/users/_index.json`;
 }
 
 export function linearMilestonePath(milestoneId: string): string {

@@ -2,6 +2,17 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { githubPullRequestRoot } from '../path-mapper.js';
 import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
+import {
+  buildRepoIndexFile,
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
+  readRecordIndexRows,
+  readRepoIndexRows,
+  upsertRecordIndexRow,
+  upsertRepoIndexRow,
+} from '../index-emitter.js';
+import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
@@ -177,6 +188,56 @@ export async function bulkIngestPR(
     diffWrite,
     toIngestResult(bulkWrite),
   );
+
+  if (metaWrite.errors.length === 0 && metaWrite.paths.length > 0) {
+    // Write indexes after the canonical record write resolves so failed writes
+    // do not leak into the lightweight directory indexes.
+    const updated = metadata.updatedAt || metadata.createdAt || '';
+    const pullIndex = buildRepoPullsIndexFile(
+      trimmedOwner,
+      trimmedRepo,
+      upsertRecordIndexRow(
+        await readRecordIndexRows(vfs, githubRepoPullsIndexPath(trimmedOwner, trimmedRepo)),
+        {
+          id: String(metadata.number),
+          title: metadata.title || '',
+          updated,
+          number: metadata.number,
+          state: metadata.state || '',
+        },
+      ),
+    );
+    const issueIndex = buildRepoIssuesIndexFile(
+      trimmedOwner,
+      trimmedRepo,
+      await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo)),
+    );
+    const repoIndex = buildRepoIndexFile(
+      upsertRepoIndexRow(
+        await readRepoIndexRows(vfs),
+        {
+          id: `${trimmedOwner}/${trimmedRepo}`,
+          title: `${trimmedOwner}/${trimmedRepo}`,
+          updated,
+        },
+      ),
+    );
+    const layoutFile = githubLayoutPromptFile();
+
+    const indexResults = await Promise.all([
+      writeTextFile(vfs, pullIndex.path, pullIndex.content),
+      writeTextFile(vfs, issueIndex.path, issueIndex.content),
+      writeTextFile(vfs, repoIndex.path, repoIndex.content),
+      writeTextFile(vfs, layoutFile.path, layoutFile.content),
+    ]);
+    for (const indexResult of indexResults) {
+      aggregated.filesWritten += indexResult.filesWritten;
+      aggregated.filesUpdated += indexResult.filesUpdated;
+      aggregated.filesDeleted += indexResult.filesDeleted;
+      aggregated.paths.push(...indexResult.paths);
+      aggregated.errors.push(...indexResult.errors);
+    }
+  }
 
   for (const error of batchResult.errors) {
     aggregated.errors.push({
@@ -516,7 +577,7 @@ function toIngestResult(writeResult: BulkWriteResult): IngestResult {
 async function writeJsonFile(
   vfs: VfsLike,
   path: string,
-  value: JsonRecord | PullRequestMetadata,
+  value: unknown,
 ): Promise<IngestResult> {
   return writeTextFile(vfs, path, `${JSON.stringify(value, null, 2)}\n`);
 }

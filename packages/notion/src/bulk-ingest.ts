@@ -1,5 +1,7 @@
 import type { RelayFileClient, WriteQueuedResponse } from '@relayfile/sdk';
 import { ingestDatabaseArtifacts } from './databases/ingestion.js';
+import { buildIndexFiles } from './index-emitter.js';
+import { notionLayoutPromptFile } from './layout-prompt.js';
 import { ingestPageArtifacts, retrievePage } from './pages/ingestion.js';
 import type { NotionApiClient } from './client.js';
 import type { NotionVfsFile } from './types.js';
@@ -19,7 +21,7 @@ export async function collectWorkspaceFiles(client: NotionApiClient): Promise<No
     }
   });
 
-  return files;
+  return [...files, ...buildIndexFiles(files), notionLayoutPromptFile()];
 }
 
 export async function writeWorkspaceFiles(
