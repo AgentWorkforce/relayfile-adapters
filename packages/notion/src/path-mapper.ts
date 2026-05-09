@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { NOTION_PATH_ROOT } from './types.js';
 
@@ -40,7 +41,10 @@ interface NamingScope {
 }
 
 const MAX_HUMAN_READABLE_LENGTH = 80;
-const namingScopeStack: NamingScope[] = [];
+// AsyncLocalStorage isolates naming scopes per logical async chain so that
+// concurrent `withNotionNamingScope` callers do not corrupt each other's
+// dedupe maps. The previous module-level stack was unsafe across awaits.
+const namingScopeStorage = new AsyncLocalStorage<NamingScope>();
 
 function assertSegment(value: string, label: string): string {
   const trimmed = value.trim();
@@ -76,7 +80,7 @@ function shortHash(value: string): string {
 }
 
 function currentNamingScope(): NamingScope | undefined {
-  return namingScopeStack.at(-1);
+  return namingScopeStorage.getStore();
 }
 
 function collectionNameWithId(collectionKey: string, humanReadable: string | undefined, id: string): string {
@@ -155,15 +159,11 @@ export function parseNameWithId(filename: string): ParseNameWithIdResult {
 }
 
 export async function withNotionNamingScope<T>(fn: () => Promise<T> | T): Promise<T> {
-  namingScopeStack.push({
+  const scope: NamingScope = {
     namesByCollection: new Map<string, Map<string, string>>(),
     seenByCollection: new Map<string, Set<string>>(),
-  });
-  try {
-    return await fn();
-  } finally {
-    namingScopeStack.pop();
-  }
+  };
+  return namingScopeStorage.run(scope, async () => fn());
 }
 
 export function notionDatabaseMetadataPath(databaseId: string, title?: string): string {

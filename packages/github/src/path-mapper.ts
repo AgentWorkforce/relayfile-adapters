@@ -52,6 +52,8 @@ export function encodeGitHubPathSegment(value: string): string {
   return encodeURIComponent(trimmed);
 }
 
+// GitHub uses `<id>__<slug>` segments so `parseNameWithId` round-trips correctly:
+// the leading token before `__` is the id; the trailing token is the human-readable slug.
 export function nameWithId(humanReadable: string | undefined, id: string, opts: NameWithIdOptions = {}): string {
   const normalizedId = encodeGitHubPathSegment(id);
   const slug = humanReadable ? slugify(humanReadable) : '';
@@ -60,9 +62,16 @@ export function nameWithId(humanReadable: string | undefined, id: string, opts: 
   }
 
   const existingNames = opts.existingNames;
-  const baseName = existingNames?.has(slug) ? `${slug}-${shortHash(normalizedId)}` : slug;
-  existingNames?.add(baseName);
-  return `${baseName}__${normalizedId}`;
+  const candidate = `${normalizedId}__${slug}`;
+  if (existingNames?.has(candidate)) {
+    const hashedSlug = `${slug}-${shortHash(normalizedId)}`;
+    const hashedCandidate = `${normalizedId}__${hashedSlug}`;
+    existingNames.add(hashedCandidate);
+    return hashedCandidate;
+  }
+
+  existingNames?.add(candidate);
+  return candidate;
 }
 
 // For GitHub `<number>__<slug>` segments, `id` is the leading number and `humanReadable` is the trailing slug.

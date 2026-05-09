@@ -9,6 +9,7 @@ import {
   githubNumberSlug,
   githubPullRequestPath,
   githubPullRequestRoot,
+  nameWithId,
   parseNameWithId,
 } from '../path-mapper.js';
 
@@ -42,6 +43,25 @@ test('GitHub directory names are stable across re-ingest and collision suffixes 
 
   assert.equal(first, second);
   assert.equal(collision, `42__ship-cleaner-path-names-${expectedHash}`);
+});
+
+test('GitHub nameWithId round-trips through parseNameWithId (id first, slug second)', () => {
+  const composed = nameWithId('Ship cleaner path names', '42');
+  assert.equal(composed, '42__ship-cleaner-path-names');
+
+  const parsed = parseNameWithId(composed);
+  assert.deepEqual(parsed, {
+    humanReadable: 'ship-cleaner-path-names',
+    id: '42',
+    ext: null,
+  });
+
+  // Collision suffix tracks the full candidate name.
+  const seen = new Set<string>(['42__ship-cleaner-path-names']);
+  const collided = nameWithId('Ship cleaner path names', '42', { existingNames: seen });
+  const expectedHash = createHash('sha256').update('42').digest('hex').slice(0, 8);
+  assert.equal(collided, `42__ship-cleaner-path-names-${expectedHash}`);
+  assert.ok(seen.has(`42__ship-cleaner-path-names-${expectedHash}`));
 });
 
 test('GitHub drops the separator when there is no usable title slug', () => {
