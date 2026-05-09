@@ -222,16 +222,21 @@ integrations:
     package: "@relayfile/adapter-jira"
     nango_slug: jira
     auth_model: oauth
-    scope_status: needs_review
-    required_scopes: []
-    candidate_scopes:
+    scope_status: verified
+    required_scopes:
       - read:jira-work
+      - manage:jira-project
+      - manage:jira-configuration
+      - read:jira-user
       - write:jira-work
       - manage:jira-webhook
       - offline_access
+    candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/jira
-    notes: "Candidate scopes are for current app registration convenience; verify exact Jira issue/project/sprint/comment and webhook needs before marking verified."
+      - https://developer.atlassian.com/cloud/jira/software/scopes-for-oauth-2-3LO-and-forge-apps/
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian classic OAuth scope docs. Includes read/write issue and project data, user profile access, project/global administration, webhook management, and offline_access for long-lived Nango OAuth connections."
 
   - slug: linear
     display_name: Linear
@@ -485,6 +490,23 @@ integrations:
     sources: []
     notes: "Research tickets/users/organizations read/write and webhook requirements."
 
+  - slug: compass
+    display_name: Compass
+    category: dev-tools
+    status: gap
+    package:
+    nango_slug: compass
+    auth_model: oauth
+    scope_status: verified
+    required_scopes:
+      - read:component:compass
+      - read:metric:compass
+    candidate_scopes: []
+    sources:
+      - https://developer.atlassian.com/cloud/compass/graphql/
+      - https://developer.atlassian.com/platform/forge/manifest-reference/scopes-product-compass/
+    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian Compass GraphQL scope docs. Includes the selected component and metric read scopes; event read/write scopes were visible but not selected in the screenshot."
+
   - slug: confluence
     display_name: Confluence
     category: knowledge-base
@@ -492,11 +514,23 @@ integrations:
     package:
     nango_slug: confluence
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - write:confluence-content
+      - read:confluence-space.summary
+      - write:confluence-space
+      - read:confluence-content.all
+      - read:confluence-content.summary
+      - search:confluence
+      - read:confluence-user
+      - read:confluence-groups
+      - write:confluence-groups
     candidate_scopes: []
-    sources: []
-    notes: "High-priority gap; research page/content read/write and comment permissions."
+    sources:
+      - https://nango.dev/docs/api-integrations/confluence
+      - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshots and Atlassian classic OAuth scope docs. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes."
 
   - slug: google-docs
     display_name: Google Docs
