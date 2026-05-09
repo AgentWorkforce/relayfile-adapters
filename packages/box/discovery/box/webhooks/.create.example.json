@@ -1,0 +1,10 @@
+{
+  "target": {
+    "id": "12345",
+    "type": "folder"
+  },
+  "triggers": [
+    "FILE.UPLOADED"
+  ],
+  "address": "https://example.com/hooks/box"
+}

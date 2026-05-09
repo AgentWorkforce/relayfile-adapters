@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "QueueUrl"
+  ],
+  "properties": {
+    "QueueUrl": {
+      "type": "string",
+      "description": "SQS queue URL."
+    },
+    "Bucket": {
+      "type": "string",
+      "description": "Bucket name."
+    },
+    "Events": {
+      "type": "array",
+      "description": "S3 events delivered to the queue.",
+      "items": {
+        "enum": [
+          "s3:ObjectCreated:*",
+          "s3:ObjectRemoved:*",
+          "s3:ObjectRestore:*"
+        ],
+        "description": "S3 notification event."
+      }
+    },
+    "FilterPrefix": {
+      "type": "string",
+      "description": "Object key prefix filter."
+    },
+    "FilterSuffix": {
+      "type": "string",
+      "description": "Object key suffix filter."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

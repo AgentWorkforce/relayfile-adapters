@@ -1,0 +1,7 @@
+{
+  "_op": "insert",
+  "primaryKey": "id",
+  "row": {
+    "title": "Bridge plan"
+  }
+}

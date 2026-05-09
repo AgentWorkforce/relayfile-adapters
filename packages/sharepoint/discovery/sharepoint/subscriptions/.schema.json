@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "resource",
+    "changeType",
+    "notificationUrl",
+    "expirationDateTime"
+  ],
+  "properties": {
+    "resource": {
+      "type": "string",
+      "description": "Graph resource path to subscribe to."
+    },
+    "changeType": {
+      "enum": [
+        "created",
+        "updated",
+        "deleted"
+      ],
+      "description": "Graph subscription change type."
+    },
+    "notificationUrl": {
+      "type": "string",
+      "description": "Webhook notification URL."
+    },
+    "expirationDateTime": {
+      "type": "string",
+      "description": "Subscription expiration timestamp."
+    },
+    "clientState": {
+      "type": "string",
+      "description": "Opaque client state."
+    },
+    "latestSupportedTlsVersion": {
+      "enum": [
+        "v1_2",
+        "v1_3"
+      ],
+      "description": "Latest supported TLS version."
+    },
+    "lifecycleNotificationUrl": {
+      "type": "string",
+      "description": "Lifecycle notification URL."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "endpointUrl"
+  ],
+  "properties": {
+    "endpointUrl": {
+      "type": "string",
+      "description": "Event Grid webhook endpoint."
+    },
+    "includedEventTypes": {
+      "type": "array",
+      "description": "Included Event Grid event types.",
+      "items": {
+        "enum": [
+          "Microsoft.Storage.BlobCreated",
+          "Microsoft.Storage.BlobDeleted",
+          "Microsoft.Storage.BlobRenamed"
+        ],
+        "description": "Azure Storage event type."
+      }
+    },
+    "subjectBeginsWith": {
+      "type": "string",
+      "description": "Subject prefix filter."
+    },
+    "subjectEndsWith": {
+      "type": "string",
+      "description": "Subject suffix filter."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

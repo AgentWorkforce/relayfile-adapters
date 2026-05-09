@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "topicName"
+  ],
+  "properties": {
+    "topicName": {
+      "type": "string",
+      "description": "Google Pub/Sub topic name."
+    },
+    "labelIds": {
+      "type": "array",
+      "description": "Labels to watch.",
+      "items": {
+        "type": "string",
+        "description": "Gmail label id."
+      }
+    },
+    "labelFilterAction": {
+      "enum": [
+        "include",
+        "exclude"
+      ],
+      "description": "Gmail watch label filter action."
+    },
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}

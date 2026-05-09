@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id"
+  ],
+  "properties": {
+    "id": {
+      "description": "Provider id.",
+      "readOnly": true
+    },
+    "historyId": {
+      "type": "string",
+      "description": "Latest Gmail history id."
+    },
+    "messages": {
+      "type": "array",
+      "description": "Messages in the thread.",
+      "items": {
+        "type": "object",
+        "description": "Gmail message.",
+        "additionalProperties": true,
+        "required": [],
+        "properties": {}
+      }
+    },
+    "labelIds": {
+      "type": "array",
+      "description": "Thread label ids.",
+      "items": {
+        "type": "string",
+        "description": "Gmail label id."
+      }
+    },
+    "snippet": {
+      "type": "string",
+      "description": "Thread snippet."
+    },
+    "createdAt": {
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "description": "Provider URL.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true
+    },
+    "_connection": {
+      "description": "Relayfile connection metadata.",
+      "readOnly": true
+    }
+  }
+}
