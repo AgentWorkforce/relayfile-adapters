@@ -4,7 +4,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 
 ## Tree
 
-\`/linear/.layout.md\` is this guide.
+\`/linear/LAYOUT.md\` is this guide.
 \`/linear/issues/\`, \`/linear/comments/\`, \`/linear/users/\`, and \`/linear/teams/\` each own their canonical JSON records plus a sibling \`_index.json\`.
 Other integration-owned trees include \`/linear/projects/\`, \`/linear/cycles/\`, \`/linear/milestones/\`, and \`/linear/roadmaps/\`.
 
@@ -38,7 +38,7 @@ grep -R "ENG-" /linear/comments
 
 export function linearLayoutPromptFile() {
   return {
-    path: '/linear/.layout.md',
+    path: '/linear/LAYOUT.md',
     contentType: 'text/markdown; charset=utf-8' as const,
     content: LINEAR_LAYOUT_PROMPT.endsWith('\n') ? LINEAR_LAYOUT_PROMPT : `${LINEAR_LAYOUT_PROMPT}\n`,
   };

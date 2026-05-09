@@ -332,7 +332,7 @@ describe('pull request ingestion', () => {
         '/github/repos/octocat/hello-world/pulls/_index.json',
         '/github/repos/octocat/hello-world/issues/_index.json',
         '/github/repos/_index.json',
-        '/github/.layout.md',
+        '/github/LAYOUT.md',
       ],
       errors: [],
     });

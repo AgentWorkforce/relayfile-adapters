@@ -168,13 +168,13 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.paths, [
-    '/linear/issues/ship-index-writes--issue_123.json',
-    '/linear/.layout.md',
+    '/linear/issues/ENG-123__issue_123.json',
+    '/linear/LAYOUT.md',
     '/linear/issues/_index.json',
   ]);
   assert.equal(result.filesWritten, 2);
   assert.equal(result.filesUpdated, 1);
-  assert.match(client.files.get('/linear/.layout.md') ?? '', /# Linear Mount Layout/);
+  assert.match(client.files.get('/linear/LAYOUT.md') ?? '', /# Linear Mount Layout/);
   assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
     {
       id: 'issue_123',
@@ -211,7 +211,7 @@ test('ingestWebhook removes deleted issues from the best-effort linear issue ind
         state: 'Todo',
       },
     ]),
-    '/linear/issues/ship-index-writes--issue_123.json': '{}\n',
+    '/linear/issues/ENG-123__issue_123.json': '{}\n',
   });
   const adapter = createAdapter({}, client);
 
@@ -222,6 +222,7 @@ test('ingestWebhook removes deleted issues from the best-effort linear issue ind
     objectId: 'issue_123',
     payload: {
       id: 'issue_123',
+      identifier: 'ENG-123',
       title: 'Ship index writes',
       updatedAt: '2026-04-09T10:00:00.000Z',
     },
@@ -229,12 +230,12 @@ test('ingestWebhook removes deleted issues from the best-effort linear issue ind
 
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.paths, [
-    '/linear/issues/ship-index-writes--issue_123.json',
-    '/linear/.layout.md',
+    '/linear/issues/ENG-123__issue_123.json',
+    '/linear/LAYOUT.md',
     '/linear/issues/_index.json',
   ]);
   assert.equal(result.filesDeleted, 1);
-  assert.deepEqual(client.deletedPaths, ['/linear/issues/ship-index-writes--issue_123.json']);
+  assert.deepEqual(client.deletedPaths, ['/linear/issues/ENG-123__issue_123.json']);
   assert.deepEqual(JSON.parse(client.files.get('/linear/issues/_index.json') ?? '[]'), [
     {
       id: 'issue_existing',
@@ -451,7 +452,9 @@ test('ingestWebhook writes identifier-aware issue and comment filenames at runti
     writes.map((write) => write.path),
     [
       '/linear/issues/AGE-8__issue_123.json',
+      '/linear/LAYOUT.md',
       '/linear/comments/AGE-8__comment_123.json',
+      '/linear/LAYOUT.md',
     ],
   );
 });
@@ -671,4 +674,38 @@ test('barrel exports import cleanly for runtime and type-checked usage', async (
 
   assert.equal(adapter.name, 'linear');
   assert.equal(adapter.config.connectionId, 'conn_linear_barrel');
+});
+
+test('ingestWebhook bootstraps the issue index on first ingest when no _index.json exists yet', async () => {
+  // Empty client (readFile present, but no seed for the index path) — the
+  // adapter must still write a fresh `_index.json` instead of skipping it.
+  const client = createRecordingClient({});
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_first',
+    payload: {
+      id: 'issue_first',
+      identifier: 'ENG-7',
+      title: 'First ingest after fresh install',
+      updatedAt: '2026-04-09T10:00:00.000Z',
+      state: { name: 'Backlog' },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  const indexBody = client.files.get('/linear/issues/_index.json');
+  assert.ok(indexBody, 'expected the linear issue index to be bootstrapped on first ingest');
+  assert.deepEqual(JSON.parse(indexBody), [
+    {
+      id: 'issue_first',
+      title: 'First ingest after fresh install',
+      updated: '2026-04-09T10:00:00.000Z',
+      identifier: 'ENG-7',
+      state: 'Backlog',
+    },
+  ]);
 });

@@ -64,7 +64,7 @@ describe('package barrel', () => {
       assert.ok(typeof op.path === 'string' && op.path.length > 0, 'operation.path is set');
     }
 
-    assert.equal(githubLayoutPromptFile().path, '/github/.layout.md');
+    assert.equal(githubLayoutPromptFile().path, '/github/LAYOUT.md');
     assert.equal(buildRepoIndexFile([]).path, '/github/repos/_index.json');
     assert.equal(
       buildRepoIssuesIndexFile(ref.owner, ref.repo, []).path,

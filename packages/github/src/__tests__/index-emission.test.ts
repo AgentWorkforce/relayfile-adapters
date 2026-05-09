@@ -102,8 +102,8 @@ describe('github index emission', () => {
     ]);
 
     assert.equal(githubRepositoryMetadataPath('octocat', 'hello-world'), '/github/repos/octocat/hello-world/metadata.json');
-    assert.equal(githubIssuePath('octocat', 'hello-world', 7), '/github/repos/octocat/hello-world/issues/7/metadata.json');
-    assert.equal(githubPullRequestPath('octocat', 'hello-world', 9), '/github/repos/octocat/hello-world/pulls/9/metadata.json');
+    assert.equal(githubIssuePath('octocat', 'hello-world', 7), '/github/repos/octocat/hello-world/issues/7/meta.json');
+    assert.equal(githubPullRequestPath('octocat', 'hello-world', 9), '/github/repos/octocat/hello-world/pulls/9/meta.json');
   });
 
   it('emits empty per-repo indexes when a repo directory has no current records', () => {

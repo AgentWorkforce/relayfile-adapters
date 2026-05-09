@@ -406,8 +406,14 @@ export class LinearAdapter extends IntegrationAdapter {
     path: string,
   ): Promise<Array<LinearBaseIndexRow | LinearIssueIndexRow> | undefined> {
     const content = await readClientFile(this.client, workspaceId, path);
-    if (content === undefined) {
+    if (content === READ_NOT_AVAILABLE) {
+      // No reader on the client — we can't reconcile, so skip the auxiliary write entirely.
       return undefined;
+    }
+    if (content === undefined) {
+      // Reader ran but the index is missing/empty/malformed. Bootstrap with an empty
+      // array so the first ingest writes the index instead of getting stuck.
+      return [];
     }
 
     try {
@@ -888,13 +894,20 @@ function upsertLinearIndexRow<T extends { id: string }>(rows: T[], row: T): T[] 
   return [...rows.filter((existing) => existing.id !== row.id), row];
 }
 
+// `READ_NOT_AVAILABLE` is returned when the client cannot read at all (no
+// `readFile` method). `undefined` means the call ran but the file is missing
+// or the response was malformed. Callers use this distinction to decide
+// whether to skip auxiliary writes (no readFile) or bootstrap an empty index
+// (file missing on first ingest).
+const READ_NOT_AVAILABLE = Symbol('readNotAvailable');
+
 async function readClientFile(
   client: RelayFileClientLike,
   workspaceId: string,
   path: string,
-): Promise<string | undefined> {
+): Promise<string | undefined | typeof READ_NOT_AVAILABLE> {
   if (!client.readFile) {
-    return undefined;
+    return READ_NOT_AVAILABLE;
   }
 
   try {

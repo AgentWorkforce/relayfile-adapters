@@ -6,7 +6,7 @@ Always run \`ls\` on the live directory before constructing a path. Page and dat
 
 ## Tree
 
-\`/notion/.layout.md\` is this guide.
+\`/notion/LAYOUT.md\` is this guide.
 \`/notion/pages/\` holds standalone page records, their \`_index.json\`, and nested page artifacts such as \`content.md\`, \`comments.json\`, and \`blocks/*.json\`.
 \`/notion/databases/\` holds one directory per database, a root \`_index.json\`, and per-database \`pages/_index.json\` files for the database page collections.
 
@@ -38,7 +38,7 @@ grep -R \"keyword\" /notion/pages
 
 export function notionLayoutPromptFile(): NotionVfsFile {
   return {
-    path: '/notion/.layout.md',
+    path: '/notion/LAYOUT.md',
     contentType: 'text/markdown; charset=utf-8',
     content: NOTION_LAYOUT_PROMPT.endsWith('\n') ? NOTION_LAYOUT_PROMPT : `${NOTION_LAYOUT_PROMPT}\n`,
   };

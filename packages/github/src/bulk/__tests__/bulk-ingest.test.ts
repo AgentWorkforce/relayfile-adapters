@@ -415,7 +415,7 @@ describe('bulk ingest', () => {
       writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/diff.patch'),
       mockDiff,
     );
-    assert.strictEqual(writes.get('/github/.layout.md')?.includes('_index.json'), true);
+    assert.strictEqual(writes.get('/github/LAYOUT.md')?.includes('_index.json'), true);
     assert.deepStrictEqual(
       JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'),
       [{

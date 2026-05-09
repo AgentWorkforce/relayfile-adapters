@@ -1,13 +1,13 @@
 export const GITHUB_LAYOUT_PROMPT = `# GitHub Mount Layout
 
-Always run \`ls\` before constructing a path. PR 0 standardizes human-readable leaf names to \`<sanitized-name>__<id>\`, so consumers should inspect the live repo directory instead of assuming a filename.
+Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull request directory names to \`<number>__<slug>\` (the GitHub number first, then a sanitized title slug), so consumers should inspect the live repo directory instead of assuming a filename.
 
 ## Tree
 
-\`/github/.layout.md\` is this guide.
+\`/github/LAYOUT.md\` is this guide.
 \`/github/repos/_index.json\` lists materialized repositories.
-\`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories.
-\`pulls/<n>/diff.patch\`, \`pulls/<n>/files/**\`, and \`pulls/<n>/base/**\` are nested artifacts and should not be treated as canonical records.
+\`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
+\`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
 
 ## Indexes
 
@@ -39,7 +39,7 @@ grep -R "TODO" /github/repos/octocat/hello-world/pulls
 
 export function githubLayoutPromptFile() {
   return {
-    path: '/github/.layout.md',
+    path: '/github/LAYOUT.md',
     contentType: 'text/markdown; charset=utf-8' as const,
     content: GITHUB_LAYOUT_PROMPT.endsWith('\n') ? GITHUB_LAYOUT_PROMPT : `${GITHUB_LAYOUT_PROMPT}\n`,
   };

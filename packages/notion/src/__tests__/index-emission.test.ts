@@ -113,10 +113,10 @@ describe('notion index emission', () => {
     const rootDatabases = parseIndex(first.find((file) => file.path === '/notion/databases/_index.json'));
     const rootPages = parseIndex(first.find((file) => file.path === '/notion/pages/_index.json'));
     const engineeringPages = parseIndex(
-      first.find((file) => file.path === '/notion/databases/engineering-wiki/pages/_index.json'),
+      first.find((file) => file.path === '/notion/databases/engineering-wiki__db-1/pages/_index.json'),
     );
     const roadmapPages = parseIndex(
-      first.find((file) => file.path === '/notion/databases/roadmap-q2/pages/_index.json'),
+      first.find((file) => file.path === '/notion/databases/roadmap-q2__db-2/pages/_index.json'),
     );
 
     assert.deepEqual(rootDatabases, [

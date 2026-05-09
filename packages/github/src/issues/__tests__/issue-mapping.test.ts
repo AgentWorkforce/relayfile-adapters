@@ -270,7 +270,7 @@ describe('issue mapping', () => {
       '/github/repos/octocat/hello-world/issues/_index.json',
       '/github/repos/octocat/hello-world/pulls/_index.json',
       '/github/repos/_index.json',
-      '/github/.layout.md',
+      '/github/LAYOUT.md',
     ]);
     assert.deepStrictEqual(
       JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'),
@@ -301,7 +301,7 @@ describe('issue mapping', () => {
         '/github/repos/octocat/hello-world/issues/_index.json',
         '/github/repos/octocat/hello-world/pulls/_index.json',
         '/github/repos/_index.json',
-        '/github/.layout.md',
+        '/github/LAYOUT.md',
       ],
       errors: [],
     });

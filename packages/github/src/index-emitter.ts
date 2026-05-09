@@ -110,7 +110,9 @@ async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefin
         return value;
       }
     } catch {
-      return undefined;
+      // A throwing reader should not abort the loop — fall through to the
+      // next available reader so we still surface text from working backends.
+      continue;
     }
   }
 
