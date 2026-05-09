@@ -97,6 +97,40 @@ describe('slack writeback', () => {
     });
   });
 
+  describe('update_message (PATCH on canonical filename)', () => {
+    it('routes a PATCH on /messages/<ts>.json to chat.update with the same ts', () => {
+      // Pins a CodeRabbit Review finding: previously the PATCH branch fell
+      // through to chat.postMessage with thread_ts=<ts>, which Slack treats
+      // as creating a new threaded reply rather than editing the original
+      // message. PATCH must call /api/chat.update with channel + ts.
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/1762445678_001234.json',
+        'Edited body.',
+      );
+      assert.strictEqual(req.action, 'update_message');
+      assert.strictEqual(req.endpoint, '/api/chat.update');
+      assert.deepStrictEqual(req.body, {
+        channel: '#customer-success',
+        ts: '1762445678.001234',
+        text: 'Edited body.',
+      });
+    });
+
+    it('routes a PATCH on /replies/<ts>.json to chat.update for the reply', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/customer-success/messages/1762445678_001234/replies/1762445999_005678.json',
+        'Edited reply body.',
+      );
+      assert.strictEqual(req.action, 'update_message');
+      assert.strictEqual(req.endpoint, '/api/chat.update');
+      assert.deepStrictEqual(req.body, {
+        channel: '#customer-success',
+        ts: '1762445999.005678',
+        text: 'Edited reply body.',
+      });
+    });
+  });
+
   describe('reply_in_thread', () => {
     it('reverses the tsToken (underscore → dot) and sets thread_ts', () => {
       const req = resolveWritebackRequest(

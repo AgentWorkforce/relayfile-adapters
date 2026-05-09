@@ -59,17 +59,17 @@ Use the status surface before retrying a write. For example, if a create fails b
 
 | Adapter | Canonical ID pattern | Example create draft path |
 |---|---|---|
-| Asana | `^\d+$` | `/asana/tasks/create request.json` |
-| ClickUp | `^[A-Za-z0-9]+$` | `/clickup/lists/<listId>/tasks/create request.json` |
-| GitHub | `^\d+$` | `/github/repos/<owner>/<repo>/pulls/<pullNumber>/reviews/create request.json` |
-| GitLab | `^[A-Za-z0-9_.:-]+$` | `/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/discussions/create request.json` |
-| HubSpot | `^\d+$` | `/hubspot/contacts/create request.json` |
-| Intercom | `^[A-Za-z0-9_-]+$` | `/intercom/conversations/create request.json` |
-| Jira | comments: `^\d+$`; issues/projects: `^(?:[A-Z][A-Z0-9]+-\d+|\d+)$` | `/jira/issues/create request.json` |
-| Linear | `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` | `/linear/issues/create request.json` |
-| Notion | `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` | `/notion/databases/<databaseId>/pages/create request.json` |
-| Pipedrive | `^\d+$` | `/pipedrive/deals/create request.json` |
-| Salesforce | `^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$` | `/salesforce/accounts/create request.json` |
-| Slack | `^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$` | `/slack/channels/<channelId>/messages/create request.json` |
-| Teams | `^[A-Za-z0-9_.=!-]+$` | `/teams/<teamId>/channels/<channelId>/messages/create request.json` |
-| Zendesk | `^\d+$` | `/zendesk/tickets/create request.json` |
+| Asana | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/asana/tasks/<draft>.json` |
+| ClickUp | `^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$` | `/clickup/lists/<listId>/tasks/<draft>.json` |
+| GitHub | `^\d+$` | `/github/repos/<owner>/<repo>/pulls/<pullNumber>/reviews/<draft>.json` |
+| GitLab | `^[A-Za-z0-9_.:-]+$` | `/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/discussions/<draft>.json` |
+| HubSpot | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/hubspot/contacts/<draft>.json` |
+| Intercom | `^[A-Za-z0-9_-]+$` | `/intercom/conversations/<draft>.json` |
+| Jira | comments: `^(?:[A-Za-z0-9_.~-]+--)?\d+$`; issues/projects: bare `KEY-123` or `\d+`, slug-prefixed forms also canonical | `/jira/issues/<draft>.json` |
+| Linear | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?[0-9a-f]{32}$` (or canonical UUID) | `/linear/issues/<draft>.json` |
+| Notion | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?[0-9a-f]{32}$` (or canonical UUID) | `/notion/databases/<databaseId>/pages/<draft>.json` |
+| Pipedrive | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/pipedrive/deals/<draft>.json` |
+| Salesforce | `^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$` | `/salesforce/accounts/<draft>.json` |
+| Slack | `^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$` | `/slack/channels/<channelId>/messages/<draft>.json` |
+| Teams | `^[A-Za-z0-9_.=!-]+$` | `/teams/<teamId>/channels/<channelId>/messages/<draft>.json` |
+| Zendesk | `^\d+$` | `/zendesk/tickets/<draft>.json` |

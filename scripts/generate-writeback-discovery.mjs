@@ -43,7 +43,7 @@ function renderAdapterReadme(adapter) {
     '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resource.resourcePath}/<id>.json\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | \`${resource.idPatternSource}\` | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resource.resourcePath}/<id>.json\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | \`${escapeMarkdownTableCell(resource.idPatternSource)}\` | ${resource.description} |`),
     '',
     '## Operations',
     '',
@@ -280,11 +280,16 @@ function pathPatternSourceFor(resourcePath) {
 }
 
 function idPatternFor(adapterSlug, resourcePath) {
+  // Patterns must stay in lockstep with each adapter's `src/resources.ts`.
+  // Path-mappers emit canonical filenames as either `<id>` or
+  // `<slug>(?:--|__)<id>`, so most adapters allow an optional slug prefix.
+  // Editors: when adjusting an idPattern in resources.ts, mirror the change
+  // here — the discovery generator overwrites resources.ts on regeneration.
   if (adapterSlug === 'linear') {
-    return pattern('^(?:(?:[A-Za-z0-9_.~-]+--)?[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+    return pattern('^(?:(?:[A-Za-z0-9_.~-]+(?:--|__))?[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'notion') {
-    return pattern('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', 'i');
+    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'slack') {
     return pattern('^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$');
@@ -292,11 +297,16 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'gitlab') {
     return pattern('^[A-Za-z0-9_.:-]+$');
   }
-  if (adapterSlug === 'github' || adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
+  if (adapterSlug === 'github') {
     return pattern('^\\d+$');
   }
+  if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
+    return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
+  }
   if (adapterSlug === 'jira') {
-    return resourcePath.includes('/comments') ? pattern('^\\d+$') : pattern('^(?:[A-Z][A-Z0-9]+-\\d+|\\d+)$');
+    return resourcePath.includes('/comments')
+      ? pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$')
+      : pattern('^(?:[A-Za-z0-9_.~-]+--(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
   }
   if (adapterSlug === 'salesforce') {
     return pattern('^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$');
@@ -305,7 +315,7 @@ function idPatternFor(adapterSlug, resourcePath) {
     return pattern('^[A-Za-z0-9_.=!-]+$');
   }
   if (adapterSlug === 'clickup') {
-    return pattern('^[A-Za-z0-9]+$');
+    return pattern('^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$');
   }
   if (adapterSlug === 'intercom') {
     return pattern('^[A-Za-z0-9_-]+$');
@@ -324,6 +334,13 @@ function pattern(source, flags = '') {
     idPatternLiteral: patternLiteral(source, flags),
     idPatternSource: source,
   };
+}
+
+// GitHub markdown tables split cells on every literal `|`, so a regex like
+// `(a|b)` would render as four columns. Backslash-escape pipes inside the
+// inline-code cell so the table stays intact.
+function escapeMarkdownTableCell(value) {
+  return value.replace(/\|/g, '\\|');
 }
 
 function patternLiteral(source, flags = '') {

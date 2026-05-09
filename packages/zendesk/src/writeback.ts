@@ -119,8 +119,11 @@ function buildTicketCommentRequest(ticketId: string, content: string): ZendeskWr
 
 function buildTicketCreateRequest(content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
-  rejectReadOnlyFields(payload);
+  // Unwrap the `{"ticket": {...}}` envelope (also emitted by sync-read flow)
+  // before checking read-only fields, so caller-supplied envelopes can't
+  // smuggle a stray `ticket.id` past the gate.
   const ticket = readObject(payload, 'ticket') ?? payload;
+  rejectReadOnlyFields(ticket);
   const subject = readString(ticket, 'subject');
   if (!subject) {
     throw new Error('ticket create writeback requires a `subject`');
@@ -151,8 +154,10 @@ function buildTicketUpdateRequest(ticketId: string, content: string): ZendeskWri
 
 function buildUserCreateRequest(content: string): ZendeskWritebackRequest {
   const payload = parseJsonObject(content);
-  rejectReadOnlyFields(payload);
+  // Same envelope-first / reject-after order as ticket create — see
+  // buildTicketCreateRequest.
   const user = readObject(payload, 'user') ?? payload;
+  rejectReadOnlyFields(user);
   const name = readString(user, 'name');
   if (!name) {
     throw new Error('user create writeback requires a `name`');
@@ -186,6 +191,7 @@ function buildOrganizationUpdateRequest(organizationId: string, content: string)
   const source = looksLikeSyncedEnvelope(payload)
     ? readObject(payload, 'payload') ?? payload
     : readObject(payload, 'organization') ?? payload;
+  rejectReadOnlyFields(source);
   const organization = pickOrganizationFields(source);
   if (Object.keys(organization).length === 0) {
     throw new Error('organization update writeback requires at least one mutable organization field');

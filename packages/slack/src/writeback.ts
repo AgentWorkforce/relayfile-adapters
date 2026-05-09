@@ -37,16 +37,19 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
       return buildPostMessage(messageMatch[1], undefined, content);
     }
     if (route.kind === 'patch' && messageMatch?.[1] && messageMatch[2]) {
-      return buildPostMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]), content);
+      return buildUpdateMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]), content);
     }
   }
 
-  if (route?.resource.name === 'replies' && route.kind === 'create') {
+  if (route?.resource.name === 'replies') {
     const replyMatch = path.match(
       /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/,
     );
-    if (replyMatch?.[1] && replyMatch[2]) {
+    if (route.kind === 'create' && replyMatch?.[1] && replyMatch[2]) {
       return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content);
+    }
+    if (route.kind === 'patch' && replyMatch?.[1] && replyMatch[3]) {
+      return buildUpdateMessage(replyMatch[1], extractMessageTimestamp(replyMatch[3]), content);
     }
   }
 
@@ -256,6 +259,65 @@ function buildPostMessage(
     action,
     method: 'POST',
     endpoint: '/api/chat.postMessage',
+    body,
+  };
+}
+
+/**
+ * Build a `chat.update` request for editing an existing top-level message
+ * or thread reply. `chat.postMessage` (used by buildPostMessage) creates a
+ * new message — for PATCH semantics on a canonical `<ts>.json` filename we
+ * must call `chat.update` with the same `ts` to mutate the existing record.
+ *
+ * Accepts the same body shapes as buildPostMessage. Slack ignores
+ * `thread_ts` on update calls (the message's thread membership is fixed at
+ * post time), so we omit it.
+ */
+function buildUpdateMessage(
+  channelSegment: string,
+  ts: string,
+  content: string,
+): SlackWritebackRequest {
+  const pathChannel = extractSlackChannel(channelSegment);
+  const parsed = safeParseJson(content);
+
+  if (typeof parsed === 'string') {
+    if (!parsed) throw new Error('Slack message update writeback requires a non-empty body');
+    return {
+      action: 'update_message',
+      method: 'POST',
+      endpoint: '/api/chat.update',
+      body: { channel: pathChannel, ts, text: parsed },
+    };
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error('Slack message update writeback expects a JSON object or plain string');
+  }
+  rejectReadOnlyFields(parsed);
+
+  const text = readString(parsed, 'text');
+  const blocks = Array.isArray(parsed.blocks) ? parsed.blocks : undefined;
+  const attachments = Array.isArray(parsed.attachments) ? parsed.attachments : undefined;
+  if (!text && !blocks && !attachments) {
+    throw new Error(
+      'Slack message update writeback requires `text`, `blocks`, or `attachments`',
+    );
+  }
+
+  const explicitChannel = readString(parsed, 'channel');
+  const body: Record<string, unknown> = {
+    channel: explicitChannel ?? pathChannel,
+    ts,
+  };
+  if (text) body.text = text;
+  if (blocks) body.blocks = blocks;
+  if (attachments) body.attachments = attachments;
+
+  return {
+    action: 'update_message',
+    method: 'POST',
+    endpoint: '/api/chat.update',
     body,
   };
 }

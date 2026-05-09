@@ -52,6 +52,17 @@ function formatUuid(hex32: string): string {
   return `${hex32.slice(0, 8)}-${hex32.slice(8, 12)}-${hex32.slice(12, 16)}-${hex32.slice(16, 20)}-${hex32.slice(20, 32)}`;
 }
 
+// Standalone notion pages aren't a declared resource (`resources.ts` only
+// covers database pages), so `classifyWrite` returns null for them. Tier-0
+// canonicity is checked inline against the same forms the page idPattern
+// accepts: dehyphenated 32-hex, canonical 8-4-4-4-12, or either form prefixed
+// by a `<slug>(?:--|__)`.
+const STANDALONE_PAGE_CANONICAL = /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+function isCanonicalStandalonePageSegment(segment: string): boolean {
+  return STANDALONE_PAGE_CANONICAL.test(decodeURIComponent(segment));
+}
+
 /**
  * Resolve a relayfile writeback into a Notion REST request.
  *
@@ -80,7 +91,7 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   }
 
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (standalonePageMatch) {
+  if (standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
@@ -115,7 +126,7 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
   }
 
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (standalonePageMatch?.[1]) {
+  if (standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
   }
 

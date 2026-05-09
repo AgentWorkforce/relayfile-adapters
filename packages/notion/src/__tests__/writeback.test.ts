@@ -49,6 +49,30 @@ describe('writeback rule matching', () => {
     });
   });
 
+  it('rejects standalone-page draft delete (no canonical id) instead of archiving', () => {
+    // Pins a Devin Review finding: standalone notion pages aren't declared
+    // as a resource, so classifyWrite returns null and the delete resolver
+    // would archive any draft path it saw. The canonical-id gate now ensures
+    // only canonical UUIDs (or <slug>(?:--|__)<32hex> forms) trigger archive.
+    assert.throws(
+      () => resolveDeleteRequest('/notion/pages/draft-page.json'),
+      /No Notion delete writeback rule matched/,
+    );
+    assert.throws(
+      () => resolveWritebackRequest('/notion/pages/draft-page.json', '{"properties":{}}'),
+      /No Notion writeback rule matched/,
+    );
+    assert.deepStrictEqual(
+      resolveDeleteRequest('/notion/pages/00000000-0000-0000-0000-000000000001.json'),
+      {
+        action: 'delete_page',
+        method: 'PATCH',
+        endpoint: '/v1/pages/00000000-0000-0000-0000-000000000001',
+        body: { archived: true },
+      },
+    );
+  });
+
   it('maps the canonical <slug>__<32hex> form emitted by the notion path-mapper to PATCH', () => {
     // Pins #49: notion path-mapper now emits `<slug>__<id>` rather than the
     // legacy `<slug>--<id>`. classifyWrite + extractNotionId must accept

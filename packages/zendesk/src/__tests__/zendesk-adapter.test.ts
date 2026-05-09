@@ -225,6 +225,38 @@ test('path mapping stays deterministic for supported Zendesk VFS objects', () =>
     () => resolveDeleteRequest('/zendesk/tickets/draft-ticket.json'),
     /No Zendesk delete writeback rule matched/,
   );
+
+  // Pins a CodeRabbit Review finding: ticket/user create previously called
+  // rejectReadOnlyFields BEFORE unwrapping the {ticket: ...} envelope, so a
+  // payload like {ticket: {id: "...", ...}} would smuggle a read-only id
+  // through. Order is now unwrap → reject.
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/tickets/draft-ticket.json',
+        JSON.stringify({ ticket: { id: '999', subject: 'Smuggled' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/users/draft-user.json',
+        JSON.stringify({ user: { id: '999', name: 'Smuggled' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
+  // Pins a CodeRabbit Review finding: organization update was the only mutable
+  // zendesk path that didn't call rejectReadOnlyFields, silently letting `id`
+  // through as a generic error instead of a precise ReadOnlyFieldError.
+  assert.throws(
+    () =>
+      resolveWritebackRequest(
+        '/zendesk/organizations/123.json',
+        JSON.stringify({ organization: { id: '999', name: 'Renamed' } }),
+      ),
+    (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+  );
 });
 
 test('barrel exports import cleanly for runtime and type-checked usage', async () => {

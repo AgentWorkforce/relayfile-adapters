@@ -195,6 +195,35 @@ describe('JiraAdapter', () => {
     );
   });
 
+  it('treats bare uppercase strings as drafts and slug-prefixed short keys as canonical', () => {
+    // Pins a Devin Review finding: an earlier idPattern made `-\d+` optional
+    // at the top level, which caused `/jira/projects/ENG.json` to classify as
+    // a canonical PATCH (issuing PUT /rest/api/3/project/ENG) instead of a
+    // CREATE. The fix: bare strings must look like KEY-123 or pure digits;
+    // short uppercase keys are canonical only inside the slug-prefixed form.
+    assert.deepEqual(
+      resolveJiraWritebackRequest(
+        '/jira/projects/engineering-platform--ENG.json',
+        JSON.stringify({ name: 'Engineering Platform' }),
+      ),
+      {
+        action: 'update_project',
+        method: 'PUT',
+        endpoint: '/rest/api/3/project/ENG',
+        body: { name: 'Engineering Platform' },
+      },
+    );
+    // /jira/projects/ENG.json must NOT route to PUT /rest/api/3/project/ENG
+    // (the bug: bare `ENG` was classified as canonical PATCH). Instead it
+    // should route to CREATE — surfaced here as the "requires key" error
+    // because the body omits the required `key` field, proving the create
+    // path was taken.
+    assert.throws(
+      () => resolveJiraWritebackRequest('/jira/projects/ENG.json', JSON.stringify({})),
+      /project create writeback requires key/,
+    );
+  });
+
   it('deletes files for deleted events when deleteFile is available', async () => {
     const client = createClient();
     const adapter = createAdapter(client);
