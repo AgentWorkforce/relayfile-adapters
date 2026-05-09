@@ -67,7 +67,7 @@ export async function syncGitHubWorkspace(
   const rootIndexResult = await writeJsonFile(vfs, ROOT_INDEX_PATH, { repos });
   const tracked = mergeTrackedResults(rootMarkerResult, rootIndexResult);
 
-  if (config.lazy !== false) {
+  if (config.lazy) {
     return toSyncResult(tracked, options.cursor, ['repository']);
   }
 
