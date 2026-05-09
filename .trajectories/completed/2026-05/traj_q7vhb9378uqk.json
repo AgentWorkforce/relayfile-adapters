@@ -1,0 +1,53 @@
+{
+  "id": "traj_q7vhb9378uqk",
+  "version": 1,
+  "task": {
+    "title": "Wire Jira privacy-safe adapter storage"
+  },
+  "status": "completed",
+  "startedAt": "2026-05-09T18:56:17.285Z",
+  "completedAt": "2026-05-09T18:56:17.493Z",
+  "agents": [
+    {
+      "name": "default",
+      "role": "lead",
+      "joinedAt": "2026-05-09T18:56:17.394Z"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "chap_2ch5b7pul6ba",
+      "title": "Work",
+      "agentName": "default",
+      "startedAt": "2026-05-09T18:56:17.394Z",
+      "endedAt": "2026-05-09T18:56:17.493Z",
+      "events": [
+        {
+          "ts": 1778352977396,
+          "type": "decision",
+          "content": "Redact Atlassian user profile objects before Jira records reach storage: Redact Atlassian user profile objects before Jira records reach storage",
+          "raw": {
+            "question": "Redact Atlassian user profile objects before Jira records reach storage",
+            "chosen": "Redact Atlassian user profile objects before Jira records reach storage",
+            "alternatives": [],
+            "reasoning": "Avoiding stored account IDs, display names, emails, avatars, and timezones keeps Relayfile out of Atlassian personal-data reporting for profile data while preserving issue/project/sprint/comment content."
+          },
+          "significance": "high"
+        }
+      ]
+    }
+  ],
+  "retrospective": {
+    "summary": "Added default-on Jira record sanitization, exported the sanitizer, removed user profile semantics/relations, and added regression coverage that stored Jira content omits email, display name, and accountId.",
+    "approach": "Standard approach",
+    "confidence": 0.9
+  },
+  "commits": [],
+  "filesChanged": [],
+  "projectId": ".",
+  "tags": [],
+  "_trace": {
+    "startRef": "bfe67fdadbe60855bb72e44c9f5a9be21221f7b9",
+    "endRef": "bfe67fdadbe60855bb72e44c9f5a9be21221f7b9"
+  }
+}

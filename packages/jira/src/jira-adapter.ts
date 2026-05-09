@@ -107,6 +107,55 @@ type JiraWebhookEnvelope = Record<string, unknown>;
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const SUPPORTED_EVENTS = JIRA_WEBHOOK_OBJECT_TYPES;
 const JIRA_PROVIDER_NAME = 'jira';
+const JIRA_DUPLICATE_WEBHOOK_KEYS = new Set(['changelog', 'issue', 'user']);
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function looksLikeJiraUserRecord(value: Record<string, unknown>): boolean {
+  return (
+    hasOwn(value, 'accountId') ||
+    hasOwn(value, 'account_id') ||
+    hasOwn(value, 'emailAddress') ||
+    hasOwn(value, 'email_address') ||
+    (hasOwn(value, 'displayName') &&
+      (hasOwn(value, 'avatarUrls') || hasOwn(value, 'timeZone') || hasOwn(value, 'self'))) ||
+    (hasOwn(value, 'display_name') &&
+      (hasOwn(value, 'avatar_urls') || hasOwn(value, 'timezone') || hasOwn(value, 'self')))
+  );
+}
+
+function redactJiraPersonalDataValue(value: unknown, parentKey?: string): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactJiraPersonalDataValue(item, parentKey));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  if (looksLikeJiraUserRecord(value)) {
+    return null;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'changelog') {
+      continue;
+    }
+    if (parentKey === '_webhook' && JIRA_DUPLICATE_WEBHOOK_KEYS.has(key)) {
+      continue;
+    }
+    output[key] = redactJiraPersonalDataValue(child, key);
+  }
+  return output;
+}
+
+export function sanitizeJiraRecordForStorage(payload: Record<string, unknown>): Record<string, unknown> {
+  const result = redactJiraPersonalDataValue(payload);
+  return isRecord(result) ? result : {};
+}
 
 export class JiraAdapter extends IntegrationAdapter {
   override readonly name = JIRA_PROVIDER_NAME;
@@ -215,6 +264,7 @@ export class JiraAdapter extends IntegrationAdapter {
     objectId: string,
     payload: Record<string, unknown>,
   ): FileSemantics {
+    const safePayload = sanitizeJiraRecordForStorage(payload);
     const normalizedType = normalizeJiraObjectType(objectType);
     const properties: Record<string, string> = {
       provider: JIRA_PROVIDER_NAME,
@@ -226,9 +276,9 @@ export class JiraAdapter extends IntegrationAdapter {
     const relations = new Set<string>();
     const comments: string[] = [];
 
-    addStringProperty(properties, 'jira.self', payload.self);
+    addStringProperty(properties, 'jira.self', safePayload.self);
 
-    const webhook = getRecord(payload._webhook);
+    const webhook = getRecord(safePayload._webhook);
     if (webhook) {
       addStringProperty(properties, 'jira.webhook.event_type', webhook.eventType);
       addStringProperty(properties, 'jira.webhook.webhook_event', webhook.webhookEvent);
@@ -238,16 +288,16 @@ export class JiraAdapter extends IntegrationAdapter {
 
     switch (normalizedType) {
       case 'issue':
-        applyIssueSemantics(properties, relations, comments, payload as JiraRecord);
+        applyIssueSemantics(properties, relations, comments, safePayload as JiraRecord);
         break;
       case 'project':
-        applyProjectSemantics(properties, relations, payload as JiraRecord);
+        applyProjectSemantics(properties, relations, safePayload as JiraRecord);
         break;
       case 'sprint':
-        applySprintSemantics(properties, payload as JiraRecord);
+        applySprintSemantics(properties, safePayload as JiraRecord);
         break;
       case 'comment':
-        applyCommentSemantics(properties, relations, comments, payload as JiraRecord);
+        applyCommentSemantics(properties, relations, comments, safePayload as JiraRecord);
         break;
     }
 
@@ -303,6 +353,7 @@ export class JiraAdapter extends IntegrationAdapter {
   }
 
   private renderContent(workspaceId: string, event: NormalizedWebhook, deleted: boolean): string {
+    const payload = sanitizeJiraRecordForStorage(event.payload);
     return stableJson({
       provider: event.provider,
       connectionId: event.connectionId ?? null,
@@ -311,7 +362,7 @@ export class JiraAdapter extends IntegrationAdapter {
       objectType: normalizeJiraObjectType(event.objectType),
       objectId: event.objectId,
       deleted,
-      payload: event.payload,
+      payload,
     });
   }
 }
@@ -542,15 +593,12 @@ function applyUserProperties(
   prefix: string,
   user: JiraUser,
 ): void {
-  const accountId = user.accountId ?? user.account_id;
-  addStringProperty(properties, `${prefix}_account_id`, accountId);
-  addStringProperty(properties, `${prefix}_display_name`, user.displayName ?? user.display_name ?? user.name);
-  addStringProperty(properties, `${prefix}_email`, user.emailAddress ?? user.email_address);
-  addStringProperty(properties, `${prefix}_time_zone`, user.timeZone ?? user.timezone);
-  addBooleanProperty(properties, `${prefix}_active`, user.active);
-  if (accountId) {
-    relations.add(`/jira/users/${encodeURIComponent(accountId)}.json`);
-  }
+  // Atlassian account profile fields are deliberately excluded from storage and
+  // semantics so Relayfile does not retain reportable Jira personal data.
+  void properties;
+  void relations;
+  void prefix;
+  void user;
 }
 
 function mergeJiraPayload(event: JiraWebhookPayload, objectType: string): Record<string, unknown> {

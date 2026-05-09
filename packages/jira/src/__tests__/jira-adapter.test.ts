@@ -2,7 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
-import { JiraAdapter, type RelayFileClientLike, type WriteFileInput } from '../jira-adapter.js';
+import {
+  JiraAdapter,
+  sanitizeJiraRecordForStorage,
+  type RelayFileClientLike,
+  type WriteFileInput,
+} from '../jira-adapter.js';
 import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
 import { ReadOnlyFieldError, resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
@@ -145,10 +150,89 @@ describe('JiraAdapter', () => {
       },
     });
 
-    assert.equal(semantics.properties?.['jira.assignee_display_name'], 'Ada Lovelace');
+    assert.equal(semantics.properties?.['jira.assignee_account_id'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_display_name'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_email'], undefined);
+    assert.equal(semantics.properties?.['jira.assignee_time_zone'], undefined);
+    assert.deepEqual(semantics.relations ?? [], []);
     assert.equal(semantics.properties?.['jira.priority_name'], 'High');
     assert.equal(semantics.properties?.['jira.status_category_key'], 'indeterminate');
     assert.equal(semantics.properties?.['jira.labels'], 'auth, web');
+  });
+
+  it('redacts Jira user profile fields from stored file content', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    const result = await adapter.ingestWebhook('workspace-1', {
+      provider: 'jira',
+      eventType: 'issue.updated',
+      objectType: 'issue',
+      objectId: '10001',
+      payload: {
+        id: '10001',
+        key: 'ENG-42',
+        fields: {
+          summary: 'Fix login redirect',
+          assignee: {
+            accountId: 'acct-1',
+            displayName: 'Ada Lovelace',
+            emailAddress: 'ada@example.com',
+            timeZone: 'Europe/London',
+            avatarUrls: { '48x48': 'https://avatar.example/ada.png' },
+          },
+          reporter: {
+            accountId: 'acct-2',
+            displayName: 'Grace Hopper',
+            emailAddress: 'grace@example.com',
+          },
+        },
+        changelog: {
+          histories: [{ author: { accountId: 'acct-1', displayName: 'Ada Lovelace' } }],
+        },
+        _webhook: {
+          webhookEvent: 'jira:issue_updated',
+          user: { accountId: 'acct-3', displayName: 'Webhook Actor' },
+        },
+      },
+    });
+
+    assert.equal(result.filesWritten, 1);
+    assert.equal(client.writes.length, 1);
+
+    const content = JSON.parse(client.writes[0]?.content ?? '{}') as {
+      payload?: { fields?: Record<string, unknown>; changelog?: unknown; _webhook?: Record<string, unknown> };
+    };
+
+    assert.equal(content.payload?.fields?.assignee, null);
+    assert.equal(content.payload?.fields?.reporter, null);
+    assert.equal(content.payload?.changelog, undefined);
+    assert.equal(content.payload?._webhook?.user, undefined);
+    for (const write of client.writes) {
+      for (const token of [
+        'acct-1',
+        'acct-2',
+        'acct-3',
+        'ada@example.com',
+        'grace@example.com',
+        'Ada Lovelace',
+        'Grace Hopper',
+        'Webhook Actor',
+      ]) {
+        assert.equal(write.content.includes(token), false);
+      }
+    }
+  });
+
+  it('returns an object when sanitizing a root Jira user profile record', () => {
+    assert.deepEqual(
+      sanitizeJiraRecordForStorage({
+        accountId: 'acct-1',
+        displayName: 'Ada Lovelace',
+        emailAddress: 'ada@example.com',
+      }),
+      {},
+    );
   });
 
   it('computes deterministic path mappings for all primary object types', () => {
