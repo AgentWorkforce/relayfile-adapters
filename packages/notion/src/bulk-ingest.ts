@@ -1,4 +1,5 @@
 import type { RelayFileClient, WriteQueuedResponse } from '@relayfile/sdk';
+import { upsertIndexAtomic, type AtomicUpsertOptions, type VfsLike } from '@relayfile/adapter-core';
 import { ingestDatabaseArtifacts } from './databases/ingestion.js';
 import { buildIndexFiles } from './index-emitter.js';
 import { notionLayoutPromptFile } from './layout-prompt.js';
@@ -132,27 +133,68 @@ async function writeNotionIndex(
   relayClient: RelayFileClient,
   workspaceId: string,
   scopePath: string,
+  options?: AtomicUpsertOptions,
 ): Promise<void> {
   const indexPath = `${scopePath}/_index.json`;
-  const existing = await readExistingContent(relayClient, workspaceId, indexPath);
-  const rows = mergeIndexRows(existing, [
-    { title: 'by-id', file: 'by-id/' },
-    { title: 'by-title', file: 'by-title/' },
-  ]);
-  const baseRevision = await resolveBaseRevision(relayClient, workspaceId, indexPath);
-  await relayClient.writeFile({
-    workspaceId,
-    path: indexPath,
-    baseRevision,
-    contentType: 'application/json; charset=utf-8',
-    content: `${JSON.stringify({ rows }, null, 2)}\n`,
-  });
+  const vfs = relayClientToVfs(relayClient, workspaceId);
+
+  await upsertIndexAtomic<NotionIndexRow>(
+    vfs,
+    indexPath,
+    parseIndexRows,
+    (rows) =>
+      mergeIndexRowsList(rows, [
+        { title: 'by-id', file: 'by-id/' },
+        { title: 'by-title', file: 'by-title/' },
+      ]),
+    (rows) => `${JSON.stringify({ rows }, null, 2)}\n`,
+    options,
+  );
 }
 
-function mergeIndexRows(existingContent: string | undefined, requiredRows: NotionIndexRow[]): NotionIndexRow[] {
+/**
+ * Wrap the SDK's single-input `RelayFileClient` in the VfsLike duck-typed
+ * shape the atomic-index helper consumes. The shim is deliberately
+ * minimal: it only exposes the readers / writer the helper invokes, and
+ * forwards `baseRevision` from the helper's third positional options arg
+ * into the SDK's `WriteFileInput.baseRevision` field.
+ *
+ * Reading a missing file currently surfaces as a thrown error from the
+ * SDK; we translate that to `undefined` so the helper treats it as a
+ * fresh-revision read (revision "0").
+ */
+function relayClientToVfs(relayClient: RelayFileClient, workspaceId: string): VfsLike {
+  return {
+    async readFile(path: string): Promise<{ content: string; revision: string } | undefined> {
+      try {
+        const existing = await relayClient.readFile(workspaceId, path);
+        return { content: existing.content, revision: existing.revision };
+      } catch {
+        return undefined;
+      }
+    },
+    async writeFile(
+      path: string,
+      content: string,
+      writeOptions?: { baseRevision?: string },
+    ): Promise<unknown> {
+      return relayClient.writeFile({
+        workspaceId,
+        path,
+        // Default to '0' (fresh revision) when the helper omits the
+        // baseRevision; in practice it always passes one.
+        baseRevision: writeOptions?.baseRevision ?? '0',
+        contentType: 'application/json; charset=utf-8',
+        content,
+      });
+    },
+  };
+}
+
+function mergeIndexRowsList(existingRows: NotionIndexRow[], requiredRows: NotionIndexRow[]): NotionIndexRow[] {
   const rows = new Map<string, NotionIndexRow>();
 
-  for (const row of parseIndexRows(existingContent)) {
+  for (const row of existingRows) {
     rows.set(row.file, row);
   }
 
