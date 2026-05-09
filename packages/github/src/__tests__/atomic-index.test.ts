@@ -139,6 +139,16 @@ describe('isConflictError', () => {
     assert.equal(isConflictError(null), false);
     assert.equal(isConflictError('conflict'), false);
   });
+
+  it('does not match unrelated codes that merely contain the word "conflict"', () => {
+    // Regression: previous regex `/(revision_conflict|conflict)/i` matched
+    // any code with "conflict" as a substring, causing false retries on
+    // unrelated errors like merge_conflict / name_conflict.
+    assert.equal(isConflictError({ code: 'merge_conflict' }), false);
+    assert.equal(isConflictError({ code: 'name_conflict' }), false);
+    assert.equal(isConflictError({ code: 'permission_conflict' }), false);
+    assert.equal(isConflictError({ code: 'CONFLICT' }), false);
+  });
 });
 
 describe('upsertIndexAtomic', () => {
@@ -323,5 +333,52 @@ describe('atomicUpsertRecordIndex (integration with CAS-aware VFS)', () => {
       ['7', '8'],
       'both concurrent writers must contribute a row to the final index',
     );
+  });
+
+  it('reports filesUpdated when a racing writer creates the file first', async () => {
+    // Regression: runAtomicIndexWrite previously read existedBefore from a
+    // dedicated pre-CAS read. If a racing writer created the file between
+    // that read and the eventual successful CAS write, the result reported
+    // filesWritten: 1 / filesUpdated: 0 even though the winning attempt
+    // actually updated an existing file. The fix moves the existed check
+    // inside upsertIndexAtomic where the read that produced the winning
+    // baseRevision is the source of truth.
+    const vfs = new CasVfs();
+    const path = githubRepoPullsIndexPath('octocat', 'hello-world');
+
+    // Seed the file by another writer (simulates the race winner) BEFORE
+    // we attempt the upsert. Under the old code the empty pre-read would
+    // have decided "the file is new" — but we're updating, not creating.
+    vfs.writeFile(
+      path,
+      buildRepoPullsIndexFile('octocat', 'hello-world', [
+        {
+          id: '1',
+          title: 'PR one',
+          updated: '2026-04-01T00:00:00Z',
+          number: 1,
+          state: 'open',
+        },
+      ]).content,
+    );
+
+    const result = await atomicUpsertRecordIndex(
+      vfs as unknown as VfsLike,
+      path,
+      (rows) =>
+        upsertRecordIndexRow(rows, {
+          id: '2',
+          title: 'PR two',
+          updated: '2026-04-02T00:00:00Z',
+          number: 2,
+          state: 'open',
+        }),
+      (rows) => buildRepoPullsIndexFile('octocat', 'hello-world', rows).content,
+      { sleep: async () => undefined, baseDelayMs: 0 },
+    );
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.filesUpdated, 1, 'must report filesUpdated for an existing file');
+    assert.equal(result.filesWritten, 0, 'must not report filesWritten when updating');
   });
 });

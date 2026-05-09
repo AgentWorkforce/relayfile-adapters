@@ -173,10 +173,7 @@ export function isConflictError(error: unknown): boolean {
   if (candidate.status === 409 || candidate.statusCode === 409) {
     return true;
   }
-  if (
-    typeof candidate.code === 'string' &&
-    /(revision_conflict|conflict)/i.test(candidate.code)
-  ) {
+  if (candidate.code === 'revision_conflict') {
     return true;
   }
   return false;
@@ -198,7 +195,7 @@ export async function upsertIndexAtomic<TRow>(
   merge: (rows: TRow[]) => TRow[],
   serialize: (rows: TRow[]) => string,
   options: AtomicUpsertOptions = {},
-): Promise<void> {
+): Promise<{ existedAtWrite: boolean }> {
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
   const sleep = options.sleep ?? defaultSleep;
@@ -215,7 +212,11 @@ export async function upsertIndexAtomic<TRow>(
 
     try {
       await writeIndexWithRevision(vfs, path, next, revision);
-      return;
+      // The read that produced the winning baseRevision is authoritative for
+      // existed-vs-new accounting: another writer cannot have raced us between
+      // this read and the matching CAS write without us seeing a conflict and
+      // looping.
+      return { existedAtWrite: content !== undefined };
     } catch (error) {
       if (!isConflictError(error)) {
         throw error;
@@ -287,13 +288,18 @@ async function runAtomicIndexWrite<TRow>(
   serialize: (rows: TRow[]) => string,
   options?: AtomicUpsertOptions,
 ): Promise<IngestResult> {
-  const existedBefore = (await readIndexWithRevision(vfs, path)).content !== undefined;
-
   try {
-    await upsertIndexAtomic(vfs, path, parse, merge, serialize, options);
+    const { existedAtWrite } = await upsertIndexAtomic(
+      vfs,
+      path,
+      parse,
+      merge,
+      serialize,
+      options,
+    );
     return {
-      filesWritten: existedBefore ? 0 : 1,
-      filesUpdated: existedBefore ? 1 : 0,
+      filesWritten: existedAtWrite ? 0 : 1,
+      filesUpdated: existedAtWrite ? 1 : 0,
       filesDeleted: 0,
       paths: [path],
       errors: [],
