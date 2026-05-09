@@ -1,4 +1,8 @@
 import { GITHUB_API_BASE_URL } from '../config.js';
+import {
+  atomicUpsertRecordIndex,
+  atomicUpsertRepoIndex,
+} from '../atomic-index.js';
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import {
   githubByIdAliasPath,
@@ -7,11 +11,8 @@ import {
 } from '../path-mapper.js';
 import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
 import {
-  buildRepoIndexFile,
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
-  readRecordIndexRows,
-  readRepoIndexRows,
   upsertRecordIndexRow,
   upsertRepoIndexRow,
 } from '../index-emitter.js';
@@ -194,41 +195,42 @@ export async function bulkIngestPR(
     // Write indexes after the canonical record write resolves so failed writes
     // do not leak into the lightweight directory indexes.
     const updated = metadata.updatedAt || metadata.createdAt || '';
-    const pullIndex = buildRepoPullsIndexFile(
-      trimmedOwner,
-      trimmedRepo,
-      upsertRecordIndexRow(
-        await readRecordIndexRows(vfs, githubRepoPullsIndexPath(trimmedOwner, trimmedRepo)),
-        {
-          id: String(metadata.number),
-          title: metadata.title || '',
-          updated,
-          number: metadata.number,
-          state: metadata.state || '',
-        },
+    const pullIndexPath = githubRepoPullsIndexPath(trimmedOwner, trimmedRepo);
+    const issueIndexPath = githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo);
+    const layoutFile = githubLayoutPromptFile();
+
+    // Atomic CAS upserts — concurrent ingestions for the same repo can read
+    // the same baseline rows otherwise and silently drop one another's
+    // additions on the second write (issue #106 / CodeRabbit follow-up).
+    const indexResults = await Promise.all([
+      atomicUpsertRecordIndex(
+        vfs,
+        pullIndexPath,
+        (rows) =>
+          upsertRecordIndexRow(rows, {
+            id: String(metadata.number),
+            title: metadata.title || '',
+            updated,
+            number: metadata.number,
+            state: metadata.state || '',
+          }),
+        (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
       ),
-    );
-    const issueIndex = buildRepoIssuesIndexFile(
-      trimmedOwner,
-      trimmedRepo,
-      await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo)),
-    );
-    const repoIndex = buildRepoIndexFile(
-      upsertRepoIndexRow(
-        await readRepoIndexRows(vfs),
-        {
+      // Re-emit the issues index under CAS so we never clobber an issue row
+      // that was concurrently appended by another ingestion.
+      atomicUpsertRecordIndex(
+        vfs,
+        issueIndexPath,
+        (rows) => rows,
+        (rows) => buildRepoIssuesIndexFile(trimmedOwner, trimmedRepo, rows).content,
+      ),
+      atomicUpsertRepoIndex(vfs, (rows) =>
+        upsertRepoIndexRow(rows, {
           id: `${trimmedOwner}/${trimmedRepo}`,
           title: `${trimmedOwner}/${trimmedRepo}`,
           updated,
-        },
+        }),
       ),
-    );
-    const layoutFile = githubLayoutPromptFile();
-
-    const indexResults = await Promise.all([
-      writeTextFile(vfs, pullIndex.path, pullIndex.content),
-      writeTextFile(vfs, issueIndex.path, issueIndex.content),
-      writeTextFile(vfs, repoIndex.path, repoIndex.content),
       writeTextFile(vfs, layoutFile.path, layoutFile.content),
     ]);
     for (const indexResult of indexResults) {

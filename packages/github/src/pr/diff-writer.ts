@@ -5,14 +5,15 @@ import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
 import {
-  buildRepoIndexFile,
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
-  readRecordIndexRows,
-  readRepoIndexRows,
   upsertRecordIndexRow,
   upsertRepoIndexRow,
 } from '../index-emitter.js';
+import {
+  atomicUpsertRecordIndex,
+  atomicUpsertRepoIndex,
+} from '../atomic-index.js';
 import { githubLayoutPromptFile } from '../layout-prompt.js';
 import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
@@ -155,44 +156,53 @@ export async function ingestPullRequest(
     // Write indexes after the canonical record write resolves so failed writes
     // do not leak into the lightweight directory indexes.
     const updated = parsedPullRequest.updatedAt || parsedPullRequest.createdAt || '';
-    const pullIndex = buildRepoPullsIndexFile(
-      trimmedOwner,
-      trimmedRepo,
-      upsertRecordIndexRow(
-        await readRecordIndexRows(vfs, githubRepoPullsIndexPath(trimmedOwner, trimmedRepo)),
-        {
+    const layoutFile = githubLayoutPromptFile();
+
+    // Atomic CAS upserts — concurrent ingestions for the same repo can read
+    // the same baseline rows otherwise and silently drop one another's
+    // additions on the second write (issue #106 / CodeRabbit follow-up).
+    const pullIndexResult = await atomicUpsertRecordIndex(
+      vfs,
+      githubRepoPullsIndexPath(trimmedOwner, trimmedRepo),
+      (rows) =>
+        upsertRecordIndexRow(rows, {
           id: String(parsedPullRequest.number),
           title: parsedPullRequest.title ?? '',
           updated,
           number: parsedPullRequest.number,
           state: parsedPullRequest.state || '',
-        },
-      ),
+        }),
+      (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
     );
-    const issueIndex = buildRepoIssuesIndexFile(
-      trimmedOwner,
-      trimmedRepo,
-      await readRecordIndexRows(vfs, githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo)),
+    const issueIndexResult = await atomicUpsertRecordIndex(
+      vfs,
+      githubRepoIssuesIndexPath(trimmedOwner, trimmedRepo),
+      (rows) => rows,
+      (rows) => buildRepoIssuesIndexFile(trimmedOwner, trimmedRepo, rows).content,
     );
-    const repoIndex = buildRepoIndexFile(
-      upsertRepoIndexRow(
-        await readRepoIndexRows(vfs),
-        {
-          id: `${trimmedOwner}/${trimmedRepo}`,
-          title: `${trimmedOwner}/${trimmedRepo}`,
-          updated,
-        },
-      ),
+    const repoIndexResult = await atomicUpsertRepoIndex(vfs, (rows) =>
+      upsertRepoIndexRow(rows, {
+        id: `${trimmedOwner}/${trimmedRepo}`,
+        title: `${trimmedOwner}/${trimmedRepo}`,
+        updated,
+      }),
     );
-    const layoutFile = githubLayoutPromptFile();
 
-    await writeTrackedFile(vfs, pullIndex.path, pullIndex.content, result);
-    await writeTrackedFile(vfs, issueIndex.path, issueIndex.content, result);
-    await writeTrackedFile(vfs, repoIndex.path, repoIndex.content, result);
+    mergeIntoResult(result, pullIndexResult);
+    mergeIntoResult(result, issueIndexResult);
+    mergeIntoResult(result, repoIndexResult);
     await writeTrackedFile(vfs, layoutFile.path, layoutFile.content, result);
   }
 
   return result;
+}
+
+function mergeIntoResult(result: IngestResult, partial: IngestResult): void {
+  result.filesWritten += partial.filesWritten;
+  result.filesUpdated += partial.filesUpdated;
+  result.filesDeleted += partial.filesDeleted;
+  result.paths.push(...partial.paths);
+  result.errors.push(...partial.errors);
 }
 
 function assertSuccessfulResponse(response: ProxyResponse, context: string): void {
