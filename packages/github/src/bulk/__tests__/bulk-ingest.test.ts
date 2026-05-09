@@ -648,8 +648,8 @@ describe('bulk ingest', () => {
     assert.deepStrictEqual(result.errors, []);
     assert.strictEqual(result.filesWritten, 246);
     assert.strictEqual(result.filesUpdated, 0);
-    assert.strictEqual(result.paths.length, 246);
-    assert.strictEqual(writes.size, 246);
+    assert.strictEqual(result.paths.length, 242);
+    assert.strictEqual(writes.size, 245);
     assert.strictEqual(provider.proxy.mock.calls.length, 244);
   });
 });

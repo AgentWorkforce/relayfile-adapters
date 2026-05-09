@@ -1,6 +1,12 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
-import { githubNumberSlug } from '../path-mapper.js';
+import {
+  githubByIdAliasPath,
+  githubByTitleAliasPath,
+  githubNumberSlug,
+  githubRepoIssuesIndexPath,
+  githubRepoPullsIndexPath,
+} from '../path-mapper.js';
 import {
   buildRepoIndexFile,
   buildRepoIssuesIndexFile,
@@ -11,7 +17,6 @@ import {
   upsertRepoIndexRow,
 } from '../index-emitter.js';
 import { githubLayoutPromptFile } from '../layout-prompt.js';
-import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
@@ -96,6 +101,7 @@ export async function ingestIssue(
     buildAbsoluteVfsPath(owner, repo, mapped.vfsPath),
     mapped.content,
   );
+  await writeIssueAliases(vfs, owner, repo, number, mapped.title, mapped.content);
   const commentResult = await resolveIssueCommentIngestor()(
     provider,
     owner,
@@ -334,4 +340,125 @@ async function writeMappedFile(vfs: VfsLike, path: string, content: string): Pro
   }
 
   return result;
+}
+
+interface GitHubIndexRow {
+  file: string;
+  title: string;
+}
+
+async function writeIssueAliases(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  number: number,
+  title: string | null,
+  content: string,
+): Promise<void> {
+  // duplicate write — the VFS interface only supports file writes, so aliases store the canonical bytes verbatim.
+  if (!owner || !repo) {
+    return;
+  }
+
+  const scope = `/github/repos/${encodeURIComponent(owner)}__${encodeURIComponent(repo)}/issues`;
+  await writeGitHubIndex(vfs, scope);
+  await runVfsWrite(vfs, githubByIdAliasPath(owner, repo, 'issues', number), content);
+
+  if (!title?.trim()) {
+    return;
+  }
+
+  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'issues', title, number);
+  const aliasPath = await resolveAliasPath(
+    vfs,
+    baseAliasPath,
+    githubByTitleAliasPath(owner, repo, 'issues', title, number, true),
+    content,
+  );
+  // TODO(issue #106): remove stale by-title aliases when an issue title changes on re-ingest; this wave only writes the current alias.
+  await runVfsWrite(vfs, aliasPath, content);
+}
+
+async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
+  const indexPath = `${scope}/_index.json`;
+  const rows = mergeGitHubIndexRows(await readVfsContent(vfs, indexPath), [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ]);
+  await runVfsWrite(vfs, indexPath, `${JSON.stringify({ rows }, null, 2)}\n`);
+}
+
+function mergeGitHubIndexRows(existingContent: string | undefined, requiredRows: GitHubIndexRow[]): GitHubIndexRow[] {
+  const rows = new Map<string, GitHubIndexRow>();
+
+  for (const row of parseGitHubIndexRows(existingContent)) {
+    rows.set(row.file, row);
+  }
+
+  for (const row of requiredRows) {
+    rows.set(row.file, row);
+  }
+
+  return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function parseGitHubIndexRows(existingContent: string | undefined): GitHubIndexRow[] {
+  if (!existingContent) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<GitHubIndexRow>> };
+    return Array.isArray(parsed.rows)
+      ? parsed.rows.filter((row): row is GitHubIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function resolveAliasPath(
+  vfs: VfsLike,
+  baseAliasPath: string,
+  collisionAliasPath: string,
+  content: string,
+): Promise<string> {
+  const exists = await pathExists(vfs, baseAliasPath);
+  if (!exists) {
+    return baseAliasPath;
+  }
+
+  const existing = await readVfsContent(vfs, baseAliasPath);
+  return existing === undefined || existing !== content ? collisionAliasPath : baseAliasPath;
+}
+
+async function readVfsContent(vfs: VfsLike, path: string): Promise<string | undefined> {
+  if (typeof vfs.readFile === 'function') {
+    try {
+      const value = await vfs.readFile(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.read === 'function') {
+    try {
+      const value = await vfs.read(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.get === 'function') {
+    try {
+      const value = await vfs.get(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
 }

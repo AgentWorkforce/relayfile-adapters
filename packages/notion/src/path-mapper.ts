@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { NOTION_PATH_ROOT } from './types.js';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 /**
  * Canonical Notion filenames use `<slug>__<id>.<ext>` when a human-readable
@@ -237,6 +238,29 @@ export function notionDatabasePagesCollectionPath(databaseId: string, databaseTi
 
 export function notionDatabasePagesIndexPath(databaseId: string, databaseTitle?: string): string {
   return `${notionDatabasePagesCollectionPath(databaseId, databaseTitle)}/_index.json`;
+}
+
+export function notionStandalonePagesCollectionPath(): string {
+  return `${NOTION_PATH_ROOT}/pages`;
+}
+
+export function notionByTitleAliasPath(
+  parentScope: string,
+  title: string,
+  id: string,
+  colliding = false,
+): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    throw new Error('Notion alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  return `${parentScope}/by-title/${assertSegment(filename, 'alias title')}.json`;
+}
+
+export function notionByIdAliasPath(parentScope: string, id: string): string {
+  return `${parentScope}/by-id/${assertSegment(idSuffix(id), 'alias id')}.json`;
 }
 
 export function notionDiscoveryManifestPath(): string {

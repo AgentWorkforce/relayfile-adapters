@@ -3,6 +3,9 @@ export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile
 
 import {
   computeLinearPath,
+  LINEAR_PATH_ROOT,
+  linearByIdAliasPath,
+  linearByTitleAliasPath,
   linearCyclePath,
   linearIssuePath,
   linearMilestonePath,
@@ -173,6 +176,8 @@ export class LinearAdapter extends IntegrationAdapter {
         normalized.objectId,
         readPathHumanReadable(normalized.objectType, normalized.payload),
       );
+      const content = this.renderContent(workspaceId, normalized, false);
+      const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
 
       if (this.isRemoveEvent(normalized)) {
         if (this.client.deleteFile) {
@@ -192,7 +197,7 @@ export class LinearAdapter extends IntegrationAdapter {
           path,
           content: this.renderContent(workspaceId, normalized, true),
           contentType: JSON_CONTENT_TYPE,
-          semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+          semantics,
         });
 
         const counts = inferWriteCounts(normalized, deleteResult, true);
@@ -209,10 +214,11 @@ export class LinearAdapter extends IntegrationAdapter {
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, false),
+        content,
         contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+        semantics,
       });
+      await writeLinearAliases(this.client, workspaceId, normalized, path, content, semantics);
 
       const counts = inferWriteCounts(normalized, writeResult, false);
       const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, false);
@@ -1069,6 +1075,127 @@ function sortStrings(values: Set<string>): string[] {
 
 function stableJson(value: unknown): string {
   return `${JSON.stringify(sortJson(value), null, 2)}\n`;
+}
+
+interface LinearIndexRow {
+  file: string;
+  title: string;
+}
+
+async function writeLinearAliases(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  event: NormalizedWebhook,
+  canonicalPath: string,
+  content: string,
+  semantics: FileSemantics,
+): Promise<void> {
+  // duplicate write — the adapter only has a file-write interface, so aliases store the canonical bytes verbatim.
+  const normalizedType = normalizeLinearObjectType(event.objectType);
+  if (normalizedType !== 'issue' && normalizedType !== 'project') {
+    return;
+  }
+
+  const scope = normalizedType === 'issue' ? `${LINEAR_PATH_ROOT}/issues` : `${LINEAR_PATH_ROOT}/projects`;
+  const title = normalizedType === 'issue' ? asString(event.payload.title) : asString(event.payload.name);
+  const byId = normalizedType === 'issue'
+    ? asString(event.payload.identifier) ?? event.objectId
+    : event.objectId;
+
+  await writeLinearIndex(client, workspaceId, scope);
+  await writeLinearFile(client, workspaceId, linearByIdAliasPath(scope, byId), content, semantics);
+
+  if (!title) {
+    return;
+  }
+
+  const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
+  const existingBaseContent = await readLinearFile(client, baseAliasPath);
+  const aliasPath =
+    existingBaseContent !== undefined && existingBaseContent !== content
+      ? linearByTitleAliasPath(scope, title, event.objectId, true)
+      : baseAliasPath;
+
+  // TODO(issue #106): remove stale by-title aliases when a record title changes on re-ingest; this wave only writes the current alias.
+  await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
+}
+
+async function writeLinearIndex(client: RelayFileClientLike, workspaceId: string, scope: string): Promise<void> {
+  const indexPath = `${scope}/_index.json`;
+  const rows = mergeLinearIndexRows(await readLinearFile(client, indexPath), [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ]);
+  await writeLinearFile(
+    client,
+    workspaceId,
+    indexPath,
+    stableJson({ rows }),
+    undefined,
+  );
+}
+
+function mergeLinearIndexRows(existingContent: string | undefined, requiredRows: LinearIndexRow[]): LinearIndexRow[] {
+  const rows = new Map<string, LinearIndexRow>();
+
+  for (const row of parseLinearIndexRows(existingContent)) {
+    rows.set(row.file, row);
+  }
+
+  for (const row of requiredRows) {
+    rows.set(row.file, row);
+  }
+
+  return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function parseLinearIndexRows(existingContent: string | undefined): LinearIndexRow[] {
+  if (!existingContent) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<LinearIndexRow>> };
+    return Array.isArray(parsed.rows)
+      ? parsed.rows.filter((row): row is LinearIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeLinearFile(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  path: string,
+  content: string,
+  semantics?: FileSemantics,
+): Promise<void> {
+  await client.writeFile({
+    workspaceId,
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+    ...(semantics ? { semantics } : {}),
+  });
+}
+
+async function readLinearFile(client: RelayFileClientLike, path: string): Promise<string | undefined> {
+  const reader = (client as unknown as Record<string, unknown>).readFile;
+  if (typeof reader !== 'function') {
+    return undefined;
+  }
+
+  try {
+    const value = await reader.call(client, path);
+    return typeof value === 'string'
+      ? value
+      : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
+        ? value.content
+        : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function sortJson(value: unknown): unknown {

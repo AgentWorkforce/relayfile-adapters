@@ -2,6 +2,7 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
 import {
   buildRepoIndexFile,
@@ -96,12 +97,14 @@ export async function ingestPullRequest(
 
   if (parsedPullRequest) {
     metaPath = buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json', parsedPullRequest.title);
+    const metaContent = serializeJson(parsedPullRequest);
     await writeTrackedFile(
       vfs,
       metaPath,
-      serializeJson(parsedPullRequest),
+      metaContent,
       result,
     );
+    await writePullRequestAliases(vfs, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest.title, metaContent);
   }
 
   let mappedFiles: PullRequestFileMapping[] = [];
@@ -336,7 +339,7 @@ async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise
   await writer.call(vfs, path, content);
 }
 
-function serializeJson(value: PullRequestMetadata): string {
+function serializeJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
@@ -380,4 +383,125 @@ async function writeTrackedFile(
       error: formatError(error),
     });
   }
+}
+
+interface GitHubIndexRow {
+  file: string;
+  title: string;
+}
+
+async function writePullRequestAliases(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  number: number,
+  title: string,
+  content: string,
+): Promise<void> {
+  // duplicate write — the VFS interface only supports file writes, so aliases store the canonical bytes verbatim.
+  if (!owner || !repo) {
+    return;
+  }
+
+  const scope = `/github/repos/${encodeURIComponent(owner)}__${encodeURIComponent(repo)}/pulls`;
+  await writeGitHubIndex(vfs, scope);
+  await runVfsWrite(vfs, githubByIdAliasPath(owner, repo, 'pulls', number), content);
+
+  if (!title.trim()) {
+    return;
+  }
+
+  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'pulls', title, number);
+  const aliasPath = await resolveAliasPath(
+    vfs,
+    baseAliasPath,
+    githubByTitleAliasPath(owner, repo, 'pulls', title, number, true),
+    content,
+  );
+  // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.
+  await runVfsWrite(vfs, aliasPath, content);
+}
+
+async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
+  const indexPath = `${scope}/_index.json`;
+  const rows = mergeGitHubIndexRows(await readVfsContent(vfs, indexPath), [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ]);
+  await runVfsWrite(vfs, indexPath, `${JSON.stringify({ rows }, null, 2)}\n`);
+}
+
+function mergeGitHubIndexRows(existingContent: string | undefined, requiredRows: GitHubIndexRow[]): GitHubIndexRow[] {
+  const rows = new Map<string, GitHubIndexRow>();
+
+  for (const row of parseGitHubIndexRows(existingContent)) {
+    rows.set(row.file, row);
+  }
+
+  for (const row of requiredRows) {
+    rows.set(row.file, row);
+  }
+
+  return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
+}
+
+function parseGitHubIndexRows(existingContent: string | undefined): GitHubIndexRow[] {
+  if (!existingContent) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<GitHubIndexRow>> };
+    return Array.isArray(parsed.rows)
+      ? parsed.rows.filter((row): row is GitHubIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function resolveAliasPath(
+  vfs: VfsLike,
+  baseAliasPath: string,
+  collisionAliasPath: string,
+  content: string,
+): Promise<string> {
+  const exists = await pathExists(vfs, baseAliasPath);
+  if (!exists) {
+    return baseAliasPath;
+  }
+
+  const existing = await readVfsContent(vfs, baseAliasPath);
+  return existing === undefined || existing !== content ? collisionAliasPath : baseAliasPath;
+}
+
+async function readVfsContent(vfs: VfsLike, path: string): Promise<string | undefined> {
+  if (typeof vfs.readFile === 'function') {
+    try {
+      const value = await vfs.readFile(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.read === 'function') {
+    try {
+      const value = await vfs.read(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (typeof vfs.get === 'function') {
+    try {
+      const value = await vfs.get(path);
+      return typeof value === 'string' ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
 }

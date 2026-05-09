@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 export const LINEAR_PATH_ROOT = '/linear';
 
@@ -240,7 +241,26 @@ export function linearRoadmapPath(roadmapId: string): string {
   return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
 }
 
+<<<<<<< HEAD
 export function computeLinearPath(objectType: string, objectId: string, humanReadable?: string): string {
+=======
+export function linearByTitleAliasPath(scope: string, title: string, id: string, colliding = false): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    // TODO(issue #106): define empty-slug fallback/skip behavior for emoji-only or punctuation-only Linear titles instead of throwing.
+    throw new Error('Linear alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  return `${scope}/by-title/${encodeLinearPathSegment(filename)}.json`;
+}
+
+export function linearByIdAliasPath(scope: string, identifier: string): string {
+  return `${scope}/by-id/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function computeLinearPath(objectType: string, objectId: string, title?: string): string {
+>>>>>>> e19ffb6 (fix: align adapter alias slug contract)
   const normalizedType = normalizeLinearObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');
 

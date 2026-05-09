@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 export const GITHUB_PATH_ROOT = '/github';
 const GITHUB_ROOT = '/github/repos';
@@ -178,6 +179,37 @@ export function githubCheckRunPath(owner: string, repo: string, checkRunId: numb
 
 export function githubCommitPath(owner: string, repo: string, sha: string): string {
   return `${githubRepoPrefix(owner, repo)}/commits/${sha}/metadata.json`;
+}
+
+export function githubAliasRepoPrefix(owner: string, repo: string): string {
+  return `${GITHUB_ROOT}/${encodeRepoSegment(`${owner}__${repo}`)}`;
+}
+
+export function githubByTitleAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  title: string,
+  number: number | string,
+  colliding = false,
+): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    // TODO(issue #106): define empty-slug fallback/skip behavior for emoji-only or punctuation-only GitHub titles instead of throwing.
+    throw new Error('GitHub alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(String(number))}` : slug;
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-title/${encodeGitHubPathSegment(filename)}.json`;
+}
+
+export function githubByIdAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-id/${encodeGitHubPathSegment(String(number))}.json`;
 }
 
 const OBJECT_TYPE_ALIASES: Record<string, string> = {
