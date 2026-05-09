@@ -1,4 +1,5 @@
 import type { ConnectionProvider } from '@relayfile/sdk';
+import { upsertIndexAtomic, type AtomicUpsertOptions, type VfsLike } from '@relayfile/adapter-core';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 import {
@@ -80,6 +81,12 @@ export interface WriteFileInput {
   content: string;
   contentType?: string;
   semantics?: FileSemantics;
+  /**
+   * Optional optimistic-concurrency token forwarded to revision-aware
+   * backends (e.g. relayfile-client). Backends that ignore the field
+   * fall through to plain last-write-wins semantics.
+   */
+  baseRevision?: string;
 }
 
 export interface WriteFileResult {
@@ -1240,25 +1247,87 @@ async function writeLinearAliases(
   await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
 }
 
-async function writeLinearIndex(client: RelayFileClientLike, workspaceId: string, scope: string): Promise<void> {
+async function writeLinearIndex(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  scope: string,
+  options?: AtomicUpsertOptions,
+): Promise<void> {
   const indexPath = `${scope}/_index.json`;
-  const rows = mergeLinearIndexRows(await readLinearFile(client, indexPath), [
-    { title: 'by-id', file: 'by-id/' },
-    { title: 'by-title', file: 'by-title/' },
-  ]);
-  await writeLinearFile(
-    client,
-    workspaceId,
+  const vfs = linearClientToVfs(client, workspaceId);
+
+  await upsertIndexAtomic<LinearIndexRow>(
+    vfs,
     indexPath,
-    stableJson({ rows }),
-    undefined,
+    parseLinearIndexRows,
+    (rows) =>
+      mergeLinearIndexRowsList(rows, [
+        { title: 'by-id', file: 'by-id/' },
+        { title: 'by-title', file: 'by-title/' },
+      ]),
+    (rows) => stableJson({ rows }),
+    options,
   );
 }
 
-function mergeLinearIndexRows(existingContent: string | undefined, requiredRows: LinearIndexRow[]): LinearIndexRow[] {
+/**
+ * Wrap the linear `RelayFileClientLike` (single-input WriteFileInput shape)
+ * in the duck-typed `VfsLike` contract the atomic-index helper consumes.
+ *
+ * The helper invokes `writeFile(path, content, { baseRevision })`; we
+ * translate that into the linear-style `writeFile({ workspaceId, path,
+ * content, baseRevision, ... })`. Reading a missing file currently surfaces
+ * as `undefined` from the underlying `readLinearFile`; we represent that
+ * to the helper as a fresh-revision read.
+ */
+function linearClientToVfs(client: RelayFileClientLike, workspaceId: string): VfsLike {
+  return {
+    async readFile(path: string): Promise<{ content: string; revision: string } | undefined> {
+      const reader = (client as unknown as Record<string, unknown>).readFile;
+      if (typeof reader !== 'function') {
+        return undefined;
+      }
+      try {
+        const value = await reader.call(client, path);
+        if (typeof value === 'string') {
+          return { content: value, revision: '0' };
+        }
+        if (value && typeof value === 'object') {
+          const record = value as { content?: unknown; revision?: unknown };
+          if (typeof record.content !== 'string') {
+            return undefined;
+          }
+          const revision = typeof record.revision === 'string' ? record.revision : '0';
+          return { content: record.content, revision };
+        }
+        return undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    async writeFile(
+      path: string,
+      content: string,
+      writeOptions?: { baseRevision?: string },
+    ): Promise<unknown> {
+      const input: WriteFileInput = {
+        workspaceId,
+        path,
+        content,
+        contentType: JSON_CONTENT_TYPE,
+      };
+      if (writeOptions?.baseRevision !== undefined) {
+        input.baseRevision = writeOptions.baseRevision;
+      }
+      return client.writeFile(input);
+    },
+  };
+}
+
+function mergeLinearIndexRowsList(existingRows: LinearIndexRow[], requiredRows: LinearIndexRow[]): LinearIndexRow[] {
   const rows = new Map<string, LinearIndexRow>();
 
-  for (const row of parseLinearIndexRows(existingContent)) {
+  for (const row of existingRows) {
     rows.set(row.file, row);
   }
 

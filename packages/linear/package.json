@@ -34,7 +34,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "build": "tsc",
+    "build": "npm run build --workspace @relayfile/adapter-core && tsc",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -56,6 +56,9 @@
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
+  },
+  "dependencies": {
+    "@relayfile/adapter-core": "^0.2.0"
   },
   "devDependencies": {
     "@agent-relay/sdk": "^6.0.7",
