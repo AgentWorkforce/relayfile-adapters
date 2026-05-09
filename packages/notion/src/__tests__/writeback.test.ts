@@ -49,6 +49,23 @@ describe('writeback rule matching', () => {
     });
   });
 
+  it('maps the canonical <slug>__<32hex> form emitted by the notion path-mapper to PATCH', () => {
+    // Pins #49: notion path-mapper now emits `<slug>__<id>` rather than the
+    // legacy `<slug>--<id>`. classifyWrite + extractNotionId must accept
+    // both forms so canonical paths PATCH instead of misclassifying as create.
+    const request = resolveWritebackRequest(
+      '/notion/databases/db-1/pages/release-notes__00000000000000000000000000000001.json',
+      JSON.stringify({
+        properties: {
+          Name: { id: 'title', type: 'title', value: 'Renamed' },
+        },
+      }),
+    );
+    assert.strictEqual(request.action, 'update_page_properties');
+    assert.strictEqual(request.method, 'PATCH');
+    assert.strictEqual(request.endpoint, '/v1/pages/00000000-0000-0000-0000-000000000001');
+  });
+
   it('maps markdown and comments writeback paths', () => {
     const markdown = resolveWritebackRequest('/notion/pages/page-1/content.md', '# Updated');
     const comment = resolveWritebackRequest('/notion/pages/page-1/comments.json', '"Looks good"');

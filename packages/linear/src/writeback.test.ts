@@ -103,6 +103,20 @@ describe('linear writeback', () => {
       });
     });
 
+    it('builds an issueUpdate mutation for the canonical __ separator emitted by path-mapper', () => {
+      // Pins the merged convention from #49: nameWithId now emits
+      // `<basename>__<id>` rather than the legacy `<slug>--<id>`. classifyWrite
+      // and extractLinearId must treat the underscore form as canonical.
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor__${PAGE_HEX}.json`,
+        JSON.stringify({ title: 'New title' }),
+      );
+      assert.strictEqual(req.action, 'update_issue');
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, { title: 'New title' });
+    });
+
     it('rejects read-only fields instead of silently stripping them', () => {
       assert.throws(
         () =>
