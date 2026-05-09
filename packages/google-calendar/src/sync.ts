@@ -23,20 +23,49 @@ export async function listGoogleCalendarEventChanges(
   const events: GoogleCalendarEvent[] = [];
   let pageToken: string | undefined;
   let nextSyncToken = checkpoint.syncToken;
+  let syncTokenReset = false;
+  let effectiveCheckpoint = checkpoint;
 
   do {
-    const page = await fetchGoogleCalendarSyncPage(provider, checkpoint, config, pageToken);
+    const page = await fetchGoogleCalendarSyncPage(provider, effectiveCheckpoint, config, pageToken);
     events.push(...page.events);
     pageToken = page.nextPageToken;
+    if (page.syncTokenReset) {
+      syncTokenReset = true;
+      effectiveCheckpoint = {};
+      nextSyncToken = page.nextSyncToken;
+    }
     if (page.nextSyncToken) {
       nextSyncToken = page.nextSyncToken;
     }
   } while (pageToken);
 
-  return nextSyncToken ? { events, nextSyncToken } : { events };
+  return {
+    events,
+    ...(nextSyncToken ? { nextSyncToken } : {}),
+    ...(syncTokenReset ? { syncTokenReset } : {}),
+  };
 }
 
 export async function fetchGoogleCalendarSyncPage(
+  provider: ConnectionProvider,
+  checkpoint: GoogleCalendarSyncCheckpoint = {},
+  config: GoogleCalendarAdapterConfig = {},
+  pageToken?: string,
+): Promise<GoogleCalendarSyncPage> {
+  try {
+    return await fetchGoogleCalendarSyncPageOnce(provider, checkpoint, config, pageToken);
+  } catch (error) {
+    if (!checkpoint.syncToken || pageToken || !isExpiredSyncTokenError(error)) {
+      throw error;
+    }
+
+    const resetPage = await fetchGoogleCalendarSyncPageOnce(provider, {}, config);
+    return { ...resetPage, syncTokenReset: true };
+  }
+}
+
+async function fetchGoogleCalendarSyncPageOnce(
   provider: ConnectionProvider,
   checkpoint: GoogleCalendarSyncCheckpoint = {},
   config: GoogleCalendarAdapterConfig = {},
@@ -70,6 +99,9 @@ export async function fetchGoogleCalendarSyncPage(
     connectionId,
     query: Object.fromEntries(params.entries()),
   });
+  if (response.status === 410) {
+    throw Object.assign(new Error('Google Calendar sync token expired'), { status: 410 });
+  }
   const data = response.data ?? {};
 
   return {
@@ -77,6 +109,12 @@ export async function fetchGoogleCalendarSyncPage(
     ...(data.nextPageToken ? { nextPageToken: data.nextPageToken } : {}),
     ...(data.nextSyncToken ? { nextSyncToken: data.nextSyncToken } : {}),
   };
+}
+
+function isExpiredSyncTokenError(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+  const status = error.status ?? error.statusCode ?? error.code;
+  return status === 410 || status === '410' || status === 'GONE';
 }
 
 export async function ingestGoogleCalendarEvents(
@@ -100,8 +138,9 @@ export async function ingestGoogleCalendarEvents(
   };
 
   for (const event of events) {
-    const path = computeGoogleCalendarPath('event', event.id, event.calendarId ?? config.calendarId);
+    let path = '/google-calendar/calendars/unknown/events/unknown.json';
     try {
+      path = computeGoogleCalendarPath('event', event.id, event.calendarId ?? config.calendarId);
       if (event.status === 'cancelled' || event.deleted) {
         if (client.deleteFile) {
           await client.deleteFile({ workspaceId, path });
@@ -165,9 +204,23 @@ function applyWriteCounts(
   result: { filesWritten: number; filesUpdated: number },
   writeResult: WriteFileResult | void,
 ): void {
+  if (!writeResult) {
+    return;
+  }
   if (writeResult?.created || writeResult?.status === 'created') {
     result.filesWritten += 1;
     return;
   }
-  result.filesUpdated += 1;
+  if (
+    writeResult.updated ||
+    writeResult.status === 'updated' ||
+    writeResult.status === 'queued' ||
+    writeResult.status === 'pending'
+  ) {
+    result.filesUpdated += 1;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

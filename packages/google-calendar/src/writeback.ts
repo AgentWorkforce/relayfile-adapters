@@ -8,18 +8,16 @@ import {
 export function resolveGoogleCalendarWritebackRequest(path: string, content: string): GoogleCalendarWritebackRequest {
   const normalizedPath = normalizePath(path);
 
-  const createMatch = normalizedPath.match(/^\/google-calendar\/calendars\/([^/]+)\/events\/new\.json$/u);
-  if (createMatch?.[1]) {
-    return buildCreateEvent(extractGoogleCalendarIdFromPathSegment(createMatch[1]), content);
-  }
-
   const updateMatch = normalizedPath.match(/^\/google-calendar\/calendars\/([^/]+)\/events\/([^/]+)\.json$/u);
   if (updateMatch?.[1] && updateMatch[2]) {
-    return buildUpdateEvent(
-      extractGoogleCalendarIdFromPathSegment(updateMatch[1]),
-      extractGoogleCalendarIdFromPathSegment(updateMatch[2]),
-      content,
-    );
+    const calendarId = extractGoogleCalendarIdFromPathSegment(updateMatch[1]);
+    const eventId = extractGoogleCalendarIdFromPathSegment(updateMatch[2]);
+    const parsed = parsePayload(content);
+    const eventPayload = isRecord(parsed.payload) ? parsed.payload : parsed;
+    if (shouldCreateEvent(eventId, parsed, eventPayload)) {
+      return buildCreateEvent(calendarId, eventPayload);
+    }
+    return buildUpdateEvent(calendarId, eventId, eventPayload);
   }
 
   const deleteMatch = normalizedPath.match(/^\/google-calendar\/calendars\/([^/]+)\/events\/([^/]+)\/delete\.json$/u);
@@ -33,8 +31,7 @@ export function resolveGoogleCalendarWritebackRequest(path: string, content: str
   throw new Error(`No Google Calendar writeback rule matched ${path}`);
 }
 
-function buildCreateEvent(calendarId: string, content: string): GoogleCalendarWritebackRequest {
-  const payload = parsePayload(content);
+function buildCreateEvent(calendarId: string, payload: Record<string, unknown>): GoogleCalendarWritebackRequest {
   const body = pickAllowed(payload, [
     'summary',
     'description',
@@ -43,21 +40,23 @@ function buildCreateEvent(calendarId: string, content: string): GoogleCalendarWr
     'end',
     'attendees',
     'status',
+    'recurrence',
+    'reminders',
     'conferenceData',
   ]);
   if (!body.start || !body.end) {
-    throw new Error('events/new.json writeback requires `start` and `end`');
+    throw new Error('event create writeback requires `start` and `end`');
   }
   return {
     action: 'create_event',
     method: 'POST',
     endpoint: `/calendar/v3/calendars/${encodeURIComponent(calendarId || GOOGLE_CALENDAR_DEFAULT_CALENDAR_ID)}/events`,
     body,
+    ...(body.conferenceData ? { query: { conferenceDataVersion: '1' } } : {}),
   };
 }
 
-function buildUpdateEvent(calendarId: string, eventId: string, content: string): GoogleCalendarWritebackRequest {
-  const payload = parsePayload(content);
+function buildUpdateEvent(calendarId: string, eventId: string, payload: Record<string, unknown>): GoogleCalendarWritebackRequest {
   const body = pickAllowed(payload, [
     'summary',
     'description',
@@ -66,6 +65,8 @@ function buildUpdateEvent(calendarId: string, eventId: string, content: string):
     'end',
     'attendees',
     'status',
+    'recurrence',
+    'reminders',
     'conferenceData',
   ]);
   if (Object.keys(body).length === 0) {
@@ -73,9 +74,10 @@ function buildUpdateEvent(calendarId: string, eventId: string, content: string):
   }
   return {
     action: 'update_event',
-    method: 'PUT',
+    method: 'PATCH',
     endpoint: `/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
     body,
+    ...(body.conferenceData ? { query: { conferenceDataVersion: '1' } } : {}),
   };
 }
 
@@ -101,7 +103,23 @@ function parsePayload(content: string): Record<string, unknown> {
   if (!isRecord(parsed)) {
     throw new Error('Expected JSON object payload');
   }
-  return isRecord(parsed.payload) ? parsed.payload : parsed;
+  return parsed;
+}
+
+function shouldCreateEvent(
+  pathEventId: string,
+  rawPayload: Record<string, unknown>,
+  eventPayload: Record<string, unknown>,
+): boolean {
+  const payloadId = readString(eventPayload.id) ?? readString(rawPayload.objectId);
+  if (payloadId && payloadId === pathEventId) return false;
+  return Boolean(
+    eventPayload.start &&
+      eventPayload.end &&
+      !rawPayload.provider &&
+      !payloadId &&
+      !looksCanonicalGoogleEventId(pathEventId),
+  );
 }
 
 function safeParseJson(content: string): JsonValue | string {
@@ -123,5 +141,13 @@ function pickAllowed(source: Record<string, unknown>, keys: string[]): Record<st
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function looksCanonicalGoogleEventId(value: string): boolean {
+  return /^[a-v0-9]{5,1024}$/u.test(value);
 }

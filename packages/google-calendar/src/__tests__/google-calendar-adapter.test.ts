@@ -6,6 +6,9 @@ import {
   computeGoogleCalendarPath,
   googleCalendarCalendarPath,
   googleCalendarEventPath,
+  googleCalendarWritebackResources,
+  ingestGoogleCalendarEvents,
+  listGoogleCalendarEventChanges,
   normalizeGoogleCalendarWebhook,
   registerGoogleCalendarWatch,
   renewGoogleCalendarWatch,
@@ -92,6 +95,42 @@ test('webhook normalizer marks exists notifications as sync-worthy', () => {
   assert.equal(normalized.shouldSync, true);
 });
 
+test('webhook normalizer reads Nango forwarded Google Calendar headers', () => {
+  const normalized = normalizeGoogleCalendarWebhook({
+    from: 'google-calendar',
+    providerConfigKey: 'google-calendar',
+    type: 'forward',
+    connectionId: 'conn_nango_1',
+    payload: {
+      'x-goog-resource-state': 'exists',
+      'x-goog-resource-uri': 'https://www.googleapis.com/calendar/v3/calendars/user%40example.com/events?alt=json',
+      'x-goog-channel-id': 'channel_1',
+      'x-goog-message-number': '10',
+    },
+  }, {});
+
+  assert.equal(normalized.connectionId, 'conn_nango_1');
+  assert.equal(normalized.providerConfigKey, 'google-calendar');
+  assert.equal(normalized.eventType, 'calendar.exists');
+  assert.equal(normalized.objectId, 'user@example.com');
+  assert.equal(normalized.shouldSync, true);
+});
+
+test('webhook normalizer treats sync and not_exists states as reconciliation signals', () => {
+  const syncEvent = normalizeGoogleCalendarWebhook({}, {
+    'x-goog-resource-state': 'sync',
+    'x-goog-resource-uri': 'https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json',
+  });
+  const deletedEvent = normalizeGoogleCalendarWebhook({}, {
+    'x-goog-resource-state': 'not_exists',
+    'x-goog-resource-uri': 'https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json',
+  });
+
+  assert.equal(syncEvent.shouldSync, true);
+  assert.equal(syncEvent.objectType, 'calendar');
+  assert.equal(deletedEvent.shouldSync, true);
+});
+
 test('sync ingests incremental events into relayfile paths', async () => {
   const writes: WriteFileInput[] = [];
   const adapter = createAdapter({}, writes);
@@ -104,9 +143,71 @@ test('sync ingests incremental events into relayfile paths', async () => {
   assert.equal(writes[0]?.semantics?.properties?.['google_calendar.organizer_email'], 'team@example.com');
 });
 
+test('event ingestion contains malformed paths and does not overcount void writes', async () => {
+  const writes: WriteFileInput[] = [];
+  const client: RelayFileClientLike = {
+    async writeFile(input) {
+      writes.push(input);
+      return undefined;
+    },
+  };
+
+  const result = await ingestGoogleCalendarEvents(client, 'ws_1', [
+    {
+      id: 'evt_1',
+      summary: 'Valid',
+      start: { dateTime: '2026-05-07T09:00:00Z' },
+      end: { dateTime: '2026-05-07T09:15:00Z' },
+    },
+    {
+      id: '',
+      summary: 'Malformed',
+    },
+  ]);
+
+  assert.equal(result.filesWritten, 0);
+  assert.equal(result.filesUpdated, 0);
+  assert.equal(writes.length, 1);
+  assert.deepEqual(result.paths, ['/google-calendar/calendars/primary/events/evt_1.json']);
+  assert.equal(result.errors.length, 1);
+});
+
+test('sync resets expired Google Calendar sync tokens and retries full window', async () => {
+  const requests: ProxyRequest[] = [];
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+      requests.push(request);
+      if (requests.length === 1) {
+        throw Object.assign(new Error('Gone'), { status: 410 });
+      }
+      return {
+        status: 200,
+        headers: {},
+        data: {
+          items: [{ id: 'evt_2', summary: 'Recovered' }],
+          nextSyncToken: 'sync_after_reset',
+        } as T,
+      };
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+
+  const result = await listGoogleCalendarEventChanges(provider, { syncToken: 'expired' });
+
+  assert.equal(result.syncTokenReset, true);
+  assert.equal(result.nextSyncToken, 'sync_after_reset');
+  assert.equal(result.events[0]?.id, 'evt_2');
+  assert.equal(requests[0]?.query?.syncToken, 'expired');
+  assert.equal(requests[1]?.query?.syncToken, undefined);
+  assert.ok(requests[1]?.query?.timeMin);
+});
+
 test('writeback resolves create, update, and delete event routes', () => {
   assert.deepEqual(resolveGoogleCalendarWritebackRequest(
-    '/google-calendar/calendars/primary/events/new.json',
+    '/google-calendar/calendars/primary/events/draft-event.json',
     JSON.stringify({ summary: 'Launch review', start: { dateTime: '2026-05-08T10:00:00Z' }, end: { dateTime: '2026-05-08T10:30:00Z' } }),
   ), {
     action: 'create_event',
@@ -124,9 +225,32 @@ test('writeback resolves create, update, and delete event routes', () => {
     JSON.stringify({ summary: 'Updated summary' }),
   ), {
     action: 'update_event',
-    method: 'PUT',
+    method: 'PATCH',
     endpoint: '/calendar/v3/calendars/primary/events/evt_1',
     body: { summary: 'Updated summary' },
+  });
+
+  assert.deepEqual(resolveGoogleCalendarWritebackRequest(
+    '/google-calendar/calendars/primary/events/evt_1.json',
+    JSON.stringify({
+      provider: 'google-calendar',
+      objectType: 'event',
+      objectId: 'evt_1',
+      payload: {
+        summary: 'Updated time',
+        start: { dateTime: '2026-05-08T11:00:00Z' },
+        end: { dateTime: '2026-05-08T11:30:00Z' },
+      },
+    }),
+  ), {
+    action: 'update_event',
+    method: 'PATCH',
+    endpoint: '/calendar/v3/calendars/primary/events/evt_1',
+    body: {
+      summary: 'Updated time',
+      start: { dateTime: '2026-05-08T11:00:00Z' },
+      end: { dateTime: '2026-05-08T11:30:00Z' },
+    },
   });
 
   assert.deepEqual(resolveGoogleCalendarWritebackRequest(
@@ -156,14 +280,32 @@ test('watch helpers register, renew, and stop channels via provider proxy', asyn
     },
   };
 
-  const created = await registerGoogleCalendarWatch(provider, { webhookUrl: 'https://example.com/webhook' });
+  const created = await registerGoogleCalendarWatch(provider, {
+    webhookUrl: 'https://example.com/webhook',
+    connectionId: 'conn_google_1',
+  });
+  assert.equal(created.googleCalendarConnectionId, 'conn_google_1');
   assert.equal(created.googleCalendarResourceId, 'resource_1');
   assert.equal(requests[0]?.method, 'POST');
+  assert.equal(requests[0]?.connectionId, 'conn_google_1');
 
-  const renewed = await renewGoogleCalendarWatch(provider, created, { webhookUrl: 'https://example.com/webhook' });
+  const renewed = await renewGoogleCalendarWatch(provider, created, {
+    webhookUrl: 'https://example.com/webhook',
+    connectionId: 'conn_google_1',
+  });
   assert.equal(renewed.googleCalendarResourceId, 'resource_1');
 
   await stopGoogleCalendarWatch(provider, renewed);
   assert.equal(requests.at(-1)?.baseUrl, 'https://www.googleapis.com');
   assert.equal(requests.at(-1)?.endpoint, '/calendar/v3/channels/stop');
+  assert.equal(requests.at(-1)?.connectionId, 'conn_google_1');
+});
+
+test('resource discovery describes Google Calendar event writeback metadata', () => {
+  const [events] = googleCalendarWritebackResources;
+  assert.equal(events?.name, 'events');
+  assert.equal(events?.schemaPath, 'discovery/events.schema.json');
+  assert.equal(events?.createExamplePath, 'discovery/events.create.example.json');
+  assert.equal(events?.idPattern, '^[a-v0-9]{5,1024}$');
+  assert.deepEqual(events?.operations.map((operation) => operation.method), ['POST', 'PATCH', 'DELETE']);
 });

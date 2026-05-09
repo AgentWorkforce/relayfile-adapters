@@ -96,6 +96,7 @@ export interface GoogleCalendarSyncPage {
   events: GoogleCalendarEvent[];
   nextPageToken?: string;
   nextSyncToken?: string;
+  syncTokenReset?: boolean;
 }
 
 export interface GoogleCalendarSyncResult {
@@ -105,14 +106,17 @@ export interface GoogleCalendarSyncResult {
   paths: string[];
   errors: Array<{ path: string; error: string }>;
   syncToken?: string | undefined;
+  syncTokenReset?: boolean | undefined;
 }
 
 export interface GoogleCalendarIncrementalSyncResult {
   events: GoogleCalendarEvent[];
   nextSyncToken?: string | undefined;
+  syncTokenReset?: boolean | undefined;
 }
 
 export interface GoogleCalendarWatchChannelMetadata {
+  googleCalendarConnectionId?: string | undefined;
   googleCalendarChannelId?: string | undefined;
   googleCalendarResourceId?: string | undefined;
   googleCalendarChannelExpiration?: string | undefined;
@@ -123,6 +127,7 @@ export interface GoogleCalendarWatchRequest {
   type: 'webhook';
   address: string;
   expiration: string;
+  token?: string;
 }
 
 export interface GoogleCalendarWatchResponse {
@@ -161,9 +166,10 @@ export interface GoogleCalendarNormalizedWebhook {
 
 export interface GoogleCalendarWritebackRequest {
   action: 'create_event' | 'update_event' | 'delete_event';
-  method: 'POST' | 'PUT' | 'DELETE';
+  method: 'POST' | 'PATCH' | 'DELETE';
   endpoint: string;
   body?: Record<string, unknown>;
+  query?: Record<string, string>;
 }
 
 export interface FileSemantics {

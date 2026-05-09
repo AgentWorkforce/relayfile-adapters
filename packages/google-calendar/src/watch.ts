@@ -14,11 +14,14 @@ export async function registerGoogleCalendarWatch(
   provider: ConnectionProvider,
   options: {
     webhookUrl: string;
+    connectionId?: string;
     calendarId?: string;
     apiBaseUrl?: string;
     expirationMs?: number;
+    token?: string;
   },
 ): Promise<GoogleCalendarWatchChannelMetadata> {
+  const connectionId = resolveConnectionId(provider, options.connectionId);
   const calendarId = options.calendarId ?? 'primary';
   const channelId = randomUUID();
   const expiration = String(Date.now() + (options.expirationMs ?? GOOGLE_CALENDAR_WATCH_RENEWAL_WINDOW_MS));
@@ -27,6 +30,7 @@ export async function registerGoogleCalendarWatch(
     type: 'webhook',
     address: options.webhookUrl,
     expiration,
+    ...(options.token ? { token: options.token } : {}),
   };
 
   const baseUrl = options.apiBaseUrl ?? GOOGLE_CALENDAR_DEFAULT_BASE_URL;
@@ -34,11 +38,12 @@ export async function registerGoogleCalendarWatch(
     method: 'POST',
     baseUrl,
     endpoint: `/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
-    connectionId: calendarId,
+    connectionId,
     body,
   });
 
   return {
+    googleCalendarConnectionId: connectionId,
     googleCalendarChannelId: channelId,
     ...(response.data?.resourceId ? { googleCalendarResourceId: response.data.resourceId } : {}),
     googleCalendarChannelExpiration: response.data?.expiration ?? expiration,
@@ -48,11 +53,12 @@ export async function registerGoogleCalendarWatch(
 export async function stopGoogleCalendarWatch(
   provider: ConnectionProvider,
   metadata: GoogleCalendarWatchChannelMetadata,
-  options: { apiBaseUrl?: string } = {},
+  options: { apiBaseUrl?: string; connectionId?: string } = {},
 ): Promise<void> {
   if (!metadata.googleCalendarChannelId || !metadata.googleCalendarResourceId) {
     return;
   }
+  const connectionId = resolveConnectionId(provider, options.connectionId ?? metadata.googleCalendarConnectionId);
 
   const body: GoogleCalendarChannelStopRequest = {
     id: metadata.googleCalendarChannelId,
@@ -63,7 +69,7 @@ export async function stopGoogleCalendarWatch(
     method: 'POST',
     baseUrl: options.apiBaseUrl ?? GOOGLE_CALENDAR_DEFAULT_BASE_URL,
     endpoint: '/calendar/v3/channels/stop',
-    connectionId: metadata.googleCalendarChannelId,
+    connectionId,
     body,
   });
 }
@@ -73,9 +79,11 @@ export async function renewGoogleCalendarWatch(
   metadata: GoogleCalendarWatchChannelMetadata,
   options: {
     webhookUrl: string;
+    connectionId?: string;
     calendarId?: string;
     apiBaseUrl?: string;
     expirationMs?: number;
+    token?: string;
   },
 ): Promise<GoogleCalendarWatchChannelMetadata> {
   const next = await registerGoogleCalendarWatch(provider, options);
@@ -85,4 +93,24 @@ export async function renewGoogleCalendarWatch(
     // best effort, old channel may already be expired
   }
   return next;
+}
+
+function resolveConnectionId(provider: ConnectionProvider, explicitConnectionId?: string): string {
+  const direct = explicitConnectionId?.trim();
+  if (direct) return direct;
+
+  const providerRecord = provider as unknown as {
+    connectionId?: string;
+    defaultConnectionId?: string;
+    getConnectionId?: () => string | undefined;
+  };
+  const providerConnectionId =
+    providerRecord.connectionId?.trim() ??
+    providerRecord.defaultConnectionId?.trim() ??
+    providerRecord.getConnectionId?.()?.trim();
+  if (providerConnectionId) return providerConnectionId;
+
+  throw new Error(
+    'Google Calendar watch helpers require a connectionId option or a provider with connectionId/defaultConnectionId',
+  );
 }

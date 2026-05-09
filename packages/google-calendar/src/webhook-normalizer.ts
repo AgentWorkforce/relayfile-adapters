@@ -10,7 +10,11 @@ export function normalizeGoogleCalendarWebhook(
   headers: Record<string, string | string[] | undefined>,
   options: { connectionId?: string; providerConfigKey?: string; calendarId?: string } = {},
 ): GoogleCalendarNormalizedWebhook {
-  const normalizedHeaders = normalizeHeaders(headers);
+  const normalizedHeaders = {
+    ...normalizeHeaders(headers),
+    ...normalizeHeaders(extractForwardedHeaders(payload)),
+  };
+  const payloadRecord = isRecord(payload) ? payload : {};
   const resourceState = normalizedHeaders['x-goog-resource-state'] ?? 'unknown';
   const calendarId =
     readCalendarId(payload) ??
@@ -20,12 +24,12 @@ export function normalizeGoogleCalendarWebhook(
 
   return {
     provider: GOOGLE_CALENDAR_PROVIDER_NAME,
-    connectionId: options.connectionId,
-    providerConfigKey: options.providerConfigKey,
+    connectionId: readOptionalString(payloadRecord.connectionId) ?? options.connectionId,
+    providerConfigKey: readOptionalString(payloadRecord.providerConfigKey) ?? options.providerConfigKey,
     eventType: `calendar.${resourceState}`,
     objectType: resourceState === 'sync' ? 'calendar' : 'event',
     objectId: calendarId,
-    shouldSync: resourceState === 'exists',
+    shouldSync: isSyncWorthyResourceState(resourceState),
     headers: normalizedHeaders,
     payload: {
       ...(isRecord(payload) ? payload : {}),
@@ -40,6 +44,22 @@ export function normalizeGoogleCalendarWebhook(
       },
     },
   };
+}
+
+function extractForwardedHeaders(payload: unknown): Record<string, string | string[] | undefined> {
+  if (!isRecord(payload)) return {};
+  const forwardedPayload = isRecord(payload.payload) ? payload.payload : undefined;
+  const forwardedHeaders = isRecord(payload.headers) ? payload.headers : undefined;
+  const source = forwardedPayload ?? forwardedHeaders;
+  if (!source) return {};
+
+  const headers: Record<string, string | string[] | undefined> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === 'string' || Array.isArray(value)) {
+      headers[key] = value as string | string[];
+    }
+  }
+  return headers;
 }
 
 function normalizeHeaders(headers: Record<string, string | string[] | undefined>): GoogleCalendarWebhookHeaders {
@@ -57,7 +77,9 @@ function readCalendarId(payload: unknown): string | undefined {
   const direct = readOptionalString(payload.calendarId) ?? readOptionalString(payload.calendar_id);
   if (direct) return direct;
   const metadata = isRecord(payload.metadata) ? payload.metadata : undefined;
-  return readOptionalString(metadata?.calendarId) ?? readOptionalString(metadata?.calendar_id);
+  const metadataCalendarId = readOptionalString(metadata?.calendarId) ?? readOptionalString(metadata?.calendar_id);
+  if (metadataCalendarId) return metadataCalendarId;
+  return isRecord(payload.payload) ? readCalendarId(payload.payload) : undefined;
 }
 
 function readCalendarIdFromResourceUri(resourceUri: string | undefined): string | undefined {
@@ -70,6 +92,10 @@ function readOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function isSyncWorthyResourceState(resourceState: string): boolean {
+  return resourceState === 'exists' || resourceState === 'not_exists' || resourceState === 'sync';
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object';
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

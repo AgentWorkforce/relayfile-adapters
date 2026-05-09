@@ -21,6 +21,11 @@
       "import": "./dist/sync.js",
       "default": "./dist/sync.js"
     },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js",
+      "default": "./dist/resources.js"
+    },
     "./webhook": {
       "types": "./dist/webhook-normalizer.d.ts",
       "import": "./dist/webhook-normalizer.js",
@@ -43,7 +48,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "discovery",
+    ".adapter.md",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

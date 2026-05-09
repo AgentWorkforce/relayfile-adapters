@@ -93,8 +93,9 @@ export class GoogleCalendarAdapter {
       };
     }
 
+    const calendarId = resolveWebhookCalendarId(event, this.config.calendarId);
     const syncResult = await this.sync(workspaceId, {
-      calendarId: event.objectId,
+      ...(calendarId ? { calendarId } : {}),
     });
 
     return {
@@ -119,12 +120,11 @@ export class GoogleCalendarAdapter {
     };
     const changes = await listGoogleCalendarEventChanges(this.provider, options.checkpoint, config);
     const ingestResult = await ingestGoogleCalendarEvents(this.client, workspaceId, changes.events, config);
-    return changes.nextSyncToken
-      ? {
-          ...ingestResult,
-          syncToken: changes.nextSyncToken,
-        }
-      : ingestResult;
+    return {
+      ...ingestResult,
+      ...(changes.nextSyncToken ? { syncToken: changes.nextSyncToken } : {}),
+      ...(changes.syncTokenReset ? { syncTokenReset: true } : {}),
+    };
   }
 
   async writeBack(path: string, content: string) {
@@ -166,4 +166,17 @@ function addString(target: Record<string, string>, key: string, value: unknown):
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function resolveWebhookCalendarId(
+  event: GoogleCalendarNormalizedWebhook,
+  fallbackCalendarId?: string,
+): string | undefined {
+  if (event.objectType === 'calendar') return event.objectId;
+  const webhook = isRecord(event.payload._webhook) ? event.payload._webhook : undefined;
+  return readString(webhook?.calendarId) ?? readString(event.payload.calendarId) ?? fallbackCalendarId;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
