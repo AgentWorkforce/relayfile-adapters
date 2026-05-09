@@ -1,7 +1,7 @@
 {
-  "name": "@relayfile/adapter-linear",
-  "version": "0.2.0",
-  "description": "Linear adapter bootstrap package for Relayfile",
+  "name": "@relayfile/adapter-google-calendar",
+  "version": "0.1.0",
+  "description": "Google Calendar adapter for relayfile",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,6 +16,26 @@
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
     },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.js",
+      "default": "./dist/sync.js"
+    },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js",
+      "default": "./dist/resources.js"
+    },
+    "./webhook": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
+    },
+    "./watch": {
+      "types": "./dist/watch.d.ts",
+      "import": "./dist/watch.js",
+      "default": "./dist/watch.js"
+    },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",
@@ -29,17 +49,19 @@
   },
   "files": [
     "dist",
-    "discovery"
+    "discovery",
+    "README.md"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "build": "npm run build --workspace @relayfile/adapter-core && tsc",
+    "test": "node --import tsx --test 'src/__tests__/*.test.ts'",
+    "build": "tsc",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
     "relayfile",
-    "linear",
+    "google-calendar",
+    "calendar",
     "adapter"
   ],
   "license": "MIT",
@@ -52,16 +74,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
-    "directory": "packages/linear"
-  },
-  "dependencies": {
-    "@relayfile/adapter-core": "^0.2.0"
+    "directory": "packages/google-calendar"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
-  },
-  "dependencies": {
-    "@relayfile/adapter-core": "^0.2.0"
   },
   "devDependencies": {
     "@agent-relay/sdk": "^6.0.7",

@@ -1,9 +1,8 @@
----
-name: running-headless-orchestrator
-description: Use when an agent needs to self-bootstrap agent-relay and autonomously manage a team of workers - covers infrastructure startup, agent spawning, lifecycle monitoring, and team coordination without human intervention
----
+# Headless Orchestrator
 
-### Overview
+Use when an agent needs to self-bootstrap agent-relay and autonomously manage a team of workers - covers infrastructure startup, agent spawning, lifecycle monitoring, and team coordination without human intervention
+
+## Overview
 
 A headless orchestrator is an agent that:
 1. Starts the relay infrastructure itself (`agent-relay up`)
@@ -11,14 +10,14 @@ A headless orchestrator is an agent that:
 3. Monitors agent lifecycle events
 4. Coordinates work without human intervention
 
-### When to Use
+## When to Use
 
 - Agent needs full control over its worker team
 - No human available to run `agent-relay up` manually
 - Agent should manage agent lifecycle autonomously
 - Building self-contained multi-agent systems
 
-### Quick Reference
+## Quick Reference
 
 | Step | Command/Tool |
 |------|--------------|
@@ -36,9 +35,9 @@ A headless orchestrator is an agent that:
 | Release worker | `agent-relay release Worker1` |
 | Stop infrastructure | `agent-relay down` |
 
-### Bootstrap Flow
+## Bootstrap Flow
 
-#### Step 0: Verify Installation
+### Step 0: Verify Installation
 
 ```bash
 # Check if agent-relay is available
@@ -55,14 +54,14 @@ npm install -g agent-relay
 npx agent-relay --version
 ```
 
-#### Step 1: Start Infrastructure
+### Step 1: Start Infrastructure
 
 ```bash
 # Preferred: run broker in foreground/stdin mode and keep the session open
 agent-relay up --no-dashboard --verbose
 ```
 
-#### Step 2: Spawn Workers via MCP
+### Step 2: Spawn Workers via MCP
 
 ```
 mcp__relaycast__agent_add(
@@ -72,7 +71,7 @@ mcp__relaycast__agent_add(
 )
 ```
 
-#### Step 3: Monitor and Coordinate
+### Step 3: Monitor and Coordinate
 
 ```
 # Check if workers have replied (returns unread counts — not the content)
@@ -91,22 +90,22 @@ mcp__relaycast__message_post(channel: "general", text: "All workers: wrap up cur
 mcp__relaycast__agent_list()
 ```
 
-#### Step 4: Release Workers
+### Step 4: Release Workers
 
 ```
 mcp__relaycast__agent_remove(name: "Worker1")
 ```
 
-#### Step 5: Shutdown (optional)
+### Step 5: Shutdown (optional)
 
 ```bash
 agent-relay down
 ```
 
 
-### CLI Commands for Orchestration
+## CLI Commands for Orchestration
 
-#### Channel vs DM — When to Use Each
+### Channel vs DM — When to Use Each
 
 ```bash
 # WRONG — history (no flags) will not show DM replies from workers
@@ -122,7 +121,7 @@ agent-relay history --to Worker1
 agent-relay history --to Worker1 --from Orchestrator
 ```
 
-#### Spawning and Messaging
+### Spawning and Messaging
 
 ```bash
 # Spawn a worker
@@ -141,7 +140,7 @@ agent-relay inbox --agent Worker1
 agent-relay release Worker1
 ```
 
-#### Monitoring Workers (Essential)
+### Monitoring Workers (Essential)
 
 ```bash
 # Show currently active agents
@@ -160,7 +159,7 @@ agent-relay history --to '#general'
 agent-relay status
 ```
 
-#### Troubleshooting
+### Troubleshooting
 
 ```bash
 # Kill unresponsive worker
@@ -174,9 +173,9 @@ agent-relay agents:logs Worker1
 ```
 
 
-### Orchestrator Instructions Template
+## Orchestrator Instructions Template
 
-#### Give your lead agent these instructions:
+### Give your lead agent these instructions:
 
 ```
 You are an autonomous orchestrator. Bootstrap the relay infrastructure and manage a team of workers.
@@ -222,7 +221,7 @@ Release when done:
 ```
 
 
-### Lifecycle Events
+## Lifecycle Events
 
 The broker emits these events (available via SDK subscriptions):
 
@@ -234,7 +233,7 @@ The broker emits these events (available via SDK subscriptions):
 | `agent_exited` | Worker process ended |
 | `agent_permanently_dead` | Worker failed after retries |
 
-### Common Mistakes
+## Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
@@ -252,13 +251,13 @@ The broker emits these events (available via SDK subscriptions):
 | `inbox --agent` showed messages once but now shows nothing | `inbox` only shows **unread** — already-read messages won't reappear. Use `agent-relay history --to <name>` to re-read the full conversation |
 | Sent to wrong destination | `agent-relay send Worker1 "..."` = DM; `agent-relay send '#general' "..."` = channel broadcast. The `#` prefix is required for channels |
 
-### Overview
+## Overview
 
 Self-bootstrap agent-relay infrastructure and manage a team of agents autonomously.
 
-### Prerequisites
+## Prerequisites
 
-#### 1. **agent-relay CLI installed** (required)
+### 1. **agent-relay CLI installed** (required)
 
 ```bash
 npm install -g agent-relay

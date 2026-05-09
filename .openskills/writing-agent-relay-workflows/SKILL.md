@@ -1,9 +1,8 @@
----
-name: writing-agent-relay-workflows
-description: Use when building multi-agent workflows with the relay broker-sdk - covers conversation-shape vs pipeline-shape coordination, repairable/reliable workflow gates, the WorkflowBuilder API, DAG step dependencies, agent definitions, step output chaining via {{steps.X.output}}, verification gates, evidence-based completion, owner decisions, dedicated channels, dynamic channel management (subscribe/unsubscribe/mute/unmute), swarm patterns, chat-native coordination recipes (Q/A, broadcast-ack, peer review, standup, hand-off), error handling, event listeners, step sizing rules, authoring best practices, and the lead+workers team pattern for complex steps
----
+# Writing Agent Relay Workflows
 
-### Overview
+Use when building multi-agent workflows with the relay broker-sdk - covers conversation-shape vs pipeline-shape coordination, repairable/reliable workflow gates, the WorkflowBuilder API, DAG step dependencies, agent definitions, step output chaining via {{steps.X.output}}, verification gates, evidence-based completion, owner decisions, dedicated channels, dynamic channel management (subscribe/unsubscribe/mute/unmute), swarm patterns, chat-native coordination recipes (Q/A, broadcast-ack, peer review, standup, hand-off), error handling, event listeners, step sizing rules, authoring best practices, and the lead+workers team pattern for complex steps
+
+## Overview
 
 The relay broker-sdk workflow system orchestrates multiple AI agents (Claude, Codex, Gemini, Aider, Goose) through typed DAG-based workflows. Workflows can be written in **TypeScript** (preferred), **Python**, or **YAML**.
 
@@ -11,7 +10,7 @@ The relay broker-sdk workflow system orchestrates multiple AI agents (Claude, Co
 
 **Pattern selection:** Do not default to `dag` blindly. If the job needs a different swarm/workflow type, consult the `choosing-swarm-patterns` skill when available and select the pattern that best matches the coordination problem.
 
-### When to Use
+## When to Use
 
 - Building multi-agent workflows with step dependencies
 - Orchestrating different AI CLIs (claude, codex, gemini, aider, goose)
@@ -20,7 +19,7 @@ The relay broker-sdk workflow system orchestrates multiple AI agents (Claude, Co
 - Designing product-contract workflows where failing checks should route to agents for repair instead of stopping the run
 - Dynamic channel management: agents joining/leaving/muting channels mid-workflow
 
-### Default Principle: Workflows Repair Before They Fail
+## Default Principle: Workflows Repair Before They Fail
 
 - Run deterministic checks as evidence-capturing gates with `captureOutput: true`.
 - Prefer `failOnError: false` for intermediate validation gates so the workflow can pass the output to a repair agent.
@@ -28,7 +27,7 @@ The relay broker-sdk workflow system orchestrates multiple AI agents (Claude, Co
 - Keep final acceptance deterministic, but still put an agent repair step before commit/PR creation. If the repair budget is exhausted or a true external blocker remains, write a blocked artifact and skip commit/PR creation; do not let the workflow end as `FAILED`.
 - Use `.reliable()` or `.repairable()` on SDK versions that support it, especially for product-contract workflows. As of AgentWorkforce/relay#827, retry-mode workflows with agents are repair-aware by default, repair agents run before retrying malformed/failed agent steps, and the SDK covers DAG, pipeline, fan-out, worktree-backed, deterministic-only, and agent-plus-gate shapes.
 
-### Choose Your Coordination Style — Conversation vs Pipeline
+## Choose Your Coordination Style — Conversation vs Pipeline
 
 Before writing the workflow, decide *how the agents will coordinate*. The relay primitive supports two very different shapes, and picking the wrong one wastes the most valuable thing the SDK gives you.
 
@@ -43,9 +42,9 @@ The two shapes can mix within one workflow: pipeline-style deterministic preflig
 
 > **A blunt rule of thumb:** if your workflow only uses `agent` steps with `preset: 'worker'` chained by `{{steps.X.output}}`, you are not using the relay — you are using `claude -p | codex exec`. That may still be the right answer; just make it a deliberate choice.
 
-### Quick Reference (Pipeline shape)
+## Quick Reference (Pipeline shape)
 
-#### > Use this when steps are linear, well-specified, and need no agent-to-agent feedback. For anything with iteration, review, or coordination, jump to **Quick Reference (Conversation shape)** below.
+### > Use this when steps are linear, well-specified, and need no agent-to-agent feedback. For anything with iteration, review, or coordination, jump to **Quick Reference (Conversation shape)** below.
 
 ```typescript
 import { workflow } from '@agent-relay/sdk/workflows';
@@ -80,9 +79,9 @@ const result = await workflow('my-workflow')
 ```
 
 
-### Quick Reference (Conversation shape)
+## Quick Reference (Conversation shape)
 
-#### > Use this for any non-trivial work — peer review, multi-file edits, cross-agent feedback, dynamic re-planning. Lead and workers spawn **in parallel** on a shared channel and self-organize via messages. The relay primitive does the coordinating; verification gates downstream of the lead close the workflow.
+### > Use this for any non-trivial work — peer review, multi-file edits, cross-agent feedback, dynamic re-planning. Lead and workers spawn **in parallel** on a shared channel and self-organize via messages. The relay primitive does the coordinating; verification gates downstream of the lead close the workflow.
 
 ```typescript
 import { workflow } from '@agent-relay/sdk/workflows';
@@ -175,9 +174,9 @@ If it failed, use this output to assign and fix issues, then rerun the command u
 ```
 
 
-### ⚡ Parallelism — Design for Speed
+## ⚡ Parallelism — Design for Speed
 
-#### Cross-Workflow Parallelism: Wave Planning
+### Cross-Workflow Parallelism: Wave Planning
 
 ```bash
 # BAD — sequential (14 hours for 27 workflows at ~30 min each)
@@ -203,7 +202,7 @@ wait
 git add -A && git commit -m "Wave 2"
 ```
 
-#### Declare File Scope for Planning
+### Declare File Scope for Planning
 
 ```typescript
 workflow('48-comparison-mode')
@@ -212,7 +211,7 @@ workflow('48-comparison-mode')
   .requiresBefore(['46-admin-dashboard'])    // explicit ordering constraint
 ```
 
-#### Within-Workflow Parallelism
+### Within-Workflow Parallelism
 
 ```typescript
 // BAD — unnecessary sequential chain
@@ -226,9 +225,9 @@ workflow('48-comparison-mode')
 ```
 
 
-### Failure Prevention
+## Failure Prevention
 
-#### 1. Do not use raw top-level `await`
+### 1. Do not use raw top-level `await`
 
 ```ts
 async function runWorkflow() {
@@ -245,7 +244,7 @@ runWorkflow().catch((error) => {
 });
 ```
 
-#### 2b. Standard preflight template for resumable workflows
+### 2b. Standard preflight template for resumable workflows
 
 ```ts
 .step('preflight', {
@@ -273,7 +272,7 @@ runWorkflow().catch((error) => {
 }),
 ```
 
-#### 2c. Picking the right `.join()` for multi-line shell commands
+### 2c. Picking the right `.join()` for multi-line shell commands
 
 ```ts
 command: [
@@ -284,19 +283,19 @@ command: [
 ].join(' && '),
 ```
 
-#### 3. Keep final verification boring and deterministic
+### 3. Keep final verification boring and deterministic
 
 ```bash
 grep -Eq "foo|bar|baz" file.ts
 ```
 
-#### 6. Be explicit about shell requirements
+### 6. Be explicit about shell requirements
 
 ```bash
 /opt/homebrew/bin/bash workflows/your-workflow/execute.sh --wave 2
 ```
 
-#### 9. Factor repo-specific setup into a shared helper
+### 9. Factor repo-specific setup into a shared helper
 
 ```ts
 // workflows/lib/cloud-repo-setup.ts
@@ -315,7 +314,7 @@ export function applyCloudRepoSetup<T>(wf: T, opts: CloudRepoSetupOptions): T {
 ```
 
 
-### End-to-End Bug Fix Workflows
+## End-to-End Bug Fix Workflows
 
 - **Capture the original failure**
 - Reproduce the bug first in a deterministic or evidence-capturing step
@@ -348,9 +347,9 @@ export function applyCloudRepoSetup<T>(wf: T, opts: CloudRepoSetupOptions): T {
 - chooses the best swarm pattern
 - then authors the final fix/validation workflow
 
-### Shipping the Result — Open a PR via `createGitHubStep`
+## Shipping the Result — Open a PR via `createGitHubStep`
 
-#### The minimal "open a PR" recipe
+### The minimal "open a PR" recipe
 
 ```typescript
 import { workflow } from '@agent-relay/sdk/workflows';
@@ -406,9 +405,9 @@ await workflow('feature-x')
 ```
 
 
-### Key Concepts
+## Key Concepts
 
-#### Verification Gates
+### Verification Gates
 
 ```typescript
 verification: { type: 'exit_code' }                        // preferred for code-editing steps
@@ -416,7 +415,7 @@ verification: { type: 'output_contains', value: 'DONE' }   // optional accelerat
 verification: { type: 'file_exists', value: 'src/out.ts' } // deterministic file check
 ```
 
-#### DAG Dependencies
+### DAG Dependencies
 
 ```typescript
 .step('fix-types',  { agent: 'worker', dependsOn: ['review'], ... })
@@ -424,7 +423,7 @@ verification: { type: 'file_exists', value: 'src/out.ts' } // deterministic file
 .step('final',      { agent: 'lead',   dependsOn: ['fix-types', 'fix-tests'], ... })
 ```
 
-#### SDK API
+### SDK API
 
 ```typescript
 // Subscribe an agent to additional channels post-spawn
@@ -440,7 +439,7 @@ relay.mute({ agent: 'security-auditor', channel: 'review-pr-123' });
 relay.unmute({ agent: 'security-auditor', channel: 'review-pr-123' });
 ```
 
-#### Events
+### Events
 
 ```typescript
 relay.onChannelSubscribed = (agent, channels) => { /* ... */ };
@@ -450,9 +449,9 @@ relay.onChannelUnmuted = (agent, channel) => { /* ... */ };
 ```
 
 
-### Agent Definition
+## Agent Definition
 
-#### ```typescript
+### ```typescript
 
 ```typescript
 .agent('name', {
@@ -465,7 +464,7 @@ relay.onChannelUnmuted = (agent, channel) => { /* ... */ };
 })
 ```
 
-#### Model Constants
+### Model Constants
 
 ```typescript
 import { ClaudeModels, CodexModels, GeminiModels } from '@agent-relay/config';
@@ -476,9 +475,9 @@ import { ClaudeModels, CodexModels, GeminiModels } from '@agent-relay/config';
 ```
 
 
-### Step Definition
+## Step Definition
 
-#### Agent Steps
+### Agent Steps
 
 ```typescript
 .step('name', {
@@ -490,7 +489,7 @@ import { ClaudeModels, CodexModels, GeminiModels } from '@agent-relay/config';
 })
 ```
 
-#### Deterministic Steps (Shell Commands)
+### Deterministic Steps (Shell Commands)
 
 ```typescript
 .step('verify-files', {
@@ -518,9 +517,9 @@ Output:
 ```
 
 
-### Common Patterns
+## Common Patterns
 
-#### Interactive Team (lead + workers on shared channel)
+### Interactive Team (lead + workers on shared channel)
 
 ```typescript
 .agent('lead', {
@@ -570,7 +569,7 @@ Edit files as assigned. Report completion. Fix issues from feedback.`,
 .step('verify', { type: 'deterministic', dependsOn: ['lead-coordinate'], ... })
 ```
 
-#### 1. Question / Answer (blocking ask)
+### 1. Question / Answer (blocking ask)
 
 ```typescript
 .step('integrate', {
@@ -583,7 +582,7 @@ channel. If no reply arrives in 5 minutes, @-mention the lead.`,
 })
 ```
 
-#### 2. Broadcast / Ack
+### 2. Broadcast / Ack
 
 ```typescript
 .step('lead-coordinate', {
@@ -596,7 +595,7 @@ Only after all three have acked, post per-worker assignments.`,
 })
 ```
 
-#### 3. Peer Review Handoff
+### 3. Peer Review Handoff
 
 ```typescript
 .step('impl-a-work', {
@@ -611,7 +610,7 @@ commit SHA. Then wait for @reviewer's verdict in channel.
 })
 ```
 
-#### 4. Standup / Status Probe
+### 4. Standup / Status Probe
 
 ```typescript
 .step('lead-coordinate', {
@@ -629,7 +628,7 @@ reassign their work to a peer.`,
 })
 ```
 
-#### 5. Hand-Off with Context
+### 5. Hand-Off with Context
 
 ```typescript
 .step('impl-a-work', {
@@ -642,7 +641,7 @@ Tests: <pass/fail summary>. Commit: <sha>."`,
 })
 ```
 
-#### Pipeline (sequential handoff)
+### Pipeline (sequential handoff)
 
 ```typescript
 .pattern('pipeline')
@@ -651,7 +650,7 @@ Tests: <pass/fail summary>. Commit: <sha>."`,
 .step('test', { agent: 'tester', task: '{{steps.implement.output}}', dependsOn: ['implement'] })
 ```
 
-#### Error Handling
+### Error Handling
 
 ```typescript
 .onError('fail-fast')   // stop on first failure (default)
@@ -660,9 +659,9 @@ Tests: <pass/fail summary>. Commit: <sha>."`,
 ```
 
 
-### Multi-File Edit Pattern
+## Multi-File Edit Pattern
 
-#### When a workflow needs to modify multiple existing files, **use one agent step per file** with a deterministic verify gate after each. Agents reliably edit 1-2 files per step but fail on 4+.
+### When a workflow needs to modify multiple existing files, **use one agent step per file** with a deterministic verify gate after each. Agents reliably edit 1-2 files per step but fail on 4+.
 
 ```yaml
 steps:
@@ -775,9 +774,9 @@ steps:
 ```
 
 
-### File Materialization: Verify Before Proceeding
+## File Materialization: Verify Before Proceeding
 
-#### After any step that creates files, add a deterministic `file_exists` check before proceeding. Non-interactive agents may exit 0 without writing anything (wrong cwd, stdout instead of disk).
+### After any step that creates files, add a deterministic `file_exists` check before proceeding. Non-interactive agents may exit 0 without writing anything (wrong cwd, stdout instead of disk).
 
 ```yaml
 - name: verify-files
@@ -817,7 +816,7 @@ steps:
   failOnError: true
 ```
 
-#### Edit Gates Must See Untracked Files
+### Edit Gates Must See Untracked Files
 
 ```yaml
 - name: provider-edit-gate-capture
@@ -869,9 +868,9 @@ steps:
 ```
 
 
-### Agent Transport Must Not Be The First Hard Gate
+## Agent Transport Must Not Be The First Hard Gate
 
-#### Interactive lead-and-worker teams are useful, but they are still process
+### Interactive lead-and-worker teams are useful, but they are still process
 
 ```typescript
 .step('runtime-implementation', {
@@ -909,9 +908,9 @@ test -f packages/core/src/runtime/router.ts || echo "MISSING_ROUTER"`,
 ```
 
 
-### DAG Deadlock Anti-Pattern
+## DAG Deadlock Anti-Pattern
 
-#### ```yaml
+### ```yaml
 
 ```yaml
 # WRONG — deadlock: coordinate depends on context, work-a depends on coordinate
@@ -934,9 +933,9 @@ steps:
 ```
 
 
-### Step Sizing
+## Step Sizing
 
-#### **One agent, one deliverable.** A step's task prompt should be 10-20 lines max.
+### **One agent, one deliverable.** A step's task prompt should be 10-20 lines max.
 
 ```yaml
 # Team pattern: lead + workers on a shared channel
@@ -962,7 +961,7 @@ steps:
 ```
 
 
-### Supervisor Pattern
+## Supervisor Pattern
 
 When you set `.pattern('supervisor')` (or `hub-spoke`, `fan-out`), the runner auto-assigns a supervisor agent as owner for worker steps. The supervisor monitors progress, nudges idle workers, and issues `OWNER_DECISION`.
 
@@ -975,7 +974,7 @@ When you set `.pattern('supervisor')` (or `hub-spoke`, `fan-out`), the runner au
 | Local/small models | `supervisor` | Supervisor catches stuck workers |
 | All non-interactive | `pipeline` or `dag` | No PTY = no supervision needed |
 
-### Concurrency
+## Concurrency
 
 **Cap `maxConcurrency` at 4-6.** Spawning 10+ agents simultaneously causes broker timeouts.
 
@@ -985,7 +984,7 @@ When you set `.pattern('supervisor')` (or `hub-spoke`, `fan-out`), the runner au
 | 5-10            | 5                 |
 | 10+             | 6-8 max           |
 
-### Common Mistakes
+## Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
@@ -1037,9 +1036,9 @@ When you set `.pattern('supervisor')` (or `hub-spoke`, `fan-out`), the runner au
 | Not printing PR URL after `createGitHubStep({ action: 'createPR' })` | Capture `html_url` with `output: { mode: 'data', format: 'json', path: 'html_url' }` and echo or write it in a final deterministic step |
 | Workflow ending without worktree + PR for cross-repo changes | Add `setup-worktree` at start and `push-and-pr` + `cleanup-worktree` at end |
 
-### YAML Alternative
+## YAML Alternative
 
-#### ```yaml
+### ```yaml
 
 ```yaml
 version: '1.0'
@@ -1069,7 +1068,7 @@ workflows:
 ```
 
 
-### Available Swarm Patterns
+## Available Swarm Patterns
 
 `dag` (default), `fan-out`, `pipeline`, `hub-spoke`, `consensus`, `mesh`, `handoff`, `cascade`, `debate`, `hierarchical`, `map-reduce`, `scatter-gather`, `supervisor`, `reflection`, `red-team`, `verifier`, `auction`, `escalation`, `saga`, `circuit-breaker`, `blackboard`, `swarm`
 

@@ -20,3 +20,4 @@ export * from "./docs/mapping-generator.js";
 export * from "./docs/change-detector.js";
 export * from "./docs/updater.js";
 export * from "./storage-bridge/index.js";
+export * from "./atomic-index/index.js";

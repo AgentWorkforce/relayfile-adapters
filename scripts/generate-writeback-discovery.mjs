@@ -313,6 +313,9 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'zendesk') {
     return pattern('^\\d+$');
   }
+  if (adapterSlug === 'google-calendar') {
+    return pattern('^[a-v0-9]{5,1024}$');
+  }
   return pattern('^[A-Za-z0-9_.:-]+$');
 }
 
