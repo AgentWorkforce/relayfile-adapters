@@ -75,11 +75,9 @@ jobs:
         run: |
           node scripts/resolve-publish-targets.mjs "$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
 
-      - name: Version & Publish
+      - name: Version packages
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
-          INPUT_TAG: ${{ github.event.inputs.tag }}
-          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
           RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
         run: |
           set -euo pipefail
@@ -95,6 +93,28 @@ jobs:
             if [ "$INPUT_VERSION" != "none" ]; then
               npm version "$INPUT_VERSION" --no-git-tag-version --allow-same-version
             fi
+            cd ../..
+          done < <(printf '%s\n' "$RESOLVED_PACKAGES" | tr ' ,' '\n' | sed '/^$/d')
+
+      - name: Sync internal dependency specifiers
+        run: node scripts/sync-internal-dependencies.mjs
+
+      - name: Publish packages
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            case "$pkg" in
+              *[!a-zA-Z0-9_-]*)
+                echo "Invalid package slug: $pkg" >&2
+                exit 1
+                ;;
+            esac
+            cd "packages/$pkg"
 
             name=$(node -p "require('./package.json').name")
             version=$(node -p "require('./package.json').version")
