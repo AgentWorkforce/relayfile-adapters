@@ -478,13 +478,12 @@ integrations:
     auth_model: oauth
     scope_status: verified
     required_scopes:
+      - offline_access
       - read:jira-work
-      - manage:jira-project
-      - manage:jira-configuration
-      - read:jira-user
       - write:jira-work
       - manage:jira-webhook
-      - offline_access
+      - read:webhook:jira
+      - write:webhook:jira
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/jira
@@ -1028,7 +1027,7 @@ integrations:
   - slug: confluence
     display_name: Confluence
     category: knowledge-base
-    status: gap
+    status: implemented
     package:
     nango_slug: confluence
     auth_model: oauth
@@ -1036,14 +1035,14 @@ integrations:
     required_scopes:
       - write:confluence-content
       - read:confluence-space.summary
-      - write:confluence-space
-      - read:confluence-content.all
       - read:confluence-content.summary
-      - search:confluence
+      - search.confluence
       - read:confluence-user
       - read:confluence-groups
       - write:confluence-groups
-      - offline_access
+      - read:space:confluence
+      - read:page:confluence
+      - read:confluence-content.all
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/confluence
