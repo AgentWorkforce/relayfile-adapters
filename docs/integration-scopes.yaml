@@ -27,11 +27,24 @@ integrations:
     package: "@relayfile/adapter-airtable"
     nango_slug: airtable
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - data.records:read
+      - data.records:write
+      - schema.bases:read
+      - webhook:manage
     candidate_scopes: []
-    sources: []
-    notes: "Research record/table read/write and webhook requirements."
+    sources:
+      - https://nango.dev/docs/integrations/all/airtable
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/airtable/.nango/nango.json
+      - https://airtable.com/developers/web/api/scopes
+      - https://airtable.com/developers/web/api/list-records
+      - https://airtable.com/developers/web/api/create-records
+      - https://airtable.com/developers/web/api/update-multiple-records
+      - https://airtable.com/developers/web/api/get-base-schema
+      - https://airtable.com/developers/web/api/create-a-webhook
+    notes: "Airtable uses OAuth scopes. The adapter reads records, reads base/table schema, writes records, and ingests routed webhook events; Airtable endpoint security maps these to data.records:read, data.records:write, schema.bases:read, and webhook:manage. No schema write, comment, base-listing, or user-email scopes are required for the current eval surface."
 
   - slug: asana
     display_name: Asana
@@ -40,11 +53,36 @@ integrations:
     package: "@relayfile/adapter-asana"
     nango_slug: asana
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Full permissions
+      - default
+      - tasks:read
+      - tasks:write
+      - tasks:delete
+      - projects:read
+      - projects:write
+      - projects:delete
+      - workspaces:read
+      - users:read
+      - custom_fields:read
+      - webhooks:read
+      - webhooks:write
+      - webhooks:delete
     candidate_scopes: []
-    sources: []
-    notes: "Research task/project read/write and webhook requirements."
+    sources:
+      - https://nango.dev/docs/api-integrations/asana
+      - https://nango.dev/docs/api-integrations/asana/how-to-register-your-own-asana-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/asana/.nango/nango.json
+      - https://developers.asana.com/docs/oauth
+      - https://developers.asana.com/docs/oauth-scopes
+      - https://developers.asana.com/docs/webhooks-guide
+      - https://developers.asana.com/reference/createsectionforproject
+      - https://developers.asana.com/reference/updatesection
+      - https://developers.asana.com/reference/deletesection
+      - https://developers.asana.com/reference/getsection
+    notes: "Asana uses OAuth scopes, and Nango's provider registry defaults to the `default` scope. The adapter reads tasks, projects, sections, and workspaces; writes and deletes tasks/projects/sections; requests assignee email and custom-field display data; and can manage webhook subscriptions. Asana maps task, project, workspace, user, custom-field, and webhook endpoints to the named scopes listed here, but the section endpoints used by the adapter are not present in the OAuth scope matrix. Asana's OAuth docs state that endpoints without scopes require the OAuth app's Full permissions grant, where the `default` scope is used when no explicit scopes are requested."
 
   - slug: azure-blob
     display_name: Azure Blob Storage
@@ -53,11 +91,24 @@ integrations:
     package: "@relayfile/azure-blob"
     nango_slug: azure-blob-storage
     auth_model: cloud_iam_or_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - offline_access
+      - https://storage.azure.com/.default
+      - "Azure Blob Storage delegated permission: user_impersonation"
+      - Storage Blob Data Contributor
+      - EventGrid EventSubscription Contributor
     candidate_scopes: []
-    sources: []
-    notes: "Research Azure app permissions or connection credentials required for blob read/write and Event Grid delivery."
+    sources:
+      - https://nango.dev/docs/integrations/all/azure-blob-storage
+      - https://nango.dev/docs/integrations/all/azure-blob-storage/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/authorize-access-azure-active-directory
+      - https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-azure-active-directory
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+      - https://learn.microsoft.com/en-us/azure/event-grid/security-authorization
+      - https://learn.microsoft.com/en-us/azure/event-grid/event-schema-blob-storage
+    notes: "Azure Blob Storage uses Microsoft OAuth through Nango plus Azure RBAC for authorization. Nango's provider registry and docs default to offline_access and https://storage.azure.com/.default, and the Azure app setup grants the Azure Blob Storage delegated user_impersonation permission. Blob read/write/delete requires a data-plane role such as Storage Blob Data Contributor at the narrowest practical storage account or container scope. Event Grid delivery itself is not an OAuth scope, but creating, updating, or deleting storage-account event subscriptions requires EventGrid EventSubscription Contributor, or an equivalent custom role with Microsoft.EventGrid/eventSubscriptions/* at the storage account event-source scope."
 
   - slug: box
     display_name: Box
@@ -66,11 +117,20 @@ integrations:
     package: "@relayfile/box"
     nango_slug: box
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - root_readwrite
+      - manage_webhook
     candidate_scopes: []
-    sources: []
-    notes: "Research file/folder read, write, and webhook scopes."
+    sources:
+      - https://nango.dev/docs/api-integrations/box
+      - https://nango.dev/docs/api-integrations/box/how-to-register-your-own-box-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/box/.nango/nango.json
+      - https://developer.box.com/guides/api-calls/permissions-and-errors/scopes
+      - https://developer.box.com/reference/post-files-content
+      - https://developer.box.com/guides/webhooks/v2/create-v2
+    notes: "Box uses OAuth application scopes. The adapter reads Box file/folder metadata and content, uploads files through /2.0/files/content, and manages webhook subscriptions through /2.0/webhooks. Box documents root_readwrite as read/write access for authenticated-user files and folders, including upload and download behavior, and manage_webhook as the scope required to create/manage webhooks. root_readonly is not needed because root_readwrite covers the read surface; user permissions on the target Box items still apply."
 
   - slug: calendly
     display_name: Calendly
@@ -79,11 +139,22 @@ integrations:
     package: "@relayfile/adapter-calendly"
     nango_slug: calendly
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - scheduled_events:write
+      - event_types:write
+      - webhooks:write
     candidate_scopes: []
-    sources: []
-    notes: "Research event and invitee read/write requirements."
+    sources:
+      - https://nango.dev/docs/api-integrations/calendly
+      - https://nango.dev/docs/api-integrations/calendly/how-to-register-your-own-calendly-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/calendly/.nango/nango.json
+      - https://developer.calendly.com/scopes
+      - https://developer.calendly.com/schedule-events-with-ai-agents
+      - https://developer.calendly.com/receive-data-from-scheduled-events-in-real-time-with-webhook-subscriptions
+      - https://calendly.com/help/webhooks-overview
+    notes: "Calendly uses OAuth authorization scopes. The adapter reads scheduled events, scheduled-event invitees, and event types; creates invitees; cancels scheduled events; and creates/updates event types. Calendly documents scheduled_events:write for POST /invitees and scheduled-event cancellation, event_types:write for POST/PATCH /event_types, and that write scopes include the corresponding read scope in the same domain, so separate scheduled_events:read and event_types:read are not required. webhooks:write covers webhook subscription creation/deletion for near-real-time invitee created/canceled delivery, while Calendly still requires the related domain read grant for webhook payloads; scheduled_events:write satisfies that related scheduled-events read domain. Paid-plan and user/admin role restrictions may still apply."
 
   - slug: clickup
     display_name: ClickUp
@@ -92,11 +163,17 @@ integrations:
     package: "@relayfile/adapter-clickup"
     nango_slug: clickup
     auth_model: oauth
-    scope_status: pending
+    scope_status: not_applicable
     required_scopes: []
     candidate_scopes: []
-    sources: []
-    notes: "Research task/list/space read/write and webhook requirements."
+    sources:
+      - https://nango.dev/docs/api-integrations/clickup
+      - https://nango.dev/docs/api-integrations/clickup/how-to-register-your-own-clickup-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developer.clickup.com/docs/authentication
+      - https://developer.clickup.com/openapi/clickup-api-v2-reference.json
+      - https://developer.clickup.com/docs/webhooks
+    notes: "ClickUp uses OAuth 2.0 access tokens but does not define OAuth scope strings; Nango's ClickUp setup guide explicitly says scopes are not used, and the provider registry does not declare default scopes. ClickUp authorization asks the user to select the Workspaces the app can access, then endpoint access follows the authorized user's ClickUp permissions in those Workspaces. The adapter reads spaces, folders, lists, and tasks; creates/updates/deletes folders, lists, and tasks; adds task comments; and consumes task/list/folder/space webhook events. The official OpenAPI marks these REST and webhook endpoints with the shared Authorization header security scheme rather than per-endpoint scopes, so no required_scopes are listed."
 
   - slug: dropbox
     display_name: Dropbox
@@ -105,11 +182,22 @@ integrations:
     package: "@relayfile/dropbox"
     nango_slug: dropbox
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - files.metadata.read
+      - files.content.read
+      - files.content.write
     candidate_scopes: []
-    sources: []
-    notes: "Research metadata/content read, file write, and webhook requirements."
+    sources:
+      - https://nango.dev/docs/api-integrations/dropbox
+      - https://nango.dev/docs/api-integrations/dropbox/how-to-register-your-own-dropbox-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/dropbox/.nango/nango.json
+      - https://developers.dropbox.com/oauth-guide
+      - https://dropbox.github.io/dropbox-sdk-js/Dropbox.html
+      - https://www.dropbox.com/developers/reference/webhooks
+      - https://developers.dropbox.com/detecting-changes-guide
+    notes: "Dropbox uses OAuth scopes plus an app content-access choice of App Folder or Full Dropbox. The Relayfile adapter reads file/folder metadata, tracks cursors with list_folder/list_folder/continue, fetches file content, uploads or modifies file content, and consumes Dropbox webhook notifications by resolving account IDs back through list_folder/continue. Dropbox documents metadata/list/cursor endpoints and scoped-app webhooks under files.metadata.read, content download under files.content.read, and upload/modify/delete-style file content operations under files.content.write. Nango's provider registry does not declare Dropbox default scopes, though it requests offline token access through authorization params; offline access is not a Dropbox OAuth scope. No sharing, team, member, file-properties, or permanent-delete scopes are required for the current adapter eval surface."
 
   - slug: gcs
     display_name: Google Cloud Storage
@@ -118,11 +206,36 @@ integrations:
     package: "@relayfile/gcs"
     nango_slug: google-cloud-storage
     auth_model: google_oauth_or_service_account
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/devstorage.read_write
+      - storage.objects.get
+      - storage.objects.list
+      - storage.objects.create
+      - storage.objects.update
+      - storage.objects.delete
+      - storage.buckets.get
+      - storage.buckets.update
+      - pubsub.topics.get
+      - "Grant roles/pubsub.publisher to the Cloud Storage service agent on the destination Pub/Sub topic"
     candidate_scopes: []
-    sources: []
-    notes: "Research Google Cloud Storage OAuth scopes or service account IAM roles for object read/write and Pub/Sub notifications."
+    sources:
+      - https://nango.dev/docs/integrations/all/google-cloud-storage
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/google-cloud-storage
+      - https://docs.cloud.google.com/storage/docs/oauth-scopes
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/objects/get
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/objects/list
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/objects/insert
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/objects/patch
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/objects/delete
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/notifications/insert
+      - https://docs.cloud.google.com/storage/docs/json_api/v1/notifications/delete
+      - https://docs.cloud.google.com/storage/docs/access-control/iam-permissions
+      - https://docs.cloud.google.com/storage/docs/access-control/iam-json
+      - https://docs.cloud.google.com/storage/docs/reporting-changes
+      - https://docs.cloud.google.com/pubsub/docs/access-control
+    notes: "Google Cloud Storage can use Google OAuth through Nango or service account credentials. The adapter's object read/write/delete surface maps to Cloud Storage JSON object methods, so OAuth connections need https://www.googleapis.com/auth/devstorage.read_write and the authorized principal or service account still needs object IAM permissions for get, list, create, update, and delete on the target buckets. Pub/Sub notification configuration is not a separate OAuth scope in the Storage JSON API; notification insert/delete require storage.buckets.update, notification get/list require storage.buckets.get, the configuring identity needs to view the destination Pub/Sub topic, and the bucket project's Cloud Storage service agent must have roles/pubsub.publisher on that topic. If Relayfile provisions Pub/Sub topics or subscriptions itself, add the relevant Pub/Sub create/update/consume grants separately; they are not required for the current bucket notificationConfig eval surface."
 
   - slug: github
     display_name: GitHub
@@ -131,11 +244,33 @@ integrations:
     package: "@relayfile/adapter-github"
     nango_slug: github
     auth_model: github_app_or_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - "GitHub App permission: Metadata: read"
+      - "GitHub App permission: Contents: read"
+      - "GitHub App permission: Issues: read"
+      - "GitHub App permission: Pull requests: write"
+      - "GitHub App permission: Checks: read"
+      - "GitHub App event: pull_request"
+      - "GitHub App event: pull_request_review"
+      - "GitHub App event: pull_request_review_comment"
+      - "GitHub App event: issues"
+      - "GitHub App event: check_run"
+      - "OAuth App scope: repo"
     candidate_scopes: []
-    sources: []
-    notes: "Research GitHub App permissions and OAuth scopes for issues, pull requests, checks, contents, and comments."
+    sources:
+      - https://nango.dev/docs/api-integrations/github-app-oauth
+      - https://nango.dev/docs/integrations/all/github-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/github
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/github/.nango/nango.json
+      - https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app
+      - https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps
+      - https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens?apiVersion=2022-11-28
+      - https://docs.github.com/en/rest/checks/runs?apiVersion=2022-11-28
+      - https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28
+      - https://docs.github.com/en/webhooks/webhook-events-and-payloads
+    notes: "Nango exposes GitHub App OAuth and GitHub App providers but does not publish default action-level scopes for this adapter surface, so the minimum is derived from GitHub's REST endpoint and webhook permission docs. For GitHub App installations, metadata read is the baseline repository metadata permission; contents read covers repository content and commit/file reads; issues read covers issue metadata and issue comments; pull requests write is needed because the adapter writes, updates, and deletes pull request reviews and also covers PR/review read; checks read covers check-run ingestion. Webhook subscriptions for pull_request, pull_request_review, pull_request_review_comment, issues, and check_run require the corresponding read-level repository permissions and no repository Webhooks permission when using a GitHub App's configured webhook. For OAuth App connections against private repositories, GitHub's classic repo scope is the practical minimum because it grants repository read/write coverage needed for issues, pull requests, contents, checks reads, and PR review writeback; public-only deployments may be able to use public_repo, but that does not cover the full private-repository eval surface."
 
   - slug: gitlab
     display_name: GitLab
@@ -144,11 +279,24 @@ integrations:
     package: "@relayfile/adapter-gitlab"
     nango_slug: gitlab
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - api
     candidate_scopes: []
-    sources: []
-    notes: "Research merge request, issue, pipeline, and repository read/write scopes."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/integrations/all/gitlab
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/gitlab
+      - https://docs.gitlab.com/integration/oauth_provider/#view-all-authorized-applications
+      - https://docs.gitlab.com/user/profile/personal_access_tokens/#personal-access-token-scopes
+      - https://docs.gitlab.com/api/merge_requests/
+      - https://docs.gitlab.com/api/issues/
+      - https://docs.gitlab.com/api/notes/
+      - https://docs.gitlab.com/api/pipelines/
+      - https://docs.gitlab.com/api/commits/
+      - https://docs.gitlab.com/api/project_webhooks/
+    notes: "GitLab uses OAuth application scopes through Nango's gitlab provider, which is OAUTH2 and declares no default scopes. The adapter reads merge requests, MR diffs/discussions/approvals, issues, pipelines/jobs, and repository commits, and writes merge requests, issues, MR discussions, and issue notes through GitLab REST API endpoints. GitLab documents the `api` scope as complete read/write API access; `read_api` is read-only, `read_repository` covers Git-over-HTTP or the Repository Files API, and `write_repository` is Git-over-HTTP only and does not support API authentication. No separate webhook OAuth scope is documented; project hook management, if Relayfile provisions hooks through the API, is also covered by `api`, while webhook delivery still depends on project/user permissions."
 
   - slug: gmail
     display_name: Gmail
@@ -157,11 +305,25 @@ integrations:
     package: "@relayfile/gmail"
     nango_slug: gmail
     auth_model: google_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/gmail.modify
     candidate_scopes: []
-    sources: []
-    notes: "Research mailbox read, labels, drafts/send, and Gmail Watch requirements."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/google-mail
+      - https://nango.dev/docs/integrations/all/google-mail
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-mail/.nango/nango.json
+      - https://developers.google.com/workspace/gmail/api/auth/scopes
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.threads/get
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/modify
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/create
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.drafts/send
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.watch
+      - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.history/list
+      - https://developers.google.com/workspace/gmail/api/guides/push
+    notes: "Gmail uses Google OAuth scopes through Nango's `google-mail` provider, which aliases the shared Google OAuth provider and declares no default scopes. The adapter reads mailbox threads/history, modifies message labels, creates draft/send writeback records, and starts Gmail Watch subscriptions. Google documents `gmail.modify` as all Gmail read/write operations except immediate permanent deletion, and the relevant thread read, message modify, draft create/send, history list, and watch endpoints all accept `gmail.modify`; narrower `gmail.readonly`, `gmail.compose`, `gmail.send`, `gmail.labels`, or `gmail.metadata` scopes alone do not cover the full eval surface. Gmail Watch delivery also requires Cloud Pub/Sub setup outside OAuth: grant publish rights on the topic to `gmail-api-push@system.gserviceaccount.com`."
 
   - slug: google-calendar
     display_name: Google Calendar
@@ -170,11 +332,32 @@ integrations:
     package: "@relayfile/adapter-google-calendar"
     nango_slug: google-calendar
     auth_model: google_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/calendar.events
     candidate_scopes: []
-    sources: []
-    notes: "Research event read/write and watch channel requirements."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/google-calendar
+      - https://nango.dev/docs/api-integrations/google-calendar/how-to-register-your-own-google-calendar-api-oauth-app
+      - https://nango.dev/docs/api-integrations/google-calendar/webhooks
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/google-calendar
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/syncs/events.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/actions/create-event.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/actions/patch-event.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/actions/delete-event.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/actions/watch-events.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-calendar/actions/stop-channel.ts
+      - https://developers.google.com/workspace/calendar/api/auth
+      - https://developers.google.com/workspace/calendar/api/v3/reference/events/list
+      - https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
+      - https://developers.google.com/workspace/calendar/api/v3/reference/events/patch
+      - https://developers.google.com/workspace/calendar/api/v3/reference/events/delete
+      - https://developers.google.com/workspace/calendar/api/v3/reference/events/watch
+      - https://developers.google.com/workspace/calendar/api/v3/reference/channels/stop
+      - https://developers.google.com/workspace/calendar/api/guides/push
+    notes: "Google Calendar uses Google OAuth scopes through Nango's `google-calendar` provider, which aliases the shared Google OAuth provider and declares no default scopes. The adapter syncs events with `events.list`, creates events with `events.insert`, patches events with `events.patch`, deletes events with `events.delete`, and manages event push channels with `events.watch` plus `channels.stop`. Google's Calendar scope guide defines `calendar.events` as view/edit access to events on all calendars, and the event list/insert/patch/delete/watch endpoint docs all accept `https://www.googleapis.com/auth/calendar.events`; narrower read-only, owned-calendar, app-created-calendar, freebusy, public-readonly, calendar-list, calendar metadata, ACL, or full `calendar` scopes are not required for the current eval surface. Push notifications are direct webhook channels rather than a separate cloud IAM grant; `channels.stop` must be called by the same user/client that created the channel."
 
   - slug: google-drive
     display_name: Google Drive
@@ -183,11 +366,35 @@ integrations:
     package: "@relayfile/google-drive"
     nango_slug: google-drive
     auth_model: google_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/drive.file
+      - https://www.googleapis.com/auth/drive.metadata.readonly
     candidate_scopes: []
-    sources: []
-    notes: "Research Drive file read/write and Watch API requirements."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/google-drive
+      - https://nango.dev/docs/api-integrations/google-drive/how-to-register-your-own-google-drive-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/google-drive
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/syncs/documents.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/actions/upload-document.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/actions/update-file.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/actions/delete-file.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/actions/get-changes-start-page-token.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/google-drive/actions/list-changes.ts
+      - https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/get
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/create
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/update
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/delete
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/watch
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/getStartPageToken
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/list
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/watch
+      - https://developers.google.com/workspace/drive/api/guides/push
+    notes: "Google Drive uses Google OAuth through Nango's `google-drive` provider, which aliases the shared Google provider and declares no default scopes. The Relayfile adapter's least-privilege app-visible file model needs `drive.file` for Drive file create/update/delete and content access to files the app creates, opens, or is explicitly given through Picker/share flows, and `drive.metadata.readonly` for file metadata listing plus change token/list/watch behavior. Google documents `drive.file` as the non-sensitive scope for creating files and modifying app-opened/shared files, and the Drive file create/update/delete endpoint docs accept it; files.get/list/watch and changes.getStartPageToken/list/watch accept `drive.metadata.readonly` for metadata/watch operations. Nango's templates align write actions to `drive.file` and change actions to read/metadata scopes. If Relayfile must read, download, update, or delete every file in a user's Drive without a Picker/app-visible constraint, the restricted `https://www.googleapis.com/auth/drive` scope would be required instead; that broader all-file scope is not included in the minimum set for the current adapter model. Drive push notifications require HTTPS callback channels and optional channel tokens, not a separate cloud IAM grant."
 
   - slug: hubspot
     display_name: HubSpot
@@ -196,11 +403,39 @@ integrations:
     package: "@relayfile/adapter-hubspot"
     nango_slug: hubspot
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - crm.objects.contacts.read
+      - crm.objects.contacts.write
+      - crm.objects.companies.read
+      - crm.objects.companies.write
+      - crm.objects.deals.read
+      - crm.objects.deals.write
+      - crm.objects.tickets.read
+      - crm.objects.tickets.write
+      - tickets
     candidate_scopes: []
-    sources: []
-    notes: "Research CRM object read/write and webhook app requirements."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/hubspot
+      - https://nango.dev/docs/api-integrations/hubspot/how-to-register-your-own-hubspot-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/hubspot
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/list-contacts.ts
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/create-company.ts
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/create-deal.ts
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/create-ticket.ts
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/list-tickets.ts
+      - https://github.com/NangoHQ/integration-templates/blob/main/integrations/hubspot/actions/create-association.ts
+      - https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/oauth/working-with-oauth
+      - https://developers.hubspot.com/docs/apps/legacy-apps/authentication/scopes
+      - https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/guide
+      - https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/companies/guide
+      - https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/deals/guide
+      - https://developers.hubspot.com/docs/api-reference/crm-tickets-v3/guide
+      - https://developers.hubspot.com/docs/api-reference/latest/webhooks/guide
+      - https://developers.hubspot.com/docs/apps/developer-platform/add-features/configure-webhooks
+    notes: "HubSpot uses OAuth through Nango's `hubspot` provider, which declares no default scopes, so the app must request the CRM permissions it needs. The adapter reads, creates, updates, deletes, and associates contacts, companies, deals, and tickets through CRM object endpoints; HubSpot documents granular read/write scopes for contacts, companies, and deals, and current HubSpot/Nango ticket surfaces use `crm.objects.tickets.read`, `crm.objects.tickets.write`, and the legacy `tickets` scope. HubSpot webhook subscriptions are app-level public-app configuration, not per-connection OAuth API calls; CRM webhook subscriptions require the read scope for the subscribed object type, while ticket webhook subscription types list `tickets` as the required scope. Webhook delivery also requires a public HTTPS target URL and uses HubSpot request signatures with the app client secret, not an additional OAuth grant."
 
   - slug: intercom
     display_name: Intercom
@@ -209,11 +444,26 @@ integrations:
     package: "@relayfile/adapter-intercom"
     nango_slug: intercom
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Read and list users and companies
+      - Write users and companies
+      - Read conversations
+      - Write conversations
+      - Delete conversations and metrics
+      - Read and List articles
     candidate_scopes: []
-    sources: []
-    notes: "Research conversations, contacts, companies, articles, and reply permissions."
+    sources:
+      - https://nango.dev/docs/api-integrations/intercom
+      - https://nango.dev/docs/api-integrations/intercom/how-to-register-your-own-intercom-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/intercom/.nango/nango.json
+      - https://developers.intercom.com/docs/build-an-integration/learn-more/authentication/oauth-scopes
+      - https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations
+      - https://developers.intercom.com/docs/references/rest-api/api.intercom.io/contacts
+      - https://developers.intercom.com/docs/references/rest-api/api.intercom.io/companies
+      - https://developers.intercom.com/docs/references/rest-api/api.intercom.io/articles
+    notes: "Intercom uses OAuth through Nango's `intercom` provider, but Nango's setup guide says permissions are selected in the Intercom Developer Hub rather than passed as API scopes during authorization. The adapter reads conversations, contacts, and companies; creates/updates/deletes those resources; and supports conversation replies. Intercom's OAuth permission names map that surface to Read and list users and companies plus Write users and companies for contacts/companies, Read conversations plus Write conversations for conversation read/update/reply behavior, and Delete conversations and metrics for canonical conversation delete writeback. The assigned research surface also calls out articles; the current Relayfile package does not expose article writeback, so only Read and List articles is included for Nango/template article read/fetch coverage. Webhook topics use the corresponding OAuth permission scopes and do not have a separate webhook-management scope."
 
   - slug: jira
     display_name: Jira
@@ -222,16 +472,21 @@ integrations:
     package: "@relayfile/adapter-jira"
     nango_slug: jira
     auth_model: oauth
-    scope_status: needs_review
-    required_scopes: []
-    candidate_scopes:
+    scope_status: verified
+    required_scopes:
       - read:jira-work
+      - manage:jira-project
+      - manage:jira-configuration
+      - read:jira-user
       - write:jira-work
       - manage:jira-webhook
       - offline_access
+    candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/jira
-    notes: "Candidate scopes are for current app registration convenience; verify exact Jira issue/project/sprint/comment and webhook needs before marking verified."
+      - https://developer.atlassian.com/cloud/jira/software/scopes-for-oauth-2-3LO-and-forge-apps/
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian classic OAuth scope docs. Includes read/write issue and project data, user profile access, project/global administration, webhook management, and offline_access for long-lived Nango OAuth connections."
 
   - slug: linear
     display_name: Linear
@@ -256,11 +511,27 @@ integrations:
     package: "@relayfile/adapter-mailgun"
     nango_slug: mailgun
     auth_model: api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "Mailgun API key: Developer role or Admin/account API key"
+      - "Domains: Read"
+      - "Messages: Read/Write"
+      - "Logs/Events: Read"
+      - "Webhooks: Read/Write"
+      - "Mailing Lists: Read/Write"
+      - "HTTP Webhook Signing Key"
     candidate_scopes: []
-    sources: []
-    notes: "Research whether Relayfile app registration has scopes; likely API-key/domain-token based."
+    sources:
+      - https://nango.dev/docs/integrations/all/mailgun
+      - https://nango.dev/docs/integrations/all/mailgun/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/mailgun
+      - https://documentation.mailgun.com/docs/mailgun/api-reference/mg-auth
+      - https://documentation.mailgun.com/docs/mailgun/user-manual/api-key-mgmt/rbac-mgmt
+      - https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun
+      - https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/account-management/get-v5-accounts-http_signing_key
+      - https://help.mailgun.com/hc/en-us/articles/203380100-Where-can-I-find-my-API-keys-and-SMTP-credentials
+    notes: "Mailgun's Nango provider uses BASIC auth with username/api-key credentials and a region config, not OAuth scopes. Relayfile's current Mailgun surface reads domain message/events/list data, sends messages, creates/updates lists and list members, and consumes webhook payloads. A Domain Sending Key is too narrow because it only covers sending for one domain; use an account/RBAC API key with Developer or Admin permissions, which Mailgun documents as Read/Write for Domains, Messages, Webhooks, Logs, and Mailing Lists. Webhook verification also needs the account HTTP Webhook Signing Key. No Nango integration template exists for mailgun."
 
   - slug: mixpanel
     display_name: Mixpanel
@@ -269,11 +540,29 @@ integrations:
     package: "@relayfile/adapter-mixpanel"
     nango_slug: mixpanel
     auth_model: oauth_or_service_account
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "Mixpanel service account username and secret via HTTP Basic auth"
+      - "Project Admin or Project Owner role for server-side event import and user profile create/edit/delete"
+      - "Project Analyst or higher for Query API reads, cohort reads, and cohort export; Project Admin/Owner covers the full Relayfile writeback surface"
+      - "project_id request parameter for service-account-authenticated Query API requests"
+      - "workspace_id request parameter when the Mixpanel project uses Data Views"
+      - "Project Token for /track and user profile ingestion endpoints that use token-based ingestion"
+      - "Paid Mixpanel plan and custom webhook destination for cohort sync webhooks"
     candidate_scopes: []
-    sources: []
-    notes: "Research analytics read/export and profile/cohort requirements."
+    sources:
+      - https://nango.dev/docs/integrations/all/mixpanel
+      - https://nango.dev/docs/integrations/all/mixpanel/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/mixpanel
+      - https://developer.mixpanel.com/reference/service-accounts
+      - https://developer.mixpanel.com/reference/query-api-authentication
+      - https://developer.mixpanel.com/reference/ingestion-api-authentication
+      - https://developer.mixpanel.com/reference/import-events
+      - https://developer.mixpanel.com/reference/project-token
+      - https://docs.mixpanel.com/docs/orgs-and-projects/roles-and-permissions
+      - https://docs.mixpanel.com/docs/cohort-sync/webhooks
+    notes: "Mixpanel does not use OAuth scopes for the Nango `mixpanel` provider; Nango configures Basic auth with a Mixpanel service account username and secret and no default scopes. Relayfile reads events, profiles, and cohorts through the Query API, which prefers service accounts and requires `project_id` plus `workspace_id` for Data Views. Relayfile writeback covers `/track`, `/import`, `/engage`, profile deletion, and cohort update behavior: Mixpanel documents most ingestion calls as project-token based, `/import` as requiring an Owner/Admin service account, and project roles as allowing Admin/Owner to create/edit/delete user profiles while Analyst or higher can export cohorts. Cohort webhook ingestion is configured as a paid-plan custom webhook destination in Mixpanel UI, not an OAuth scope. No Nango integration template exists for mixpanel."
 
   - slug: notion
     display_name: Notion
@@ -282,11 +571,32 @@ integrations:
     package: "@relayfile/adapter-notion"
     nango_slug: notion
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - "Connection capability: Read content"
+      - "Connection capability: Update content"
+      - "Connection capability: Insert content"
+      - "Connection capability: Read comments"
+      - "Connection capability: Insert comments"
     candidate_scopes: []
-    sources: []
-    notes: "Research page/database/block/comment read and write capabilities."
+    sources:
+      - https://nango.dev/docs/api-integrations/notion
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/notion
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/notion/actions/create-page.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/notion/actions/update-page-markdown.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/notion/actions/create-comment.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/notion/actions/list-comments.ts
+      - https://developers.notion.com/reference/capabilities
+      - https://developers.notion.com/reference/retrieve-a-page
+      - https://developers.notion.com/reference/post-page
+      - https://developers.notion.com/reference/patch-page
+      - https://developers.notion.com/reference/get-block-children
+      - https://developers.notion.com/reference/patch-block-children
+      - https://developers.notion.com/reference/create-a-comment
+      - https://developers.notion.com/guides/data-apis/working-with-comments
+      - https://developers.notion.com/reference/webhooks
+    notes: "Notion uses OAuth through Nango, but resource access is controlled by Notion connection capabilities selected in the Creator dashboard rather than provider OAuth scope strings; Nango's provider registry declares the `notion` OAuth2 provider and no default_scopes. The adapter reads/searches shared pages and databases, queries database pages, retrieves page properties, block children, markdown content, and optional comments, and ingests page/database/block webhook payloads by refetching the changed object. It writes page properties, replaces page markdown, archives pages, creates pages in databases, and creates comments. Notion maps these operations to Read content, Update content, Insert content, Read comments, and Insert comments. Webhook subscriptions are configured on the Notion connection Webhooks tab, not through a separate OAuth scope; event delivery still depends on object access and relevant capabilities such as Read comments for comment.created."
 
   - slug: onedrive
     display_name: OneDrive
@@ -295,11 +605,31 @@ integrations:
     package: "@relayfile/onedrive"
     nango_slug: one-drive
     auth_model: microsoft_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Files.ReadWrite.All
+      - offline_access
     candidate_scopes: []
-    sources: []
-    notes: "Research Microsoft Graph file read/write and subscription permissions."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/one-drive
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/one-drive
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/one-drive/.nango/nango.json
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/one-drive/actions/list-drives.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/one-drive/actions/fetch-file.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/one-drive/syncs/user-files.ts
+      - https://learn.microsoft.com/en-us/graph/api/drive-list?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-list-children?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-update?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-delete?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-post-children?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/permissions-reference#filesreadwriteall
+      - https://learn.microsoft.com/en-us/graph/auth-v2-user#offline-access
+    notes: "OneDrive for Business uses Microsoft Graph delegated OAuth through Nango's `one-drive` provider, which aliases the shared Microsoft OAuth provider. The Nango templates use `Files.Read` plus `Files.Read.All` for listing drives, fetching file metadata/download URLs, and syncing files; the Relayfile adapter also performs `/me/drive/root/delta`, item create/update/delete/writeback, and Graph subscription lifecycle calls. `Files.ReadWrite.All` is the minimum single Graph delegated permission that covers reading, creating, updating, and deleting all files the signed-in user can access, including the read permission needed for driveItem change subscriptions. `offline_access` is required so Nango can refresh Microsoft access tokens for recurring syncs and webhook/subscription maintenance."
 
   - slug: pipedrive
     display_name: Pipedrive
@@ -308,11 +638,23 @@ integrations:
     package: "@relayfile/adapter-pipedrive"
     nango_slug: pipedrive
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - deals:full
+      - contacts:full
+      - activities:full
     candidate_scopes: []
-    sources: []
-    notes: "Research deals/persons/organizations/activities read/write scopes."
+    sources:
+      - https://nango.dev/docs/api-integrations/pipedrive
+      - https://nango.dev/docs/api-integrations/pipedrive/how-to-register-your-own-pipedrive-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/pipedrive/syncs/deals.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/pipedrive/syncs/persons.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/pipedrive/syncs/organizations.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/pipedrive/syncs/activities.ts
+      - https://pipedrive.readme.io/docs/marketplace-scopes-and-permissions-explanations
+      - https://pipedrive.readme.io/docs/webhooks-for-apps
+    notes: "Pipedrive uses OAuth through Nango's `pipedrive` provider; the provider registry declares OAuth 2.0 and no default scopes, while Nango's Pipedrive templates use `deals:read`, `contacts:read`, and `activities:read` for read syncs. The Relayfile adapter reads, creates, updates, and deletes deals, persons, organizations, and activities, so Pipedrive's full object scopes are the minimum OAuth scopes for that read/write surface: `deals:full` covers deal CRUD and read access included by `deals:read`, `contacts:full` covers person and organization CRUD and read access included by `contacts:read`, and `activities:full` covers activity CRUD and read access included by `activities:read`. The adapter normalizes and ingests incoming webhooks but does not create, list, or delete Pipedrive webhooks; if Relayfile later provisions app-specific webhooks through `/webhooks`, Pipedrive documents that the additional `admin` scope is required."
 
   - slug: postgres
     display_name: Postgres
@@ -347,13 +689,31 @@ integrations:
     category: storage
     status: implemented
     package: "@relayfile/s3"
-    nango_slug:
+    nango_slug: aws-iam
     auth_model: aws_iam
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - s3:ListBucket
+      - s3:GetObject
+      - s3:PutObject
+      - s3:DeleteObject
+      - s3:GetBucketNotification
+      - s3:PutBucketNotification
+      - sqs:ReceiveMessage
+      - sqs:DeleteMessage
+      - "SQS queue resource policy: allow Service s3.amazonaws.com to call SQS:SendMessage from the target bucket ARN"
     candidate_scopes: []
-    sources: []
-    notes: "Research AWS IAM actions for object read/write, bucket listing, and SQS event source integration."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://nango.dev/docs/api-integrations/aws-iam
+      - https://nango.dev/docs/api-integrations/aws-iam/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html
+      - https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-api-permissions-reference.html
+      - https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-event-types-and-destinations.html
+      - https://docs.aws.amazon.com/AmazonS3/latest/userguide/grant-destinations-permissions-to-s3.html
+    notes: "Amazon S3 through Nango uses the aws-iam provider with AWS access-key credentials and SigV4 signing, not OAuth scopes, so OAuth scope_status is not_applicable. The minimum IAM policy grants for the Relayfile object surface are bucket listing plus object get/put/delete on the target bucket and object ARNs. S3-to-SQS event source setup requires reading/updating the bucket notification configuration, polling and acknowledging the destination SQS queue, and a queue resource policy that grants the S3 service principal SQS:SendMessage from the target bucket. Additional KMS grants are conditional only when S3 objects or the SQS destination use customer-managed KMS keys."
 
   - slug: salesforce
     display_name: Salesforce
@@ -362,11 +722,22 @@ integrations:
     package: "@relayfile/adapter-salesforce"
     nango_slug: salesforce
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - api
+      - offline_access
     candidate_scopes: []
-    sources: []
-    notes: "Research sObject read/write, refresh token/offline access, and webhook/outbound event needs."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://nango.dev/docs/api-integrations/salesforce
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/salesforce
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/salesforce/.nango/nango.json
+      - https://help.salesforce.com/s/articleView?id=sf.remoteaccess_oauth_tokens_scopes.htm&language=en_US&type=5
+      - https://developer.salesforce.com/blogs/2024/04/accessing-object-data-with-salesforce-platform-apis
+      - https://help.salesforce.com/s/articleView?id=platform.workflow_managing_outbound_messages.htm&type=5
+    notes: "Salesforce uses OAuth scopes through Nango's `salesforce` provider, which is OAuth2 and defaults to `offline_access`. The adapter reads Salesforce records through SOQL `/query`, reads individual sObject rows, and creates, updates, replaces, and deletes Account, Contact, Opportunity, Lead, and Case records through REST sObject endpoints. Salesforce documents `api` as API access to the logged-in user's account, including REST API access, and `offline_access`/`refresh_token` as the refresh-token grant; Nango's provider and Salesforce templates use `offline_access` plus `api` for these read/write actions. Object, field, and sharing access still depends on the authorizing Salesforce user's profile and permission sets. The current Relayfile package normalizes inbound outbound-message/webhook payloads but does not provision outbound messages, CDC, or Streaming API subscriptions, so webhook delivery does not add a separate OAuth scope for the current eval surface; Salesforce outbound messages are configured in Setup with an endpoint URL and are sent as a selected Salesforce user."
 
   - slug: segment
     display_name: Segment
@@ -375,11 +746,22 @@ integrations:
     package: "@relayfile/adapter-segment"
     nango_slug: segment
     auth_model: oauth_or_api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - workspace:read
+      - public_api:read_write
+      - tracking_api:write
+      - "Source Write Key for the target Segment source"
     candidate_scopes: []
-    sources: []
-    notes: "Research source/destination/tracking API permissions."
+    sources:
+      - https://nango.dev/docs/integrations/all/segment
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://segment.com/docs/partners/enable-with-segment/
+      - https://segment.com/docs/connections/oauth/
+      - https://segment.com/docs/connections/sources/catalog/libraries/server/http-api/
+      - https://docs.segmentapis.com/tag/Authentication/
+      - https://docs.segmentapis.com/tag/Delivery-Overview/
+    notes: "Segment has a mixed permission model. Nango's `segment` provider is OAuth2 against Segment's partner OAuth endpoints and declares no default scopes, and Nango has no pre-built Segment syncs/actions to narrow the surface. The adapter reads Delivery Overview filtered-at-source metrics, which Segment's partner OAuth docs map to the read-only `workspace:read` scope for workspace settings, metadata, and event-delivery metrics; Segment's source OAuth model separately documents `public_api:read_write` as the only Public API OAuth scope. Writeback sends Tracking API identify, track, page, group, and batch calls; Segment's Tracking API authenticates with the target source Write Key through body or Basic auth, and Segment's OAuth 2.0 source auth uses `tracking_api:write` when OAuth is used for ingestion. Segment Public API tokens are workspace-scoped and role/permission-bound, so API-key deployments should use a token with access to the target workspace/source plus the source Write Key. The current adapter ingests incoming Segment webhook/destination payloads but does not provision Segment destinations or source subscriptions, so `destination/<slug>` or full `workspace` OAuth is not required for the current eval surface."
 
   - slug: sendgrid
     display_name: SendGrid
@@ -388,11 +770,26 @@ integrations:
     package: "@relayfile/adapter-sendgrid"
     nango_slug: sendgrid
     auth_model: api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - mail.send
+      - marketing.read
+      - email_activity.read
     candidate_scopes: []
-    sources: []
-    notes: "Research API key scopes for mail send, templates, contacts, and event webhooks."
+    sources:
+      - https://nango.dev/docs/integrations/all/sendgrid
+      - https://nango.dev/docs/integrations/all/sendgrid/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/sendgrid
+      - https://www.twilio.com/docs/sendgrid/ui/account-and-settings/api-keys
+      - https://www.twilio.com/docs/sendgrid/api-reference/api-key-permissions
+      - https://www.twilio.com/docs/sendgrid/api-reference/mail-send/mail-send
+      - https://www.twilio.com/docs/sendgrid/api-reference/contacts/add-or-update-a-contact
+      - https://www.twilio.com/docs/sendgrid/for-developers/sending-email/getting-started-email-activity-api
+      - https://www.twilio.com/docs/sendgrid/api-reference/email-activity/filter-messages-by-message-id
+      - https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook
+      - https://www.twilio.com/docs/sendgrid/for-developers/tracking-events/getting-started-event-webhook-security-features
+    notes: "SendGrid uses API-key authentication through Nango, not OAuth app scopes. Nango's provider registry declares `sendgrid` with auth_mode API_KEY and no default scopes, and the Nango SendGrid docs have no pre-built syncs or actions. Relayfile's writeback surface sends `/v3/mail/send` and upserts contacts through `/v3/marketing/contacts`; SendGrid documents `mail.send` for Mail Send and the `marketing.read` API-key permission as read/write access to the Email Marketing API, which covers contacts. Relayfile's read resolver fetches `/v3/marketing/contacts` and `/v3/messages/{id}`; Email Activity reads require Email Activity access, represented in SendGrid's API-key permission list as `email_activity.read`, plus the paid Email Activity history add-on. Mail send can reference an existing `template_id`, but the adapter does not create, read, update, or delete template resources, so `templates.*` is not required for the current eval surface. The current adapter consumes Event Webhook payloads and verifies signatures with the webhook public key but does not provision or update SendGrid Event Webhook settings; if Relayfile later provisions webhooks through SendGrid's API, add `user.webhooks.event.settings.read`, `user.webhooks.event.settings.update`, and the relevant `user.webhooks.event.test.*` permissions."
 
   - slug: sharepoint
     display_name: SharePoint
@@ -401,11 +798,35 @@ integrations:
     package: "@relayfile/sharepoint"
     nango_slug: sharepoint-online
     auth_model: microsoft_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Files.ReadWrite.All
+      - Sites.Read.All
+      - offline_access
     candidate_scopes: []
-    sources: []
-    notes: "Research Microsoft Graph sites/files read/write and subscription permissions."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://nango.dev/docs/api-integrations/sharepoint-online
+      - https://nango.dev/docs/api-integrations/sharepoint-online/how-to-register-your-own-sharepoint-online-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/sharepoint-online
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/sharepoint-online/actions/fetch-file.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/sharepoint-online/actions/list-shared-sites.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/sharepoint-online/syncs/user-files.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/sharepoint-online/syncs/user-files-selection.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/sharepoint-online/syncs/shared-sites-selection.ts
+      - https://learn.microsoft.com/en-us/graph/api/site-get?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/drive-list?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-list-children?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-update?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/permissions-reference#filesreadwriteall
+      - https://learn.microsoft.com/en-us/graph/permissions-reference#sitesreadall
+      - https://learn.microsoft.com/en-us/graph/auth-v2-user#offline-access
+    notes: "SharePoint Online v2 uses Microsoft Graph delegated OAuth through Nango's `sharepoint-online` provider, which aliases the shared Microsoft OAuth provider. Nango's provider registry declares the Microsoft provider with `offline_access` and `.default`, and Nango's SharePoint setup guide requires `Sites.Read.All` for SharePoint token issuance. Relayfile reads SharePoint file metadata/content, lists drives and drive children through Graph, writes driveItem metadata/content under `/v1.0/sites/{siteId}/drives/{driveId}/items/{itemId}`, and manages Graph subscription records. `Files.ReadWrite.All` is the minimum single delegated file permission that covers the adapter's SharePoint document-library file reads plus create/update/upload behavior across files the signed-in user can access. `Sites.Read.All` covers SharePoint site/list discovery and Graph list subscription read requirements; `Sites.ReadWrite.All` is not required because the adapter writes driveItems, not SharePoint sites or lists. Graph subscriptions require read permission for the subscribed resource: driveItem subscriptions use file read access, while SharePoint list subscriptions use `Sites.Read.All`; the current adapter accepts subscription resources but does not request security-event rich notifications or provision selected-site grants. `offline_access` is required so Nango can refresh tokens for recurring syncs and subscription maintenance."
 
   - slug: shopify
     display_name: Shopify
@@ -414,11 +835,32 @@ integrations:
     package: "@relayfile/adapter-shopify"
     nango_slug: shopify
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - read_products
+      - write_products
+      - read_orders
+      - write_orders
+      - read_customers
+      - write_customers
+      - read_fulfillments
+      - write_fulfillments
+      - Protected customer data access
+      - "Protected customer fields: Name, Address, Email, Phone"
     candidate_scopes: []
-    sources: []
-    notes: "Research products, orders, customers, fulfillments, and webhook scopes."
+    sources:
+      - https://nango.dev/docs/api-integrations/shopify
+      - https://nango.dev/docs/api-integrations/shopify/how-to-register-your-own-shopify-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/refs/heads/main/integrations/shopify/.nango/nango.json
+      - https://shopify.dev/docs/api/usage/access-scopes
+      - https://shopify.dev/docs/api/admin-rest/latest/resources/order
+      - https://shopify.dev/docs/api/admin-rest/latest/resources/product
+      - https://shopify.dev/docs/api/admin-rest/latest/resources/customer
+      - https://shopify.dev/docs/api/admin-rest/latest/resources/fulfillment
+      - https://shopify.dev/docs/api/admin-rest/latest/resources/webhook
+      - https://shopify.dev/docs/apps/launch/protected-customer-data
+    notes: "Shopify uses Admin API OAuth scopes. Nango's `shopify` provider is OAuth2 and does not declare default scopes; its template only covers order sync with read_customers and read_orders, so the adapter's broader eval surface is mapped from Shopify's official Admin API access-scope and REST resource docs. Relayfile reads and writes products, orders, customers, and fulfillments, and ingests product/order/customer/fulfillment webhook topics. Shopify maps product, order, customer, and fulfillment resources/webhook topics to the corresponding products, orders, customers, and fulfillments access-scope groups, so the app should request both read_* and write_* scopes for those groups. There is no separate Shopify webhook OAuth scope; webhook subscriptions require the relevant resource scopes for the subscribed topics. Because the adapter reads and writes order/customer/shipping/fulfillment fields that include names, addresses, emails, and phone numbers, public apps also need Shopify protected customer data access and protected customer field approval for those fields. `read_all_orders` is not included because it is only needed for orders older than Shopify's default 60-day order window and requires separate Partner Dashboard approval."
 
   - slug: slack
     display_name: Slack
@@ -453,11 +895,35 @@ integrations:
     package: "@relayfile/adapter-stripe"
     nango_slug: stripe
     auth_model: oauth_or_restricted_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - read_write
+      - customer_write
+      - invoice_write
+      - subscription_write
+      - charge_write
+      - payment_intent_write
+      - webhook_write
     candidate_scopes: []
-    sources: []
-    notes: "Research connected account OAuth or restricted key permissions for customers, invoices, subscriptions, charges, and refunds."
+    sources:
+      - https://nango.dev/docs/api-integrations/stripe
+      - https://nango.dev/docs/api-integrations/stripe/how-to-register-your-own-stripe-api-oauth-app
+      - https://nango.dev/docs/api-integrations/stripe-api-key
+      - https://nango.dev/docs/api-integrations/stripe-api-key/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/stripe
+      - https://docs.stripe.com/connect/oauth-standard-accounts
+      - https://docs.stripe.com/connect/oauth-reference
+      - https://docs.stripe.com/keys
+      - https://docs.stripe.com/stripe-apps/reference/permissions
+      - https://docs.stripe.com/api/customers
+      - https://docs.stripe.com/api/invoices
+      - https://docs.stripe.com/api/subscriptions
+      - https://docs.stripe.com/api/charges
+      - https://docs.stripe.com/api/refunds
+      - https://docs.stripe.com/api/payment_intents
+      - https://docs.stripe.com/api/webhook_endpoints
+    notes: "Stripe uses two relevant permission models for this adapter. Nango's `stripe` provider is Stripe Connect OAuth and Stripe's Connect OAuth docs require the `read_write` scope for write-capable connected-account API access; `read_only` is the default and is insufficient for customer, invoice, subscription, refund, and payment intent writeback. Nango's `stripe-api-key` provider uses Stripe restricted API keys, where users configure per-resource Read or Write grants in the Dashboard. The Stripe permission reference maps the adapter's object families to customer_write, invoice_write, subscription_write, charge_write for charges and refunds, payment_intent_write, and webhook_write for API-managed webhook endpoints or event destinations. Relayfile reads customers, invoices, subscriptions, charges, and payment intents; writes customers, invoices, subscriptions, payment intents, and refunds; and ingests Stripe webhook events. If webhooks are configured manually outside the API, webhook_write is an operational setup grant rather than a runtime read/write requirement."
 
   - slug: teams
     display_name: Microsoft Teams
@@ -466,11 +932,40 @@ integrations:
     package: "@relayfile/adapter-teams"
     nango_slug: microsoft-teams
     auth_model: microsoft_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Channel.ReadBasic.All
+      - Team.ReadBasic.All
+      - TeamMember.Read.All
+      - TeamsTab.Read.All
+      - ChannelMessage.Read.All
+      - Chat.Read.All
+      - ChannelMessage.Send
+      - ChannelMessage.ReadWrite
+      - Chat.ReadWrite
+      - offline_access
     candidate_scopes: []
-    sources: []
-    notes: "Research Microsoft Graph channel/chat/message read/write and subscription permissions."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://nango.dev/docs/api-integrations/microsoft-teams
+      - https://nango.dev/docs/api-integrations/microsoft-teams/how-to-register-your-own-microsoft-teams-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/microsoft-teams
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/microsoft-teams/syncs/messages.md
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/microsoft-teams/syncs/messages.ts
+      - https://learn.microsoft.com/en-us/graph/api/channel-list-messages?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/chat-list-messages?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/chat-get?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/chatmessage-post?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/chatmessage-softdelete?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/team-get-members?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.teams/get-mgteamchanneltab?view=graph-powershell-1.0
+      - https://learn.microsoft.com/en-us/graph/teams-changenotifications-chatmessage
+      - https://learn.microsoft.com/en-us/graph/teams-changenotifications-team-and-channel
+      - https://learn.microsoft.com/en-us/graph/teams-changenotifications-teammembership
+      - https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0
+    notes: "Microsoft Teams uses Microsoft Graph permissions. Nango's `microsoft-teams` provider aliases the shared Microsoft OAuth provider, whose registry default is `offline_access` plus `.default`; Nango's Teams setup guide tells operators to add required delegated Microsoft Graph permissions in Entra, and its maintained messages sync declares `ChannelMessage.Read.All` and `Chat.Read.All`. Relayfile reads team/channel metadata, members, tabs, channel messages/replies, chat metadata/messages, and reactions, and writes channel messages, channel replies, and chat messages. The read surface maps to `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `TeamMember.Read.All`, `TeamsTab.Read.All`, `ChannelMessage.Read.All`, and `Chat.Read.All`. Message create writeback uses delegated `ChannelMessage.Send`; Microsoft documents application message send only through migration-only `Teamwork.Migrate.All`, so that is not included for normal app behavior. Message deletion is delegated-only in Graph's `chatMessage: softDelete` API and requires `ChannelMessage.ReadWrite` for channel messages/replies and `Chat.ReadWrite` for chat messages; the current adapter's delete resolver should use Graph softDelete semantics for real deletion. Graph subscriptions require read permission for the subscribed resource: tenant-wide `/teams/getAllMessages`, `/chats/getAllMessages`, `/teams/getAllChannels`, and `/teams` presets are application-only, while team/channel/chat scoped presets can use delegated or application permissions depending on the resource. This means the full eval surface is a mixed model: delegated OAuth with `offline_access` for user-scoped read/write, plus admin-consented Graph application permissions when tenant-wide subscription presets are enabled."
 
   - slug: zendesk
     display_name: Zendesk
@@ -479,11 +974,42 @@ integrations:
     package: "@relayfile/adapter-zendesk"
     nango_slug: zendesk
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - tickets:read
+      - tickets:write
+      - users:read
+      - users:write
+      - organizations:read
+      - organizations:write
     candidate_scopes: []
-    sources: []
-    notes: "Research tickets/users/organizations read/write and webhook requirements."
+    sources:
+      - https://nango.dev/docs/api-integrations/zendesk
+      - https://nango.dev/docs/api-integrations/zendesk/how-to-register-your-own-zendesk-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/zendesk/.nango/nango.json
+      - https://developer.zendesk.com/api-reference/ticketing/oauth/grant_type_tokens/
+      - https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/
+      - https://developer.zendesk.com/api-reference/webhooks/webhooks-api/webhooks/
+      - https://developer.zendesk.com/api-reference/webhooks/event-types/webhook-event-types/
+    notes: "Zendesk uses OAuth scope strings. Nango's zendesk provider is OAuth2 and has no default scopes; its Zendesk templates use tickets:read/tickets:write and users:read/users:write for the matching sync/action surfaces. Zendesk's official OAuth docs define resource-specific read/write scopes and list tickets, users, organizations, and webhooks as scopeable resources; read covers GET endpoints and write covers POST, PUT, and DELETE endpoints. The adapter reads tickets, users, and organizations; writes tickets and ticket comments, users, and organizations; and deletes tickets, users, and organizations, so the listed ticket/user/organization scopes are the minimum current read/write set. Incoming webhook normalization and ingestion does not require an OAuth scope. If Relayfile later provisions Zendesk webhooks by API, add webhooks:read/webhooks:write for webhook management and trigger/automation scopes if it also creates ticket-activity rules."
+
+  - slug: compass
+    display_name: Compass
+    category: dev-tools
+    status: gap
+    package:
+    nango_slug: compass
+    auth_model: oauth
+    scope_status: verified
+    required_scopes:
+      - read:component:compass
+      - read:metric:compass
+    candidate_scopes: []
+    sources:
+      - https://developer.atlassian.com/cloud/compass/graphql/
+      - https://developer.atlassian.com/platform/forge/manifest-reference/scopes-product-compass/
+    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian Compass GraphQL scope docs. Includes the selected component and metric read scopes; event read/write scopes were visible but not selected in the screenshot."
 
   - slug: confluence
     display_name: Confluence
@@ -492,11 +1018,23 @@ integrations:
     package:
     nango_slug: confluence
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - write:confluence-content
+      - read:confluence-space.summary
+      - write:confluence-space
+      - read:confluence-content.all
+      - read:confluence-content.summary
+      - search:confluence
+      - read:confluence-user
+      - read:confluence-groups
+      - write:confluence-groups
     candidate_scopes: []
-    sources: []
-    notes: "High-priority gap; research page/content read/write and comment permissions."
+    sources:
+      - https://nango.dev/docs/api-integrations/confluence
+      - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshots and Atlassian classic OAuth scope docs. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes."
 
   - slug: google-docs
     display_name: Google Docs
@@ -505,11 +1043,26 @@ integrations:
     package:
     nango_slug: google-docs
     auth_model: google_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/documents
+      - https://www.googleapis.com/auth/drive.metadata.readonly
     candidate_scopes: []
-    sources: []
-    notes: "High-priority gap; research document read/write scopes and Drive coupling."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/docs/api-integrations/google-docs
+      - https://nango.dev/docs/api-integrations/google-docs/how-to-register-your-own-google-docs-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/google-docs
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-docs/proxy/fetch-document.ts
+      - https://developers.google.com/workspace/docs/api/auth
+      - https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/get
+      - https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/create
+      - https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/batchUpdate
+      - https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/watch
+    notes: "Google Docs uses Google OAuth through Nango's `google-docs` provider, which aliases the shared Google provider and declares no default scopes. The Nango template fetches documents by ID through the Docs API. Google's Docs API scope guide defines `documents` as read/write/create/delete access for Google Docs documents, and documents.get/create/batchUpdate all accept `https://www.googleapis.com/auth/documents`. Drive coupling is needed for discovery and change notifications because the Docs API does not list or watch documents directly; Drive files.list and changes.watch accept `https://www.googleapis.com/auth/drive.metadata.readonly`, avoiding broader `drive`/`drive.readonly` file-content scopes. `drive.file` is a valid narrower per-file alternative for apps using Picker or app-created/shared files, but it is not sufficient for an all-docs sync surface unless Relayfile intentionally limits access to selected files."
 
   - slug: google-sheets
     display_name: Google Sheets
@@ -518,11 +1071,32 @@ integrations:
     package:
     nango_slug: google-sheet
     auth_model: google_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/spreadsheets
+      - https://www.googleapis.com/auth/drive.metadata.readonly
     candidate_scopes: []
-    sources: []
-    notes: "High-priority gap; research spreadsheet read/write scopes and Drive coupling."
+    sources:
+      - https://nango.dev/docs/api-integrations/google-sheet
+      - https://nango.dev/docs/api-integrations/google-sheet/how-to-register-your-own-google-sheet-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/google-sheet
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-sheet/syncs/rows.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-sheet/syncs/worksheets.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-sheet/actions/create-spreadsheet.ts
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/google-sheet/actions/update-values.ts
+      - https://developers.google.com/workspace/sheets/api/scopes
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/get
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/create
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/get
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/update
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/append
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets.values/clear
+      - https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/batchUpdate
+      - https://developers.google.com/workspace/drive/api/guides/api-specific-auth
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list
+      - https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/watch
+    notes: "Google Sheets uses Google OAuth through Nango's `google-sheet` provider, which aliases the shared Google provider and declares no default scopes. The Nango template reads rows and worksheets and exposes create/update/append/clear/batchUpdate-style spreadsheet write actions; Google's Sheets API scope guide defines `https://www.googleapis.com/auth/spreadsheets` as see/edit/create/delete access for Google Sheets spreadsheets, and the relevant Sheets read/write/create endpoints accept it. Drive coupling is needed for file discovery and change notifications because the Sheets API does not list or watch spreadsheet files directly; Drive files.list and changes.watch accept `https://www.googleapis.com/auth/drive.metadata.readonly`, avoiding broader Drive content scopes. `drive.file` is a narrower alternative only for app-created or user-selected files, but it is insufficient for an all-spreadsheets discovery/sync surface."
 
   - slug: freshdesk
     display_name: Freshdesk
@@ -531,11 +1105,18 @@ integrations:
     package:
     nango_slug: freshdesk
     auth_model: oauth_or_api_key
-    scope_status: pending
+    scope_status: not_applicable
     required_scopes: []
     candidate_scopes: []
-    sources: []
-    notes: "High-priority support gap; research tickets/contacts/companies read/write."
+    sources:
+      - https://nango.dev/docs/api-integrations/freshdesk
+      - https://nango.dev/docs/api-integrations/freshdesk/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/freshdesk
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/freshdesk/.nango/nango.json
+      - https://developers.freshdesk.com/api/
+      - https://support.freshdesk.com/support/solutions/folders/272646
+    notes: "Freshdesk through Nango uses Basic authentication with a Freshdesk API key as the username and a dummy password, not OAuth scopes. Nango's Freshdesk templates declare empty scopes for contacts/users actions and articles/contacts/tickets/users syncs. Freshdesk API access for tickets, contacts, companies, and related read/write endpoints depends on the Freshdesk user/agent role tied to the API key; webhooks are configured through Freshdesk automation/app facilities rather than requestable OAuth scopes. Use an API key for an agent with the necessary ticket, contact, company, and automation/admin permissions for the adapter surface."
 
   - slug: service-now
     display_name: ServiceNow
@@ -544,11 +1125,28 @@ integrations:
     package:
     nango_slug: servicenow
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - web_service
+      - "ServiceNow role: itil"
+      - "ServiceNow role: snc_platform_rest_api_access"
+      - "Table ACL grants: read/create/update/delete on incident and any other enabled ITSM tables in the adapter surface"
+      - "REST API Auth Scope records for Table API and Attachment API, if enabled on the instance"
     candidate_scopes: []
-    sources: []
-    notes: "High-priority ITSM gap; verify Nango slug and table/API scopes."
+    sources:
+      - https://nango.dev/docs/integrations/all/servicenow
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://www.servicenow.com/docs/r/platform-security/authentication/oauth-inbound.html
+      - https://www.servicenow.com/docs/r/platform-security/authentication/rest-api-auth-scope.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/c_RESTAPI.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-apis/api-rest.html
+      - https://www.servicenow.com/docs/r/xanadu/platform-administration/user-administration/r_BaseSystemRoles.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/t_GetStartedCreateInt.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/t_GetStartedReadInt.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/t_GetStartedRetrieveExisting.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/get-started-update-incident.html
+      - https://www.servicenow.com/docs/r/api-reference/rest-api-explorer/t_GetStartedDeleteInt.html
+    notes: "ServiceNow uses OAuth through Nango's `servicenow` provider, but the provider registry declares no default scopes and ServiceNow does not publish a fixed global read/write scope set for Table API access. Nango's setup guide lists `web_service` as the common scope for web-service access, while ServiceNow REST authorization is ultimately enforced by the authenticated user's roles, REST API ACLs, table/field ACLs, and optional REST API Auth Scope records. For an ITSM eval surface based on incident-style Table API CRUD, grant the connected user an ITSM role such as `itil`, platform REST API access through `snc_platform_rest_api_access` when platform REST API ACLs are active, and table/field ACLs for the specific ITSM tables exposed by the adapter. ServiceNow's REST API Auth Scope is instance-configured rather than provider-fixed; include matching auth-scope records for Table API and Attachment API only if the customer instance has protected those APIs with REST API Auth Scope. Nango has no pre-built ServiceNow integration template or real-time third-party webhook support, so no additional webhook OAuth scope is listed."
 
   - slug: pagerduty
     display_name: PagerDuty
@@ -557,11 +1155,22 @@ integrations:
     package:
     nango_slug: pagerduty
     auth_model: oauth_or_api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - incidents.read
+      - incidents.write
+      - services.read
+      - escalation_policies.read
+      - webhook_subscriptions.read
+      - webhook_subscriptions.write
     candidate_scopes: []
-    sources: []
-    notes: "Incident gap; research incidents, services, escalation policies, and webhook scopes."
+    sources:
+      - https://nango.dev/docs/integrations/all/pagerduty
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developer.pagerduty.com/docs/dd91fbd09a1a1-register-an-app
+      - https://developer.pagerduty.com/api-reference/e65c5833eeb07-pager-duty-api
+      - https://raw.githubusercontent.com/PagerDuty/api-schema/main/reference/REST/openapiv3.json
+    notes: "PagerDuty supports API keys and scoped OAuth. Nango's provider registry configures PagerDuty as OAuth2 without default scopes, while the Nango integration page notes PagerDuty scope behavior at a broad read/write level. PagerDuty's official API schema lists granular scoped-OAuth requirements per endpoint: incidents.read for incident/list/detail/log data, incidents.write for create/update/manage incident flows including acknowledgement, resolution, escalation/reassignment, notes, and responder actions, services.read for service lookup, escalation_policies.read for escalation-policy lookup, and webhook_subscriptions.read/write for listing and managing webhook subscriptions. Service, escalation-policy, custom-field, subscriber, analytics, user, schedule, and team write/read scopes are not required for the current incident lifecycle eval surface."
 
   - slug: monday
     display_name: Monday.com
@@ -570,11 +1179,28 @@ integrations:
     package:
     nango_slug: monday
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - boards:read
+      - boards:write
+      - users:read
+      - updates:read
+      - updates:write
+      - webhooks:read
+      - webhooks:write
     candidate_scopes: []
-    sources: []
-    notes: "Project management gap; research boards/items/users/updates read/write scopes."
+    sources:
+      - https://nango.dev/docs/api-integrations/monday
+      - https://nango.dev/docs/api-integrations/monday/how-to-register-your-own-monday-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/monday
+      - https://developer.monday.com/apps/docs/oauth
+      - https://developer.monday.com/api-reference/docs/authentication
+      - https://developer.monday.com/api-reference/reference/items
+      - https://developer.monday.com/api-reference/reference/users
+      - https://developer.monday.com/api-reference/reference/updates
+      - https://developer.monday.com/api-reference/reference/webhooks
+    notes: "Monday uses OAuth2 through Nango's `monday` provider; the provider registry defines the authorization/token URLs and no default scopes, and there is no current Nango monday integration-template directory to refine action-level scopes. Monday's OAuth scope table defines `boards:read`/`boards:write` for board data modification, which covers board item read/create/update/delete and column value writes; `users:read` covers account user profile lookup. `updates:read` and `updates:write` cover item update/comment reads and writes. `webhooks:read` and `webhooks:write` cover webhook configuration discovery and create/modify behavior. User write/admin scopes such as `users:write`, `account:read`, or workspace/team scopes are not required for the current boards/items/users/updates/webhook eval surface."
 
   - slug: discord
     display_name: Discord
@@ -583,11 +1209,28 @@ integrations:
     package:
     nango_slug: discord
     auth_model: oauth_or_bot_token
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - "OAuth2 scope: bot"
+      - "Bot permission: VIEW_CHANNEL"
+      - "Bot permission: READ_MESSAGE_HISTORY"
+      - "Bot permission: SEND_MESSAGES"
+      - "Bot permission: SEND_MESSAGES_IN_THREADS"
+      - "Bot permission: MANAGE_WEBHOOKS"
+      - "Gateway intent: GUILDS"
+      - "Gateway intent: GUILD_MESSAGES"
+      - "Gateway intent: MESSAGE_CONTENT"
     candidate_scopes: []
-    sources: []
-    notes: "Communication gap; research bot OAuth scopes, gateway intents, and message read/write limitations."
+    sources:
+      - https://nango.dev/docs/api-integrations/discord
+      - https://nango.dev/docs/api-integrations/discord/how-to-register-your-own-discord-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://docs.discord.com/developers/topics/oauth2
+      - https://docs.discord.com/developers/topics/permissions
+      - https://docs.discord.com/developers/events/gateway
+      - https://docs.discord.com/developers/resources/message
+      - https://docs.discord.com/developers/resources/webhook
+    notes: "Discord's Relayfile eval surface should be treated as a bot-token integration. Nango's Discord provider is OAuth2 but declares no default scopes, and Nango has no Discord pre-built syncs/actions. User OAuth scopes such as identify/email/guilds cover account identity and guild listing, but do not grant a Relayfile service permission to read and write server channels. The minimum app registration grant is the Discord OAuth2 `bot` scope to install the bot, plus channel-level bot permissions to view channels, read message history, send messages, send in threads, and manage webhooks when webhook resources are part of the eval. Gateway sync needs GUILDS and GUILD_MESSAGES intents, and message body/attachments/embed/component fields require the privileged MESSAGE_CONTENT intent or Discord returns empty content fields except for messages the app sends, DMs with the app, app mentions, and context-menu target messages."
 
   - slug: outlook
     display_name: Outlook / Exchange
@@ -596,11 +1239,26 @@ integrations:
     package:
     nango_slug: outlook
     auth_model: microsoft_oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - Mail.ReadWrite
+      - Mail.Send
+      - offline_access
     candidate_scopes: []
-    sources: []
-    notes: "Email gap; research Microsoft Graph mail read/write/send and subscription permissions."
+    sources:
+      - https://nango.dev/docs/api-integrations/outlook
+      - https://nango.dev/docs/api-integrations/outlook/how-to-register-your-own-outlook-api-oauth-app
+      - https://nango.dev/docs/api-integrations/microsoft
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/outlook
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/outlook/.nango/nango.json
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/outlook/syncs/emails.ts
+      - https://learn.microsoft.com/en-us/graph/permissions-reference#mailreadwrite
+      - https://learn.microsoft.com/en-us/graph/permissions-reference#mailsend
+      - https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0
+      - https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc#offline_access
+    notes: "Outlook uses Microsoft Graph delegated OAuth through Nango's `outlook` provider, which aliases the shared Microsoft provider. Nango's current Outlook templates are read-only and declare `Mail.Read` for email, folder, and attachment reads plus `Calendars.Read` for calendar syncs; the planned Relayfile email gap needs a broader mail surface. Microsoft Graph documents `Mail.ReadWrite` as delegated create/read/update/delete access for the signed-in user's mailbox and explicitly excludes send, so `Mail.Send` is required separately for outbound mail. Graph change notification subscriptions for messages require a read permission for the message resource; `Mail.ReadWrite` covers the read/write mail surface without adding a separate lower-privilege `Mail.Read` scope. `offline_access` is required so Nango can keep recurring sync and subscription maintenance working with refresh tokens. Microsoft identity platform docs also warn not to combine these explicit resource scopes with the static `.default` scope in the same authorization request."
 
   - slug: figma
     display_name: Figma
@@ -609,11 +1267,30 @@ integrations:
     package:
     nango_slug: figma
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - file_content:read
+      - file_metadata:read
+      - file_versions:read
+      - file_comments:read
+      - file_comments:write
+      - projects:read
+      - webhooks:read
+      - webhooks:write
     candidate_scopes: []
-    sources: []
-    notes: "Design gap; research files, comments, projects, and webhook requirements."
+    sources:
+      - https://nango.dev/docs/integrations/all/figma
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/docs/snippets/generated/figma/PreBuiltUseCases.mdx
+      - https://developers.figma.com/docs/rest-api/scopes/
+      - https://developers.figma.com/docs/rest-api/oauth-apps/
+      - https://developers.figma.com/docs/rest-api/file-endpoints/
+      - https://developers.figma.com/docs/rest-api/version-history-endpoints/
+      - https://developers.figma.com/docs/rest-api/comments-endpoints/
+      - https://developers.figma.com/docs/rest-api/projects-endpoints/
+      - https://developers.figma.com/docs/rest-api/webhooks/
+      - https://developers.figma.com/docs/rest-api/webhooks-endpoints/
+    notes: "Figma uses granular OAuth scopes selected on the OAuth app and requested through the authorization `scope` parameter; Nango's Figma provider supplies OAuth2 token handling with comma-separated scopes, but its docs show no pre-built syncs or actions and the integration-template repository has no Figma template. The minimum Relayfile eval set is file_content:read for file JSON, nodes, and image export; file_metadata:read for file metadata; file_versions:read for file version history called out by the eval catalog; file_comments:read and file_comments:write for comments and reactions; projects:read for team project and project file listing; and webhooks:read plus webhooks:write for webhook listing, request inspection, creation, update, and deletion. Figma webhook creation is also constrained by provider roles: team admins can manage team-context webhooks, while project and file webhooks require Can edit permission on the project or file."
 
   - slug: coda
     display_name: Coda
@@ -622,11 +1299,17 @@ integrations:
     package:
     nango_slug: coda
     auth_model: oauth_or_api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - Read & Write API token access
     candidate_scopes: []
-    sources: []
-    notes: "Doc-database gap; research docs, tables, rows, pages, and permissions."
+    sources:
+      - https://nango.dev/docs/integrations/all/coda
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://coda.io/developers/apis/v1
+      - https://help.coda.io/hc/en-us/articles/39555941038349-Does-Coda-have-an-API
+      - https://help.coda.io/hc/en-us/articles/44722769665549-Security-recommendations-for-the-Coda-MCP
+    notes: "Coda's Nango provider uses API_KEY auth with Authorization: Bearer api_token, so OAuth app scopes are not applicable for the Relayfile registration. The eval surface needs a Coda API token with Read & Write access for docs, pages, tables, row reads, row inserts/updates/deletes, and permission-related reads/writes; the token is still bounded by the connected user's access to the target docs/tables and by doc sharing controls such as canShare for ACL operations. Coda's current OAuth2 PKCE path for MCP documents only mcp:all, while granular read/write restrictions are available for personal API tokens."
 
   - slug: trello
     display_name: Trello
@@ -635,11 +1318,18 @@ integrations:
     package:
     nango_slug: trello
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - read
+      - write
     candidate_scopes: []
-    sources: []
-    notes: "Project gap; research board/card/list/comment read/write."
+    sources:
+      - https://nango.dev/docs/integrations/all/trello
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/
+      - https://developer.atlassian.com/cloud/trello/guides/rest-api/webhooks/
+      - https://developer.atlassian.com/cloud/trello/rest/
+    notes: "Trello uses OAuth1 token scopes. Nango's provider entry uses the trello slug with OAuth1 and comma-separated scopes; Atlassian documents the available scopes as read, write, and account. The Relayfile eval surface needs board, card, list, and comment reads plus creates/updates/deletes and webhook registration on accessible models, so read and write are sufficient. The account scope is only for member email/member-info writes/notification reads and is not required."
 
   - slug: miro
     display_name: Miro
@@ -648,11 +1338,20 @@ integrations:
     package:
     nango_slug: miro
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - boards:read
+      - boards:write
     candidate_scopes: []
-    sources: []
-    notes: "Whiteboard gap; research boards/items/comments read/write and webhook requirements."
+    sources:
+      - https://nango.dev/docs/integrations/all/miro
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developers.miro.com/reference/scopes
+      - https://developers.miro.com/docs/getting-started-with-oauth
+      - https://developers.miro.com/docs/miro-rest-api-introduction
+      - https://developers.miro.com/changelog/removed-experimental-webhooks-support
+      - https://developers.miro.com/docs/lifecycle-policy
+    notes: "Miro uses OAuth scopes for REST API access. Nango's provider registry confirms the `miro` OAuth2 provider but does not declare default scopes or pre-built integration templates. Miro documents `boards:read` for retrieving boards, board members, and items, and `boards:write` for creating, updating, or deleting boards, board members, and items, covering the board/item read-write eval surface. Current public REST docs do not expose a separate comment CRUD OAuth scope; comments are not covered by a stable REST writeback surface. Miro retired the experimental `/v2-experimental/webhooks/board_subscriptions` endpoints effective 2025-12-05, so no current OAuth scope enables production Miro REST webhooks for Relayfile."
 
   - slug: freshsales
     display_name: Freshsales
@@ -661,11 +1360,20 @@ integrations:
     package:
     nango_slug: freshsales
     auth_model: oauth_or_api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - Freshsales API key
+      - "Contacts: View, Create, Edit"
+      - "Accounts: View, Create, Edit"
+      - "Deals: View, Create, Edit"
     candidate_scopes: []
-    sources: []
-    notes: "CRM gap; research contacts/accounts/deals read/write permissions."
+    sources:
+      - https://nango.dev/docs/api-integrations/freshsales
+      - https://nango.dev/docs/api-integrations/freshsales/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developers.freshworks.com/crm/api/
+      - https://crmsupport.freshworks.com/support/solutions/articles/50000002412-how-to-configure-roles-and-manage-user-permissions-
+    notes: "Freshsales under Nango's freshsales provider uses API_KEY auth, not OAuth scopes: the connection collects a bundle alias and Freshsales API key and sends Authorization: Token token=${apiKey}. Freshworks CRM's API docs also authenticate requests with each user's API key and state that API callers can only view data they have access to. The minimum Relayfile eval credential is therefore a Freshsales API key for a user whose CRM role grants Contacts, Accounts, and Deals module access with View plus Create/Edit permissions; record scope may still be constrained by the role's All Records, Territory/Group Only, or Owned Only scope. Delete is a separate role permission and is not included unless delete writeback is added to the eval surface."
 
   - slug: telegram
     display_name: Telegram
@@ -688,37 +1396,78 @@ integrations:
     package:
     nango_slug:
     auth_model: api_key_or_database_credentials
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "MongoDB Atlas database user role: readWrite on the target database or collections"
+      - "MongoDB database privilege actions for change streams: find and changeStream on the watched collection, database, or deployment"
+      - "Atlas project role for managed triggers/functions: Project Owner, or GROUP_TRIGGER_MANAGER where Atlas project roles expose trigger-only administration"
     candidate_scopes: []
-    sources: []
-    notes: "Research Atlas API roles, Data API keys, and trigger/function permissions."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/mongodb-atlas
+      - https://www.mongodb.com/docs/atlas/configure-api-access/
+      - https://www.mongodb.com/docs/atlas/mongodb-users-roles-and-privileges/
+      - https://www.mongodb.com/docs/manual/changestreams/
+      - https://www.mongodb.com/docs/atlas/atlas-ui/triggers/
+      - https://www.mongodb.com/docs/atlas/reference/user-roles/
+      - https://www.mongodb.com/docs/atlas/app-services/data-api/
+      - https://www.mongodb.com/docs/atlas/app-services/deprecation/
+    notes: "MongoDB Atlas is not an OAuth-scope integration in Nango: the Nango catalog/provider registry has no mongodb-atlas provider and the expected template path is absent. Relayfile data access should use a MongoDB database user or equivalent credential, with readWrite for JSON document CRUD and find/changeStream for direct change-stream webhooks. Atlas Administration API keys/service accounts are control-plane credentials only and do not read/write cluster data; if Relayfile provisions Atlas Triggers/Functions instead of using a direct driver change stream, current Atlas docs require Project Owner for trigger create/modify/delete, while the Atlas user-role reference also lists GROUP_TRIGGER_MANAGER as the trigger administration role. Atlas Data API keys are not a viable new eval path because the Data API has reached end-of-life; database triggers remain available and functions continue only in the trigger context."
 
   - slug: cloudflare-r2
     display_name: Cloudflare R2
     category: storage
     status: gap
     package:
-    nango_slug:
+    nango_slug: cloudflare
     auth_model: api_token
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - Workers R2 Storage Write
+      - Queues Write
+      - Workers Scripts Write
     candidate_scopes: []
-    sources: []
-    notes: "Research Cloudflare API token permissions for R2 buckets, Queues, and Worker bridge."
+    sources:
+      - https://nango.dev/docs/api-integrations/cloudflare
+      - https://nango.dev/docs/api-integrations/cloudflare/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://developers.cloudflare.com/r2/api/tokens/
+      - https://developers.cloudflare.com/fundamentals/api/reference/permissions/
+      - https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/list/
+      - https://developers.cloudflare.com/api/resources/r2/subresources/buckets/methods/create/
+      - https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/event_notifications/methods/update/
+      - https://developers.cloudflare.com/api/resources/queues/methods/create/
+      - https://developers.cloudflare.com/api/resources/queues/methods/list/
+      - https://developers.cloudflare.com/api/resources/queues/subresources/messages/methods/pull/
+      - https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/
+    notes: "Cloudflare R2 uses Cloudflare API tokens, not OAuth scopes, so scope_status is not_applicable for OAuth app registration. The minimum Cloudflare token permission grants for the Relayfile eval surface are Workers R2 Storage Write for bucket listing/creation, object read/write/list, and R2 event notification rules; Queues Write for queue creation/listing and pull/ack-style queue delivery; and Workers Scripts Write for provisioning or updating the Worker bridge with R2/Queue bindings. Bucket-scoped Workers R2 Storage Bucket Item Write is narrower for object-only access but is insufficient for bucket creation/configuration and event notification setup."
 
   - slug: supabase-storage
     display_name: Supabase Storage
     category: storage
     status: gap
     package:
-    nango_slug:
+    nango_slug: supabase
     auth_model: api_key_or_service_role
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "Supabase project URL plus secret key (sb_secret_*) or legacy service_role key"
+      - "service_role Storage API access for bucket/object read, write, update, delete, and signed URL operations; bypasses storage.objects RLS"
+      - "Database owner/admin access to create a Database Webhook or SQL trigger on storage.objects for INSERT, UPDATE, and DELETE events"
     candidate_scopes: []
-    sources: []
-    notes: "Research Storage API keys, service role requirements, and webhook availability."
+    sources:
+      - https://nango.dev/docs/api-integrations/supabase
+      - https://nango.dev/docs/api-integrations/supabase/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/supabase-storage
+      - https://supabase.com/docs/guides/getting-started/api-keys
+      - https://supabase.com/docs/guides/storage/security/access-control
+      - https://supabase.com/docs/guides/storage/schema/design
+      - https://supabase.com/docs/guides/database/webhooks
+      - https://supabase.com/docs/guides/storage/s3/authentication
+    notes: "Supabase Storage does not use OAuth scopes for Relayfile app registration. Nango's Supabase provider is API_KEY auth using a project URL and Supabase secret key, sent as both Authorization bearer and apikey headers; the expected supabase-storage and supabase integration-template paths are absent. Supabase secret keys and legacy service_role keys authorize as the service_role Postgres role, which has full data access and bypasses RLS. For a trusted server-side adapter, that is the minimum runtime permission for Storage bucket/object read/write/delete and signed URL behavior. If Relayfile intentionally avoids service_role, the target Supabase project must instead provide RLS policies on storage.objects granting the connected role SELECT, INSERT, UPDATE, and DELETE for the target buckets/paths; uploads need INSERT, upserts additionally need SELECT and UPDATE. Supabase has no separate Storage webhook OAuth grant; webhook behavior is available through Database Webhooks or equivalent SQL triggers on the storage.objects metadata table for INSERT, UPDATE, and DELETE events, and configuring those requires database owner/admin-level setup outside Nango's API-key provider."
 
   - slug: nextcloud
     display_name: Nextcloud
@@ -727,11 +1476,23 @@ integrations:
     package:
     nango_slug: next-cloud-ocs
     auth_model: oauth_or_basic
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "Nextcloud username/password or app password for the connected user"
+      - "Authenticated WebDAV access to /remote.php/dav/files/{user}"
+      - "File permissions on target files/folders: readable (G), writable (W), creatable (C/K), deletable (D), renameable/moveable (N/V) as required by writeback"
+      - "OCS API access with OCS-APIRequest: true; admin user is required for OCS endpoints that enumerate all users"
     candidate_scopes: []
-    sources: []
-    notes: "Research WebDAV/OCS auth and file read/write requirements."
+    sources:
+      - https://nango.dev/docs/integrations/all/next-cloud-ocs
+      - https://nango.dev/docs/integrations/all/next-cloud-ocs/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/next-cloud-ocs/.nango/nango.json
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/next-cloud-ocs/syncs/users.md
+      - https://docs.nextcloud.com/server/latest/developer_manual/client_apis/WebDAV/basic.html
+      - https://docs.nextcloud.com/server/latest/developer_manual/client_apis/OCS/ocs-api-overview.html
+      - https://docs.nextcloud.com/server/latest/admin_manual/configuration_server/oauth2.html
+    notes: "Nango's next-cloud-ocs provider is BASIC auth and its template declares no scopes. Nextcloud WebDAV and OCS APIs require an authenticated user, session, app password, OIDC token, or unscoped OAuth bearer token rather than OAuth scope strings. Nextcloud OAuth currently has no scoped access, so any OAuth token has full read/write access to that account's files; WebDAV write behavior is constrained by the connected user's file/share permissions. Use an app password for scripted WebDAV/OCS access, especially when 2FA or external auth is enabled. The Nango users sync calls OCS /cloud/users, which Nextcloud documents as admin-only for listing all users; file read/write uses WebDAV methods against /remote.php/dav/files/{user}."
 
   - slug: smartsheet
     display_name: Smartsheet
@@ -740,11 +1501,19 @@ integrations:
     package:
     nango_slug: smartsheet
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - READ_SHEETS
+      - WRITE_SHEETS
     candidate_scopes: []
-    sources: []
-    notes: "Research sheets/rows/attachments read/write scopes."
+    sources:
+      - https://nango.dev/docs/integrations/all/smartsheet
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://raw.githubusercontent.com/NangoHQ/integration-templates/main/integrations/smartsheet/.nango/nango.json
+      - https://developers.smartsheet.com/api/smartsheet/guides/advanced-topics/oauth
+      - https://developers.smartsheet.com/api/smartsheet/openapi/attachments/attachment
+      - https://developers.smartsheet.com/api/smartsheet/guides/webhooks/webhook-access
+    notes: "Smartsheet uses OAuth scopes plus the connected user's existing sheet sharing permissions. Nango's provider is OAUTH2 and declares no default scopes; its Smartsheet docs list READ_SHEETS and WRITE_SHEETS as common sheet data scopes. Smartsheet's OAuth guide defines READ_SHEETS as reading all sheet data, including attachments, discussions, and cell data, and WRITE_SHEETS as inserting/modifying sheet data, including attachments, discussions, and cell data. Attachment upload operations require WRITE_SHEETS and attachment read/download/list operations require READ_SHEETS. Webhook management is documented separately and would require ADMIN_WEBHOOKS if Relayfile later registers or manages Smartsheet webhooks, but it is not required for the stated sheet, row, and attachment read/write eval surface."
 
   - slug: snowflake
     display_name: Snowflake
@@ -753,11 +1522,24 @@ integrations:
     package:
     nango_slug: snowflake
     auth_model: oauth_or_key_pair
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - refresh_token
+      - session:role:<ROLE_WITH_RELAYFILE_READ_GRANTS>
+      - USAGE on the query warehouse
+      - USAGE on target database(s)
+      - USAGE on target schema(s)
+      - SELECT on target table(s), view(s), materialized view(s), or semantic view(s)
     candidate_scopes: []
-    sources: []
-    notes: "Research OAuth scopes/roles or warehouse/database grants for read-heavy evals."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://docs.nango.dev/integrations/all/snowflake
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/snowflake
+      - https://docs.snowflake.com/en/user-guide/oauth-custom
+      - https://docs.snowflake.com/en/developer-guide/sql-api/index
+      - https://docs.snowflake.com/en/user-guide/security-access-control-privileges
+    notes: "Snowflake uses role-scoped OAuth or key-pair JWT, not provider read/write scope strings. Nango's `snowflake` provider is OAuth2 and declares no default scopes; its Snowflake page has no pre-built integrations and notes that connections must use a scope/role granted to the user. For persistent OAuth connections request `refresh_token` plus one `session:role:<ROLE_WITH_RELAYFILE_READ_GRANTS>` scope; key-pair JWT has no OAuth scope request but still authenticates as a user/role. The selected Snowflake role must be granted USAGE on the warehouse used to run SQL, USAGE on the target database and schema, and SELECT on the tables/views/materialized views/semantic views read by the eval surface. No write, DDL, warehouse administration, Account Usage, or webhook-specific permission is required for read-heavy SQL API evals."
 
   - slug: bigquery
     display_name: BigQuery
@@ -766,11 +1548,23 @@ integrations:
     package:
     nango_slug: google-bigquery
     auth_model: google_oauth_or_service_account
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - https://www.googleapis.com/auth/bigquery.readonly
+      - BigQuery Job User
+      - BigQuery Data Viewer
     candidate_scopes: []
-    sources: []
-    notes: "Research BigQuery OAuth scopes and dataset/table IAM roles."
+    sources:
+      - https://nango.dev/docs/api-integrations/google-bigquery
+      - https://nango.dev/docs/api-integrations/google-bigquery/how-to-register-your-own-google-bigquery-api-oauth-app
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/datasets/list
+      - https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tables/list
+      - https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list
+      - https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query
+      - https://docs.cloud.google.com/bigquery/docs/running-queries
+      - https://docs.cloud.google.com/bigquery/docs/access-control
+    notes: "BigQuery can use Google OAuth through Nango or service account credentials. For the read-heavy analytics eval surface, the narrow OAuth scope is https://www.googleapis.com/auth/bigquery.readonly; Google REST docs list it for dataset/table listing, table row reads, synchronous queries, and query-result reads. IAM is still required: grant BigQuery Job User on the query project so jobs can be created, and BigQuery Data Viewer on the datasets/tables/views being queried so metadata and table data can be read. No write, load, streaming insert, export, or webhook permissions are required."
 
   - slug: twilio
     display_name: Twilio
@@ -779,11 +1573,33 @@ integrations:
     package:
     nango_slug: twilio
     auth_model: api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - "Twilio Account SID + Auth Token or Standard API key with account access"
+      - twilio/messaging/messages/create
+      - twilio/messaging/messages/read
+      - twilio/messaging/messages/list
+      - twilio/messaging/messages/update
+      - twilio/voice/calls/create
+      - twilio/voice/calls/read
+      - twilio/voice/calls/list
+      - twilio/voice/calls/update
+      - "Twilio Auth Token for X-Twilio-Signature webhook validation"
     candidate_scopes: []
-    sources: []
-    notes: "Research API key permissions for SMS/voice transactional workflows."
+    sources:
+      - https://nango.dev/docs/integrations/all/twilio
+      - https://nango.dev/docs/integrations/all/twilio/connect
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/twilio
+      - https://www.twilio.com/docs/iam/api-keys
+      - https://www.twilio.com/docs/iam/api-keys/restricted-api-keys
+      - https://docs-resources.prod.twilio.com/documents/Twilio_Restricted_API_Keys_Permissions_-_Messaging_Permissions.pdf
+      - https://www.twilio.com/docs/documents/591/Twilio_Restricted_API_Keys_Permissions_-_Voice_Permissions.pdf
+      - https://www.twilio.com/docs/messaging/api/message-resource
+      - https://www.twilio.com/docs/messaging/guides/outbound-message-status-in-status-callbacks
+      - https://www.twilio.com/docs/voice/api/call-resource
+      - https://www.twilio.com/docs/usage/webhooks/webhooks-security
+    notes: "Twilio under Nango uses Basic/API-key authentication with Account SID plus Auth Token, not OAuth scopes, so scope_status is not_applicable for app-registration scopes. The minimum Relayfile SMS/voice transactional surface needs credentials that can create, read, list, and update Message resources and Call resources. If a Twilio Restricted API Key is used instead of a standard full-account credential, grant the listed Twilio permission names. Status callbacks and inbound webhook verification do not use OAuth or separate webhook scopes; Twilio sends callbacks to URLs supplied on message/call requests, and request verification uses the account Auth Token with X-Twilio-Signature. Phone-number, Messaging Service, recording, transcription, SIP, WhatsApp sender, content-template, and delete permissions are not included unless the eval surface expands to provision those resources."
 
   - slug: typeform
     display_name: Typeform
@@ -792,11 +1608,26 @@ integrations:
     package:
     nango_slug: typeform
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - offline
+      - forms:read
+      - forms:write
+      - responses:read
+      - webhooks:read
+      - webhooks:write
     candidate_scopes: []
-    sources: []
-    notes: "Research forms/responses/webhook scopes."
+    sources:
+      - https://nango.dev/docs/integrations/all/typeform
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/typeform
+      - https://www.typeform.com/developers/get-started/scopes/
+      - https://www.typeform.com/developers/create/reference/retrieve-forms/
+      - https://www.typeform.com/developers/create/reference/create-form/
+      - https://www.typeform.com/developers/responses/reference/retrieve-responses/
+      - https://www.typeform.com/developers/webhooks/reference/retrieve-webhooks/
+      - https://www.typeform.com/developers/webhooks/reference/create-or-update-webhook/
+    notes: "Typeform uses OAuth 2.0 scopes. Nango's provider registry confirms the typeform provider is OAuth2 and has only offline as its default scope; Typeform's official scope table maps form list/read endpoints to forms:read, form create/update/delete endpoints to forms:write, response retrieval to responses:read, webhook retrieval/delivery inspection to webhooks:read, and webhook create/update/delete to webhooks:write. The local eval catalog frames Typeform as form response ingestion, mostly append-only, so responses:write is not included because Typeform uses it for deleting responses. Nango has no Typeform integration-template directory as of this research."
 
   - slug: webflow
     display_name: Webflow
@@ -805,11 +1636,39 @@ integrations:
     package:
     nango_slug: webflow
     auth_model: oauth
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - sites:read
+      - sites:write
+      - pages:read
+      - pages:write
+      - cms:read
+      - cms:write
+      - assets:read
+      - assets:write
     candidate_scopes: []
-    sources: []
-    notes: "Research CMS items, sites, pages, assets, and publish scopes."
+    sources:
+      - https://nango.dev/docs/integrations/all/webflow
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/webflow
+      - https://developers.webflow.com/data/reference/scopes
+      - https://developers.webflow.com/data/reference/sites/list
+      - https://developers.webflow.com/data/reference/sites/publish
+      - https://developers.webflow.com/data/reference/pages-and-components/pages/list
+      - https://developers.webflow.com/data/reference/pages-and-components/pages/update-page-settings
+      - https://developers.webflow.com/data/reference/pages-and-components/pages/update-static-content
+      - https://developers.webflow.com/data/reference/cms/collections/list
+      - https://developers.webflow.com/data/reference/cms/collection-items/staged-items/list-items
+      - https://developers.webflow.com/data/reference/cms/collection-items/staged-items/create-items
+      - https://developers.webflow.com/data/reference/cms/collection-items/staged-items/update-items
+      - https://developers.webflow.com/data/reference/cms/collection-items/staged-items/publish-item
+      - https://developers.webflow.com/data/reference/assets/assets/list
+      - https://developers.webflow.com/data/reference/assets/assets/create
+      - https://developers.webflow.com/data/reference/assets/assets/update
+      - https://developers.webflow.com/data/reference/webhooks/list
+      - https://developers.webflow.com/data/reference/webhooks/create
+      - https://developers.webflow.com/data/reference/all-events
+    notes: "Webflow uses OAuth Data Client app site-level scopes. Nango's provider registry confirms the webflow provider is OAuth2 and does not declare default scopes; no Nango integration-template directory exists for Webflow as of this research. The Relayfile eval surface needs site discovery and app-created webhook listing (sites:read), site/page publishing and webhook creation (sites:write), page listing/content and metadata reads/writes (pages:read, pages:write), CMS collection and item reads/writes/publish (cms:read, cms:write), and asset list/upload/metadata updates (assets:read, assets:write). Webflow webhook delivery has no separate webhook scope: the API documents webhook registration under sites:write, webhook listing under sites:read, and event payload access by trigger type, with site_publish requiring sites:read, page events requiring pages:read, and collection item events requiring cms:read."
 
   - slug: convex
     display_name: Convex
@@ -818,11 +1677,19 @@ integrations:
     package:
     nango_slug:
     auth_model: deploy_key_or_api_key
-    scope_status: pending
-    required_scopes: []
+    scope_status: not_applicable
+    required_scopes:
+      - Deployment admin deploy key
     candidate_scopes: []
-    sources: []
-    notes: "Research deploy/API credentials and whether scope-like permissions exist."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://docs.convex.dev/cli/deploy-key-types
+      - https://docs.convex.dev/http-api/
+      - https://docs.convex.dev/deployment-platform-api
+      - https://docs.convex.dev/platform-apis/oauth-applications
+      - https://docs.convex.dev/management-api
+    notes: "Convex is not listed in Nango's integration catalog or provider registry, and no Convex Nango template is available. Convex does not expose granular OAuth scope strings for the deploy-key/API-key path; deployment administration uses Convex deploy keys, team tokens, or OAuth application tokens in Authorization headers. The minimum Relayfile eval credential for arbitrary deployment data read/write is a deployment admin deploy key, which Convex documents as full read/write access to Convex data and as the admin credential for Deployment Platform APIs. Convex OAuth application tokens are selected at team or project token scope, not by per-resource scope strings, and are only needed if Relayfile later implements Convex's Platform API/OAuth flow to create or manage user deployments."
 
   - slug: hugging-face-buckets
     display_name: Hugging Face Buckets
@@ -831,11 +1698,22 @@ integrations:
     package:
     nango_slug:
     auth_model: access_token
-    scope_status: pending
-    required_scopes: []
+    scope_status: verified
+    required_scopes:
+      - "Hugging Face User Access Token role: write"
+      - "Resource Group bucket permission: write or admin"
     candidate_scopes: []
-    sources: []
-    notes: "Research Hugging Face token roles/scopes for bucket/object read/write."
+    sources:
+      - https://nango.dev/docs/integrations/overview
+      - https://nango.dev/api-integrations
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - https://github.com/NangoHQ/integration-templates/tree/main/integrations/hugging-face-buckets
+      - https://huggingface.co/docs/hub/en/security-tokens
+      - https://huggingface.co/docs/hub/en/storage-buckets
+      - https://huggingface.co/docs/hub/en/storage-buckets-security
+      - https://huggingface.co/docs/huggingface_hub/en/guides/buckets
+      - https://huggingface.co/docs/hub/en/storage-buckets-access
+    notes: "Hugging Face Buckets are not listed in Nango's integration catalog/provider registry and no Nango template exists. Buckets use Hugging Face Hub access control rather than OAuth scope strings: programmatic access uses User Access Tokens with scoped permissions, and bucket RBAC/Resource Groups control read/write/admin access. For Relayfile bucket/object list, read, upload, overwrite, delete, and sync behavior, require a write-capable Hugging Face User Access Token plus write or admin permission on the target bucket/resource group. Organization buckets may also require matching org membership/admin approval policies."
 
   - slug: sftp-ftp
     display_name: SFTP / FTP
