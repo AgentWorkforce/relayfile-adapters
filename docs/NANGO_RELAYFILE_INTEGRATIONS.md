@@ -27,6 +27,22 @@ For legacy Linear connections, first try without `--integration-id`; Nango may i
 
 For legacy Slack connections, first try without `--integration-id`; Nango may infer `slack-sage`. If the local project only registers `slack-relay`, add or keep a `slack-sage` action alias for compatibility.
 
+## Relayfile Writeback Contract
+
+Relayfile file writes should not call Nango actions directly. A write to `/jira`, `/linear`, `/slack`, `/github`, or another adapter namespace should first resolve inside this repository through the adapter's writeback resolver, then the Cloud bridge should send the resolved request through the backend provider proxy.
+
+This keeps provider semantics in the adapter packages:
+
+| Provider | Adapter-owned resolver | Proxy request shape | Cloud bridge responsibility |
+|---|---|---|---|
+| GitHub | `@relayfile/adapter-github/writeback` | GitHub REST paths such as `/repos/{owner}/{repo}/pulls/{pullNumber}/reviews` | Add GitHub REST headers and call Nango proxy with `github-relay`. |
+| Jira | `@relayfile/adapter-jira/writeback` | Jira REST paths such as `/rest/api/3/issue` and `/rest/agile/1.0/sprint/{sprintId}` | Prefix Atlassian OAuth paths as `/ex/jira/{cloudId}` from Nango connection metadata, then call Nango proxy with `jira-relay`. |
+| Linear | `@relayfile/adapter-linear/writeback` | Linear GraphQL `POST /graphql` mutations for issue and comment create/update/delete | Call Nango proxy with `linear-relay` and inspect GraphQL `errors` plus mutation `success`. |
+| Slack | `@relayfile/adapter-slack/writeback` | Slack Web API paths such as `/api/chat.postMessage` and `/api/reactions.add` | Normalize the `/api/` prefix for Nango's Slack proxy convention, then call Nango proxy with `slack-relay`. |
+| Notion | `@relayfile/adapter-notion/writeback` | Notion REST paths such as `/v1/pages` | Add the Notion API version header and call Nango proxy with `notion-relay`. |
+
+Nango actions are still useful for explicit control-plane work: listing, registering, updating, or deleting provider webhooks; reading Slack incoming-webhook installation metadata; or running isolated dryruns against provider APIs. They should not become the source of truth for file-native writeback behavior. If a webhook registration flow should become file-native later, add it as a writable resource here first: update `src/resources.ts`, schemas, create examples, `.adapter.md`, resolver tests, `scripts/writeback-discovery-data.mjs`, regenerate discovery, and only then wire Cloud to proxy the adapter-produced request.
+
 ## GitHub Repository Webhooks
 
 Relayfile's `github-relay` actions should use GitHub REST API version `2026-03-10` and send these headers:
