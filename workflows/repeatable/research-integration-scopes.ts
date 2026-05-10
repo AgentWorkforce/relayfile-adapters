@@ -32,7 +32,6 @@ const NANGO_PROVIDERS =
 const NANGO_PROVIDER_RAW =
   'https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml';
 const NANGO_TEMPLATES = 'https://github.com/NangoHQ/integration-templates/tree/main/integrations';
-const SCOPE_RESEARCH_LIMIT = Number.parseInt(process.env.SCOPE_RESEARCH_LIMIT ?? '', 10);
 
 // Load repository-local environment vars if present, without overwriting existing exports.
 function loadEnvFromFile(filePath: string) {
@@ -55,6 +54,8 @@ function loadEnvFromFile(filePath: string) {
 // Initialize environment for deterministic behavior in workflows.
 loadEnvFromFile('.env.local');
 loadEnvFromFile('.env');
+// SCOPE_RESEARCH_LIMIT is read after env files so values from .env / .env.local apply.
+const SCOPE_RESEARCH_LIMIT = Number.parseInt(process.env.SCOPE_RESEARCH_LIMIT ?? '', 10);
 // Default cap for the number of integration targets researched per run.
 // This helps keep total steps bounded to avoid step-overflow timeouts on large catalogs.
 const DEFAULT_TARGET_LIMIT = 10;
@@ -253,6 +254,14 @@ NODE`;
 
 async function main() {
   const targets = researchTargets();
+  const pendingAtStart = loadCatalog().integrations.filter(
+    (entry) => entry.scope_status === 'pending' || entry.scope_status === 'needs_review',
+  ).length;
+  // Relax the final no-pending check whenever this run cannot possibly resolve every
+  // pending entry — either the user opted in via SCOPE_RESEARCH_ALLOW_PENDING, or the
+  // effective target limit (explicit or default) was below the pending count.
+  const requireNoPendingFinal =
+    process.env.SCOPE_RESEARCH_ALLOW_PENDING !== '1' && pendingAtStart <= targets.length;
   const firstDependency = 'validate-scope-yaml-initial';
   let previousStep = firstDependency;
 
@@ -303,10 +312,7 @@ async function main() {
     .step('validate-scope-yaml-final', {
       type: 'deterministic',
       dependsOn: [previousStep],
-      command: validationCommand(
-        process.env.SCOPE_RESEARCH_ALLOW_PENDING !== '1' &&
-          !(Number.isFinite(SCOPE_RESEARCH_LIMIT) && SCOPE_RESEARCH_LIMIT > 0),
-      ),
+      command: validationCommand(requireNoPendingFinal),
       captureOutput: true,
       failOnError: true,
     })
