@@ -1,11 +1,9 @@
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { extractConfluenceIdFromPathSegment } from './path-mapper.js';
 import { resources } from './resources.js';
-import type { ConfluenceWritebackRequest } from './types.js';
+import { CONFLUENCE_API_PAGES_ROUTE, type ConfluenceWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
-
-export const CONFLUENCE_API_PAGES_ROUTE = '/wiki/api/v2/pages';
 
 export function resolveConfluenceWritebackRequest(path: string, content: string): ConfluenceWritebackRequest {
   const normalized = normalizePath(path);

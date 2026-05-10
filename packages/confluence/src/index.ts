@@ -19,6 +19,8 @@ export {
 } from './path-mapper.js';
 export {
   CONFLUENCE_API_PAGES_ROUTE,
+} from './types.js';
+export {
   CONFLUENCE_API_SPACES_ROUTE,
   resolveConfluenceReadRequest,
 } from './queries.js';

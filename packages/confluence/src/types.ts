@@ -4,6 +4,7 @@ export type { BulkWriteFile, ConnectionProvider, ProxyRequest, ProxyResponse } f
 
 export const CONFLUENCE_PROVIDER_NAME = 'confluence';
 export const CONFLUENCE_PATH_ROOT = '/confluence';
+export const CONFLUENCE_API_PAGES_ROUTE = '/wiki/api/v2/pages';
 export const CONFLUENCE_DEFAULT_PAGE_SIZE = 100;
 
 export type JsonPrimitive = boolean | number | null | string;

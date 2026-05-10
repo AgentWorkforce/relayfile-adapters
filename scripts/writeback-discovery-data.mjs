@@ -669,7 +669,31 @@ function confluencePageProps(options = {}) {
       description: 'Confluence page body as a storage-format string or a body object with `value`/`representation` or `storage.value`.',
       oneOf: [
         { type: 'string', minLength: 1 },
-        { type: 'object', additionalProperties: true },
+        {
+          type: 'object',
+          additionalProperties: true,
+          required: ['value', 'representation'],
+          properties: {
+            value: { type: 'string', minLength: 1 },
+            representation: { type: 'string', minLength: 1 },
+          },
+        },
+        {
+          type: 'object',
+          additionalProperties: true,
+          required: ['storage'],
+          properties: {
+            storage: {
+              type: 'object',
+              additionalProperties: true,
+              required: ['value'],
+              properties: {
+                value: { type: 'string', minLength: 1 },
+                representation: { type: 'string' },
+              },
+            },
+          },
+        },
       ],
     },
     version: obj('Optional synced version object. Updates increment `version.number` when present.', {

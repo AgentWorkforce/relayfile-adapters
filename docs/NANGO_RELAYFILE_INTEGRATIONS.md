@@ -73,13 +73,13 @@ Source: https://docs.github.com/en/rest/repos/webhooks?apiVersion=2026-03-10
 
 ## Jira Dynamic Webhooks
 
-Relayfile's Jira webhook actions should use `jira-relay` and Jira Cloud OAuth dynamic webhooks through the Atlassian OAuth gateway:
+Relayfile's Jira webhook actions should use `jira-relay` and Jira Cloud OAuth dynamic webhooks through the Atlassian OAuth gateway. The Jira REST webhook path is relative to the OAuth gateway base `/ex/jira/{cloudId}`:
 
 ```text
 /ex/jira/{cloudId}/rest/api/3/webhook
 ```
 
-Do not use the legacy admin endpoint `/rest/webhooks/1.0/webhook` for OAuth connections; production dryrun rejected that surface with a scope mismatch. With the updated production Jira connection, listing dynamic webhooks through `/rest/api/3/webhook` succeeded and returned an empty list.
+Do not treat `/rest/api/3/webhook` as an absolute endpoint for OAuth connections; call the full gateway endpoint `/ex/jira/{cloudId}/rest/api/3/webhook`. Do not use the legacy admin endpoint `/rest/webhooks/1.0/webhook` for OAuth connections; production dryrun rejected that surface with a scope mismatch. With the updated production Jira connection, listing dynamic webhooks through the gateway path succeeded and returned an empty list.
 
 Minimum classic scopes for the current Relayfile Jira surface include:
 
@@ -156,7 +156,7 @@ Source: https://developer.atlassian.com/server/confluence/rest/v921/api-group-we
 
 ## Confluence Page Syncs
 
-Relayfile's Confluence provider config key is `confluence-relay`. The page sync needs detailed page body access, so `read:confluence-content.summary` is not enough by itself. In the classic Confluence scope model, include `read:confluence-content.all`; for a newer granular page-focused implementation, check `read:page:confluence`.
+Relayfile's Confluence provider config key is `confluence-relay`. The page sync requires detailed page body access, so `read:confluence-content.summary` is not enough by itself. In the classic Confluence scope model, include `read:confluence-content.all`; for a newer granular page-focused implementation, check `read:page:confluence`.
 
 Current verified Confluence scopes:
 

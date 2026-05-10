@@ -1,6 +1,6 @@
 # Nango Template Gap Scan
 
-This scan compares the local Nango template corpus under `/Volumes/Paris Drive/Projects/NangoHQ/nango/integration-templates` with the Relayfile adapter package set. It is a planning aid for adding future adapters from provider-backed templates.
+This scan compares the local Nango template corpus under `${NANGO_REPO_ROOT}/integration-templates` with the Relayfile adapter package set. Set `NANGO_REPO_ROOT` to a local Nango checkout, or run the scan from the Nango repository root and resolve `./integration-templates`, so the comparison is reproducible across machines. It is a planning aid for adding future adapters from provider-backed templates.
 
 ## Added In This Pass
 

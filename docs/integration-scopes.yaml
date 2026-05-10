@@ -1017,11 +1017,13 @@ integrations:
     required_scopes:
       - read:component:compass
       - read:metric:compass
+      - offline_access
     candidate_scopes: []
     sources:
       - https://developer.atlassian.com/cloud/compass/graphql/
       - https://developer.atlassian.com/platform/forge/manifest-reference/scopes-product-compass/
-    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian Compass GraphQL scope docs. Includes the selected component and metric read scopes; event read/write scopes were visible but not selected in the screenshot."
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshot, Atlassian Compass GraphQL scope docs, and Atlassian OAuth scope docs. Includes the selected component and metric read scopes plus offline_access for long-lived Nango OAuth connections; event read/write scopes were visible but not selected in the screenshot."
 
   - slug: confluence
     display_name: Confluence
@@ -1041,6 +1043,7 @@ integrations:
       - read:confluence-user
       - read:confluence-groups
       - write:confluence-groups
+      - offline_access
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/confluence
@@ -1048,7 +1051,7 @@ integrations:
       - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
       - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
       - https://developer.atlassian.com/server/confluence/rest/v921/api-group-webhooks/
-    notes: "Verified against the user-provided Atlassian app registration screenshots, Atlassian classic OAuth scope docs, and Nango dryruns. Relayfile's Nango provider config key is `confluence-relay`. The page sync needs detailed content/body access, so `read:confluence-content.all` is required in addition to `read:confluence-content.summary`; the newer granular equivalent for a page-focused implementation is `read:page:confluence`. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes. Confluence webhook registration is different from Jira dynamic webhooks: Atlassian exposes `/rest/api/webhooks` as a Server/Data Center administrator-only REST surface and explicitly says Forge and OAuth2 apps cannot access it, so there is no Confluence Cloud OAuth scope that unlocks programmatic webhook registration for a normal Cloud OAuth connection."
+    notes: "Verified against the user-provided Atlassian app registration screenshots, Atlassian classic OAuth scope docs, and Nango dryruns. Relayfile's Nango provider config key is `confluence-relay`. The page sync requires detailed content/body access, so `read:confluence-content.all` is required in addition to `read:confluence-content.summary`; the newer granular equivalent for a page-focused implementation is `read:page:confluence`. Includes content read/write/search, space summary/details management, user profile access, group read/write scopes, and offline_access for long-lived Nango OAuth connections. Confluence webhook registration is different from Jira dynamic webhooks: Atlassian exposes `/rest/api/webhooks` as a Server/Data Center administrator-only REST surface and explicitly says Forge and OAuth2 apps cannot access it, so there is no Confluence Cloud OAuth scope that unlocks programmatic webhook registration for a normal Cloud OAuth connection."
 
   - slug: google-docs
     display_name: Google Docs

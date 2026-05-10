@@ -161,7 +161,7 @@ function describeSchemaType(schema) {
     return 'enum';
   }
   if (schema.oneOf) {
-    return `one of ${schema.oneOf.map(describeSchemaType).join(', ')}`;
+    return `one of ${[...new Set(schema.oneOf.map(describeSchemaType))].join(', ')}`;
   }
   if (schema.anyOf) {
     return `any of ${schema.anyOf.map(describeSchemaType).join(', ')}`;

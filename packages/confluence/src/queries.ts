@@ -1,7 +1,6 @@
 import { extractConfluenceIdFromPathSegment } from './path-mapper.js';
-import { CONFLUENCE_DEFAULT_PAGE_SIZE, type ConfluenceReadRequest } from './types.js';
+import { CONFLUENCE_API_PAGES_ROUTE, CONFLUENCE_DEFAULT_PAGE_SIZE, type ConfluenceReadRequest } from './types.js';
 
-export const CONFLUENCE_API_PAGES_ROUTE = '/wiki/api/v2/pages';
 export const CONFLUENCE_API_SPACES_ROUTE = '/wiki/api/v2/spaces';
 
 export function resolveConfluenceReadRequest(path: string): ConfluenceReadRequest {
