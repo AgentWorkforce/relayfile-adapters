@@ -1045,7 +1045,8 @@ integrations:
       - https://github.com/NangoHQ/integration-templates/
       - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
       - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
-    notes: "Verified against the user-provided Atlassian app registration screenshots, Atlassian classic OAuth scope docs, and Nango dryruns. Relayfile's Nango provider config key is `confluence-relay`. The page sync needs detailed content/body access, so `read:confluence-content.all` is required in addition to `read:confluence-content.summary`; the newer granular equivalent for a page-focused implementation is `read:page:confluence`. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes."
+      - https://developer.atlassian.com/server/confluence/rest/v921/api-group-webhooks/
+    notes: "Verified against the user-provided Atlassian app registration screenshots, Atlassian classic OAuth scope docs, and Nango dryruns. Relayfile's Nango provider config key is `confluence-relay`. The page sync needs detailed content/body access, so `read:confluence-content.all` is required in addition to `read:confluence-content.summary`; the newer granular equivalent for a page-focused implementation is `read:page:confluence`. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes. Confluence webhook registration is different from Jira dynamic webhooks: Atlassian exposes `/rest/api/webhooks` as a Server/Data Center administrator-only REST surface and explicitly says Forge and OAuth2 apps cannot access it, so there is no Confluence Cloud OAuth scope that unlocks programmatic webhook registration for a normal Cloud OAuth connection."
 
   - slug: google-docs
     display_name: Google Docs

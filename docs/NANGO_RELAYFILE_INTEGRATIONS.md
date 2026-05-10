@@ -89,6 +89,23 @@ Minimum scopes for the current Linear adapter and webhook action surface:
 
 Source: https://linear.app/developers/webhooks
 
+## Confluence Server/Data Center Webhooks
+
+Relayfile's `confluence-relay` webhook actions for registration use the Confluence Server/Data Center REST API, not Confluence Cloud dynamic webhooks:
+
+| Action | Confluence endpoint | Runtime requirement |
+|---|---|---|
+| List webhooks | `GET /rest/api/webhooks` | Confluence administrator on Server/Data Center |
+| Get webhook | `GET /rest/api/webhooks/{webhookId}` | Confluence administrator on Server/Data Center |
+| Register webhook | `POST /rest/api/webhooks` | Confluence administrator on Server/Data Center |
+| Update webhook | `PUT /rest/api/webhooks/{webhookId}` | Confluence administrator on Server/Data Center |
+| Delete webhook | `DELETE /rest/api/webhooks/{webhookId}` | Confluence administrator on Server/Data Center |
+| Test webhook endpoint | `POST /rest/api/webhooks/test?url={url}` | Confluence administrator on Server/Data Center |
+
+Atlassian's REST reference says this resource is administrator-only and that Forge and OAuth2 apps cannot access it. That means there is no Confluence Cloud OAuth scope to add to make these actions work for a normal `confluence-relay` Cloud OAuth connection. A production dryrun with an existing Confluence Cloud OAuth connection compiled and reached the provider call, then failed with `404 No endpoint GET /rest/api/webhooks`, which is the expected shape for Cloud OAuth. Live webhook registration needs an administrator-capable Server/Data Center connection whose `baseUrl` points at the Confluence instance.
+
+Source: https://developer.atlassian.com/server/confluence/rest/v921/api-group-webhooks/
+
 ## Confluence Page Syncs
 
 Relayfile's Confluence provider config key is `confluence-relay`. The page sync needs detailed page body access, so `read:confluence-content.summary` is not enough by itself. In the classic Confluence scope model, include `read:confluence-content.all`; for a newer granular page-focused implementation, check `read:page:confluence`.
