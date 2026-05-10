@@ -1,6 +1,6 @@
 version: 1
 title: Relayfile integration scope catalog
-updated: "2026-05-09"
+updated: "2026-05-10"
 purpose: >
   Machine-readable scope inventory for Relayfile adapter evals and app
   registration. Entries start as pending unless scopes were already provided or
@@ -251,12 +251,15 @@ integrations:
       - "GitHub App permission: Issues: read"
       - "GitHub App permission: Pull requests: write"
       - "GitHub App permission: Checks: read"
+      - "GitHub App permission: Webhooks: read"
+      - "GitHub App permission: Webhooks: write"
       - "GitHub App event: pull_request"
       - "GitHub App event: pull_request_review"
       - "GitHub App event: pull_request_review_comment"
       - "GitHub App event: issues"
       - "GitHub App event: check_run"
       - "OAuth App scope: repo"
+      - "OAuth App scope: admin:repo_hook"
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/github-app-oauth
@@ -269,8 +272,9 @@ integrations:
       - https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens?apiVersion=2022-11-28
       - https://docs.github.com/en/rest/checks/runs?apiVersion=2022-11-28
       - https://docs.github.com/en/rest/pulls/reviews?apiVersion=2022-11-28
+      - https://docs.github.com/en/rest/repos/webhooks?apiVersion=2026-03-10
       - https://docs.github.com/en/webhooks/webhook-events-and-payloads
-    notes: "Nango exposes GitHub App OAuth and GitHub App providers but does not publish default action-level scopes for this adapter surface, so the minimum is derived from GitHub's REST endpoint and webhook permission docs. For GitHub App installations, metadata read is the baseline repository metadata permission; contents read covers repository content and commit/file reads; issues read covers issue metadata and issue comments; pull requests write is needed because the adapter writes, updates, and deletes pull request reviews and also covers PR/review read; checks read covers check-run ingestion. Webhook subscriptions for pull_request, pull_request_review, pull_request_review_comment, issues, and check_run require the corresponding read-level repository permissions and no repository Webhooks permission when using a GitHub App's configured webhook. For OAuth App connections against private repositories, GitHub's classic repo scope is the practical minimum because it grants repository read/write coverage needed for issues, pull requests, contents, checks reads, and PR review writeback; public-only deployments may be able to use public_repo, but that does not cover the full private-repository eval surface."
+    notes: "Nango exposes GitHub App OAuth and GitHub App providers but does not publish default action-level scopes for this adapter surface, so the minimum is derived from GitHub's REST endpoint and webhook permission docs. For GitHub App installations, metadata read is the baseline repository metadata permission; contents read covers repository content and commit/file reads; issues read covers issue metadata and issue comments; pull requests write is needed because the adapter writes, updates, and deletes pull request reviews and also covers PR/review read; checks read covers check-run ingestion. Webhook subscriptions for pull_request, pull_request_review, pull_request_review_comment, issues, and check_run require the corresponding read-level repository permissions when using a GitHub App's configured webhook. Programmatic repository webhook actions under Relayfile's Nango provider config key `github-relay` use GitHub REST API version 2026-03-10: list/get/ping/test require repository Webhooks read permission, while create/update/delete require repository Webhooks write permission. For OAuth App connections against private repositories, GitHub's classic repo scope is the practical broad minimum and admin:repo_hook is the narrower repository-hook administration scope; public-only deployments may be able to use public_repo for non-hook surfaces, but that does not cover the full private-repository eval surface."
 
   - slug: gitlab
     display_name: GitLab
@@ -484,9 +488,11 @@ integrations:
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/jira
+      - https://github.com/NangoHQ/integration-templates/
       - https://developer.atlassian.com/cloud/jira/software/scopes-for-oauth-2-3LO-and-forge-apps/
       - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
-    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian classic OAuth scope docs. Includes read/write issue and project data, user profile access, project/global administration, webhook management, and offline_access for long-lived Nango OAuth connections."
+      - https://developer.atlassian.com/cloud/jira/platform/webhooks/#registering-a-webhook-using-the-jira-rest-api--other-integrations-
+    notes: "Verified against the user-provided Atlassian app registration screenshot, Atlassian classic OAuth scope docs, and production Nango dryruns. Relayfile's Nango provider config key is `jira-relay`; use Jira Cloud OAuth gateway paths such as `/ex/jira/{cloudId}/rest/api/3/webhook` for dynamic webhook actions. The legacy admin endpoint `/rest/webhooks/1.0/webhook` is not valid for these OAuth connections and returned a scope mismatch during dryrun. Includes read/write issue and project data, user profile access, project/global administration, dynamic webhook management, and offline_access for long-lived Nango OAuth connections."
 
   - slug: linear
     display_name: Linear
@@ -499,10 +505,14 @@ integrations:
     required_scopes:
       - read
       - write
+      - admin
     candidate_scopes: []
     sources:
       - user-provided
-    notes: "Provided by user on 2026-05-09."
+      - https://linear.app/developers/oauth-2-0-authentication
+      - https://linear.app/developers/webhooks
+      - https://github.com/NangoHQ/integration-templates/
+    notes: "Provided by user on 2026-05-09 and refined during Nango webhook-action dryruns on 2026-05-10. Relayfile's canonical Nango provider config key is `linear-relay`, with `linear-sage` retained as a legacy alias for existing production connections. The adapter read/write surface needs read and write; programmatic webhook actions for list/create/delete require the Linear admin scope and an admin-capable connected user/app. A production dryrun using an existing legacy Linear connection resolved through `linear-sage`, reached Linear GraphQL, and failed with `Invalid role: admin required`, confirming the role requirement."
 
   - slug: mailgun
     display_name: Mailgun
@@ -883,10 +893,12 @@ integrations:
       - users:read
       - users:read.email
       - chat:write
+      - incoming-webhook
     candidate_scopes: []
     sources:
       - user-provided-screenshot
-    notes: "Provided by user screenshot on 2026-05-09."
+      - https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/
+    notes: "Provided by user screenshot on 2026-05-09 and updated during Relayfile Nango webhook action work on 2026-05-10. The core adapter reads channel, group, IM, MPIM, team, and user data and writes messages through chat:write. Incoming webhook actions use the additional incoming-webhook OAuth scope; Slack provisions the incoming_webhook object during OAuth installation after the installer chooses a channel, rather than through a later REST registration endpoint. Relayfile's canonical provider config key is slack-relay, but existing production connections can still resolve to slack-sage, so Nango actions should remain registered under both keys until stored provider ids are migrated. The incoming webhook URL is a secret and must not be returned or logged; metadata-only inspection can expose hasIncomingWebhook, channel, channelId, and configurationUrl."
 
   - slug: stripe
     display_name: Stripe
@@ -1035,9 +1047,11 @@ integrations:
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/confluence
+      - https://github.com/NangoHQ/integration-templates/
       - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
       - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
-    notes: "Verified against the user-provided Atlassian app registration screenshots and Atlassian classic OAuth scope docs. Includes content read/write/search, space summary/details management, user profile access, group read/write scopes, and offline_access for long-lived Nango OAuth connections."
+      - https://developer.atlassian.com/server/confluence/rest/v921/api-group-webhooks/
+    notes: "Verified against the user-provided Atlassian app registration screenshots, Atlassian classic OAuth scope docs, and Nango dryruns. Relayfile's Nango provider config key is `confluence-relay`. The page sync requires detailed content/body access, so `read:confluence-content.all` is required in addition to `read:confluence-content.summary`; the newer granular equivalent for a page-focused implementation is `read:page:confluence`. Includes content read/write/search, space summary/details management, user profile access, group read/write scopes, and offline_access for long-lived Nango OAuth connections. Confluence webhook registration is different from Jira dynamic webhooks: Atlassian exposes `/rest/api/webhooks` as a Server/Data Center administrator-only REST surface and explicitly says Forge and OAuth2 apps cannot access it, so there is no Confluence Cloud OAuth scope that unlocks programmatic webhook registration for a normal Cloud OAuth connection."
 
   - slug: google-docs
     display_name: Google Docs

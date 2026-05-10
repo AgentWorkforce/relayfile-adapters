@@ -161,7 +161,7 @@ function describeSchemaType(schema) {
     return 'enum';
   }
   if (schema.oneOf) {
-    return `one of ${schema.oneOf.map(describeSchemaType).join(', ')}`;
+    return `one of ${[...new Set(schema.oneOf.map(describeSchemaType))].join(', ')}`;
   }
   if (schema.anyOf) {
     return `any of ${schema.anyOf.map(describeSchemaType).join(', ')}`;
@@ -316,6 +316,9 @@ function idPatternFor(adapterSlug, resourcePath) {
   }
   if (adapterSlug === 'clickup') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$');
+  }
+  if (adapterSlug === 'confluence') {
+    return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
   }
   if (adapterSlug === 'intercom') {
     return pattern('^[A-Za-z0-9_-]+$');

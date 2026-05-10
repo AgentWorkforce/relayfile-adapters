@@ -23,13 +23,6 @@
       "completedAt": "2026-05-09T19:18:00.585Z",
       "path": ".trajectories/completed/2026-05/traj_4cuwr7i5avuh.json"
     },
-    "traj_eq6nyund0mp5": {
-      "title": "Add Atlassian OAuth scopes to scope catalog",
-      "status": "completed",
-      "startedAt": "2026-05-09T19:35:16.593Z",
-      "completedAt": "2026-05-09T19:36:53.534Z",
-      "path": ".trajectories/completed/2026-05/traj_eq6nyund0mp5.json"
-    },
     "traj_jda1vsuedsrv": {
       "title": "046-research-integration-scopes-workflow",
       "status": "active",

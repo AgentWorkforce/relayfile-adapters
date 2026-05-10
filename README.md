@@ -172,6 +172,7 @@ GitHub/GitLab/Slack/...
 | `@relayfile/adapter-asana` | Asana (projects, tasks, sections) |
 | `@relayfile/adapter-calendly` | Calendly (event types, scheduled events, invitees) |
 | `@relayfile/adapter-clickup` | ClickUp (spaces, lists, tasks) |
+| `@relayfile/adapter-confluence` | Confluence (spaces, pages) |
 | `@relayfile/adapter-github` | GitHub (PRs, issues, commits, checks, reviews) |
 | `@relayfile/adapter-gitlab` | GitLab (MRs, issues, pipelines, commits) |
 | `@relayfile/adapter-hubspot` | HubSpot (contacts, deals, companies, tickets) |
