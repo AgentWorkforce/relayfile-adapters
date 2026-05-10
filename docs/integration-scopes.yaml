@@ -1005,11 +1005,13 @@ integrations:
     required_scopes:
       - read:component:compass
       - read:metric:compass
+      - offline_access
     candidate_scopes: []
     sources:
       - https://developer.atlassian.com/cloud/compass/graphql/
       - https://developer.atlassian.com/platform/forge/manifest-reference/scopes-product-compass/
-    notes: "Verified against the user-provided Atlassian app registration screenshot and Atlassian Compass GraphQL scope docs. Includes the selected component and metric read scopes; event read/write scopes were visible but not selected in the screenshot."
+      - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
+    notes: "Verified against the user-provided Atlassian app registration screenshot, Atlassian Compass GraphQL scope docs, and Atlassian OAuth scope docs. Includes the selected component and metric read scopes plus offline_access for long-lived Nango OAuth connections; event read/write scopes were visible but not selected in the screenshot."
 
   - slug: confluence
     display_name: Confluence
@@ -1029,12 +1031,13 @@ integrations:
       - read:confluence-user
       - read:confluence-groups
       - write:confluence-groups
+      - offline_access
     candidate_scopes: []
     sources:
       - https://nango.dev/docs/api-integrations/confluence
       - https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/
       - https://developer.atlassian.com/cloud/oauth/getting-started/determining-scopes/
-    notes: "Verified against the user-provided Atlassian app registration screenshots and Atlassian classic OAuth scope docs. Includes content read/write/search, space summary/details management, user profile access, and group read/write scopes."
+    notes: "Verified against the user-provided Atlassian app registration screenshots and Atlassian classic OAuth scope docs. Includes content read/write/search, space summary/details management, user profile access, group read/write scopes, and offline_access for long-lived Nango OAuth connections."
 
   - slug: google-docs
     display_name: Google Docs
