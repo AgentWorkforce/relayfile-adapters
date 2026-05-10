@@ -35,6 +35,7 @@ This keeps provider semantics in the adapter packages:
 
 | Provider | Adapter-owned resolver | Proxy request shape | Cloud bridge responsibility |
 |---|---|---|---|
+| Confluence | `@relayfile/adapter-confluence/writeback` | Confluence Cloud REST paths such as `/wiki/api/v2/pages` | Prefix Atlassian OAuth paths as `/ex/confluence/{cloudId}` from Nango connection metadata, then call Nango proxy with `confluence-relay`. |
 | GitHub | `@relayfile/adapter-github/writeback` | GitHub REST paths such as `/repos/{owner}/{repo}/pulls/{pullNumber}/reviews` | Add GitHub REST headers and call Nango proxy with `github-relay`. |
 | Jira | `@relayfile/adapter-jira/writeback` | Jira REST paths such as `/rest/api/3/issue` and `/rest/agile/1.0/sprint/{sprintId}` | Prefix Atlassian OAuth paths as `/ex/jira/{cloudId}` from Nango connection metadata, then call Nango proxy with `jira-relay`. |
 | Linear | `@relayfile/adapter-linear/writeback` | Linear GraphQL `POST /graphql` mutations for issue and comment create/update/delete | Call Nango proxy with `linear-relay` and inspect GraphQL `errors` plus mutation `success`. |

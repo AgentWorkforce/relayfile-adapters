@@ -317,6 +317,9 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'clickup') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$');
   }
+  if (adapterSlug === 'confluence') {
+    return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
+  }
   if (adapterSlug === 'intercom') {
     return pattern('^[A-Za-z0-9_-]+$');
   }

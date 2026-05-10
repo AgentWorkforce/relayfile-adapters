@@ -75,6 +75,21 @@ export const adapters = [
     ],
   },
   {
+    slug: 'confluence',
+    title: 'Confluence adapter',
+    overview:
+      'The Confluence adapter exposes spaces and pages under `/confluence`, with writeback routes for creating, updating, and deleting pages.',
+    readPaths: [
+      ['/confluence/spaces/<spaceIdOrKey>.json', 'Space records.'],
+      ['/confluence/pages/<pageId>.json', 'Flat page records.'],
+      ['/confluence/spaces/<spaceIdOrKey>/pages/<pageId>.json', 'Space-scoped page records.'],
+    ],
+    endpoints: [
+      endpoint('/confluence/pages/new.json', 'Create Confluence page', 'Creates a Confluence page when `spaceId` is supplied in the document.', ['title', 'spaceId', 'body'], confluencePageProps(), { title: 'Replace example page title', spaceId: '12345', body: '<p>Replace example page body.</p>' }),
+      endpoint('/confluence/spaces/{spaceIdOrKey}/pages/new.json', 'Create Confluence space page', 'Creates a Confluence page in the space named by the path.', ['title', 'body'], confluencePageProps({ includeSpaceId: false }), { title: 'Replace example page title', body: '<p>Replace example page body.</p>' }),
+    ],
+  },
+  {
     slug: 'github',
     title: 'GitHub adapter',
     overview:
@@ -641,6 +656,27 @@ function clickupListProps() {
     priority: int('ClickUp priority id.'),
     assignee: str('Assignee user id.'),
     status: str('List status.'),
+  };
+}
+
+function confluencePageProps(options = {}) {
+  return {
+    title: str('Page title.', undefined, { minLength: 1 }),
+    ...(options.includeSpaceId === false ? {} : { spaceId: str('Confluence space id.') }),
+    status: en(['current', 'draft'], 'Page status. Defaults to current.'),
+    parentId: str('Optional parent page id.'),
+    body: {
+      description: 'Confluence page body as a storage-format string or a body object with `value`/`representation` or `storage.value`.',
+      oneOf: [
+        { type: 'string', minLength: 1 },
+        { type: 'object', additionalProperties: true },
+      ],
+    },
+    version: obj('Optional synced version object. Updates increment `version.number` when present.', {
+      number: int('Current Confluence version number.', { minimum: 1 }),
+      message: str('Version message.'),
+      minorEdit: bool('Whether the update is a minor edit.'),
+    }),
   };
 }
 
