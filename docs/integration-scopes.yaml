@@ -893,10 +893,12 @@ integrations:
       - users:read
       - users:read.email
       - chat:write
+      - incoming-webhook
     candidate_scopes: []
     sources:
       - user-provided-screenshot
-    notes: "Provided by user screenshot on 2026-05-09."
+      - https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/
+    notes: "Provided by user screenshot on 2026-05-09 and updated during Relayfile Nango webhook action work on 2026-05-10. The core adapter reads channel, group, IM, MPIM, team, and user data and writes messages through chat:write. Incoming webhook actions use the additional incoming-webhook OAuth scope; Slack provisions the incoming_webhook object during OAuth installation after the installer chooses a channel, rather than through a later REST registration endpoint. Relayfile's canonical provider config key is slack-relay, but existing production connections can still resolve to slack-sage, so Nango actions should remain registered under both keys until stored provider ids are migrated. The incoming webhook URL is a secret and must not be returned or logged; metadata-only inspection can expose hasIncomingWebhook, channel, channelId, and configurationUrl."
 
   - slug: stripe
     display_name: Stripe

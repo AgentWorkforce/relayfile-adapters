@@ -10,6 +10,7 @@ This runbook records the provider config keys, scope requirements, webhook actio
 | Confluence | `confluence-relay` | None currently documented | Used for Confluence space and page syncs. |
 | Jira | `jira-relay` | `jira-sage` in older cloud aliases | Used for Jira project and issue syncs plus dynamic webhook actions. |
 | Linear | `linear-relay` | `linear-sage` | New connections should use `linear-relay`; existing production connections can still resolve to `linear-sage`, so webhook actions should remain registered under both until stored provider ids are migrated. |
+| Slack | `slack-relay` | `slack-sage` | New connections should use `slack-relay`; existing production connections can still resolve to `slack-sage`, so incoming webhook actions should remain registered under both until stored provider ids are migrated. |
 
 When validating against production, pass `-e production`. Set `NANGO_SECRET_KEY_PRODUCTION` in the shell environment before running the CLI.
 
@@ -23,6 +24,8 @@ npx nango dryrun <sync-or-action> <connection-id> \
 ```
 
 For legacy Linear connections, first try without `--integration-id`; Nango may infer `linear-sage`. If the local project only registers `linear-relay`, add or keep a `linear-sage` action alias for compatibility.
+
+For legacy Slack connections, first try without `--integration-id`; Nango may infer `slack-sage`. If the local project only registers `slack-relay`, add or keep a `slack-sage` action alias for compatibility.
 
 ## GitHub Repository Webhooks
 
@@ -88,6 +91,34 @@ Minimum scopes for the current Linear adapter and webhook action surface:
 `admin` is required for webhook management. A production dryrun using an existing legacy Linear connection reached Linear GraphQL after adding the `linear-sage` alias, then failed with `Invalid role: admin required`. That means the connection exists and the action path is correct, but the connected Linear account or app role must be admin-capable before list/create/delete webhook actions can succeed.
 
 Source: https://linear.app/developers/webhooks
+
+## Slack Incoming Webhooks
+
+Relayfile's canonical Slack provider config key is `slack-relay`, but existing production connections may resolve to `slack-sage`. Keep incoming webhook actions registered under both keys until old provider ids are migrated.
+
+Slack incoming webhooks are provisioned during OAuth installation with the `incoming-webhook` scope. There is no later REST endpoint that registers an incoming webhook URL for an already-installed OAuth connection. During installation, Slack asks the installer to choose the destination channel and returns an `incoming_webhook` object containing the webhook URL and channel metadata.
+
+Minimum scopes for the current Slack adapter and incoming webhook action surface include:
+
+- `channels:history`
+- `channels:read`
+- `groups:history`
+- `groups:read`
+- `im:history`
+- `im:read`
+- `mpim:history`
+- `mpim:read`
+- `team:read`
+- `users:read`
+- `users:read.email`
+- `chat:write`
+- `incoming-webhook`
+
+The webhook URL is a secret. Nango actions should never return it to callers or write it to logs. A safe `get-incoming-webhook` action should only report metadata such as whether a webhook exists, the selected channel id, and the Slack configuration URL. A `send-incoming-webhook` action can post by reading the stored URL from the Nango connection metadata and sending the message payload directly to Slack.
+
+Production dryrun reached the legacy `slack-sage` connection and returned `hasIncomingWebhook: false`, which means the connection exists but was not installed with an incoming webhook URL available to Nango. Reconnect the Slack OAuth app with `incoming-webhook` included and choose a channel before send actions can post.
+
+Source: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/
 
 ## Confluence Server/Data Center Webhooks
 
