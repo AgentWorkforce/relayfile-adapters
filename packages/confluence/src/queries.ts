@@ -1,7 +1,69 @@
 import { extractConfluenceIdFromPathSegment } from './path-mapper.js';
-import { CONFLUENCE_API_PAGES_ROUTE, CONFLUENCE_DEFAULT_PAGE_SIZE, type ConfluenceReadRequest } from './types.js';
+import { CONFLUENCE_API_PAGES_ROUTE, CONFLUENCE_DEFAULT_PAGE_SIZE, type ConfluencePage, type ConfluenceSpace, type ConfluenceReadRequest } from './types.js';
 
 export const CONFLUENCE_API_SPACES_ROUTE = '/wiki/api/v2/spaces';
+
+export interface ConfluenceBaseIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+}
+
+export interface ConfluencePageIndexRow extends ConfluenceBaseIndexRow {
+  spaceId: string;
+  status: string;
+}
+
+export interface ConfluenceSpaceIndexRow extends ConfluenceBaseIndexRow {
+  key: string;
+}
+
+function normalizeString(value: string | null | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeIndexTitle(value: string | null | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeUpdated(...values: Array<string | null | undefined>): string {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  }
+  return '';
+}
+
+export function getConfluencePageHumanReadable(page: { title?: string | null }): string | undefined {
+  return normalizeString(page.title ?? undefined);
+}
+
+export function getConfluenceSpaceHumanReadable(space: { name?: string | null; key?: string | null }): string | undefined {
+  return normalizeString(space.name ?? undefined) ?? normalizeString(space.key ?? undefined);
+}
+
+export function confluencePageIndexRow(page: ConfluencePage): ConfluencePageIndexRow {
+  return {
+    id: page.id,
+    title: normalizeIndexTitle(page.title),
+    updated: normalizeUpdated(page.version?.createdAt, page.createdAt),
+    spaceId: normalizeIndexTitle(page.spaceId),
+    status: normalizeIndexTitle(page.status),
+  };
+}
+
+export function confluenceSpaceIndexRow(space: ConfluenceSpace): ConfluenceSpaceIndexRow {
+  return {
+    id: space.id,
+    title: normalizeIndexTitle(space.name) || normalizeIndexTitle(space.key),
+    updated: normalizeUpdated(space.createdAt),
+    key: normalizeIndexTitle(space.key),
+  };
+}
 
 export function resolveConfluenceReadRequest(path: string): ConfluenceReadRequest {
   const normalized = normalizePath(path);

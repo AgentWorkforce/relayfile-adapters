@@ -55,18 +55,18 @@ describe('ConfluenceAdapter', () => {
   it('computes deterministic Confluence paths', () => {
     assert.equal(
       computeConfluencePath('space', '12345', { title: 'Engineering Docs' }),
-      '/confluence/spaces/engineering-docs--12345.json',
+      '/confluence/spaces/engineering-docs__12345.json',
     );
     assert.equal(
       computeConfluencePath('page', '98765', { title: 'Release Plan', spaceId: '12345' }),
-      '/confluence/spaces/12345/pages/release-plan--98765.json',
+      '/confluence/spaces/12345/pages/release-plan__98765.json',
     );
   });
 
   it('materializes spaces and pages from Nango-style sync records', () => {
     const adapter = createAdapter();
     assert.deepEqual(adapter.materializeSpace({ id: '12345', key: 'ENG', name: 'Engineering' }), {
-      path: '/confluence/spaces/engineering--12345.json',
+      path: '/confluence/spaces/engineering__12345.json',
       payload: {
         provider: 'confluence',
         objectType: 'space',
@@ -77,7 +77,7 @@ describe('ConfluenceAdapter', () => {
 
     assert.equal(
       adapter.materializePage({ id: '98765', title: 'Release Plan', spaceId: '12345' }).path,
-      '/confluence/spaces/12345/pages/release-plan--98765.json',
+      '/confluence/spaces/12345/pages/release-plan__98765.json',
     );
   });
 
@@ -100,7 +100,7 @@ describe('ConfluenceAdapter', () => {
     });
 
     assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/confluence/spaces/12345/pages/release-plan--98765.json');
+    assert.equal(client.writes[0]?.path, '/confluence/spaces/12345/pages/release-plan__98765.json');
     assert.deepEqual(client.writes[0]?.semantics?.relations, [
       confluenceSpacePath('12345'),
     ]);
@@ -120,7 +120,7 @@ describe('ConfluenceAdapter', () => {
       endpoint: '/wiki/api/v2/pages',
       query: { limit: '100', 'body-format': 'storage', 'space-id': '12345' },
     });
-    assert.deepEqual(resolveConfluenceReadRequest('/confluence/pages/release-plan--98765.json'), {
+    assert.deepEqual(resolveConfluenceReadRequest('/confluence/pages/release-plan__98765.json'), {
       action: 'get_page',
       method: 'GET',
       endpoint: '/wiki/api/v2/pages/98765',
@@ -154,7 +154,7 @@ describe('ConfluenceAdapter', () => {
   it('resolves page updates and increments synced version numbers', () => {
     assert.deepEqual(
       resolveConfluenceWritebackRequest(
-        '/confluence/pages/release-plan--98765.json',
+        '/confluence/pages/release-plan__98765.json',
         JSON.stringify({
           provider: 'confluence',
           objectType: 'page',
@@ -186,7 +186,7 @@ describe('ConfluenceAdapter', () => {
   });
 
   it('resolves page deletes and rejects read-only fields', () => {
-    assert.deepEqual(resolveConfluenceDeleteRequest('/confluence/pages/release-plan--98765.json'), {
+    assert.deepEqual(resolveConfluenceDeleteRequest('/confluence/pages/release-plan__98765.json'), {
       action: 'delete_page',
       method: 'DELETE',
       endpoint: '/wiki/api/v2/pages/98765',

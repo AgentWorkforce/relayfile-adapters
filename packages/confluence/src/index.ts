@@ -8,25 +8,103 @@ export type {
   ProxyRequest,
   ProxyResponse,
 } from './confluence-adapter.js';
+
 export {
   CONFLUENCE_OBJECT_TYPES,
+  CONFLUENCE_CANONICAL_PAGE_STATUSES,
+  CONFLUENCE_PATH_ROOT,
   computeConfluencePath,
+  confluenceByIdAliasPath,
+  confluenceByTitleAliasPath,
+  confluencePageByIdAliasPath,
+  confluencePageByStatePath,
+  confluencePageByTitleAliasPath,
   confluencePagePath,
+  confluencePagesIndexPath,
+  confluenceProviderRootIndexPath,
+  confluenceSpaceByIdAliasPath,
+  confluenceSpaceByTitleAliasPath,
   confluenceSpacePath,
+  confluenceSpacesIndexPath,
   encodeConfluencePathSegment,
   extractConfluenceIdFromPathSegment,
+  nameWithId,
   normalizeConfluenceObjectType,
+  normalizeNangoConfluenceModel,
+  parseNameWithId,
+  slugifyStatusName,
+  tryNormalizeConfluenceObjectType,
 } from './path-mapper.js';
+export type {
+  ConfluencePathObjectType,
+  NameWithIdOptions,
+  ParseNameWithIdResult,
+} from './path-mapper.js';
+
+export {
+  aliasCollisionSuffix,
+  slugifyAlias,
+} from './alias-slug.js';
+
+export {
+  confluenceLayoutPromptFile,
+  CONFLUENCE_LAYOUT_PROMPT,
+} from './layout-prompt.js';
+
+export {
+  buildConfluenceIndexFile,
+} from './index-emitter.js';
+export type {
+  ConfluenceIndexBucket,
+  ConfluenceIndexFile,
+} from './index-emitter.js';
+
+export {
+  CONFLUENCE_API_SPACES_ROUTE,
+  confluencePageIndexRow,
+  confluenceSpaceIndexRow,
+  getConfluencePageHumanReadable,
+  getConfluenceSpaceHumanReadable,
+  resolveConfluenceReadRequest,
+} from './queries.js';
+export type {
+  ConfluenceBaseIndexRow,
+  ConfluencePageIndexRow,
+  ConfluenceSpaceIndexRow,
+} from './queries.js';
+
 export {
   CONFLUENCE_API_PAGES_ROUTE,
 } from './types.js';
+export type * from './types.js';
+
 export {
-  CONFLUENCE_API_SPACES_ROUTE,
-  resolveConfluenceReadRequest,
-} from './queries.js';
-export {
+  ReadOnlyFieldError,
   resolveConfluenceDeleteRequest,
   resolveConfluenceWritebackRequest,
 } from './writeback.js';
-export type * from './types.js';
+
+export {
+  assertValidConfluenceWebhookSignature,
+  computeConfluenceWebhookSignature,
+  CONFLUENCE_DELIVERY_HEADER,
+  CONFLUENCE_EVENT_HEADER,
+  CONFLUENCE_PROVIDER,
+  CONFLUENCE_SIGNATURE_HEADER,
+  extractConfluenceConnectionMetadata,
+  extractConfluenceEventType,
+  extractConfluenceObjectId,
+  extractConfluenceObjectType,
+  normalizeConfluenceWebhook,
+  parseConfluenceWebhookPayload,
+  validateConfluenceWebhookSignature,
+  validateConfluenceWebhookTimestamp,
+} from './webhook-normalizer.js';
+export type {
+  ConfluenceWebhookConnectionMetadata,
+  ConfluenceWebhookHeaders,
+  ConfluenceWebhookSignatureValidationResult,
+  ConfluenceWebhookTimestampValidationResult,
+} from './webhook-normalizer.js';
+
 export * from './resources.js';
