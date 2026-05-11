@@ -51,6 +51,8 @@ const EVENT_ALIASES: Readonly<Record<string, string>> = {
   'confluence:page_updated': 'page.update',
   'confluence:page_removed': 'page.remove',
   'confluence:page_trashed': 'page.remove',
+  'confluence:page_restored': 'page.update',
+  'confluence:page_archived': 'page.update',
   'confluence:space_created': 'space.create',
   'confluence:space_updated': 'space.update',
   'confluence:space_removed': 'space.remove',
@@ -151,10 +153,14 @@ export function normalizeConfluenceWebhook(
     ingestedPayload.id = objectId;
   }
 
+  if (objectType !== 'page' && objectType !== 'space') {
+    throw new Error(`Unsupported Confluence webhook object type: ${objectType}`);
+  }
+
   const normalized: ConfluenceNormalizedEvent = {
     provider: connection.provider,
     eventType,
-    objectType: objectType === 'space' ? 'space' : 'page',
+    objectType,
     objectId,
     payload: ingestedPayload,
   };
@@ -465,7 +471,13 @@ function toRawBodyBuffer(rawPayload: unknown): Buffer {
   if (Buffer.isBuffer(rawPayload)) return rawPayload;
   if (rawPayload instanceof Uint8Array) return Buffer.from(rawPayload);
   if (rawPayload instanceof ArrayBuffer) return Buffer.from(rawPayload);
-  return Buffer.from(JSON.stringify(rawPayload), 'utf8');
+  // HMAC signatures are computed over the provider's exact raw request body.
+  // Re-serializing a parsed payload via JSON.stringify can re-order keys,
+  // re-escape characters, or drop whitespace, all of which break the digest.
+  // Force callers to thread the raw bytes through instead.
+  throw new Error(
+    'Confluence signature validation requires the raw request body (string/Buffer/Uint8Array/ArrayBuffer).',
+  );
 }
 
 function normalizeHeaders(headers: ConfluenceWebhookHeaders): Record<string, string> {

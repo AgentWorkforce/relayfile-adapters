@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-confluence",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "description": "Confluence adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",

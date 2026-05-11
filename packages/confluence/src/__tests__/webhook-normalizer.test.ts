@@ -6,6 +6,7 @@ import {
   CONFLUENCE_DELIVERY_HEADER,
   CONFLUENCE_SIGNATURE_HEADER,
   assertValidConfluenceWebhookSignature,
+  computeConfluenceWebhookSignature,
   normalizeConfluenceWebhook,
   validateConfluenceWebhookSignature,
   validateConfluenceWebhookTimestamp,
@@ -103,4 +104,59 @@ test('validateConfluenceWebhookTimestamp enforces freshness', () => {
   const stale = validateConfluenceWebhookTimestamp(pagePayload, 60_000, 1_743_155_400_001);
   assert.equal(stale.ok, false);
   assert.equal(stale.reason, 'stale-timestamp');
+});
+
+// Atlassian Connect sends events with a `confluence:` prefix. Make sure
+// restored and archived land on the same canonical eventType as the
+// un-prefixed variants — without these aliases the fallback splits the
+// underscore name into `confluence:page.restored` and downstream filters
+// on `page.update` miss the event entirely.
+test('normalizeConfluenceWebhook resolves prefixed page_restored / page_archived to page.update', () => {
+  for (const event of ['confluence:page_restored', 'confluence:page_archived']) {
+    const normalized = normalizeConfluenceWebhook(
+      { ...pagePayload, webhookEvent: event },
+      { [CONFLUENCE_DELIVERY_HEADER]: `delivery_${event}` },
+    );
+    assert.equal(normalized.eventType, 'page.update', `${event} should map to page.update`);
+    assert.equal(normalized.objectType, 'page');
+  }
+});
+
+// Unsupported object types must fail fast. The pre-fix code silently
+// coerced anything that wasn't 'space' to 'page', which masked broken
+// upstream payloads and produced bogus tree writes. Provide an
+// objectId via the top-level `id` so we reach the objectType check
+// rather than the missing-id guard.
+test('normalizeConfluenceWebhook fails fast on unsupported object types', () => {
+  assert.throws(
+    () =>
+      normalizeConfluenceWebhook(
+        {
+          webhookEvent: 'comment_created',
+          id: '111',
+          comment: { id: '111', text: 'hi' },
+        },
+        { [CONFLUENCE_DELIVERY_HEADER]: 'delivery_comment' },
+      ),
+    /Unsupported Confluence webhook object type/,
+  );
+});
+
+// HMAC must compute over the provider's raw request body. Accepting a
+// parsed object and JSON.stringify-ing it produced digests that drifted
+// from the provider's signature whenever key ordering or whitespace
+// differed. Require raw bytes (string / Buffer / Uint8Array / ArrayBuffer).
+test('computeConfluenceWebhookSignature rejects parsed object payloads', () => {
+  assert.throws(
+    () => computeConfluenceWebhookSignature({ webhookEvent: 'page_created' }, 'secret'),
+    /raw request body/,
+  );
+});
+
+test('computeConfluenceWebhookSignature accepts string and Buffer raw bodies', () => {
+  const secret = 'shh';
+  const body = '{"webhookEvent":"page_created"}';
+  const expected = createHmac('sha256', secret).update(body).digest('hex');
+  assert.equal(computeConfluenceWebhookSignature(body, secret), expected);
+  assert.equal(computeConfluenceWebhookSignature(Buffer.from(body, 'utf8'), secret), expected);
 });

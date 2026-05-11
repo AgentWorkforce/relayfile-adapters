@@ -30,7 +30,10 @@ function normalizeIndexTitle(value: string | null | undefined): string {
 
 function normalizeUpdated(...values: Array<string | null | undefined>): string {
   for (const value of values) {
-    if (typeof value === 'string') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
   }
   return '';
 }
