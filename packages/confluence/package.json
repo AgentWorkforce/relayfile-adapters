@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-confluence",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Confluence adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -11,6 +11,21 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./alias-slug": {
+      "types": "./dist/alias-slug.d.ts",
+      "import": "./dist/alias-slug.js",
+      "default": "./dist/alias-slug.js"
+    },
+    "./index-emitter": {
+      "types": "./dist/index-emitter.d.ts",
+      "import": "./dist/index-emitter.js",
+      "default": "./dist/index-emitter.js"
+    },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
       "import": "./dist/path-mapper.js",
@@ -20,6 +35,11 @@
       "types": "./dist/queries.d.ts",
       "import": "./dist/queries.js",
       "default": "./dist/queries.js"
+    },
+    "./webhook-normalizer": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
     },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
