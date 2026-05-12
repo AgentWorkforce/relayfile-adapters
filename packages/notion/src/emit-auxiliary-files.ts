@@ -650,8 +650,17 @@ function extractPriorPageState(parsed: Record<string, unknown>): PriorPageState 
     readNonEmptyString(payload.databaseId) ??
     (parentType === 'database' ? parentId : undefined);
 
+  // Mirror `readPageTitle`'s shape detection: check the top-level `title`
+  // first, then fall back to the raw Notion `properties` map. Without the
+  // fallback, prior payloads written in the raw API shape (title only
+  // inside `properties`) report `title: undefined`, the old by-title
+  // alias is excluded from the stale-path diff, and the stale file leaks
+  // across renames. Delegate to `readPageTitle` so the two code paths
+  // stay in lockstep by construction.
+  const title = readPageTitle(payload as NotionPageLike);
+
   return {
-    title: readNonEmptyString(payload.title),
+    title,
     databaseId,
     databaseTitle:
       readNonEmptyString(payload.database_title) ?? readNonEmptyString(payload.databaseTitle),

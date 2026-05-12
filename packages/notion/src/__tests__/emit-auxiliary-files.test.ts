@@ -209,6 +209,64 @@ describe('emitNotionAuxiliaryFiles', () => {
     assert.ok(writtenPaths.has(notionStandalonePagePath(PAGE_A)));
   });
 
+  it('reconciles prior by-title alias on page rename when the prior payload used the raw Notion API shape (title only in properties)', async () => {
+    // The by-id alias was previously written from a raw Notion API
+    // record: no top-level `title` field, the title lives inside
+    // `properties` as a Notion rich-text array. `extractPriorPageState`
+    // must mirror `readPageTitle`'s shape detection and fall back to
+    // `properties`, otherwise the prior title is lost, the old by-title
+    // alias is excluded from the stale-path diff, and the stale alias
+    // file leaks across the rename. (Devin src:654)
+    const priorPayload = {
+      provider: 'notion',
+      objectType: 'page',
+      objectId: PAGE_A,
+      payload: {
+        id: PAGE_A,
+        // No top-level `title` field — raw Notion API shape only.
+        properties: {
+          Name: {
+            id: 'title',
+            type: 'title',
+            title: [
+              { type: 'text', plain_text: 'Old Raw Title' },
+            ],
+          },
+        },
+        parent: { type: 'workspace', workspace: true },
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [notionByIdAliasPath(PAGES_SCOPE, PAGE_A)]: JSON.stringify(priorPayload),
+      },
+    });
+
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pages: [
+        {
+          id: PAGE_A,
+          title: 'New Title',
+          parent: { type: 'workspace', workspace: true } as const,
+        },
+      ],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    // The old by-title alias derived from the raw-shape title must be
+    // queued for deletion. This is the regression guard for src:654.
+    assert.ok(
+      deletedPaths.has(notionByTitleAliasPath(PAGES_SCOPE, 'Old Raw Title', PAGE_A)),
+      'stale by-title alias derived from raw-shape properties must be deleted',
+    );
+    const writtenPaths = new Set(client.writes.map((w) => w.path));
+    assert.ok(writtenPaths.has(notionByTitleAliasPath(PAGES_SCOPE, 'New Title', PAGE_A)));
+    // Id-only canonical stays put.
+    assert.ok(!deletedPaths.has(notionStandalonePagePath(PAGE_A)));
+    assert.ok(writtenPaths.has(notionStandalonePagePath(PAGE_A)));
+  });
+
   it('reconciles prior by-database alias when a page moves between databases', async () => {
     const priorPayload = {
       payload: {
