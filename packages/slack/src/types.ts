@@ -17,6 +17,7 @@ export interface SlackAdapterConfig {
 export interface SlackWritebackRequest {
   action:
     | 'post_message'
+    | 'post_dm'
     | 'reply_in_thread'
     | 'update_message'
     | 'add_reaction'
@@ -27,6 +28,7 @@ export interface SlackWritebackRequest {
     | '/api/chat.delete'
     | '/api/chat.postMessage'
     | '/api/chat.update'
+    | '/api/conversations.open'
     | '/api/reactions.add'
     | '/api/reactions.remove';
   body: Record<string, unknown>;

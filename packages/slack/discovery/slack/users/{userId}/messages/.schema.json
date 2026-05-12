@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Post Slack direct message",
+  "type": "object",
+  "required": [],
+  "anyOf": [
+    {
+      "required": [
+        "text"
+      ]
+    },
+    {
+      "required": [
+        "blocks"
+      ]
+    },
+    {
+      "required": [
+        "attachments"
+      ]
+    }
+  ],
+  "properties": {
+    "text": {
+      "type": "string",
+      "description": "Message text. Required unless blocks or attachments are supplied."
+    },
+    "blocks": {
+      "type": "array",
+      "description": "Slack Block Kit blocks.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "description": "Slack message attachments.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "unfurl_links": {
+      "type": "boolean",
+      "description": "Whether Slack should unfurl links."
+    },
+    "unfurl_media": {
+      "type": "boolean",
+      "description": "Whether Slack should unfurl media."
+    },
+    "mrkdwn": {
+      "type": "boolean",
+      "description": "Whether Slack should parse mrkdwn in text."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Writable Slack direct message fields. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

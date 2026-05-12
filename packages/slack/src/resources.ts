@@ -17,6 +17,14 @@ export const resources = [
     createExample: "discovery/slack/channels/{channelId}/messages/.create.example.json",
   },
   {
+    name: "direct-messages",
+    path: "/slack/users/{userId}/messages",
+    pathPattern: /^\/slack\/users\/[^\/]+\/messages(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$/,
+    schema: "discovery/slack/users/{userId}/messages/.schema.json",
+    createExample: "discovery/slack/users/{userId}/messages/.create.example.json",
+  },
+  {
     name: "replies",
     path: "/slack/channels/{channelId}/messages/{messageTs}/replies",
     pathPattern: /^\/slack\/channels\/[^\/]+\/messages\/[^\/]+\/replies(?:\/[^\/]+(?:\.json)?)?$/,

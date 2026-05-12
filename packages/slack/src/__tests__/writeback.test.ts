@@ -257,6 +257,39 @@ describe('slack writeback', () => {
     });
   });
 
+  describe('post_dm', () => {
+    it('opens a direct message conversation and carries the message payload', () => {
+      const req = resolveWritebackRequest(
+        '/slack/users/U01ABC1234/messages/create request.json',
+        JSON.stringify({ text: 'Can you review this?', unfurl_links: false }),
+      );
+
+      assert.strictEqual(req.action, 'post_dm');
+      assert.strictEqual(req.endpoint, '/api/conversations.open');
+      assert.deepStrictEqual(req.body, {
+        users: 'U01ABC1234',
+        return_im: true,
+        message: {
+          text: 'Can you review this?',
+          unfurl_links: false,
+        },
+      });
+    });
+
+    it('extracts canonical user id from <slug>--<id> paths', () => {
+      const req = resolveWritebackRequest(
+        '/slack/users/khalid--U01ABC1234/messages/create request.json',
+        'Heads up from the deploy agent.',
+      );
+
+      assert.deepStrictEqual(req.body, {
+        users: 'U01ABC1234',
+        return_im: true,
+        message: { text: 'Heads up from the deploy agent.' },
+      });
+    });
+  });
+
   describe('delete', () => {
     it('maps canonical messages and reactions to Slack delete calls', () => {
       assert.deepStrictEqual(

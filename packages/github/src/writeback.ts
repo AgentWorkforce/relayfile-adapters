@@ -7,6 +7,8 @@ import {
   type AgentComment,
   type AgentReview,
   type AgentReviewMetadata,
+  type GitHubIssueCommentWritebackInput,
+  type GitHubIssueWritebackInput,
   type GitHubRequestProvider,
   type GitHubCreateReviewInput,
   type JsonObject,
@@ -25,6 +27,10 @@ const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 // and tolerate an optional `__<slug>` suffix on the same segment.
 const REVIEW_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/([^/]+?)(?:\.json)?$/;
+const ISSUE_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([^/]+?)(?:\.json)?$/;
+const ISSUE_COMMENT_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)(?:__[^/]+)?\/comments\/([^/]+?)(?:\.json)?$/;
 
 interface GitHubReviewResponse {
   id: number;
@@ -304,6 +310,203 @@ export function resolveDeleteRequest(path: string): ProxyRequest {
   };
 }
 
+export function resolveWritebackRequest(path: string, content: string): ProxyRequest {
+  const route = classifyWrite(path, resources);
+
+  if (route?.resource.name === 'issues') {
+    const match = path.match(ISSUE_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2] || !match[3]) {
+      throw new Error(`Unsupported GitHub issue writeback path: ${path}`);
+    }
+    const owner = decodeGitHubPathSegment(match[1], 'owner');
+    const repo = decodeGitHubPathSegment(match[2], 'repo');
+    if (route.kind === 'create') {
+      return buildIssueCreateRequest(owner, repo, content);
+    }
+    if (route.kind === 'patch') {
+      const issueNumber = parsePositiveIntegerSegment(match[3], 'issue number');
+      return buildIssueUpdateRequest(owner, repo, issueNumber, content);
+    }
+  }
+
+  if (route?.resource.name === 'issue-comments') {
+    const match = path.match(ISSUE_COMMENT_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2] || !match[3] || !match[4]) {
+      throw new Error(`Unsupported GitHub issue comment writeback path: ${path}`);
+    }
+    const owner = decodeGitHubPathSegment(match[1], 'owner');
+    const repo = decodeGitHubPathSegment(match[2], 'repo');
+    const issueNumber = Number.parseInt(match[3], 10);
+    if (route.kind === 'create') {
+      return buildIssueCommentCreateRequest(owner, repo, issueNumber, content);
+    }
+    if (route.kind === 'patch') {
+      const commentId = parsePositiveIntegerSegment(match[4], 'comment id');
+      return buildIssueCommentUpdateRequest(owner, repo, commentId, content);
+    }
+  }
+
+  throw new Error(
+    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, or pull request review file.`,
+  );
+}
+
+function buildIssueCreateRequest(owner: string, repo: string, content: string): ProxyRequest {
+  const payload = parseIssuePayload(content, 'GitHub issue create payload');
+  if (!payload.title) {
+    throw new Error('GitHub issue create payload.title must be a non-empty string');
+  }
+  return {
+    method: 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/issues`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: compactIssuePayload(payload),
+  };
+}
+
+function buildIssueUpdateRequest(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  content: string,
+): ProxyRequest {
+  const payload = parseIssuePayload(content, 'GitHub issue update payload');
+  const body = compactIssuePayload(payload);
+  if (Object.keys(body).length === 0) {
+    throw new Error('GitHub issue update payload requires at least one mutable field');
+  }
+  return {
+    method: 'PATCH',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body,
+  };
+}
+
+function buildIssueCommentCreateRequest(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  content: string,
+): ProxyRequest {
+  const payload = parseIssueCommentPayload(content, 'GitHub issue comment create payload');
+  return {
+    method: 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: payload,
+  };
+}
+
+function buildIssueCommentUpdateRequest(
+  owner: string,
+  repo: string,
+  commentId: number,
+  content: string,
+): ProxyRequest {
+  const payload = parseIssueCommentPayload(content, 'GitHub issue comment update payload');
+  return {
+    method: 'PATCH',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: payload,
+  };
+}
+
+function parseIssuePayload(content: string, context: string): GitHubIssueWritebackInput {
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(content) as JsonValue;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown JSON parse failure';
+    throw new Error(`Invalid issue JSON: ${message}`);
+  }
+
+  const object = expectObject(parsed, context);
+  rejectReadOnlyFields(object);
+  const title = optionalTrimmedString(object.title, `${context}.title`);
+  const body = optionalTrimmedString(object.body, `${context}.body`);
+  const labels = optionalStringArray(object.labels, `${context}.labels`);
+  const assignees = optionalStringArray(object.assignees, `${context}.assignees`);
+  const milestone = optionalMilestone(object.milestone, `${context}.milestone`);
+  const state = optionalIssueState(object.state, `${context}.state`);
+
+  return { title, body, labels, assignees, milestone, state };
+}
+
+function parseIssueCommentPayload(
+  content: string,
+  context: string,
+): GitHubIssueCommentWritebackInput {
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(content) as JsonValue;
+  } catch {
+    const body = content.trim();
+    if (!body) {
+      throw new Error(`${context}.body must be a non-empty string`);
+    }
+    return { body };
+  }
+
+  if (typeof parsed === 'string') {
+    const body = parsed.trim();
+    if (!body) {
+      throw new Error(`${context}.body must be a non-empty string`);
+    }
+    return { body };
+  }
+
+  const object = expectObject(parsed, context);
+  rejectReadOnlyFields(object);
+  return { body: readString(object, 'body', context) };
+}
+
+function compactIssuePayload(payload: GitHubIssueWritebackInput): JsonObject {
+  const body: JsonObject = {};
+  if (payload.title !== undefined) body.title = payload.title;
+  if (payload.body !== undefined) body.body = payload.body;
+  if (payload.labels !== undefined) body.labels = payload.labels;
+  if (payload.assignees !== undefined) body.assignees = payload.assignees;
+  if (payload.milestone !== undefined) body.milestone = payload.milestone;
+  if (payload.state !== undefined) body.state = payload.state;
+  return body;
+}
+
+function githubJsonHeaders(): Record<string, string> {
+  return {
+    Accept: 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+function parsePositiveIntegerSegment(segment: string, field: string): number {
+  const decoded = decodeGitHubPathSegment(segment.replace(/\.json$/, ''), field);
+  const numberSegment = decoded.split('__')[0] ?? decoded;
+  const value = Number.parseInt(numberSegment, 10);
+  if (!Number.isInteger(value) || value < 1 || String(value) !== numberSegment) {
+    throw new Error(`GitHub ${field} must be a positive integer`);
+  }
+  return value;
+}
+
+function decodeGitHubPathSegment(encoded: string, field: string): string {
+  const decoded = decodeURIComponent(encoded);
+  if (decoded.includes('/')) {
+    throw new Error(`Invalid GitHub ${field} in writeback path: encoded path separators are not allowed`);
+  }
+  return decoded;
+}
+
 function parseReviewUpdatePayload(content: string): { body: string; metadata?: AgentReviewMetadata } {
   let parsed: JsonValue;
   try {
@@ -413,6 +616,45 @@ function optionalTrimmedString(value: JsonValue | undefined, fieldName: string):
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function optionalStringArray(value: JsonValue | undefined, fieldName: string): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array of strings when provided`);
+  }
+  const strings = value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      throw new Error(`${fieldName}[${index}] must be a non-empty string`);
+    }
+    return entry;
+  });
+  return strings;
+}
+
+function optionalMilestone(value: JsonValue | undefined, fieldName: string): number | string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  throw new Error(`${fieldName} must be a positive integer or string when provided`);
+}
+
+function optionalIssueState(value: JsonValue | undefined, fieldName: string): 'open' | 'closed' | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === 'open' || value === 'closed') {
+    return value;
+  }
+  throw new Error(`${fieldName} must be either open or closed when provided`);
 }
 
 function readPositiveInteger(source: JsonObject, key: string, context: string): number {

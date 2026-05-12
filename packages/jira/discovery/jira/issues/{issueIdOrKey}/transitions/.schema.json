@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jira issue transition",
+  "type": "object",
+  "required": [
+    "transition"
+  ],
+  "properties": {
+    "transition": {
+      "type": "object",
+      "description": "Jira transition descriptor.",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Jira transition id."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Writable Jira issue transition request."
+}

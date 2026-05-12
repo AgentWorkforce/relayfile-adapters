@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GitHub issue",
+  "type": "object",
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Issue title."
+    },
+    "body": {
+      "type": "string",
+      "description": "Issue body."
+    },
+    "labels": {
+      "type": "array",
+      "description": "Issue label names.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assignees": {
+      "type": "array",
+      "description": "GitHub usernames to assign.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "milestone": {
+      "description": "Milestone number or title.",
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "state": {
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "description": "Issue state for canonical updates."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Writable GitHub issue fields. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

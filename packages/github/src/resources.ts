@@ -9,6 +9,22 @@ export interface AdapterResourceConfig {
 
 export const resources = [
   {
+    name: "issues",
+    path: "/github/repos/{owner}/{repo}/issues",
+    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/issues(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[1-9]\d*$/,
+    schema: "discovery/github/repos/{owner}/{repo}/issues/.schema.json",
+    createExample: "discovery/github/repos/{owner}/{repo}/issues/.create.example.json",
+  },
+  {
+    name: "issue-comments",
+    path: "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
+    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/issues\/[^\/]+\/comments(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^\d+$/,
+    schema: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json",
+    createExample: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.create.example.json",
+  },
+  {
     name: "reviews",
     path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews",
     pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/pulls\/[^\/]+\/reviews(?:\/[^\/]+(?:\.json)?)?$/,

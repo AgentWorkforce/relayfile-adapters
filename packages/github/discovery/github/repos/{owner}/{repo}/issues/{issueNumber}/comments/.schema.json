@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GitHub issue comment",
+  "type": "object",
+  "required": [
+    "body"
+  ],
+  "properties": {
+    "body": {
+      "type": "string",
+      "description": "Comment body."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Writable GitHub issue comment fields. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

@@ -27,6 +27,13 @@ export function resolveJiraWritebackRequest(path: string, content: string): Jira
     }
   }
 
+  if (route?.resource.name === 'transitions') {
+    const segments = normalized.match(/^\/jira\/issues\/([^/]+)\/transitions\/([^/]+)\.json$/u);
+    if (segments?.[1] && route.kind === 'create') {
+      return buildIssueTransition(extractJiraIdFromPathSegment(segments[1]), content);
+    }
+  }
+
   // Reject the flat form for updates: Jira's PUT /comment requires the
   // parent issue ID in the path, so the flat form cannot resolve.
   if (/^\/jira\/comments\/[^/]+\.json$/u.test(normalized)) {
@@ -178,6 +185,17 @@ function buildIssueUpdate(issueIdOrKey: string, content: string): JiraWritebackR
   };
 }
 
+function buildIssueTransition(issueIdOrKey: string, content: string): JiraWritebackRequest {
+  const parsed = safeParseJson(content);
+  const transition = normalizeTransition(parsed);
+  return {
+    action: 'transition_issue',
+    method: 'POST',
+    endpoint: `${JIRA_REST_ISSUE_ROUTE}/${issueIdOrKey}/transitions`,
+    body: { transition },
+  };
+}
+
 function buildProjectCreate(content: string): JiraWritebackRequest {
   const body = parseJsonObject(content);
   rejectReadOnlyFields(body);
@@ -192,6 +210,24 @@ function buildProjectCreate(content: string): JiraWritebackRequest {
     endpoint: JIRA_REST_PROJECT_ROUTE,
     body,
   };
+}
+
+function normalizeTransition(payload: unknown): { id: string } {
+  if (typeof payload === 'string') {
+    if (!payload) {
+      throw new Error('issue transition writeback requires transition.id');
+    }
+    return { id: payload };
+  }
+  if (!isRecord(payload)) {
+    throw new Error('issue transition writeback requires a transition object or id');
+  }
+  const transition = isRecord(payload.transition) ? payload.transition : payload;
+  const id = readString(transition, 'id');
+  if (!id) {
+    throw new Error('issue transition writeback requires transition.id');
+  }
+  return { id };
 }
 
 function buildProjectUpdate(projectIdOrKey: string, content: string): JiraWritebackRequest {
