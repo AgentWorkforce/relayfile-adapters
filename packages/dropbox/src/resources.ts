@@ -10,9 +10,9 @@ export interface AdapterResourceConfig {
 export const resources = [
   {
     name: "files",
-    path: "/dropbox/{accountId}/files",
-    pathPattern: /^\/dropbox\/[^\/]+\/files(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^\/.+$/,
+    path: "/dropbox/files",
+    pathPattern: /^\/dropbox\/files(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/dropbox/files/.schema.json",
     createExample: "discovery/dropbox/files/.create.example.json",
   },
@@ -20,13 +20,13 @@ export const resources = [
     name: "cursors",
     path: "/dropbox/cursors",
     pathPattern: /^\/dropbox\/cursors(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9._-]+$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/dropbox/cursors/.schema.json",
     createExample: "discovery/dropbox/cursors/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

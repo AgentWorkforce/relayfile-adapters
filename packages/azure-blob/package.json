@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/azure-blob",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Azure Blob Storage storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -61,6 +61,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.4"
+    "@relayfile/adapter-core": "^0.2.15"
   }
 }

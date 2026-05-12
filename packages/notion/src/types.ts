@@ -352,6 +352,38 @@ export interface NotionAliasMetadata {
   scopePath: string;
   title?: string;
   id: string;
+  /**
+   * Distinguishes the alias subtree being emitted so the writer knows
+   * which `by-*` views are load-bearing. Defaults to `'page'` when
+   * omitted to preserve compatibility with callers that predate the
+   * databases / users alias subtrees.
+   */
+  aliasKind?: 'page' | 'database' | 'user';
+  /**
+   * For pages: the database the page belongs to (if any). When present,
+   * the alias writer emits a `/notion/pages/by-database/<db>/<page>.json`
+   * cross-reference in addition to the in-scope `by-id` / `by-title`
+   * aliases.
+   */
+  databaseId?: string;
+  databaseTitle?: string;
+  /**
+   * For pages: the resolved parent, used to emit the
+   * `/notion/pages/by-parent/<parent>/<page>.json` cross-reference. When
+   * `parentType === 'workspace'` the writer skips the by-parent emit —
+   * the workspace root would collect every top-level page and lose its
+   * navigational value.
+   */
+  parentType?: 'database' | 'page' | 'workspace';
+  parentId?: string;
+  parentTitle?: string;
+  /**
+   * For users: the user's display name, aliased under
+   * `/notion/users/by-name/<slug>__<short_id>.json`. Notion lets multiple
+   * users share a display name (especially for bot integrations), so the
+   * short-id suffix is mandatory.
+   */
+  name?: string;
 }
 
 export interface NotionVfsFile extends BulkWriteFile {

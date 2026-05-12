@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-hubspot",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "HubSpot adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "directory": "packages/hubspot"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.4"
+    "@relayfile/adapter-core": "^0.2.15"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

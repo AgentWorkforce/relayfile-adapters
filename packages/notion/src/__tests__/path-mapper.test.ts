@@ -38,9 +38,18 @@ describe('path mapping', () => {
 
   it('maps standalone alias paths', () => {
     assert.strictEqual(notionStandalonePagesCollectionPath(), '/notion/pages');
+    // by-title aliases always carry a deterministic <slug>__<short_id>
+    // suffix derived from the canonical UUID — collisions are impossible
+    // and an agent holding the UUID can recompute the filename locally.
     assert.strictEqual(
-      notionByTitleAliasPath('/notion/pages', 'Cafe roadmap', 'page-1'),
-      '/notion/pages/by-title/cafe-roadmap.json',
+      notionByTitleAliasPath('/notion/pages', 'Cafe roadmap', '11111111-1111-1111-1111-111111111111'),
+      '/notion/pages/by-title/cafe-roadmap__11111111.json',
+    );
+    // The legacy `colliding` parameter is now a no-op — the short_id is
+    // always present, so both invocations resolve to the same path.
+    assert.strictEqual(
+      notionByTitleAliasPath('/notion/pages', 'Cafe roadmap', '11111111-1111-1111-1111-111111111111', true),
+      notionByTitleAliasPath('/notion/pages', 'Cafe roadmap', '11111111-1111-1111-1111-111111111111'),
     );
     assert.strictEqual(
       notionByIdAliasPath('/notion/pages', '11111111-1111-1111-1111-111111111111'),

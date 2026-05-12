@@ -256,17 +256,31 @@ function readOnlyString(description, format) {
 function resourceMetadata(adapter, endpoint) {
   const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
   return {
-    name: resourcePath.split('/').filter(Boolean).at(-1) ?? adapter.slug,
+    name: resourceNameFor(adapter.slug, resourcePath),
     resourcePath,
     schemaPath: `${resourcePath}/.schema.json`,
     examplePath: `${resourcePath}/.create.example.json`,
     description: endpoint.description,
-    pathPatternLiteral: patternLiteral(pathPatternSourceFor(resourcePath)),
+    pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapter.slug, resourcePath)),
     ...idPatternFor(adapter.slug, resourcePath),
   };
 }
 
-function pathPatternSourceFor(resourcePath) {
+function resourceNameFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'github' && resourcePath.includes('/issues/') && resourcePath.endsWith('/comments')) {
+    return 'issue-comments';
+  }
+  if (adapterSlug === 'slack' && resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
+    return 'direct-messages';
+  }
+  return resourcePath.split('/').filter(Boolean).at(-1) ?? adapterSlug;
+}
+
+function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'slack' && resourcePath === '/slack/channels/{channelId}/messages') {
+    return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
+  }
+
   const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
     if (segment === '{projectPath}') {
       return '.+?';
@@ -292,21 +306,40 @@ function idPatternFor(adapterSlug, resourcePath) {
     return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'slack') {
+    if (resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
+      return pattern('^$');
+    }
+    if (resourcePath === '/slack/channels/{channelId}/messages') {
+      return pattern('^(?:meta|(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?)$');
+    }
+    if (resourcePath.endsWith('/replies')) {
+      return pattern('^(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?$');
+    }
     return pattern('^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$');
   }
   if (adapterSlug === 'gitlab') {
     return pattern('^[A-Za-z0-9_.:-]+$');
   }
   if (adapterSlug === 'github') {
+    if (resourcePath.endsWith('/issues')) {
+      return pattern('^[1-9]\\d*$');
+    }
     return pattern('^\\d+$');
   }
   if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
   }
   if (adapterSlug === 'jira') {
+    if (resourcePath.endsWith('/transitions')) {
+      return pattern('^$');
+    }
+    // Accept both the current `<slug>__<id>` joiner and the legacy
+    // `<slug>--<id>` joiner so existing mounts written before the
+    // cross-adapter convention migration keep resolving. Mirrors
+    // confluence's tolerant pattern.
     return resourcePath.includes('/comments')
-      ? pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$')
-      : pattern('^(?:[A-Za-z0-9_.~-]+--(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
+      ? pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?\\d+$')
+      : pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__)(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
   }
   if (adapterSlug === 'salesforce') {
     return pattern('^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$');
@@ -318,7 +351,7 @@ function idPatternFor(adapterSlug, resourcePath) {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$');
   }
   if (adapterSlug === 'confluence') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
+    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?\\d+$');
   }
   if (adapterSlug === 'intercom') {
     return pattern('^[A-Za-z0-9_-]+$');

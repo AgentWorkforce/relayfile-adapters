@@ -1,5 +1,7 @@
 export {
   channelMetadataPath,
+  channelMessagesDirectory,
+  channelThreadsDirectory,
   computeSlackPath,
   createSlackMessageObjectId,
   createSlackReactionObjectId,
@@ -7,12 +9,60 @@ export {
   createSlackThreadReplyObjectId,
   fileCommentPath,
   fileMetadataPath,
+  messageLegacyPath,
   messagePath,
+  parseSlackMessageObjectId,
   parseSlackReactionObjectId,
+  parseSlackThreadObjectId,
+  parseSlackThreadReplyObjectId,
+  reactionPath,
+  sanitizeSlackPathSegment,
+  slackBotsAliasPath,
+  slackByNameChannelAliasPath,
+  slackByNameUserAliasPath,
+  slackChannelsIndexPath,
+  slackMessageReadCandidatePaths,
+  slackNameWithId,
+  slackRootIndexPath,
+  slackTimestampToPathToken,
+  slackUsersIndexPath,
   threadPath,
   threadReplyPath,
   userMetadataPath,
 } from './path-mapper.js';
+
+export type {
+  SlackMessageReference,
+  SlackPathObjectType,
+  SlackReactionObjectIdParts,
+  SlackReactionReference,
+  SlackThreadReference,
+  SlackThreadReplyReference,
+} from './path-mapper.js';
+
+export { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+
+export {
+  SLACK_LAYOUT_PROMPT,
+  slackLayoutPromptFile,
+} from './layout-prompt.js';
+
+export {
+  buildSlackBotsAliasFile,
+  buildSlackChannelByNameAliasFile,
+  buildSlackChannelsIndexFile,
+  buildSlackRootIndexFile,
+  buildSlackUserByNameAliasFile,
+  buildSlackUsersIndexFile,
+} from './index-emitter.js';
+export type {
+  SlackChannelAliasPointer,
+  SlackChannelIndexRow,
+  SlackIndexFile,
+  SlackRootIndexRow,
+  SlackUserAliasPointer,
+  SlackUserIndexRow,
+} from './index-emitter.js';
 
 export {
   IntegrationAdapter,
@@ -20,6 +70,21 @@ export {
 } from './slack-adapter.js';
 export * from './summary.js';
 export * from './thread.js';
+
+export { emitSlackAuxiliaryFiles } from './emit-auxiliary-files.js';
+export type {
+  SlackChannelEmitRecord,
+  SlackChannelRecord,
+  SlackEmitAuxiliaryFilesInput,
+  SlackMessageEmitRecord,
+  SlackMessageRecord,
+  SlackThreadEmitRecord,
+  SlackThreadRecord,
+  SlackThreadReplyEmitRecord,
+  SlackThreadReplyRecord,
+  SlackUserEmitRecord,
+  SlackUserRecord,
+} from './emit-auxiliary-files.js';
 
 export {
   SLACK_REQUEST_TIMESTAMP_HEADER,

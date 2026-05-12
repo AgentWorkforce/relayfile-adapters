@@ -90,7 +90,15 @@ test("StorageBridgeAdapterWorker fetches content, retries ingest, and emits webh
     fetchContent: async () => ({
       body: "hello",
       contentType: "text/plain",
-      metadata: { provider: "dropbox" },
+      metadata: {
+        digest: "content-digest",
+        provider: "dropbox",
+        summary: {
+          title: "content summary",
+          status: "fetched",
+          tags: ["content"],
+        },
+      },
     }),
     client: {
       async ingestWebhook(input) {

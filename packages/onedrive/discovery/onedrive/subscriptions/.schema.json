@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OneDrive subscription",
   "type": "object",
-  "additionalProperties": true,
   "required": [
     "resource",
     "changeType",
@@ -11,62 +11,86 @@
   "properties": {
     "resource": {
       "type": "string",
-      "description": "Graph resource path to subscribe to."
+      "description": "Graph resource."
     },
     "changeType": {
-      "enum": [
-        "created",
-        "updated",
-        "deleted"
-      ],
-      "description": "Graph subscription change type."
+      "type": "string",
+      "description": "Graph change type."
     },
     "notificationUrl": {
       "type": "string",
-      "description": "Webhook notification URL."
+      "description": "Notification URL."
     },
     "expirationDateTime": {
       "type": "string",
-      "description": "Subscription expiration timestamp."
-    },
-    "clientState": {
-      "type": "string",
-      "description": "Opaque client state."
-    },
-    "latestSupportedTlsVersion": {
-      "enum": [
-        "v1_2",
-        "v1_3"
-      ],
-      "description": "Latest supported TLS version."
-    },
-    "lifecycleNotificationUrl": {
-      "type": "string",
-      "description": "Lifecycle notification URL."
+      "description": "Expiration."
     },
     "id": {
-      "description": "Provider id.",
+      "type": "string",
+      "description": "Provider canonical record id.",
       "readOnly": true
     },
     "createdAt": {
+      "type": "string",
+      "format": "date-time",
       "description": "Provider creation timestamp.",
       "readOnly": true
     },
     "updatedAt": {
-      "description": "Provider update timestamp.",
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
       "readOnly": true
     },
     "url": {
-      "description": "Provider URL.",
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
       "readOnly": true
     },
     "_webhook": {
-      "description": "Relayfile webhook metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     },
     "_connection": {
-      "description": "Relayfile connection metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

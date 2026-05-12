@@ -77,12 +77,12 @@ export interface NormalizeAirtableWebhookOptions {
   webhookSecret?: string;
 }
 
-export interface NormalizeAirtableNotificationOptions extends NormalizeAirtableWebhookOptions {
+export type NormalizeAirtableNotificationOptions = Omit<NormalizeAirtableWebhookOptions, 'requireTimestamp'> & {
   defaultBaseId?: string;
   defaultConnectionId?: string;
   defaultProvider?: string;
   defaultProviderConfigKey?: string;
-}
+};
 
 export function normalizeAirtableWebhook(
   rawPayload: unknown,
@@ -153,7 +153,7 @@ export function normalizeAirtableNotification(
     normalizedHeaders,
     options.toleranceMs ?? DEFAULT_WEBHOOK_TOLERANCE_MS,
     options.nowMs,
-    options.requireTimestamp ?? true,
+    true,
   );
   if (!timestampResult.ok || timestampResult.webhookTimestamp === undefined) {
     throw new Error(`Invalid Airtable webhook timestamp: ${timestampResult.reason ?? 'missing-timestamp'}`);

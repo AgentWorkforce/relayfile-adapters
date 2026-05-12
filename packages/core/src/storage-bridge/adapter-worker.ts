@@ -219,9 +219,9 @@ export function buildStorageBridgeWebhookEnvelope(input: {
   const bodyBase64 = body === null ? null : bodyToBuffer(body).toString("base64");
   const metadata = {
     ...event.metadata,
+    ...(input.content?.metadata ?? {}),
     ...(event.digest ? { digest: event.digest } : {}),
     ...(event.summary ? { summary: event.summary as Record<string, JsonValue> } : {}),
-    ...(input.content?.metadata ?? {}),
   };
 
   return {

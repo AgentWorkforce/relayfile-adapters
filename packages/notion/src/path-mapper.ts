@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import { NOTION_PATH_ROOT } from './types.js';
-import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+import { aliasShortId, slugifyAlias } from './alias-slug.js';
 
 /**
  * Canonical Notion filenames use `<slug>__<id>.<ext>` when a human-readable
@@ -257,23 +257,129 @@ export function notionStandalonePagesCollectionPath(): string {
   return `${NOTION_PATH_ROOT}/pages`;
 }
 
+/**
+ * Compose an alias filename from a human-readable label and a Notion id.
+ * The format is always `<slug>__<short_id>` — deterministic and
+ * collision-safe regardless of duplicate titles. `short_id` is derived by
+ * `aliasShortId`, which takes the last 8 hex characters of the canonical
+ * UUID. Agents holding the UUID can recompute this filename without
+ * round-tripping through an index.
+ *
+ * Use this for `by-title`, `by-name`, and any other title-keyed alias.
+ */
+export function notionAliasFilename(label: string, id: string): string {
+  const slug = slugifyAlias(label);
+  if (!slug) {
+    throw new Error('Notion alias label must slug to a non-empty string');
+  }
+  return `${slug}__${aliasShortId(id)}`;
+}
+
+/**
+ * `/notion/<scope>/by-title/<slug>__<short_id>.json` alias path.
+ *
+ * The `<short_id>` suffix is always included. Notion permits duplicate
+ * page and database titles, so a bare `<slug>` filename would clobber
+ * across pages with matching slugs. Including the deterministic short id
+ * makes collisions impossible and lets agents construct the alias path
+ * from a UUID alone.
+ *
+ * The legacy fourth `colliding` parameter is retained for backward
+ * compatibility — it is now a no-op because the short id is always
+ * emitted.
+ */
 export function notionByTitleAliasPath(
   parentScope: string,
   title: string,
   id: string,
-  colliding = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _colliding = false,
 ): string {
-  const slug = slugifyAlias(title);
-  if (!slug) {
-    throw new Error('Notion alias title must slug to a non-empty string');
-  }
-
-  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  const filename = notionAliasFilename(title, id);
   return `${parentScope}/by-title/${assertSegment(filename, 'alias title')}.json`;
+}
+
+/**
+ * `/notion/users/by-name/<slug>__<short_id>.json` alias. Notion user
+ * display names can collide (bots and people share the same name space),
+ * so the short-id suffix is critical here.
+ */
+export function notionByNameAliasPath(parentScope: string, name: string, id: string): string {
+  const filename = notionAliasFilename(name, id);
+  return `${parentScope}/by-name/${assertSegment(filename, 'alias name')}.json`;
 }
 
 export function notionByIdAliasPath(parentScope: string, id: string): string {
   return `${parentScope}/by-id/${assertSegment(idSuffix(id), 'alias id')}.json`;
+}
+
+/**
+ * `/notion/pages/by-database/<database-slug>__<db_short_id>/<page-slug>__<page_short_id>.json`.
+ *
+ * Critical for the "find the row in my Tasks database titled 'X'" use
+ * case. The database scope segment is built with the same
+ * `<slug>__<short_id>` convention as the by-title alias so an agent can
+ * navigate `/notion/databases/by-title/tasks__abcd1234.json` to get the
+ * database UUID, then list `/notion/pages/by-database/tasks__abcd1234/`
+ * to see every page in that database addressable by title.
+ */
+export function notionPageByDatabaseAliasPath(
+  databaseId: string,
+  pageId: string,
+  databaseTitle: string,
+  pageTitle: string,
+): string {
+  const databaseSegmentValue = notionAliasFilename(databaseTitle, databaseId);
+  const pageSegmentValue = notionAliasFilename(pageTitle, pageId);
+  return `${NOTION_PATH_ROOT}/pages/by-database/${assertSegment(databaseSegmentValue, 'alias database segment')}/${assertSegment(pageSegmentValue, 'alias page segment')}.json`;
+}
+
+/**
+ * `/notion/pages/by-parent/<parent-slug>__<short_id>/<page-slug>__<short_id>.json`.
+ *
+ * Mirrors Notion's hierarchical workspace model: a page's `parent` is
+ * either another page, a database, or the workspace itself. This alias
+ * lets agents list the direct children of a given parent page without
+ * scanning the whole pages tree. The parent type is encoded into the
+ * segment as `<page|database|workspace>:` so an agent can tell whether
+ * `parent` is a page or database from the path alone.
+ */
+export function notionPageByParentAliasPath(
+  parentType: 'page' | 'database' | 'workspace',
+  parentId: string,
+  pageId: string,
+  parentTitle: string | undefined,
+  pageTitle: string,
+): string {
+  const parentLabel = parentTitle && slugifyAlias(parentTitle) ? parentTitle : parentId;
+  const parentSegmentValue = `${parentType}-${notionAliasFilename(parentLabel, parentId)}`;
+  const pageSegmentValue = notionAliasFilename(pageTitle, pageId);
+  return `${NOTION_PATH_ROOT}/pages/by-parent/${assertSegment(parentSegmentValue, 'alias parent segment')}/${assertSegment(pageSegmentValue, 'alias page segment')}.json`;
+}
+
+/**
+ * Canonical and collection paths for the `/notion/users/` subtree. Users
+ * are workspace-level records (no parent/child hierarchy) so we model
+ * them as a flat collection mirroring the standalone-page shape.
+ */
+export function notionUsersCollectionPath(): string {
+  return `${NOTION_PATH_ROOT}/users`;
+}
+
+export function notionUsersIndexPath(): string {
+  return `${NOTION_PATH_ROOT}/users/_index.json`;
+}
+
+export function notionUserPath(userId: string, name?: string): string {
+  return `${notionUsersCollectionPath()}/${nameWithId(name, userId)}.json`;
+}
+
+/**
+ * Collection path for the databases tree — used as the `parentScope` for
+ * `notionByTitleAliasPath` / `notionByIdAliasPath` when aliasing databases.
+ */
+export function notionDatabasesCollectionPath(): string {
+  return `${NOTION_PATH_ROOT}/databases`;
 }
 
 export function notionDiscoveryManifestPath(): string {

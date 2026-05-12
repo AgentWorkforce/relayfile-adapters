@@ -43,6 +43,7 @@ export interface JiraWritebackRequest {
     | 'create_comment'
     | 'create_issue'
     | 'create_project'
+    | 'transition_issue'
     | 'delete_comment'
     | 'delete_issue'
     | 'delete_project'

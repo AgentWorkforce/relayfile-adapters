@@ -17,12 +17,15 @@ export {
   confluenceByIdAliasPath,
   confluenceByTitleAliasPath,
   confluencePageByIdAliasPath,
+  confluencePageByParentAliasPath,
+  confluencePageBySpaceAliasPath,
   confluencePageByStatePath,
   confluencePageByTitleAliasPath,
   confluencePagePath,
   confluencePagesIndexPath,
   confluenceProviderRootIndexPath,
   confluenceSpaceByIdAliasPath,
+  confluenceSpaceByKeyAliasPath,
   confluenceSpaceByTitleAliasPath,
   confluenceSpacePath,
   confluenceSpacesIndexPath,
@@ -51,6 +54,15 @@ export {
   CONFLUENCE_LAYOUT_PROMPT,
 } from './layout-prompt.js';
 export * from './summary.js';
+
+export {
+  emitConfluenceAuxiliaryFiles,
+} from './emit-auxiliary-files.js';
+export type {
+  ConfluenceEmitAuxiliaryFilesInput,
+  ConfluencePageEmitRecord,
+  ConfluenceSpaceEmitRecord,
+} from './emit-auxiliary-files.js';
 
 export {
   buildConfluenceIndexFile,

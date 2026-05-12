@@ -1,5 +1,104 @@
 import { extractJiraIdFromPathSegment } from './path-mapper.js';
-import type { JiraReadRequest } from './types.js';
+import type {
+  JiraIssue,
+  JiraProject,
+  JiraReadRequest,
+  JiraSprint,
+} from './types.js';
+
+// -- Index rows ------------------------------------------------------------
+
+/**
+ * Shape of `/jira/issues/_index.json` rows. Mirrors the LAYOUT contract:
+ * `{ id, title, updated, key, state, projectKey }`. The cloud's previous
+ * `writeJiraAuxiliaryFiles` used `status` as the column name; the adapter
+ * adopts `state` to match the layout doc surfaced to agents and to align
+ * with the cross-adapter convention used by Linear (which also surfaces a
+ * `state` column for status).
+ */
+export interface JiraIssueIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+  key: string;
+  state: string;
+  projectKey: string;
+}
+
+export interface JiraProjectIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+  key: string;
+}
+
+export interface JiraSprintIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+  key: string;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function jiraIssueIndexRow(issue: JiraIssue): JiraIssueIndexRow {
+  const fields = isRecord(issue.fields) ? issue.fields : {};
+  const status = isRecord(fields.status) ? fields.status : {};
+  const project = isRecord(fields.project) ? fields.project : {};
+
+  return {
+    id: String(issue.id),
+    title:
+      readNonEmptyString((fields as { summary?: unknown }).summary) ??
+      readNonEmptyString((issue as { key?: unknown }).key) ??
+      '',
+    updated:
+      readNonEmptyString((fields as { updated?: unknown }).updated) ??
+      readNonEmptyString((issue as { updated?: unknown }).updated) ??
+      '',
+    key: readNonEmptyString((issue as { key?: unknown }).key) ?? '',
+    state: readNonEmptyString((status as { name?: unknown }).name) ?? '',
+    projectKey: readNonEmptyString((project as { key?: unknown }).key) ?? '',
+  };
+}
+
+export function jiraProjectIndexRow(project: JiraProject): JiraProjectIndexRow {
+  return {
+    id: String(project.id),
+    title:
+      readNonEmptyString(project.name) ??
+      readNonEmptyString(project.key) ??
+      '',
+    updated:
+      readNonEmptyString((project as { updated?: unknown }).updated) ??
+      '',
+    key: readNonEmptyString(project.key) ?? '',
+  };
+}
+
+export function jiraSprintIndexRow(sprint: JiraSprint): JiraSprintIndexRow {
+  return {
+    id: String(sprint.id),
+    title:
+      readNonEmptyString(sprint.name) ??
+      '',
+    updated:
+      readNonEmptyString((sprint as { updated?: unknown }).updated) ??
+      readNonEmptyString(sprint.completeDate) ??
+      readNonEmptyString(sprint.endDate) ??
+      readNonEmptyString(sprint.startDate) ??
+      '',
+    key: readNonEmptyString((sprint as { key?: unknown }).key) ?? '',
+  };
+}
 
 export const JIRA_REST_ISSUE_ROUTE = '/rest/api/3/issue';
 export const JIRA_REST_PROJECT_ROUTE = '/rest/api/3/project';

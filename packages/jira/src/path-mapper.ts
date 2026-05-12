@@ -1,3 +1,5 @@
+import { slugifyAlias } from './alias-slug.js';
+
 export const JIRA_PATH_ROOT = '/jira';
 
 export const JIRA_OBJECT_TYPES = [
@@ -46,12 +48,16 @@ function slugify(value: string): string {
 
 function titleSegmentWithId(title: string | undefined, id: string): string {
   const slug = title ? slugify(title) : '';
-  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "--"
-  // separator between slug and ID is the disambiguator, and slugs never
-  // contain "--" because slugify collapses any non-alphanumeric run into a
-  // single "-". So extractJiraIdFromPathSegment can recover the ID
-  // verbatim by capturing everything after the last "--".
-  return slug ? `${slug}--${id}` : encodeJiraPathSegment(id);
+  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "__"
+  // separator between slug and ID is the disambiguator. Slugs never contain
+  // "__" because slugify collapses any non-alphanumeric run into a single
+  // "-" (so "_" and runs of "_" never make it through). That guarantees
+  // extractJiraIdFromPathSegment can recover the ID verbatim by capturing
+  // everything after the last "__". This matches the cross-adapter
+  // `<slug>__<id>` convention used by github, linear, notion, and
+  // confluence. The legacy "--" joiner remains readable by the parser so
+  // mounts written before this migration keep resolving.
+  return slug ? `${slug}__${id}` : encodeJiraPathSegment(id);
 }
 
 export function normalizeJiraObjectType(objectType: string): JiraPathObjectType {
@@ -114,8 +120,70 @@ export function computeJiraPath(objectType: string, objectId: string, title?: st
   }
 }
 
+/**
+ * Decode a Jira path segment back to its raw identifier. Supports both the
+ * current `<slug>__<id>` convention and the legacy `<slug>--<id>` joiner so
+ * mounts written before the cross-adapter convention migration keep
+ * resolving. Mirrors `extractConfluenceIdFromPathSegment` in
+ * `@relayfile/adapter-confluence`.
+ */
+// -- Index paths -----------------------------------------------------------
+
+export function jiraIssuesIndexPath(): string {
+  return `${JIRA_PATH_ROOT}/issues/_index.json`;
+}
+
+export function jiraProjectsIndexPath(): string {
+  return `${JIRA_PATH_ROOT}/projects/_index.json`;
+}
+
+export function jiraSprintsIndexPath(): string {
+  return `${JIRA_PATH_ROOT}/sprints/_index.json`;
+}
+
+// -- Issue alias paths -----------------------------------------------------
+
+/**
+ * Stable reconciliation anchor for issues: keyed only on the immutable id,
+ * so rename / state-transition / key-change all leave this alias resolving
+ * to the latest payload. Adapter aux-file emission reads this alias before
+ * every write to recover prior alias-field values and compute stale paths
+ * to delete.
+ */
+export function jiraIssueByIdAliasPath(id: string): string {
+  return `${JIRA_PATH_ROOT}/issues/by-id/${encodeJiraPathSegment(id)}.json`;
+}
+
+/**
+ * `by-key/<TEAM-123>.json` — Jira's natural human-readable key. The key
+ * follows the issue across renames, so this alias is durable for any
+ * project that doesn't rename itself. Project-key changes (move) do
+ * invalidate the key; aux-file emission deletes the prior key alias on
+ * that transition.
+ */
+export function jiraIssueByKeyAliasPath(key: string): string {
+  return `${JIRA_PATH_ROOT}/issues/by-key/${encodeJiraPathSegment(key)}.json`;
+}
+
+/**
+ * `by-state/<status>/<id>.json` — grouped by status name slug (`to-do`,
+ * `in-progress`, `done`). The leaf is the issue id (not the key), matching
+ * the LAYOUT contract and giving readers a stable lookup that survives
+ * project moves. Issues transitioning between states require deleting the
+ * old `by-state/<old-state>/<id>.json` file, which the emit-aux module
+ * handles via the by-id reconciliation read.
+ */
+export function jiraIssueByStatePath(stateName: string, id: string): string {
+  const slug = slugifyAlias(stateName);
+  return `${JIRA_PATH_ROOT}/issues/by-state/${encodeJiraPathSegment(slug)}/${encodeJiraPathSegment(id)}.json`;
+}
+
 export function extractJiraIdFromPathSegment(segment: string): string {
   const decoded = decodeURIComponent(segment);
-  const suffix = /--([^/]+)$/u.exec(decoded);
-  return suffix?.[1] ? suffix[1] : decoded;
+  const currentMatch = /__([^/]+)$/u.exec(decoded);
+  if (currentMatch?.[1]) {
+    return currentMatch[1];
+  }
+  const legacyMatch = /--([^/]+)$/u.exec(decoded);
+  return legacyMatch?.[1] ? legacyMatch[1] : decoded;
 }
