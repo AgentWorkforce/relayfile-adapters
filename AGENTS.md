@@ -1,5 +1,61 @@
 ## Repository conventions
 
+### Adapter contract
+
+Every adapter under `packages/<name>` MUST:
+
+- Export a `path-mapper.ts` with typed helpers for every canonical record path it emits. Importing the helper is the only supported way to compute a path; consumers must not construct paths by string concatenation.
+- Emit a provider-specific `LAYOUT.md` at the root of its provider tree (e.g. `/<provider>/LAYOUT.md`) of at least ~1000 bytes describing the tree, naming convention, indexes, aliases, and copy-pasteable `jq`/`ls` examples. The 250-300 byte generic fallback is not acceptable for any shipping adapter.
+- Emit `_index.json` files at each resource root listing all materialized records. The row schema MUST include `{ id, title, updated }` at a minimum; additional fields are encouraged when they enable filterless reads (e.g. `state`, `key`, `is_bot`, `parent_id`).
+- Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path resolves to the canonical record; alias content is the minimal pointer `{ id, canonicalPath, ...minimal pointer fields }`.
+- Use `packages/github/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. NEVER write a new slugifier.
+
+### Naming convention
+
+The cross-adapter joiner between a human-readable slug and the provider's stable ID is **`<slug>__<id>`** (double underscore). The shape depends on whether the entity owns child files:
+
+- **Flat records** (entities with no sub-artifacts): `<slug>__<id>.json` at a canonical resource directory. Example: `/jira/issues/task-1__10000.json`.
+- **Directory records** (entities WITH sub-artifacts, e.g. GitHub PRs with `diff.patch`/`files/**`, Slack channels with `messages/**`): `<id>__<slug>/meta.json`. Example: `/github/repos/o/r/pulls/42__fix-thing/meta.json`.
+
+Rule of thumb: if the entity owns child files, use a directory plus `meta.json`. Otherwise, prefer the flat form — it is simpler and matches the "human-discoverable filesystem" pitch.
+
+Slug rules (always go through `slugifyAlias`):
+
+- ASCII only, lowercase, hyphen-separated.
+- Truncate to 80 characters at a word boundary.
+- Empty slugs fall back to the bare ID (or `untitled` for aliases).
+- Never roll your own slugifier; reuse `packages/github/src/alias-slug.ts`.
+
+ID format: whatever the provider's stable ID is (UUID, numeric, string key). Do not normalize provider IDs.
+
+### Indexes
+
+- `/<provider>/_index.json` enumerates top-level resource roots (e.g. `{ "id": "issues", "title": "Issues" }`-style entries).
+- `/<provider>/<resource>/_index.json` enumerates all records with `{ id, title, updated, ...natural-filter-fields }`.
+- Indexes MUST stay sorted by `updated` descending so consumers can rely on order without re-sorting.
+
+### Aliases
+
+- Path shape: `/<provider>/<resource>/by-<key>/<slug>__<id>.json` (e.g. `/notion/pages/by-title/my-page__a1b2c3d4.json`).
+- Collisions: append a deterministic short hash of the ID via `aliasCollisionSuffix`. NEVER pick "first writer wins" — collision handling must be deterministic across sync runs.
+- Each alias file contains a minimal pointer: `{ id, canonicalPath, title? }`. Do not duplicate the full record — readers follow `canonicalPath`.
+
+### Versioning
+
+- NEVER bump `version` in `package.json` in feature PRs. The publish workflow handles version bumps.
+- If you change a path-mapper helper's output, add the new helper additively and deprecate the old (export both, JSDoc-deprecate the old). Or implement reader-side back-compat: try the new path, fall back to the old. NEVER break existing consumers without a deprecation window.
+
+### Tests
+
+- `npx turbo build typecheck test` at the repo root MUST pass before any PR is opened.
+- Each path-mapper helper needs round-trip tests (compose -> parse -> equality).
+- Each alias subtree needs a collision test.
+- Each `LAYOUT.md` emitter needs a non-empty content test (length plus key-substring assertions).
+
+### Cross-repo coordination
+
+- Cloud (`AgentWorkforce/cloud`) consumes these adapters. After a path-mapper change ships and is published, cloud needs a dep bump and possibly a full provider resync. Coordinate by mentioning the follow-up in the adapter PR body.
+
 ### Do not bump package versions in feature PRs
 
 Versions in `packages/*/package.json` are bumped by the publish phase, not in the PR that introduces the change. The repo's pattern (see `chore(release): bump all (patch)` commits in history) is:
