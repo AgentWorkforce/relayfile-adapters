@@ -5,6 +5,7 @@ import {
   computeLinearPath,
   linearByIdAliasPath,
   linearByTitleAliasPath,
+  linearByUuidAliasPath,
   normalizeLinearObjectType,
   normalizeNangoLinearModel,
   tryNormalizeLinearObjectType,
@@ -89,6 +90,47 @@ describe('linear path-mapper', () => {
         linearByIdAliasPath('/linear/issues', 'AGE-8'),
         '/linear/issues/by-id/AGE-8.json',
       );
+    });
+  });
+
+  // The reconciliation anchor introduced in bcb45996: keyed on the stable
+  // Linear UUID rather than the (possibly-absent) `TEAM-123` identifier.
+  // Per AGENTS.md every path-mapper helper needs round-trip coverage, and
+  // `by-uuid` is now load-bearing for delete tombstones — without these
+  // tests the next regression on the anchor would slip through CI.
+  describe('linearByUuidAliasPath', () => {
+    it('composes a stable by-uuid alias path under any scope', () => {
+      assert.equal(
+        linearByUuidAliasPath(
+          '/linear/issues',
+          '8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e',
+        ),
+        '/linear/issues/by-uuid/8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e.json',
+      );
+      // Also works for project scope so future adapters reusing the helper
+      // don't accidentally hardcode the issues path.
+      assert.equal(
+        linearByUuidAliasPath('/linear/projects', 'proj-uuid-1'),
+        '/linear/projects/by-uuid/proj-uuid-1.json',
+      );
+    });
+
+    it('round-trips: the leaf segment decodes back to the source UUID', () => {
+      const uuid = '8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e';
+      const composed = linearByUuidAliasPath('/linear/issues', uuid);
+      const leaf = composed.split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(decodeURIComponent(leaf), uuid);
+    });
+
+    it('percent-encodes UUIDs containing characters that need escaping', () => {
+      // Linear UUIDs are well-formed today, but the helper must defend
+      // against operator-supplied scope+id pairs that include reserved
+      // URI characters — otherwise `by-uuid` becomes a foot-gun the day
+      // someone calls it with a slug-like input.
+      const messyId = 'team/id with spaces';
+      const composed = linearByUuidAliasPath('/linear/issues', messyId);
+      const leaf = composed.split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(decodeURIComponent(leaf), messyId);
     });
   });
 });
