@@ -373,7 +373,12 @@ export class SlackAdapter extends IntegrationAdapter {
       const channelId = readString(payload.channel);
       const messageTs = readString(payload.ts);
       if (channelId && messageTs) {
-        return messagePath(channelId, messageTs, readMessageSubject(payload), readChannelName(payload));
+        // v2 message dir is `<ts>__<short_slug>`, where slug is derived from
+        // the first ~40 chars of message text. Fall back to legacy subject
+        // fields when text is missing (file uploads, etc.) so the segment
+        // is still informative.
+        const messageText = readMessageText(payload) ?? readMessageSubject(payload);
+        return messagePath(channelId, messageTs, messageText, readChannelName(payload));
       }
     }
 
@@ -720,6 +725,10 @@ function readMessageSubject(payload: Record<string, unknown>): string | undefine
     ?? readString(payload.thread_subject)
     ?? readString(payload.subject)
     ?? undefined;
+}
+
+function readMessageText(payload: Record<string, unknown>): string | undefined {
+  return readString(payload.text) ?? undefined;
 }
 
 function readUserName(payload: Record<string, unknown>): string | undefined {
