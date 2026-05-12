@@ -63,6 +63,10 @@ export async function ingestPageArtifacts(
           : notionStandalonePagesCollectionPath(),
         title: explicitTitle,
         id: pageId,
+        aliasKind: 'page',
+        databaseId: context.databaseId,
+        databaseTitle: context.databaseTitle,
+        ...resolveParentMetadata(page),
       },
       semantics: buildPageSemantics(page, context.databaseId),
     },
@@ -108,6 +112,42 @@ function readPageTitle(page: NotionPage): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Translate a page's Notion `parent` discriminated union into the
+ * `(parentType, parentId, parentTitle?)` triple consumed by the alias
+ * writer. The page's `parent.type` directly maps to our alias `parentType`:
+ *
+ *   - `database_id` → `database` (alias landing: by-parent or by-database)
+ *   - `page_id`     → `page`     (alias landing: by-parent)
+ *   - `block_id`    → `page`     (blocks live on pages; treat as page parent)
+ *   - `workspace`   → `workspace` (alias writer skips the by-parent emit)
+ *
+ * The parent's *title* isn't reachable from the page payload alone — the
+ * Notion API would require a separate /v1/pages/<parent> fetch. For the
+ * by-parent alias we accept that and fall back to the UUID slug, which
+ * is sufficient because the by-parent path's primary navigational value
+ * is grouping children under a single parent directory, not naming the
+ * parent directory itself. Future work (issue #107) can hydrate parent
+ * titles from a workspace-wide title cache built during bulk ingest.
+ */
+function resolveParentMetadata(page: NotionPage): {
+  parentType: 'database' | 'page' | 'workspace';
+  parentId?: string;
+  parentTitle?: string;
+} {
+  const parent = page.parent;
+  switch (parent.type) {
+    case 'database_id':
+      return { parentType: 'database', parentId: parent.database_id };
+    case 'page_id':
+      return { parentType: 'page', parentId: parent.page_id };
+    case 'block_id':
+      return { parentType: 'page', parentId: parent.block_id };
+    default:
+      return { parentType: 'workspace' };
+  }
 }
 
 function buildPageSemantics(page: NotionPage, databaseId?: string): FileSemantics {

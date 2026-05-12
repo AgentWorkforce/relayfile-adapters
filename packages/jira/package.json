@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-jira",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Jira adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -10,6 +10,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
     },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
@@ -60,7 +65,7 @@
     "directory": "packages/jira"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.2"
+    "@relayfile/adapter-core": "^0.2.10"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

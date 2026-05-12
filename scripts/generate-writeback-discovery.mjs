@@ -261,7 +261,7 @@ function resourceMetadata(adapter, endpoint) {
     schemaPath: `${resourcePath}/.schema.json`,
     examplePath: `${resourcePath}/.create.example.json`,
     description: endpoint.description,
-    pathPatternLiteral: patternLiteral(pathPatternSourceFor(resourcePath)),
+    pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapter.slug, resourcePath)),
     ...idPatternFor(adapter.slug, resourcePath),
   };
 }
@@ -276,7 +276,11 @@ function resourceNameFor(adapterSlug, resourcePath) {
   return resourcePath.split('/').filter(Boolean).at(-1) ?? adapterSlug;
 }
 
-function pathPatternSourceFor(resourcePath) {
+function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'slack' && resourcePath === '/slack/channels/{channelId}/messages') {
+    return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
+  }
+
   const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
     if (segment === '{projectPath}') {
       return '.+?';
@@ -305,7 +309,10 @@ function idPatternFor(adapterSlug, resourcePath) {
     if (resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
       return pattern('^$');
     }
-    if (resourcePath.endsWith('/messages') || resourcePath.endsWith('/replies')) {
+    if (resourcePath === '/slack/channels/{channelId}/messages') {
+      return pattern('^(?:meta|(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?)$');
+    }
+    if (resourcePath.endsWith('/replies')) {
       return pattern('^(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?$');
     }
     return pattern('^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$');

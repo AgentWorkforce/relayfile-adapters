@@ -1,3 +1,5 @@
+import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+
 const SLACK_ROOT = '/slack';
 
 export type SlackPathObjectType =
@@ -55,34 +57,39 @@ function slugify(value: string): string {
     .toLowerCase();
 }
 
-function namedSegment(name: string | undefined, id: string): string {
-  const slug = name ? slugify(name) : '';
-  return slug || normalizeSegment(id);
+/**
+ * Compose an `<id>__<slug>` segment, mirroring `github`'s `nameWithId` and the
+ * convention used across v2 adapters. When `humanReadable` slugifies to empty
+ * (no name available, emoji-only, etc.) returns the bare normalized id.
+ */
+export function slackNameWithId(humanReadable: string | undefined, id: string): string {
+  const normalizedId = normalizeSegment(id);
+  const slug = humanReadable ? slugify(humanReadable) : '';
+  return slug ? `${normalizedId}__${slug}` : normalizedId;
 }
 
 /**
- * Channel segment for VFS paths that need to round-trip back to the canonical
- * Slack channel id at writeback time.
- *
- * Slack channel names can contain underscores (e.g. `customer_success`), but
- * `slugify()` lossily replaces them with hyphens, so the slug alone cannot be
- * uniquely reversed to a channel name. We embed the canonical id alongside
- * the slug as `<slug>--<channelId>`; the writeback resolver extracts the id
- * from the suffix and uses it as the API target.
- *
- * If no name is available we fall back to the normalized id alone, which is
- * already round-trip safe.
+ * `<channelId>__<channelName>` directory segment for paths that need to
+ * round-trip back to a Slack channel id at writeback time. The id is the
+ * leading token before `__`, so writeback resolvers can recover it.
  */
-function channelSegment(channelName: string | undefined, channelId: string): string {
+function channelSegmentV2(channelName: string | undefined, channelId: string): string {
+  return slackNameWithId(channelName, channelId);
+}
+
+/**
+ * @deprecated Use {@link channelSegmentV2}. Legacy `<slug>--<channelId>` form
+ * kept so reader code can compute matching paths for blobs emitted by
+ * adapter-slack <= 0.2.2.
+ */
+function channelSegmentLegacy(channelName: string | undefined, channelId: string): string {
   const slug = channelName ? slugify(channelName) : '';
   const normalizedId = normalizeSegment(channelId);
   return slug ? `${slug}--${normalizedId}` : normalizedId;
 }
 
-function messageSegment(messageTs: string, subject?: string): string {
-  const tsToken = slackTimestampToPathToken(messageTs);
-  const subjectSlug = subject ? slugify(subject) : '';
-  return subjectSlug ? `${subjectSlug}--${tsToken}` : tsToken;
+function messageSegmentV2(messageTs: string): string {
+  return slackTimestampToPathToken(messageTs);
 }
 
 function joinPath(...segments: string[]): string {
@@ -225,42 +232,110 @@ export function parseSlackReactionObjectId(objectId: string): SlackReactionObjec
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Canonical record paths (v2: `<id>__<slug>` segments, `meta.json` records). */
+/* -------------------------------------------------------------------------- */
+
 export function channelMetadataPath(channelId: string, channelName?: string): string {
-  return joinPath(SLACK_ROOT, 'channels', channelSegment(channelName, channelId), 'meta.json');
+  return joinPath(SLACK_ROOT, 'channels', channelSegmentV2(channelName, channelId), 'meta.json');
 }
 
 export function channelMessagesDirectory(channelId: string, channelName?: string): string {
-  return joinPath(SLACK_ROOT, 'channels', channelSegment(channelName, channelId), 'messages');
+  return joinPath(SLACK_ROOT, 'channels', channelSegmentV2(channelName, channelId), 'messages');
 }
 
+/**
+ * Canonical message record path. Filename is `meta.json` — matches the
+ * convention shared with `adapter-github`, `adapter-linear`, etc. Adapters
+ * <= 0.2.2 wrote `message.json`; readers should fall back to that filename
+ * via {@link slackMessageReadCandidatePaths}.
+ *
+ * @param channelId - Slack channel id (e.g. `C0ADE9B71CN`).
+ * @param messageTs - Slack timestamp (`<seconds>.<microseconds>`).
+ * @param _messageText - Reserved for backwards-compatible call sites. Message
+ *   paths intentionally ignore mutable text and use only the stable timestamp.
+ * @param channelName - Slack channel name; used for the channel dir segment.
+ */
 export function messagePath(
+  channelId: string,
+  messageTs: string,
+  _messageText?: string,
+  channelName?: string,
+): string {
+  return joinPath(
+    channelMessagesDirectory(channelId, channelName),
+    messageSegmentV2(messageTs),
+    'meta.json',
+  );
+}
+
+/**
+ * @deprecated v0.2.2 emitted `.../message.json`. Use {@link messagePath}.
+ * Retained for back-compat reads only — see {@link slackMessageReadCandidatePaths}.
+ */
+export function messageLegacyPath(
   channelId: string,
   messageTs: string,
   threadSubject?: string,
   channelName?: string,
 ): string {
+  const tsToken = slackTimestampToPathToken(messageTs);
+  const subjectSlug = threadSubject ? slugify(threadSubject) : '';
+  const messageSeg = subjectSlug ? `${subjectSlug}--${tsToken}` : tsToken;
   return joinPath(
-    channelMessagesDirectory(channelId, channelName),
-    messageSegment(messageTs, threadSubject),
+    SLACK_ROOT,
+    'channels',
+    channelSegmentLegacy(channelName, channelId),
+    'messages',
+    messageSeg,
     'message.json',
   );
 }
 
-export function channelThreadsDirectory(channelId: string): string {
-  return joinPath(SLACK_ROOT, 'channels', normalizeSegment(channelId), 'threads');
+/**
+ * Reader hint: candidate paths for a Slack message canonical record, in
+ * order of preference. Use to read a message that may have been written by
+ * either v2 (this adapter) or a legacy `<= 0.2.2` adapter:
+ *
+ * ```ts
+ * for (const candidate of slackMessageReadCandidatePaths(channelId, ts, text, name)) {
+ *   const blob = await vfs.read(candidate);
+ *   if (blob) return JSON.parse(blob);
+ * }
+ * ```
+ */
+export function slackMessageReadCandidatePaths(
+  channelId: string,
+  messageTs: string,
+  _messageText?: string,
+  channelName?: string,
+): string[] {
+  return [
+    messagePath(channelId, messageTs, undefined, channelName),
+    messageLegacyPath(channelId, messageTs, undefined, channelName),
+  ];
 }
 
-export function threadPath(channelId: string, threadTs: string): string {
+export function channelThreadsDirectory(channelId: string, channelName?: string): string {
+  return joinPath(SLACK_ROOT, 'channels', channelSegmentV2(channelName, channelId), 'threads');
+}
+
+export function threadPath(channelId: string, threadTs: string, channelName?: string): string {
   return joinPath(
-    channelThreadsDirectory(channelId),
+    channelThreadsDirectory(channelId, channelName),
     slackTimestampToPathToken(threadTs),
     'meta.json',
   );
 }
 
-export function threadReplyPath(channelId: string, threadTs: string, replyTs: string): string {
+export function threadReplyPath(
+  channelId: string,
+  threadTs: string,
+  replyTs: string,
+  channelName?: string,
+): string {
   return joinPath(
-    channelThreadsDirectory(channelId),
+    channelThreadsDirectory(channelId, channelName),
     slackTimestampToPathToken(threadTs),
     'replies',
     `${slackTimestampToPathToken(replyTs)}.json`,
@@ -268,11 +343,11 @@ export function threadReplyPath(channelId: string, threadTs: string, replyTs: st
 }
 
 export function userMetadataPath(userId: string, userName?: string): string {
-  return joinPath(SLACK_ROOT, 'users', namedSegment(userName, userId), 'meta.json');
+  return joinPath(SLACK_ROOT, 'users', slackNameWithId(userName, userId), 'meta.json');
 }
 
 export function fileMetadataPath(fileId: string, fileName?: string): string {
-  return joinPath(SLACK_ROOT, 'files', namedSegment(fileName, fileId), 'meta.json');
+  return joinPath(SLACK_ROOT, 'files', slackNameWithId(fileName, fileId), 'meta.json');
 }
 
 export function fileCommentPath(fileCommentId: string): string {
@@ -320,6 +395,79 @@ export function reactionPath(reference: SlackReactionReference): string {
         reactionToken,
       );
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Index paths (v2).                                                          */
+/* -------------------------------------------------------------------------- */
+
+export function slackRootIndexPath(): string {
+  return joinPath(SLACK_ROOT, '_index.json');
+}
+
+export function slackChannelsIndexPath(): string {
+  return joinPath(SLACK_ROOT, 'channels', '_index.json');
+}
+
+export function slackUsersIndexPath(): string {
+  return joinPath(SLACK_ROOT, 'users', '_index.json');
+}
+
+/* -------------------------------------------------------------------------- */
+/* By-name and bot alias paths (v2).                                          */
+/* -------------------------------------------------------------------------- */
+
+function aliasFilename(name: string, id: string, colliding: boolean): string {
+  const slug = slugifyAlias(name);
+  return colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+}
+
+/**
+ * Alias path for a Slack channel by its name — `/slack/channels/by-name/<slug>.json`.
+ * Mirrors `githubByTitleAliasPath`. Multiple channels can occasionally share a
+ * display name; pass `colliding=true` to disambiguate with an id-derived
+ * 8-char hash suffix.
+ */
+export function slackByNameChannelAliasPath(
+  channelName: string,
+  channelId: string,
+  colliding = false,
+): string {
+  return joinPath(
+    SLACK_ROOT,
+    'channels',
+    'by-name',
+    `${aliasFilename(channelName, channelId, colliding)}.json`,
+  );
+}
+
+/**
+ * Alias path for a Slack user by their display name —
+ * `/slack/users/by-name/<slug>.json`. Slack user display names are non-unique
+ * by design, so callers should pass `colliding=true` when emitting an alias
+ * whose slug already exists for a different user id.
+ */
+export function slackByNameUserAliasPath(
+  userName: string,
+  userId: string,
+  colliding = false,
+): string {
+  return joinPath(
+    SLACK_ROOT,
+    'users',
+    'by-name',
+    `${aliasFilename(userName, userId, colliding)}.json`,
+  );
+}
+
+/**
+ * Alias path for a Slack bot user — `/slack/users/bots/<id>__<slug>.json`.
+ * Living under `bots/` makes `ls /slack/users/bots` a one-line "list every
+ * bot user" discovery query. The filename uses the canonical `<id>__<slug>`
+ * convention so it round-trips by id.
+ */
+export function slackBotsAliasPath(userId: string, userName?: string): string {
+  return joinPath(SLACK_ROOT, 'users', 'bots', `${slackNameWithId(userName, userId)}.json`);
 }
 
 export function computeSlackPath(objectType: string, objectId: string): string {

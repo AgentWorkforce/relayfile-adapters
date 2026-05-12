@@ -343,7 +343,7 @@ export const adapters = [
       'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions.',
     readPaths: [
       ['/slack/channels/<channelId>.json', 'Channel records.'],
-      ['/slack/channels/<channelId>/messages/<messageTs>.json', 'Message records.'],
+      ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
       ['/slack/channels/<channelId>/messages/<messageTs>/replies/<replyTs>.json', 'Thread reply records.'],
       ['/slack/users/<userId>.json', 'User records.'],
     ],

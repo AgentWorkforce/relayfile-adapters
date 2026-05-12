@@ -7,6 +7,9 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 type JsonPrimitive = boolean | number | null | string;
 type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
 
+const MESSAGE_RECORD_PATH_PATTERN =
+  /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)(?:\.json|\/meta\.json)$/;
+
 /**
  * Resolve a relayfile writeback into a Slack Web API request.
  *
@@ -34,7 +37,7 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
   const route = classifyWrite(path, resources);
 
   if (route?.resource.name === 'messages') {
-    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    const messageMatch = path.match(MESSAGE_RECORD_PATH_PATTERN);
     if (route.kind === 'create' && messageMatch?.[1]) {
       return buildPostMessage(messageMatch[1], undefined, content);
     }
@@ -85,7 +88,7 @@ export function resolveDeleteRequest(path: string): SlackWritebackRequest {
   }
 
   if (route.resource.name === 'messages') {
-    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    const messageMatch = path.match(MESSAGE_RECORD_PATH_PATTERN);
     if (messageMatch?.[1] && messageMatch[2]) {
       return buildDeleteMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]));
     }
@@ -125,21 +128,27 @@ export function resolveDeleteRequest(path: string): SlackWritebackRequest {
  * Resolve the channel path segment to a value Slack's `channel` parameter
  * accepts. Resolution priority (most → least specific):
  *
- *   1. `<slug>--<channelId>` form emitted by `path-mapper.channelSegment()`:
- *      extract and return the canonical id. This is the round-trip-safe
- *      shape — Slack channel names can contain underscores that the slug
- *      lossily replaces with hyphens, so we must rely on the id suffix.
- *   2. Bare Slack id (`^[CDG][A-Z0-9]{7,}$`): forward as-is.
- *   3. Bare slug (no id suffix): forward as `#<slug>` as a best effort.
+ *   1. v2 round-trip-safe form `<channelId>__<slug>` emitted by current
+ *      `path-mapper`: extract and return the leading canonical id.
+ *   2. Legacy round-trip-safe form `<slug>--<channelId>` emitted by
+ *      adapter-slack <= 0.2.2: extract and return the trailing canonical id.
+ *      Slack channel names can contain underscores that the slug lossily
+ *      replaces with hyphens, so we must rely on the id suffix.
+ *   3. Bare Slack id (`^[CDG][A-Z0-9]{7,}$`): forward as-is.
+ *   4. Bare slug (no id suffix): forward as `#<slug>` as a best effort.
  *      Channels whose name contains an underscore will silently target the
- *      wrong channel; callers should either re-sync paths into the new
- *      `<slug>--<id>` form or pass an explicit `channel` field in the JSON
+ *      wrong channel; callers should either re-sync paths into the v2
+ *      `<id>__<slug>` form or pass an explicit `channel` field in the JSON
  *      payload to override.
  */
 function extractSlackChannel(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  // Round-trip-safe form: <slug>--<channelId>
+  // v2 round-trip-safe form: <channelId>__<slug>
+  const idWithSlug = /^([CDG][A-Z0-9]{7,})__[A-Za-z0-9._+=@-]+/.exec(decoded);
+  if (idWithSlug?.[1]) return idWithSlug[1];
+
+  // Legacy round-trip-safe form: <slug>--<channelId>
   const sluggedId = /--([CDG][A-Z0-9]{7,})$/.exec(decoded);
   if (sluggedId?.[1]) return sluggedId[1];
 
@@ -159,20 +168,36 @@ function extractSlackUser(segment: string): string {
 }
 
 /**
- * Reverse the `messageSegment` encoding produced by `path-mapper.ts`.
+ * Reverse the message-directory encoding produced by `path-mapper.ts`.
  *
- * `messageSegment(ts, subject)` emits one of:
- *   - `<subjectSlug>--<tsToken>` (when a subject was available)
- *   - `<tsToken>` (otherwise)
+ * The path mapper has historically used two forms:
+ *   - v2: `<tsToken>__<textSlug>` (ts leads, slug trails)
+ *   - legacy: `<subjectSlug>--<tsToken>` (slug leads, ts trails)
+ *   - bare: `<tsToken>` (no slug)
  *
  * `<tsToken>` is `messageTs.replace(/\./g, '_')`. Slack's API expects the
  * canonical `<seconds>.<microseconds>` form, so we replace the *last*
  * underscore back to a dot.
+ *
+ * The `<tsToken>` itself matches `^\d+_\d+$`, which we use to pick the right
+ * token whether it leads (v2) or trails (legacy).
  */
 function extractMessageTimestamp(segment: string): string {
   const decoded = decodeURIComponent(segment);
-  const slugSplit = decoded.split('--');
-  const tsToken = slugSplit[slugSplit.length - 1] ?? decoded;
+
+  // v2 form: ts leads, slug trails (separator `__`).
+  const v2Split = decoded.split('__');
+  if (v2Split.length > 1 && /^\d+_\d+$/.test(v2Split[0]!)) {
+    return underscoreToDot(v2Split[0]!);
+  }
+
+  // Legacy form: slug leads, ts trails (separator `--`).
+  const legacySplit = decoded.split('--');
+  const tsToken = legacySplit[legacySplit.length - 1] ?? decoded;
+  return underscoreToDot(tsToken);
+}
+
+function underscoreToDot(tsToken: string): string {
   const lastUnderscore = tsToken.lastIndexOf('_');
   if (lastUnderscore < 0) return tsToken;
   return `${tsToken.slice(0, lastUnderscore)}.${tsToken.slice(lastUnderscore + 1)}`;

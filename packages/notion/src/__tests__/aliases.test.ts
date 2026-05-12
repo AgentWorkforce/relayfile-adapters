@@ -3,14 +3,21 @@ import { describe, it } from 'node:test';
 
 import { slugifyAlias } from '../alias-slug.js';
 import { writeWorkspaceFiles } from '../bulk-ingest.js';
+import { buildIndexFiles } from '../index-emitter.js';
 import { ingestPageArtifacts } from '../pages/ingestion.js';
 import {
   notionByIdAliasPath,
+  notionByNameAliasPath,
   notionByTitleAliasPath,
+  notionDatabaseMetadataPath,
+  notionDatabasesCollectionPath,
   notionDatabasePagesCollectionPath,
+  notionStandalonePagePath,
   notionStandalonePagesCollectionPath,
+  notionUserPath,
+  notionUsersCollectionPath,
 } from '../path-mapper.js';
-import type { NotionPage, NotionRichText } from '../types.js';
+import type { NotionPage, NotionRichText, NotionVfsFile } from '../types.js';
 
 function createRelayClient() {
   const files = new Map<string, { content: string; revision: string }>();
@@ -87,6 +94,19 @@ function createText(content: string): NotionRichText {
       color: 'default',
     },
     href: null,
+  };
+}
+
+function vfsJsonFile(
+  path: string,
+  content: Record<string, unknown>,
+  aliasMetadata?: NotionVfsFile['aliasMetadata'],
+): NotionVfsFile {
+  return {
+    path,
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(content)}\n`,
+    aliasMetadata,
   };
 }
 
@@ -176,8 +196,171 @@ describe('notion aliases', () => {
     assert.strictEqual(byTitle.content, canonical.content);
   });
 
+  it('preserves generated record indexes when bulk writes also materialize aliases', async () => {
+    const relay = createRelayClient();
+    const databaseId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const databaseTitle = 'Engineering Wiki';
+    const pageId = '11111111-2222-3333-4444-555555555555';
+    const pageTitle = 'Launch Checklist';
+    const userId = '99999999-aaaa-bbbb-cccc-dddddddddddd';
+    const userName = 'Alice Chen';
+    const sourceFiles: NotionVfsFile[] = [
+      vfsJsonFile(
+        notionDatabaseMetadataPath(databaseId, databaseTitle),
+        {
+          id: databaseId,
+          title: databaseTitle,
+          lastEditedTime: '2026-05-01T10:00:00.000Z',
+        },
+        {
+          scopePath: notionDatabasesCollectionPath(),
+          id: databaseId,
+          title: databaseTitle,
+          aliasKind: 'database',
+        },
+      ),
+      vfsJsonFile(
+        notionStandalonePagePath(pageId, pageTitle),
+        {
+          id: pageId,
+          title: pageTitle,
+          lastEditedTime: '2026-05-01T09:00:00.000Z',
+          parent: { type: 'workspace', workspace: true },
+        },
+        {
+          scopePath: notionStandalonePagesCollectionPath(),
+          id: pageId,
+          title: pageTitle,
+          aliasKind: 'page',
+        },
+      ),
+      vfsJsonFile(
+        notionUserPath(userId, userName),
+        {
+          id: userId,
+          name: userName,
+          lastEditedTime: '2026-05-01T08:00:00.000Z',
+        },
+        {
+          scopePath: notionUsersCollectionPath(),
+          id: userId,
+          name: userName,
+          aliasKind: 'user',
+        },
+      ),
+    ];
+
+    await writeWorkspaceFiles(relay.client as never, 'ws-notion', [
+      ...sourceFiles,
+      ...buildIndexFiles(sourceFiles),
+    ]);
+
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/databases/_index.json')).content), [
+      {
+        id: databaseId,
+        title: databaseTitle,
+        updated: '2026-05-01T10:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/pages/_index.json')).content), [
+      {
+        id: pageId,
+        title: pageTitle,
+        updated: '2026-05-01T09:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/users/_index.json')).content), [
+      {
+        id: userId,
+        title: userName,
+        updated: '2026-05-01T08:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+
+    assert.ok(relay.files.has(notionByIdAliasPath(notionDatabasesCollectionPath(), databaseId)));
+    assert.ok(relay.files.has(notionByTitleAliasPath(notionDatabasesCollectionPath(), databaseTitle, databaseId)));
+    assert.ok(relay.files.has(notionByIdAliasPath(notionStandalonePagesCollectionPath(), pageId)));
+    assert.ok(relay.files.has(notionByTitleAliasPath(notionStandalonePagesCollectionPath(), pageTitle, pageId)));
+    assert.ok(relay.files.has(notionByIdAliasPath(notionUsersCollectionPath(), userId)));
+    assert.ok(relay.files.has(notionByNameAliasPath(notionUsersCollectionPath(), userName, userId)));
+  });
+
   it('slugging is deterministic, ASCII-folded, and strips traversal characters', () => {
     assert.strictEqual(slugifyAlias('Café ../ Roadmap'), 'cafe-roadmap');
     assert.strictEqual(slugifyAlias('Café ../ Roadmap'), slugifyAlias('Café ../ Roadmap'));
+  });
+
+  it('materializes /notion/pages/by-database/<db>/<page>.json for database pages', async () => {
+    // Cross-reference alias: a database page is reachable both at its
+    // canonical /notion/databases/<db>/pages/... path AND at the global
+    // /notion/pages/by-database/... mirror. Both share the same content
+    // so an agent can pivot from "find the row in my Tasks db titled X"
+    // to a writeback target without re-querying the index.
+    const relay = createRelayClient();
+    const databaseId = 'aaaaaaaa-bbbb-cccc-dddd-deadbeef0001';
+    const databaseTitle = 'Tasks';
+    const pageId = '66666666-6666-6666-6666-deadbeef0002';
+    const page = createDatabasePage(pageId, databaseId, 'Launch Checklist');
+    const files = await ingestPageArtifacts(createClient(), page, { databaseId, databaseTitle });
+
+    await writeWorkspaceFiles(relay.client as never, 'ws-notion', files);
+
+    // short_id is the trailing 8 hex chars of the dehyphenated UUID.
+    // dbId ends in `deadbeef0001` → short_id `beef0001`;
+    // pageId ends in `deadbeef0002` → short_id `beef0002`.
+    const byDatabasePath = '/notion/pages/by-database/tasks__beef0001/launch-checklist__beef0002.json';
+    const byDatabase = await relay.client.readFile('ws-notion', byDatabasePath);
+    const canonical = await relay.client.readFile('ws-notion', files[0]?.path ?? '');
+    assert.strictEqual(byDatabase.content, canonical.content);
+  });
+
+  it('materializes /notion/pages/by-parent/<type>-<parent>/<page>.json for child pages', async () => {
+    // The by-parent alias mirrors Notion's hierarchical workspace model.
+    // Pages with a workspace parent are intentionally skipped (the
+    // workspace bucket would collect every top-level page and lose its
+    // navigational value), but pages with a page_id parent must land
+    // here so an agent can list direct children of a parent page.
+    const relay = createRelayClient();
+    const parentPageId = 'cccccccc-cccc-cccc-cccc-deadbeef1000';
+    const childId = 'cccccccc-cccc-cccc-cccc-deadbeef2000';
+    const child: NotionPage = {
+      ...createPage(childId, 'Implementation notes'),
+      parent: { type: 'page_id', page_id: parentPageId },
+    };
+    const files = await ingestPageArtifacts(createClient(), child);
+
+    await writeWorkspaceFiles(relay.client as never, 'ws-notion', files);
+
+    const matchingAlias = Array.from(relay.files.keys()).find((path) =>
+      path.startsWith('/notion/pages/by-parent/page-') && path.endsWith('beef2000.json'),
+    );
+    assert.ok(matchingAlias, `expected a by-parent alias for child page, saw: ${[...relay.files.keys()].join(', ')}`);
+    const canonical = await relay.client.readFile('ws-notion', files[0]?.path ?? '');
+    const aliasContent = await relay.client.readFile('ws-notion', matchingAlias);
+    assert.strictEqual(aliasContent.content, canonical.content);
+  });
+
+  it('skips by-parent emit for workspace-rooted pages', async () => {
+    const relay = createRelayClient();
+    // createPage defaults to { type: 'workspace', workspace: true }.
+    const page = createPage('77777777-7777-7777-7777-777777777777', 'Workspace top-level');
+    const files = await ingestPageArtifacts(createClient(), page);
+
+    await writeWorkspaceFiles(relay.client as never, 'ws-notion', files);
+
+    const byParentPaths = Array.from(relay.files.keys()).filter((path) =>
+      path.startsWith('/notion/pages/by-parent/'),
+    );
+    assert.deepStrictEqual(
+      byParentPaths,
+      [],
+      'workspace-rooted pages must not materialize a by-parent alias',
+    );
   });
 });
