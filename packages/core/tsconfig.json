@@ -21,7 +21,8 @@
     "tests/storage-bridge/**/*.test.ts",
     "tests/runtime/**/*.test.ts",
     "tests/spec/**/*.test.ts",
-    "tests/atomic-index/**/*.test.ts"
+    "tests/atomic-index/**/*.test.ts",
+    "tests/emit-auxiliary/**/*.test.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }

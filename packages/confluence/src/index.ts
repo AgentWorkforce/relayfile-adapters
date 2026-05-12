@@ -55,6 +55,15 @@ export {
 } from './layout-prompt.js';
 
 export {
+  emitConfluenceAuxiliaryFiles,
+} from './emit-auxiliary-files.js';
+export type {
+  ConfluenceEmitAuxiliaryFilesInput,
+  ConfluencePageEmitRecord,
+  ConfluenceSpaceEmitRecord,
+} from './emit-auxiliary-files.js';
+
+export {
   buildConfluenceIndexFile,
 } from './index-emitter.js';
 export type {
