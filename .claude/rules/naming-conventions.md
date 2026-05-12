@@ -4,7 +4,7 @@ When this applies: composing or parsing any canonical/alias path emitted by an a
 
 ## Joiner
 
-All adapters use `__` (double underscore) as the joiner between a human-readable slug and the provider's stable ID. The legacy `--` (double hyphen) joiner is only present in the `jira` adapter and will be migrated by a follow-up PR.
+All adapters use `__` (double underscore) as the joiner between a human-readable slug and the provider's stable ID. The legacy `--` (double hyphen) joiner is no longer emitted by any adapter; readers in `jira` and `confluence` still accept it so mounts written before the cross-adapter convention migration keep resolving.
 
 ## Flat vs. directory decision tree
 

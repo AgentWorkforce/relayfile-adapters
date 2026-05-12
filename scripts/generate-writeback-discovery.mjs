@@ -333,9 +333,13 @@ function idPatternFor(adapterSlug, resourcePath) {
     if (resourcePath.endsWith('/transitions')) {
       return pattern('^$');
     }
+    // Accept both the current `<slug>__<id>` joiner and the legacy
+    // `<slug>--<id>` joiner so existing mounts written before the
+    // cross-adapter convention migration keep resolving. Mirrors
+    // confluence's tolerant pattern.
     return resourcePath.includes('/comments')
-      ? pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$')
-      : pattern('^(?:[A-Za-z0-9_.~-]+--(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
+      ? pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?\\d+$')
+      : pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__)(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
   }
   if (adapterSlug === 'salesforce') {
     return pattern('^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$');
