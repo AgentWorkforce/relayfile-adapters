@@ -27,6 +27,9 @@ describe('jira layout prompt', () => {
     assert.match(content, /by-state/u);
     assert.match(content, /by-key/u);
     assert.match(content, /by-id/u);
+    assert.match(content, /by-assignee/u);
+    assert.match(content, /projects\/by-id/u);
+    assert.match(content, /sprints\/by-id/u);
     assert.match(content, /\bjq\b/u);
     // Document the joiner migration so readers know the current vs. target shape.
     assert.match(content, /--/u);

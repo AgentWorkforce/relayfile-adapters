@@ -32,6 +32,12 @@ Issues are addressable through parallel paths that all resolve to the same canon
 - By id: \`/jira/issues/by-id/<id>.json\` — stable when the summary changes.
 - By key: \`/jira/issues/by-key/<TEAM-123>.json\` — Jira's natural human-readable key.
 - By state: \`/jira/issues/by-state/<status>/<id>.json\` — \`to-do\`, \`in-progress\`, \`done\`, etc.
+- By assignee: \`/jira/issues/by-assignee/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the current assignee. Unassigned issues are not emitted under this prefix.
+
+Projects and sprints carry a stable reconciliation anchor keyed on the immutable id, so renames leave the alias resolving to the latest payload:
+
+- \`/jira/projects/by-id/<id>.json\` — durable lookup for projects.
+- \`/jira/sprints/by-id/<id>.json\` — durable lookup for sprints.
 
 Each alias file is a minimal pointer of the form \`{ id, canonicalPath, title? }\`; readers follow \`canonicalPath\` for the full record. Collisions on a \`by-key\`/\`by-title\` slug get a deterministic 8-character hash suffix (never first-writer-wins).
 
