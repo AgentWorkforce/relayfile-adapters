@@ -1,5 +1,6 @@
 import {
   confluencePagesIndexPath,
+  confluenceRootIndexPath,
   confluenceSpacesIndexPath,
 } from './path-mapper.js';
 import type { ConfluenceBaseIndexRow, ConfluencePageIndexRow, ConfluenceSpaceIndexRow } from './queries.js';
@@ -10,6 +11,29 @@ export interface ConfluenceIndexFile {
   path: string;
   contentType: 'application/json; charset=utf-8';
   content: string;
+}
+
+export interface ConfluenceRootIndexRow {
+  id: string;
+  title: string;
+}
+
+/**
+ * Build `/confluence/_index.json` — a static listing of top-level resource
+ * roots the Confluence adapter exposes. Mirrors the slack pattern so an
+ * agent can `ls /confluence/` and discover the available buckets.
+ */
+export function buildConfluenceRootIndexFile(
+  rows: ConfluenceRootIndexRow[] = [
+    { id: 'pages', title: 'Pages' },
+    { id: 'spaces', title: 'Spaces' },
+  ],
+): ConfluenceIndexFile {
+  return {
+    path: confluenceRootIndexPath(),
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(rows)}\n`,
+  };
 }
 
 export function buildConfluenceIndexFile(
