@@ -62,6 +62,19 @@ export interface GitHubCreateReviewInput {
   comments: GitHubReviewComment[];
 }
 
+export interface GitHubIssueWritebackInput {
+  title?: string;
+  body?: string;
+  labels?: string[];
+  assignees?: string[];
+  milestone?: number | string;
+  state?: 'open' | 'closed';
+}
+
+export interface GitHubIssueCommentWritebackInput {
+  body: string;
+}
+
 export type ProxyRequest = SharedProxyRequest;
 export type ProxyResponse<T = JsonValue | null> = SharedProxyResponse<T>;
 

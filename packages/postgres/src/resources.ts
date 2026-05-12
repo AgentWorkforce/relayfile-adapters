@@ -10,9 +10,9 @@ export interface AdapterResourceConfig {
 export const resources = [
   {
     name: "rows",
-    path: "/postgres/{db}/{schema}/{table}",
-    pathPattern: /^\/postgres\/[^\/]+\/[^\/]+\/[^\/]+(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^.+$/,
+    path: "/postgres/rows",
+    pathPattern: /^\/postgres\/rows(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/postgres/rows/.schema.json",
     createExample: "discovery/postgres/rows/.create.example.json",
   },
@@ -20,13 +20,13 @@ export const resources = [
     name: "listeners",
     path: "/postgres/listeners",
     pathPattern: /^\/postgres\/listeners(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z_][A-Za-z0-9_]*$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/postgres/listeners/.schema.json",
     createExample: "discovery/postgres/listeners/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

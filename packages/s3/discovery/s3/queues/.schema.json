@@ -1,62 +1,85 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "S3 queue notification",
   "type": "object",
-  "additionalProperties": true,
   "required": [
     "QueueUrl"
   ],
   "properties": {
     "QueueUrl": {
       "type": "string",
-      "description": "SQS queue URL."
+      "description": "SQS Queue URL."
     },
     "Bucket": {
       "type": "string",
-      "description": "Bucket name."
-    },
-    "Events": {
-      "type": "array",
-      "description": "S3 events delivered to the queue.",
-      "items": {
-        "enum": [
-          "s3:ObjectCreated:*",
-          "s3:ObjectRemoved:*",
-          "s3:ObjectRestore:*"
-        ],
-        "description": "S3 notification event."
-      }
-    },
-    "FilterPrefix": {
-      "type": "string",
-      "description": "Object key prefix filter."
-    },
-    "FilterSuffix": {
-      "type": "string",
-      "description": "Object key suffix filter."
+      "description": "Bucket."
     },
     "id": {
-      "description": "Provider id.",
+      "type": "string",
+      "description": "Provider canonical record id.",
       "readOnly": true
     },
     "createdAt": {
+      "type": "string",
+      "format": "date-time",
       "description": "Provider creation timestamp.",
       "readOnly": true
     },
     "updatedAt": {
-      "description": "Provider update timestamp.",
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
       "readOnly": true
     },
     "url": {
-      "description": "Provider URL.",
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
       "readOnly": true
     },
     "_webhook": {
-      "description": "Relayfile webhook metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     },
     "_connection": {
-      "description": "Relayfile connection metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

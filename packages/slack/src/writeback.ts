@@ -20,6 +20,8 @@ const MESSAGE_RECORD_PATH_PATTERN =
  *       → chat.postMessage with thread_ts (thread reply)
  *   - POST /slack/channels/<channel>/messages/<msg>/reactions/<draft>.json
  *       → reactions.add
+ *   - POST /slack/users/<user>/messages/<draft>.json
+ *       → conversations.open + chat.postMessage (executed by cloud bridge)
  *
  * The `<channel>` segment is whatever `path-mapper.namedSegment(name, id)`
  * produced — either a Slack channel id like `C01ABC123` or a slugified
@@ -41,6 +43,13 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
     }
     if (route.kind === 'patch' && messageMatch?.[1] && messageMatch[2]) {
       return buildUpdateMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]), content);
+    }
+  }
+
+  if (route?.resource.name === 'direct-messages') {
+    const dmMatch = path.match(/^\/slack\/users\/([^/]+)\/messages\/([^/]+)\.json$/);
+    if (route.kind === 'create' && dmMatch?.[1]) {
+      return buildPostDirectMessage(dmMatch[1], content);
     }
   }
 
@@ -148,6 +157,14 @@ function extractSlackChannel(segment: string): string {
 
   // Bare slug — best-effort. Documented limitation: lossy for names with `_`.
   return decoded.startsWith('#') ? decoded : `#${decoded}`;
+}
+
+function extractSlackUser(segment: string): string {
+  const decoded = decodeURIComponent(segment);
+  const sluggedId = /--([UW][A-Z0-9]{7,})$/.exec(decoded);
+  if (sluggedId?.[1]) return sluggedId[1];
+  if (/^[UW][A-Z0-9]{7,}$/.test(decoded)) return decoded;
+  return decoded;
 }
 
 /**
@@ -285,6 +302,23 @@ function buildPostMessage(
     method: 'POST',
     endpoint: '/api/chat.postMessage',
     body,
+  };
+}
+
+function buildPostDirectMessage(userSegment: string, content: string): SlackWritebackRequest {
+  const user = extractSlackUser(userSegment);
+  const message = buildPostMessage(user, undefined, content);
+  const messageBody = { ...message.body };
+  delete messageBody.channel;
+  return {
+    action: 'post_dm',
+    method: 'POST',
+    endpoint: '/api/conversations.open',
+    body: {
+      users: user,
+      return_im: true,
+      message: messageBody,
+    },
   };
 }
 

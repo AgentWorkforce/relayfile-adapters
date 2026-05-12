@@ -93,14 +93,28 @@ export const adapters = [
     slug: 'github',
     title: 'GitHub adapter',
     overview:
-      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for submitting pull request reviews.',
+      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, and submitting pull request reviews.',
     readPaths: [
-      ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/metadata.json', 'Pull request metadata.'],
+      ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
-      ['/github/repos/<owner>/<repo>/issues/<issueNumber>/metadata.json', 'Issue metadata.'],
+      ['/github/repos/<owner>/<repo>/issues/<issueNumber>/meta.json', 'Issue metadata.'],
       ['/github/repos/<owner>/<repo>/commits/<sha>/metadata.json', 'Commit metadata.'],
     ],
     endpoints: [
+      endpoint('/github/repos/{owner}/{repo}/issues/new.json', 'Create GitHub issue', 'Creates a GitHub issue.', ['title'], {
+        title: str('Issue title.'),
+        body: str('Issue body.'),
+        labels: arr(str('Label name.'), 'Issue labels.'),
+        assignees: arr(str('GitHub login.'), 'Issue assignees.'),
+        milestone: {
+          description: 'Milestone number or title.',
+          oneOf: [{ type: 'number' }, { type: 'string' }],
+        },
+        state: en(['open', 'closed'], 'Issue state when updating an existing issue.'),
+      }, { title: 'Replace example issue title', body: 'Replace example issue body.', labels: ['triage'] }),
+      endpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'Create GitHub issue comment', 'Creates or updates a GitHub issue comment.', ['body'], {
+        body: str('Comment body.'),
+      }, { body: 'Replace example comment body.' }),
       endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/new.json', 'Submit GitHub pull request review', 'Submits a pull request review with optional inline comments.', ['event', 'body', 'comments'], {
         event: en(['APPROVE', 'COMMENT', 'REQUEST_CHANGES'], 'Review event to submit.'),
         body: str('Top-level review body.'),
@@ -189,7 +203,7 @@ export const adapters = [
     slug: 'jira',
     title: 'Jira adapter',
     overview:
-      'The Jira adapter exposes issues, comments, projects, and sprints under `/jira`, with writeback routes for creating issues, projects, and issue comments.',
+      'The Jira adapter exposes issues, comments, projects, and sprints under `/jira`, with writeback routes for creating issues, projects, issue comments, and issue transitions.',
     readPaths: [
       ['/jira/issues/<issueIdOrKey>.json', 'Issue records.'],
       ['/jira/issues/<issueIdOrKey>/comments/<commentId>.json', 'Issue comment records.'],
@@ -216,6 +230,11 @@ export const adapters = [
           labels: arr(str('Issue label.'), 'Issue labels.'),
         }, { required: ['project', 'summary', 'issuetype'] }),
       }, { fields: { project: { key: 'PROJ' }, summary: 'Replace example summary', issuetype: { name: 'Task' } } }),
+      endpoint('/jira/issues/{issueIdOrKey}/transitions/new.json', 'Transition Jira issue', 'Transitions a Jira issue to another workflow state.', ['transition'], {
+        transition: obj('Jira transition.', {
+          id: str('Transition id.'),
+        }, { required: ['id'] }),
+      }, { transition: { id: '31' } }),
       endpoint('/jira/projects/new.json', 'Create Jira project', 'Creates a Jira project.', ['key', 'name', 'projectTypeKey', 'leadAccountId'], {
         key: str('Project key.'),
         name: str('Project name.'),
@@ -321,7 +340,7 @@ export const adapters = [
     slug: 'slack',
     title: 'Slack adapter',
     overview:
-      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting messages, replies, and reactions.',
+      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions.',
     readPaths: [
       ['/slack/channels/<channelId>.json', 'Channel records.'],
       ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
@@ -330,6 +349,7 @@ export const adapters = [
     ],
     endpoints: [
       endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, slackContentRequirement()),
+      endpoint('/slack/users/{userId}/messages/new.json', 'Post Slack direct message', 'Opens or reuses a direct message conversation and posts a Slack message.', [], slackDirectMessageProps(), { text: 'Replace example direct message text.' }, slackContentRequirement()),
       endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }, slackContentRequirement()),
       endpoint('/slack/channels/{channelId}/messages/{messageTs}/reactions/new.json', 'Add Slack reaction', 'Adds an emoji reaction to a Slack message.', [], {
         name: str('Emoji name without surrounding colons. `reaction` is also accepted.'),
@@ -726,6 +746,11 @@ function slackMessageProps() {
     unfurl_media: bool('Whether Slack should unfurl media.'),
     mrkdwn: bool('Whether Slack should parse mrkdwn in text.'),
   };
+}
+
+function slackDirectMessageProps() {
+  const { channel, thread_ts, ...properties } = slackMessageProps();
+  return properties;
 }
 
 function slackContentRequirement() {

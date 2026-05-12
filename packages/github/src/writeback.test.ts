@@ -1,7 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GitHubWritebackHandler, resolveDeleteRequest } from './writeback.js';
+import {
+  GitHubWritebackHandler,
+  ReadOnlyFieldError,
+  resolveDeleteRequest,
+  resolveWritebackRequest,
+} from './writeback.js';
 import type {
   GitHubRequestProvider,
   JsonObject,
@@ -236,6 +241,69 @@ describe('writeback', () => {
     assert.throws(
       () => resolveDeleteRequest('/github/repos/acme/widgets/pulls/7/reviews/draft@review.json'),
       /Unsupported GitHub delete writeback path/,
+    );
+  });
+
+  it('resolves issue create writebacks to GitHub issue creation requests', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/issues/create request.json',
+      JSON.stringify({
+        title: 'Ship writeback support',
+        body: 'Wire issue create through file-native writeback.',
+        labels: ['deploy-v1'],
+        assignees: ['octocat'],
+      }),
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.baseUrl, 'https://api.github.com');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/issues');
+    assert.strictEqual(request.connectionId, '');
+    assert.deepStrictEqual(request.body, {
+      title: 'Ship writeback support',
+      body: 'Wire issue create through file-native writeback.',
+      labels: ['deploy-v1'],
+      assignees: ['octocat'],
+    });
+  });
+
+  it('resolves canonical issue updates to GitHub issue patch requests', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/issues/42.json',
+      JSON.stringify({ state: 'closed' }),
+    );
+
+    assert.strictEqual(request.method, 'PATCH');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/issues/42');
+    assert.deepStrictEqual(request.body, { state: 'closed' });
+  });
+
+  it('resolves issue comment create and update writebacks', () => {
+    const create = resolveWritebackRequest(
+      '/github/repos/acme/widgets/issues/42/comments/create comment.json',
+      'Looks good to me.',
+    );
+    const update = resolveWritebackRequest(
+      '/github/repos/acme/widgets/issues/42/comments/123.json',
+      JSON.stringify({ body: 'Updated comment body.' }),
+    );
+
+    assert.strictEqual(create.method, 'POST');
+    assert.strictEqual(create.endpoint, '/repos/acme/widgets/issues/42/comments');
+    assert.deepStrictEqual(create.body, { body: 'Looks good to me.' });
+    assert.strictEqual(update.method, 'PATCH');
+    assert.strictEqual(update.endpoint, '/repos/acme/widgets/issues/comments/123');
+    assert.deepStrictEqual(update.body, { body: 'Updated comment body.' });
+  });
+
+  it('rejects read-only fields in issue writebacks', () => {
+    assert.throws(
+      () =>
+        resolveWritebackRequest(
+          '/github/repos/acme/widgets/issues/create request.json',
+          JSON.stringify({ id: 123, title: 'Nope' }),
+        ),
+      (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
     );
   });
 });

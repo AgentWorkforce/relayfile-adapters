@@ -25,6 +25,14 @@ export const resources = [
     createExample: "discovery/jira/issues/.create.example.json",
   },
   {
+    name: "transitions",
+    path: "/jira/issues/{issueIdOrKey}/transitions",
+    pathPattern: /^\/jira\/issues\/[^\/]+\/transitions(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^$/,
+    schema: "discovery/jira/issues/{issueIdOrKey}/transitions/.schema.json",
+    createExample: "discovery/jira/issues/{issueIdOrKey}/transitions/.create.example.json",
+  },
+  {
     name: "projects",
     path: "/jira/projects",
     pathPattern: /^\/jira\/projects(?:\/[^\/]+(?:\.json)?)?$/,

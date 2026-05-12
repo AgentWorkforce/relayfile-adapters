@@ -1,5 +1,5 @@
 {
-  "resource": "me/drive/root",
+  "resource": "sites/site-a/drives/drive-a/root",
   "changeType": "updated",
   "notificationUrl": "https://example.com/hooks/graph",
   "expirationDateTime": "2026-05-10T00:00:00.000Z"
