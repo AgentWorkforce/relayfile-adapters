@@ -25,11 +25,19 @@ export function buildSummary(input: AirtableWebhookNotification | Record<string,
     readOptionalString(record.webhook_id) ??
     readOptionalString(getRecord(record.webhook)?.id) ??
     readOptionalString(record.id);
+  const fieldNamesById = buildFieldNamesById(record);
   const fieldsChanged = uniqueStrings([
-    ...(normalized?.changedFieldIds ?? []),
-    ...extractAirtableNotificationChangedFieldIds(record),
+    ...(normalized?.changedFieldIds ?? [])
+      .map((fieldId) => resolveFieldName(fieldNamesById, fieldId))
+      .filter((value): value is string => Boolean(value)),
+    ...(normalized?.changes ?? [])
+      .map((change) => change.fieldName ?? resolveFieldName(fieldNamesById, change.fieldId))
+      .filter((value): value is string => Boolean(value)),
+    ...extractAirtableNotificationChangedFieldIds(record)
+      .map((fieldId) => resolveFieldName(fieldNamesById, fieldId) ?? fieldId)
+      .filter((value): value is string => Boolean(value)),
     ...extractAirtableNotificationChanges(record, 50)
-      .map((change) => change.fieldId)
+      .map((change) => change.fieldName ?? resolveFieldName(fieldNamesById, change.fieldId) ?? change.fieldId)
       .filter((value): value is string => Boolean(value)),
   ]).slice(0, 16);
   const tableIds = uniqueStrings([
@@ -101,6 +109,67 @@ function readActor(record: Record<string, unknown>): AirtableEventSummary['actor
     id,
     ...(displayName ? { displayName } : {}),
   };
+}
+
+function buildFieldNamesById(record: Record<string, unknown>): Map<string, string> {
+  const names = new Map<string, string>();
+  collectFieldDefinitions(names, record.fields);
+  collectFieldDefinitions(names, getRecord(record.table)?.fields);
+
+  const baseTables = getRecord(record.base)?.tables;
+  if (Array.isArray(baseTables)) {
+    for (const table of baseTables) {
+      collectFieldDefinitions(names, getRecord(table)?.fields);
+    }
+  }
+
+  const changedTablesById = getRecord(record.changedTablesById);
+  if (changedTablesById) {
+    for (const tableChange of Object.values(changedTablesById)) {
+      const tableRecord = getRecord(tableChange);
+      collectFieldDefinitions(names, getRecord(tableRecord?.table)?.fields);
+      const fieldsById = getRecord(tableRecord?.fieldsById);
+      if (!fieldsById) {
+        continue;
+      }
+      for (const [fieldId, value] of Object.entries(fieldsById)) {
+        const fieldName = readOptionalString(getRecord(value)?.name);
+        if (fieldName) {
+          names.set(fieldId, fieldName);
+        }
+      }
+    }
+  }
+
+  return names;
+}
+
+function collectFieldDefinitions(
+  names: Map<string, string>,
+  value: unknown,
+): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  for (const entry of value) {
+    const record = getRecord(entry);
+    const fieldId = readOptionalString(record?.id);
+    const fieldName = readOptionalString(record?.name);
+    if (fieldId && fieldName) {
+      names.set(fieldId, fieldName);
+    }
+  }
+}
+
+function resolveFieldName(
+  fieldNamesById: Map<string, string>,
+  fieldId: string | undefined,
+): string | undefined {
+  if (!fieldId) {
+    return undefined;
+  }
+  return fieldNamesById.get(fieldId) ?? fieldId;
 }
 
 function getRecord(value: unknown): Record<string, unknown> | undefined {

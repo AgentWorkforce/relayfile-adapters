@@ -125,6 +125,7 @@ export type AirtableEventSummary = SharedEventSummary;
 
 export interface AirtableNotificationChange {
   fieldId?: string;
+  fieldName?: string;
   recordId?: string;
   tableId?: string;
   type?: string;
