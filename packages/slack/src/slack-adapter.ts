@@ -373,7 +373,7 @@ export class SlackAdapter extends IntegrationAdapter {
       const channelId = readString(payload.channel);
       const messageTs = readString(payload.ts);
       if (channelId && messageTs) {
-        return messagePath(channelId, messageTs, readMessageSubject(payload), readChannelName(payload));
+        return messagePath(channelId, messageTs, undefined, readChannelName(payload));
       }
     }
 
@@ -712,13 +712,6 @@ function readFileName(payload: Record<string, unknown>): string | undefined {
     ?? readString(file?.title)
     ?? readString(payload.file_name)
     ?? readString(payload.fileName)
-    ?? undefined;
-}
-
-function readMessageSubject(payload: Record<string, unknown>): string | undefined {
-  return readString(payload.threadSubject)
-    ?? readString(payload.thread_subject)
-    ?? readString(payload.subject)
     ?? undefined;
 }
 

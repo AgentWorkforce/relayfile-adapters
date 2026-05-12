@@ -116,6 +116,20 @@ describe('slack writeback', () => {
       });
     });
 
+    it('routes a PATCH on v2 /messages/<ts>/meta.json to chat.update', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/C01ABC1234__customer-success/messages/1762445678_001234/meta.json',
+        'Edited body.',
+      );
+      assert.strictEqual(req.action, 'update_message');
+      assert.strictEqual(req.endpoint, '/api/chat.update');
+      assert.deepStrictEqual(req.body, {
+        channel: 'C01ABC1234',
+        ts: '1762445678.001234',
+        text: 'Edited body.',
+      });
+    });
+
     it('routes a PATCH on /replies/<ts>.json to chat.update for the reply', () => {
       const req = resolveWritebackRequest(
         '/slack/channels/customer-success/messages/1762445678_001234/replies/1762445999_005678.json',
@@ -267,6 +281,18 @@ describe('slack writeback', () => {
           endpoint: '/api/chat.delete',
           body: {
             channel: '#general',
+            ts: '1762445678.001234',
+          },
+        },
+      );
+      assert.deepStrictEqual(
+        resolveDeleteRequest('/slack/channels/C01ABC1234__customer-success/messages/1762445678_001234/meta.json'),
+        {
+          action: 'delete_message',
+          method: 'POST',
+          endpoint: '/api/chat.delete',
+          body: {
+            channel: 'C01ABC1234',
             ts: '1762445678.001234',
           },
         },
