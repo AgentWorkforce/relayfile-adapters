@@ -47,9 +47,11 @@
  * flag set on their index row but no separate bots-tree emission. Follow
  * up: add `notionBotsAliasPath` and emit alongside by-name.
  *
- * Root `/notion/_index.json`: confluence and slack do not yet emit a
- * provider-root index in their Phase 1 / Phase 2 ports. We leave this as
- * follow-up so the convention can land uniformly across adapters.
+ * Root `/notion/_index.json`: every batch unconditionally emits the
+ * provider-root index via `writeRootIndex(...)` below, mirroring
+ * `emitSlackAuxiliaryFiles`. The write is guaranteed even for empty or
+ * single-bucket batches so cloud consumers always observe a current
+ * top-level pointer document.
  */
 
 import {

@@ -16,6 +16,7 @@ import {
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
   githubReviewPath,
+  githubRootIndexPath,
   normalizeGitHubObjectType,
   normalizeNangoGitHubModel,
   GITHUB_PATH_ROOT,
@@ -147,6 +148,10 @@ describe('path-mapper', () => {
         githubCommitPath('octocat', 'hello-world', 'abc123'),
         '/github/repos/octocat/hello-world/commits/abc123/metadata.json',
       );
+    });
+
+    it('githubRootIndexPath', () => {
+      assert.equal(githubRootIndexPath(), '/github/_index.json');
     });
 
     it('maps alias paths under the combined repo segment', () => {
