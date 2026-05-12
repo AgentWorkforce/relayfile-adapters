@@ -14,6 +14,7 @@ import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
   linearByTitleAliasPath,
+  linearByUuidAliasPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
@@ -88,7 +89,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.equal(client.deletes.length, 0);
   });
 
-  it('writes the canonical path plus by-id, by-title, by-state aliases plus index row for an issue', async () => {
+  it('writes the canonical path plus by-uuid, by-id, by-title, by-state aliases plus index row for an issue', async () => {
     const client = createClient();
     const issue = {
       id: 'issue-123',
@@ -102,12 +103,13 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // Issue emits 4 files (canonical + by-id + by-title + by-state) + 1 index.
-    assert.equal(result.written, 5);
+    // Issue emits 5 files (canonical + by-uuid + by-id + by-title + by-state) + 1 index.
+    assert.equal(result.written, 6);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
       linearIssuePath('issue-123', 'AGE-8'),
+      linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123'),
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
@@ -156,7 +158,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     };
     const client = createClient({
       initialFiles: {
-        [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')]: JSON.stringify(priorPayload),
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
       },
     });
 
@@ -180,6 +182,8 @@ describe('emitLinearAuxiliaryFiles', () => {
     );
     // by-id alias stays — it's keyed on the identifier, which didn't change.
     assert.ok(!deletedPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')));
+    // by-uuid alias stays — it's keyed on the UUID, which never changes.
+    assert.ok(!deletedPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')));
 
     // New by-title alias and canonical path landed.
     const writtenPaths = client.writes.map((w) => w.path);
@@ -203,7 +207,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     };
     const client = createClient({
       initialFiles: {
-        [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')]: JSON.stringify(priorPayload),
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
       },
     });
 
@@ -327,7 +331,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     ];
     const client = createClient({
       initialFiles: {
-        [linearByIdAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
         [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')]: JSON.stringify(priorPayload),
         [linearIssuesIndexPath()]: JSON.stringify(priorIndex),
       },
@@ -341,6 +345,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     const deletedPaths = new Set(client.deletes.map((d) => d.path));
     const expectedDeletes = [
       linearIssuePath('issue-123', 'AGE-8'),
+      linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123'),
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
@@ -402,6 +407,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.deepEqual(result.errors, []);
 
     const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')));
     assert.ok(writtenPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')));
     assert.ok(writtenPaths.includes(linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123')));
   });
@@ -439,6 +445,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [{ id: 'issue-1', identifier: 'AGE-1', title: '🚀!!!' }],
     });
     const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-1')));
     assert.ok(writtenPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-1')));
     // No by-title alias because the slug would collapse to empty.
     const byTitleEmitted = writtenPaths.some((p) => p.includes('/by-title/'));
@@ -464,8 +471,9 @@ describe('emitLinearAuxiliaryFiles', () => {
     };
     const client = createClient({
       initialFiles: {
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-200')]: JSON.stringify(priorRenamePayload),
         [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-200')]: JSON.stringify(priorRenamePayload),
-        [linearByIdAliasPath(ISSUES_SCOPE, 'issue-300')]: JSON.stringify(priorDeletePayload),
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-300')]: JSON.stringify(priorDeletePayload),
         [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-300')]: JSON.stringify(priorDeletePayload),
       },
     });
@@ -503,5 +511,221 @@ describe('emitLinearAuxiliaryFiles', () => {
       'expected deleted issue by-id alias in deletes',
     );
     assert.deepEqual(result.errors, []);
+  });
+
+  it('cleans up stale UUID-only canonical when an issue gains an identifier (CodeRabbit src:273)', async () => {
+    // Prior write: identifier-less. The adapter wrote the canonical path
+    // using the UUID as the human-readable suffix (no identifier, no
+    // title) and the by-uuid alias as the stable anchor. No by-id alias
+    // was emitted because the identifier was absent.
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'issue',
+      objectId: 'issue-abc',
+      payload: {
+        id: 'issue-abc',
+        identifier: null,
+        title: null,
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-abc')]: JSON.stringify(priorPayload),
+        // The prior canonical path was UUID-keyed (no human-readable
+        // segment), because identifier and title were both absent.
+        [linearIssuePath('issue-abc')]: JSON.stringify(priorPayload),
+      },
+    });
+
+    // New write: same UUID, now bearing an identifier `AGE-1`.
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-abc',
+          identifier: 'AGE-1',
+          title: 'Now Has An Identifier',
+          state: { id: 's', name: 'Todo' },
+        },
+      ],
+    });
+
+    const deletedPaths = client.deletes.map((d) => d.path);
+    // The stale UUID-keyed canonical path must be reconciled away in
+    // favor of the new identifier-keyed canonical path.
+    assert.ok(
+      deletedPaths.includes(linearIssuePath('issue-abc')),
+      `expected stale UUID-keyed canonical path in deletes, got: ${deletedPaths.join(', ')}`,
+    );
+    // The by-uuid alias is the stable anchor and must NOT be deleted on
+    // an identifier transition — the UUID never changes.
+    assert.ok(
+      !deletedPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-abc')),
+      'by-uuid alias must not be deleted across identifier transitions',
+    );
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    // New by-id alias keyed on the identifier was written.
+    assert.ok(writtenPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-1')));
+    // by-uuid alias was rewritten with the new payload.
+    assert.ok(writtenPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-abc')));
+    // New canonical path lives under the identifier slug.
+    assert.ok(writtenPaths.includes(linearIssuePath('issue-abc', 'AGE-1')));
+    assert.deepEqual(result.errors, []);
+  });
+
+  it('tombstone with UUID-only payload deletes canonical + every alias + index row (Devin src:300)', async () => {
+    // Seed a prior write where the issue had a full identifier-bearing
+    // state. The by-uuid alias is the only stable anchor — the by-id
+    // alias is keyed on the identifier (AGE-8), not the UUID.
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'issue',
+      objectId: 'issue-xyz',
+      payload: {
+        id: 'issue-xyz',
+        identifier: 'AGE-8',
+        title: 'Release Plan',
+        state: { name: 'In Progress' },
+      },
+    };
+    const priorIndex = [
+      {
+        id: 'issue-xyz',
+        title: 'Release Plan',
+        updated: '2026-05-12T00:00:00Z',
+        identifier: 'AGE-8',
+        state: 'In Progress',
+      },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-xyz')]: JSON.stringify(priorPayload),
+        [linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')]: JSON.stringify(priorPayload),
+        [linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-xyz')]:
+          JSON.stringify(priorPayload),
+        [linearIssueByStatePath('In Progress', 'AGE-8')]: JSON.stringify(priorPayload),
+        [linearIssuePath('issue-xyz', 'AGE-8')]: JSON.stringify(priorPayload),
+        [linearIssuesIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    // Bare tombstone — only the UUID is present, no identifier/title/state.
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ id: 'issue-xyz', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    // All four prior paths must be cleaned up — this is the assertion
+    // that fails on main today because planIssueDelete reads by-id keyed
+    // on the UUID, never finds prior state, and skips computing the
+    // identifier-keyed alias paths.
+    const expected = [
+      linearIssuePath('issue-xyz', 'AGE-8'),
+      linearByUuidAliasPath(ISSUES_SCOPE, 'issue-xyz'),
+      linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
+      linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-xyz'),
+      linearIssueByStatePath('In Progress', 'AGE-8'),
+    ];
+    for (const path of expected) {
+      assert.ok(
+        deletedPaths.has(path),
+        `tombstone failed to clean up ${path} (Devin regression)`,
+      );
+    }
+
+    // Index row was pruned.
+    const indexWrite = client.writes.find((w) => w.path === linearIssuesIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(writtenRows.map((r) => r.id), []);
+    assert.equal(result.deleted, expected.length);
+  });
+
+  it('round-trip: write issue, then re-emit same UUID — prior state resolved via by-uuid anchor', async () => {
+    const client = createClient();
+
+    // First emit: seeds the by-uuid alias.
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-rt',
+          identifier: 'AGE-42',
+          title: 'Original Title',
+          state: { id: 's', name: 'Todo' },
+        },
+      ],
+    });
+
+    // Capture the by-uuid alias contents.
+    const anchorBytes = client.files.get(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-rt'));
+    assert.ok(anchorBytes, 'by-uuid alias must be present after first emit');
+    const anchorParsed = JSON.parse(anchorBytes!) as {
+      payload: { id: string; identifier: string; title: string };
+    };
+    assert.equal(anchorParsed.payload.id, 'issue-rt');
+    assert.equal(anchorParsed.payload.identifier, 'AGE-42');
+    assert.equal(anchorParsed.payload.title, 'Original Title');
+
+    // Clear capture between emits to isolate the diff.
+    client.writes.length = 0;
+    client.deletes.length = 0;
+    client.reads.length = 0;
+
+    // Second emit: rename the title. Prior state must come from by-uuid.
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-rt',
+          identifier: 'AGE-42',
+          title: 'Renamed Title',
+          state: { id: 's', name: 'Todo' },
+        },
+      ],
+    });
+
+    // The prior-state lookup hit the by-uuid path (not by-id, not the
+    // canonical path).
+    const readPaths = client.reads.map((r) => r.path);
+    assert.ok(
+      readPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-rt')),
+      `expected by-uuid anchor read, got: ${readPaths.join(', ')}`,
+    );
+
+    // Stale by-title alias was diffed away.
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(
+      deletedPaths.includes(linearByTitleAliasPath(ISSUES_SCOPE, 'Original Title', 'issue-rt')),
+      `expected stale by-title in deletes, got: ${deletedPaths.join(', ')}`,
+    );
+    assert.ok(!deletedPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-rt')));
+    assert.ok(!deletedPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-42')));
+  });
+
+  it('does not emit by-id alias when issue has no identifier (anchor is by-uuid only)', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-no-ident',
+          title: 'Pending Issue',
+          state: { id: 's', name: 'Todo' },
+        },
+      ],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    // by-uuid alias is always emitted.
+    assert.ok(writtenPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-no-ident')));
+    // by-id alias must NOT be emitted under the UUID — that subtree is
+    // reserved for human-readable identifiers (e.g. `AGE-8`).
+    assert.ok(!writtenPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'issue-no-ident')));
+    assert.ok(!writtenPaths.some((p) => p.startsWith(`${ISSUES_SCOPE}/by-id/`)));
+    // by-state alias also needs identifier — must not be emitted.
+    assert.ok(!writtenPaths.some((p) => p.startsWith(`${ISSUES_SCOPE}/by-state/`)));
   });
 });

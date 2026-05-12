@@ -11,10 +11,11 @@
  * Per-resource emission:
  *
  *   * **issue** — canonical `/linear/issues/<identifier-or-title-slug>__<id>.json`,
- *     plus by-id alias keyed on the Linear `TEAM-123` identifier (or the
- *     UUID when the identifier is missing), by-title alias when the title
- *     slugs to non-empty, and by-state alias when both `state.name` and
- *     `identifier` are present. Index row carries
+ *     plus a by-uuid alias keyed on the Linear UUID (always emitted — the
+ *     stable reconciliation anchor), a by-id alias keyed on the Linear
+ *     `TEAM-123` identifier when present (human-readable lookup), a by-title
+ *     alias when the title slugs to non-empty, and a by-state alias when both
+ *     `state.name` and `identifier` are present. Index row carries
  *     `{ id, title, updated, identifier, state }`.
  *
  *   * **comment** — canonical `/linear/comments/<slug>__<id>.json`, no
@@ -33,18 +34,21 @@
  *   * **cycle**, **milestone**, **roadmap** — canonical paths only. Same
  *     rationale as projects.
  *
- * Reconciliation: every issue/user/team/project write reads the prior
- * by-id alias (issue) or prior index row (others) to recover the previous
- * identifier / title / state, then deletes whichever alias and canonical
- * paths no longer apply. Reads degrade to "no reconciliation" when the
- * client lacks `readFile` — same back-compat we shipped in #78.
+ * Reconciliation: every issue write reads the prior by-uuid alias (the
+ * stable anchor keyed on `issue.id`, always emitted) to recover the
+ * previous identifier / title / state, then deletes whichever alias and
+ * canonical paths no longer apply. User/team writes reconcile against the
+ * prior index row. Reads degrade to "no reconciliation" when the client
+ * lacks `readFile` — same back-compat we shipped in #78.
  *
  * Delete tombstones: `{ id, _deleted: true }`. For issues we read the
- * prior by-id alias to recover the identifier (the alias is keyed on it,
- * so without it we can't compute the alias path). For all resource types,
- * `IndexFileReconciler.remove(id)` is called on the delete branch so
- * `_index.json` doesn't accumulate ghost rows (the Devin regression on
- * #78 — see `packages/confluence/src/emit-auxiliary-files.ts`).
+ * prior by-uuid alias to recover the identifier, title, and state — the
+ * UUID is always present on a tombstone (it's the only field), so the
+ * lookup key is guaranteed even when the original write predated the
+ * identifier. For all resource types, `IndexFileReconciler.remove(id)` is
+ * called on the delete branch so `_index.json` doesn't accumulate ghost
+ * rows (the Devin regression on #78 — see
+ * `packages/confluence/src/emit-auxiliary-files.ts`).
  */
 
 import {
@@ -64,6 +68,7 @@ import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
   linearByTitleAliasPath,
+  linearByUuidAliasPath,
   linearCommentPath,
   linearCommentsIndexPath,
   linearCyclePath,
@@ -244,27 +249,28 @@ async function planIssueWrite(
   const content = renderContent('issue', issue, connectionId, false);
   const newPaths = issuePathsFor({ id, identifier, title, stateName });
 
-  // Reconciliation: the by-id alias is keyed on the public identifier (or
-  // UUID fallback). Probe both candidates so a rename from identifier-less
-  // to identifier-bearing recovers the prior state.
-  let prior: PriorIssueState | null = null;
-  const candidates = uniqueStrings([identifier, id]);
-  for (const candidate of candidates) {
-    const result = await priorReader.read<PriorIssueState>(
-      linearByIdAliasPath(ISSUES_SCOPE, candidate),
-      extractPriorIssueState,
-    );
-    if (result) {
-      prior = result;
-      break;
-    }
-  }
+  // Reconciliation: the by-uuid alias is the stable anchor — it's always
+  // emitted (keyed on the UUID, which is always present) so a prior write
+  // is guaranteed to have produced it. This resolves the
+  // identifier-transition gap CodeRabbit caught: an issue going from
+  // identifier-less to identifier-bearing previously left a stale
+  // UUID-keyed by-id alias behind because the fallback in this lookup
+  // recomputed the new identifier-keyed path.
+  const prior = await priorReader.read<PriorIssueState>(
+    linearByUuidAliasPath(ISSUES_SCOPE, id),
+    extractPriorIssueState,
+  );
 
   const stalePaths = prior
     ? diffPaths(
         issuePathsFor({
           id,
-          identifier: prior.identifier ?? identifier,
+          // IMPORTANT: do NOT fall back to the current identifier here. If
+          // the prior payload had no identifier, the prior by-id alias was
+          // never written (we only emit by-id when identifier is present),
+          // so there's nothing stale to clean up on that path. Passing the
+          // current identifier would synthesize a phantom prior path.
+          identifier: prior.identifier,
           title: prior.title,
           stateName: prior.stateName,
         }),
@@ -289,31 +295,24 @@ async function planIssueDelete(
   priorReader: PriorAliasReader,
   indexReconciler: IndexFileReconciler<LinearIssueIndexRow>,
 ): Promise<EmitPlan> {
-  // We don't know the identifier on a bare tombstone — try the UUID anchor
-  // first (it's always present as fallback). If a prior write seeded the
-  // by-id alias under the public identifier we still recover it from the
-  // payload.
+  // Bare tombstones carry only the UUID, so we read the by-uuid alias —
+  // the stable anchor keyed on `issue.id`, always written alongside every
+  // prior issue emit. This is the fix for the Devin finding: the previous
+  // implementation read `linearByIdAliasPath(scope, id)` (UUID), but
+  // `issuePathsFor` writes by-id keyed on the identifier (e.g. AGE-8),
+  // not the UUID, so the lookup never matched and no alias paths got
+  // computed → none of the 4 stale files got deleted on tombstone.
   const prior =
     (await priorReader.read<PriorIssueState>(
-      linearByIdAliasPath(ISSUES_SCOPE, id),
+      linearByUuidAliasPath(ISSUES_SCOPE, id),
       extractPriorIssueState,
     )) ?? null;
 
-  let resolvedPrior = prior;
-  if (!resolvedPrior) {
-    // Best-effort: walk the index for the id → identifier mapping. The
-    // IndexFileReconciler doesn't expose existing rows, so we skip this
-    // for now — the prior by-id alias is the authoritative anchor. Deletes
-    // without a prior alias degrade to "no reconciliation possible", which
-    // matches the confluence port's behavior. The index row is still
-    // removed below.
-  }
-
   const paths = issuePathsFor({
     id,
-    identifier: resolvedPrior?.identifier,
-    title: resolvedPrior?.title,
-    stateName: resolvedPrior?.stateName,
+    identifier: prior?.identifier,
+    title: prior?.title,
+    stateName: prior?.stateName,
   });
   // See planPageDelete in the confluence port — index row must drop too.
   indexReconciler.remove(id);
@@ -356,8 +355,18 @@ function issuePathsFor(args: {
   const paths: string[] = [];
   // Canonical path.
   paths.push(linearIssuePath(id, humanReadable));
-  // by-id alias — anchor on identifier when present, falling back to UUID.
-  paths.push(linearByIdAliasPath(ISSUES_SCOPE, identifier ?? id));
+  // by-uuid alias — the stable reconciliation anchor, always emitted.
+  // Keyed on the Linear UUID (`issue.id`), which is always present even on
+  // bare delete tombstones. Subsequent emits read prior state from this
+  // path to discover the previous identifier/title/state.
+  paths.push(linearByUuidAliasPath(ISSUES_SCOPE, id));
+  // by-id alias — human-readable lookup keyed on the Linear identifier
+  // (e.g. `TEAM-123`). Only emitted when the identifier is present, so we
+  // don't pollute `/linear/issues/by-id/` with UUID-keyed entries that
+  // duplicate the by-uuid subtree.
+  if (identifier) {
+    paths.push(linearByIdAliasPath(ISSUES_SCOPE, identifier));
+  }
   // by-title alias — skip when title slugs to empty (`slugifyAlias` returns
   // the literal `'untitled'` sentinel in that case).
   if (title && slugifies(title)) {
@@ -690,19 +699,6 @@ function readNonEmptyString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function uniqueStrings(values: ReadonlyArray<string | undefined>): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const value of values) {
-    if (typeof value !== 'string') continue;
-    const trimmed = value.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    out.push(trimmed);
-  }
-  return out;
 }
 
 /**
