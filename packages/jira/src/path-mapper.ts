@@ -46,12 +46,16 @@ function slugify(value: string): string {
 
 function titleSegmentWithId(title: string | undefined, id: string): string {
   const slug = title ? slugify(title) : '';
-  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "--"
-  // separator between slug and ID is the disambiguator, and slugs never
-  // contain "--" because slugify collapses any non-alphanumeric run into a
-  // single "-". So extractJiraIdFromPathSegment can recover the ID
-  // verbatim by capturing everything after the last "--".
-  return slug ? `${slug}--${id}` : encodeJiraPathSegment(id);
+  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "__"
+  // separator between slug and ID is the disambiguator. Slugs never contain
+  // "__" because slugify collapses any non-alphanumeric run into a single
+  // "-" (so "_" and runs of "_" never make it through). That guarantees
+  // extractJiraIdFromPathSegment can recover the ID verbatim by capturing
+  // everything after the last "__". This matches the cross-adapter
+  // `<slug>__<id>` convention used by github, linear, notion, and
+  // confluence. The legacy "--" joiner remains readable by the parser so
+  // mounts written before this migration keep resolving.
+  return slug ? `${slug}__${id}` : encodeJiraPathSegment(id);
 }
 
 export function normalizeJiraObjectType(objectType: string): JiraPathObjectType {
@@ -114,8 +118,19 @@ export function computeJiraPath(objectType: string, objectId: string, title?: st
   }
 }
 
+/**
+ * Decode a Jira path segment back to its raw identifier. Supports both the
+ * current `<slug>__<id>` convention and the legacy `<slug>--<id>` joiner so
+ * mounts written before the cross-adapter convention migration keep
+ * resolving. Mirrors `extractConfluenceIdFromPathSegment` in
+ * `@relayfile/adapter-confluence`.
+ */
 export function extractJiraIdFromPathSegment(segment: string): string {
   const decoded = decodeURIComponent(segment);
-  const suffix = /--([^/]+)$/u.exec(decoded);
-  return suffix?.[1] ? suffix[1] : decoded;
+  const currentMatch = /__([^/]+)$/u.exec(decoded);
+  if (currentMatch?.[1]) {
+    return currentMatch[1];
+  }
+  const legacyMatch = /--([^/]+)$/u.exec(decoded);
+  return legacyMatch?.[1] ? legacyMatch[1] : decoded;
 }

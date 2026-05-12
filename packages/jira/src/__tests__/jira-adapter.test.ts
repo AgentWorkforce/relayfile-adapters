@@ -8,7 +8,12 @@ import {
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../jira-adapter.js';
-import { computeJiraPath, jiraIssuePath, jiraProjectPath } from '../path-mapper.js';
+import {
+  computeJiraPath,
+  extractJiraIdFromPathSegment,
+  jiraIssuePath,
+  jiraProjectPath,
+} from '../path-mapper.js';
 import { ReadOnlyFieldError, resolveJiraDeleteRequest, resolveJiraWritebackRequest } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
@@ -66,7 +71,7 @@ describe('JiraAdapter', () => {
     });
 
     assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/jira/issues/fix-login-redirect--10001.json');
+    assert.equal(client.writes[0]?.path, '/jira/issues/fix-login-redirect__10001.json');
     assert.equal(client.writes[0]?.semantics?.properties?.['jira.summary'], 'Fix login redirect');
     assert.deepEqual(client.writes[0]?.semantics?.relations, [jiraProjectPath('ENG', 'Engineering')]);
   });
@@ -86,7 +91,7 @@ describe('JiraAdapter', () => {
     });
 
     assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/jira/projects/engineering-platform--10000.json');
+    assert.equal(client.writes[0]?.path, '/jira/projects/engineering-platform__10000.json');
     assert.equal(client.writes[0]?.semantics?.properties?.['jira.project_key'], 'ENG');
   });
 
@@ -105,7 +110,7 @@ describe('JiraAdapter', () => {
     });
 
     assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/jira/sprints/sprint-77--77.json');
+    assert.equal(client.writes[0]?.path, '/jira/sprints/sprint-77__77.json');
     assert.equal(client.writes[0]?.semantics?.properties?.['jira.state'], 'active');
   });
 
@@ -236,9 +241,9 @@ describe('JiraAdapter', () => {
   });
 
   it('computes deterministic path mappings for all primary object types', () => {
-    assert.equal(computeJiraPath('issue', 'ENG-42', 'Fix login redirect'), '/jira/issues/fix-login-redirect--ENG-42.json');
-    assert.equal(computeJiraPath('project', 'ENG', 'Engineering Platform'), '/jira/projects/engineering-platform--ENG.json');
-    assert.equal(computeJiraPath('sprint', '77', 'Sprint 77'), '/jira/sprints/sprint-77--77.json');
+    assert.equal(computeJiraPath('issue', 'ENG-42', 'Fix login redirect'), '/jira/issues/fix-login-redirect__ENG-42.json');
+    assert.equal(computeJiraPath('project', 'ENG', 'Engineering Platform'), '/jira/projects/engineering-platform__ENG.json');
+    assert.equal(computeJiraPath('sprint', '77', 'Sprint 77'), '/jira/sprints/sprint-77__77.json');
     // Flat form is the no-issue-context fallback (still emitted by paths
     // generated without the parent issue ref); nested form is preferred.
     assert.equal(computeJiraPath('comment', '9001'), '/jira/comments/9001.json');
@@ -287,7 +292,7 @@ describe('JiraAdapter', () => {
     // short uppercase keys are canonical only inside the slug-prefixed form.
     assert.deepEqual(
       resolveJiraWritebackRequest(
-        '/jira/projects/engineering-platform--ENG.json',
+        '/jira/projects/engineering-platform__ENG.json',
         JSON.stringify({ name: 'Engineering Platform' }),
       ),
       {
@@ -308,6 +313,57 @@ describe('JiraAdapter', () => {
     );
   });
 
+  it('reader keeps resolving the legacy <slug>--<id> joiner for back-compat', () => {
+    // Mounts written before the cross-adapter `__` convention migration
+    // still contain `<slug>--<id>.json` files. The reader must continue to
+    // recognize them so existing data stays addressable until a re-sync.
+    assert.deepEqual(
+      resolveJiraWritebackRequest(
+        '/jira/projects/engineering-platform--ENG.json',
+        JSON.stringify({ name: 'Engineering Platform' }),
+      ),
+      {
+        action: 'update_project',
+        method: 'PUT',
+        endpoint: '/rest/api/3/project/ENG',
+        body: { name: 'Engineering Platform' },
+      },
+    );
+    assert.deepEqual(
+      resolveJiraWritebackRequest(
+        '/jira/issues/fix-login-redirect--ENG-42.json',
+        JSON.stringify({ fields: { summary: 'Renamed' } }),
+      ),
+      {
+        action: 'update_issue',
+        method: 'PUT',
+        endpoint: '/rest/api/3/issue/ENG-42',
+        body: { fields: { summary: 'Renamed' } },
+      },
+    );
+    assert.deepEqual(
+      resolveJiraDeleteRequest('/jira/issues/fix-login-redirect--ENG-42.json'),
+      {
+        action: 'delete_issue',
+        method: 'DELETE',
+        endpoint: '/rest/api/3/issue/ENG-42',
+      },
+    );
+  });
+
+  it('extractJiraIdFromPathSegment round-trips both joiners', () => {
+    // Direct unit check that the segment parser recognizes both forms,
+    // mirroring extractConfluenceIdFromPathSegment's double-dispatch.
+    assert.equal(extractJiraIdFromPathSegment('fix-login-redirect__ENG-42'), 'ENG-42');
+    assert.equal(extractJiraIdFromPathSegment('fix-login-redirect--ENG-42'), 'ENG-42');
+    assert.equal(extractJiraIdFromPathSegment('engineering-platform__ENG'), 'ENG');
+    assert.equal(extractJiraIdFromPathSegment('engineering-platform--ENG'), 'ENG');
+    assert.equal(extractJiraIdFromPathSegment('sprint-77__77'), '77');
+    assert.equal(extractJiraIdFromPathSegment('sprint-77--77'), '77');
+    // A segment with neither joiner returns the bare decoded segment.
+    assert.equal(extractJiraIdFromPathSegment('ENG-42'), 'ENG-42');
+  });
+
   it('deletes files for deleted events when deleteFile is available', async () => {
     const client = createClient();
     const adapter = createAdapter(client);
@@ -325,6 +381,6 @@ describe('JiraAdapter', () => {
     });
 
     assert.equal(result.filesDeleted, 1);
-    assert.equal(client.deletes[0]?.path, '/jira/issues/fix-login-redirect--10001.json');
+    assert.equal(client.deletes[0]?.path, '/jira/issues/fix-login-redirect__10001.json');
   });
 });

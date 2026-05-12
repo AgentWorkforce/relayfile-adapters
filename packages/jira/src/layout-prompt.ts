@@ -1,6 +1,6 @@
 export const JIRA_LAYOUT_PROMPT = `# Jira Mount Layout
 
-Always run \`ls\` before constructing a path. The current jira adapter writes human-readable leaf names as \`<slug>--<id>.json\` (double hyphen) — this is PRE-MIGRATION. A follow-up convention-unification PR will switch this adapter to the cross-adapter \`<slug>__<id>\` (double underscore) joiner so it matches \`github\`, \`linear\`, \`notion\`, and \`confluence\`. Until then, inspect the live directory rather than guessing a filename, and use the \`by-id\` and \`by-key\` alias subtrees when you have a stable identifier.
+Always run \`ls\` before constructing a path. The jira adapter writes human-readable leaf names as \`<slug>__<id>.json\` (double underscore), matching the cross-adapter convention shared with \`github\`, \`linear\`, \`notion\`, and \`confluence\`. Mounts written before the convention migration used \`<slug>--<id>\` (double hyphen); the reader still recognizes that legacy form so older records remain addressable. Inspect the live directory rather than guessing a filename, and use the \`by-id\` and \`by-key\` alias subtrees when you have a stable identifier.
 
 ## Tree
 
@@ -28,7 +28,7 @@ Indexes are sorted by \`updated\` descending so the newest records are first.
 
 Issues are addressable through parallel paths that all resolve to the same canonical record:
 
-- Canonical: \`/jira/issues/<slug>--<id>.json\` (\`__\` after the migration PR).
+- Canonical: \`/jira/issues/<slug>__<id>.json\` (legacy \`--\` joiner still readable).
 - By id: \`/jira/issues/by-id/<id>.json\` — stable when the summary changes.
 - By key: \`/jira/issues/by-key/<TEAM-123>.json\` — Jira's natural human-readable key.
 - By state: \`/jira/issues/by-state/<status>/<id>.json\` — \`to-do\`, \`in-progress\`, \`done\`, etc.
