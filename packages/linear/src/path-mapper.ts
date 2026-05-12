@@ -246,6 +246,10 @@ export function linearIssuesIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/issues/_index.json`;
 }
 
+export function linearRootIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/_index.json`;
+}
+
 export function linearIssueByStatePath(stateName: string, identifier: string): string {
   return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
 }

@@ -1,6 +1,7 @@
 import {
   linearCommentsIndexPath,
   linearIssuesIndexPath,
+  linearRootIndexPath,
   linearTeamsIndexPath,
   linearUsersIndexPath,
 } from './path-mapper.js';
@@ -12,6 +13,35 @@ export interface LinearIndexFile {
   path: string;
   contentType: 'application/json; charset=utf-8';
   content: string;
+}
+
+export interface LinearRootIndexRow {
+  id: string;
+  title: string;
+}
+
+/**
+ * Build `/linear/_index.json` — a static listing of top-level resource
+ * roots the Linear adapter exposes. Mirrors the slack pattern so an agent
+ * can `ls /linear/` and discover the available buckets.
+ */
+export function buildLinearRootIndexFile(
+  rows: LinearRootIndexRow[] = [
+    { id: 'issues', title: 'Issues' },
+    { id: 'comments', title: 'Comments' },
+    { id: 'teams', title: 'Teams' },
+    { id: 'users', title: 'Users' },
+    { id: 'projects', title: 'Projects' },
+    { id: 'cycles', title: 'Cycles' },
+    { id: 'milestones', title: 'Milestones' },
+    { id: 'roadmaps', title: 'Roadmaps' },
+  ],
+): LinearIndexFile {
+  return {
+    path: linearRootIndexPath(),
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(rows)}\n`,
+  };
 }
 
 export function buildLinearIndexFile(
