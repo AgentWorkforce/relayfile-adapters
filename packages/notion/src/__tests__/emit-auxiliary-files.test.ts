@@ -602,6 +602,74 @@ describe('emitNotionAuxiliaryFiles', () => {
     assert.ok(writtenPaths.has(aliasB));
   });
 
+  it('keeps distinct by-database paths for same-title pages in the same database (different UUIDs)', async () => {
+    // AGENTS.md: every alias subtree needs a collision test. by-title
+    // and by-name are covered above; by-database is the last
+    // page-side subtree that lacked one. Two pages sharing both
+    // database AND title must still produce distinct alias paths via
+    // `aliasShortId` keyed on the page UUID. Fresh inline UUIDs so the
+    // trailing 8 hex differ — the module-scope constants would alias to
+    // the same short_id.
+    const pageAlpha = '11111111-1111-1111-1111-aaaaaaaaaaaa';
+    const pageBeta = '22222222-2222-2222-2222-bbbbbbbbbbbb';
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pages: [
+        {
+          id: pageAlpha,
+          title: 'Release Plan',
+          parent: { type: 'database_id', database_id: DATABASE_A } as const,
+          databaseTitle: 'Tasks',
+        },
+        {
+          id: pageBeta,
+          title: 'Release Plan',
+          parent: { type: 'database_id', database_id: DATABASE_A } as const,
+          databaseTitle: 'Tasks',
+        },
+      ],
+    });
+
+    const writtenPaths = new Set(client.writes.map((w) => w.path));
+    const aliasA = notionPageByDatabaseAliasPath(DATABASE_A, pageAlpha, 'Tasks', 'Release Plan');
+    const aliasB = notionPageByDatabaseAliasPath(DATABASE_A, pageBeta, 'Tasks', 'Release Plan');
+    assert.notEqual(aliasA, aliasB);
+    assert.ok(writtenPaths.has(aliasA));
+    assert.ok(writtenPaths.has(aliasB));
+  });
+
+  it('keeps distinct by-parent paths for same-title pages under the same page-parent (different UUIDs)', async () => {
+    // Final alias-subtree collision case. Two pages under the same
+    // page parent with the same title must produce distinct by-parent
+    // alias paths via `aliasShortId` keyed on the child page UUID.
+    const pageAlpha = '33333333-1111-1111-1111-cccccccccccc';
+    const pageBeta = '44444444-2222-2222-2222-dddddddddddd';
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pages: [
+        {
+          id: pageAlpha,
+          title: 'Sub Page',
+          parent: { type: 'page_id', page_id: PARENT_PAGE_A } as const,
+        },
+        {
+          id: pageBeta,
+          title: 'Sub Page',
+          parent: { type: 'page_id', page_id: PARENT_PAGE_A } as const,
+        },
+      ],
+    });
+
+    const writtenPaths = new Set(client.writes.map((w) => w.path));
+    const aliasA = notionPageByParentAliasPath('page', PARENT_PAGE_A, pageAlpha, undefined, 'Sub Page');
+    const aliasB = notionPageByParentAliasPath('page', PARENT_PAGE_A, pageBeta, undefined, 'Sub Page');
+    assert.notEqual(aliasA, aliasB);
+    assert.ok(writtenPaths.has(aliasA));
+    assert.ok(writtenPaths.has(aliasB));
+  });
+
   it('does NOT emit a by-parent alias for database-rooted pages', async () => {
     // Regression for CodeRabbit src:505: the prior `parentType !== 'workspace'`
     // guard let database-rooted pages slip into `/notion/pages/by-parent/`,
