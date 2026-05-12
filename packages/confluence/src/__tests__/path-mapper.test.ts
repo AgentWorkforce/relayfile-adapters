@@ -148,6 +148,10 @@ describe('confluence path-mapper', () => {
       const aliasPath = confluencePageBySpaceAliasPath('12345', '98765');
       const leaf = aliasPath.split('/').pop()!.replace(/\.json$/u, '');
       assert.equal(extractConfluenceIdFromPathSegment(leaf), '98765');
+
+      const parentAliasPath = confluencePageByParentAliasPath('44444', '98765');
+      const parentLeaf = parentAliasPath.split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(extractConfluenceIdFromPathSegment(parentLeaf), '98765');
     });
   });
 
