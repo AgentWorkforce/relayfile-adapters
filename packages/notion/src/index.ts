@@ -1,4 +1,5 @@
 export * from './adapter.js';
+export * from './alias-slug.js';
 export * from './bulk-ingest.js';
 export * from './client.js';
 export * from './comments/ingestion.js';
