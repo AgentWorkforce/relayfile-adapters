@@ -18,6 +18,7 @@ export {
   IntegrationAdapter,
   SlackAdapter,
 } from './slack-adapter.js';
+export * from './summary.js';
 
 export {
   SLACK_REQUEST_TIMESTAMP_HEADER,

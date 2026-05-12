@@ -3,6 +3,7 @@ export * from './linear-adapter.js';
 export * from './index-emitter.js';
 export * from './layout-prompt.js';
 export * from './path-mapper.js';
+export * from './summary.js';
 export * from './webhook-normalizer.js';
 export * from './types.js';
 export * from './queries.js';

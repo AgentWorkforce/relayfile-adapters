@@ -1,3 +1,5 @@
+import type { EventSummary as SharedEventSummary } from '@agent-relay/events';
+
 export const AIRTABLE_WEBHOOK_OBJECT_TYPES = [
   'record',
   'table',
@@ -113,6 +115,61 @@ export type AirtableWebhookPayload =
   | AirtableRecordWebhookPayload
   | AirtableTableWebhookPayload
   | AirtableWebhookBase<Record<string, unknown>>;
+
+export interface AirtableEventActorSummary {
+  id: string;
+  displayName?: string;
+}
+
+export type AirtableEventSummary = SharedEventSummary;
+
+export interface AirtableNotificationChange {
+  fieldId?: string;
+  recordId?: string;
+  tableId?: string;
+  type?: string;
+}
+
+export interface AirtableWebhookNotification {
+  baseId: string;
+  kind?: string;
+  webhookId: string;
+  timestamp: string;
+  notificationId?: string;
+  changedFieldIds?: string[];
+  changes?: AirtableNotificationChange[];
+  connectionId?: string;
+  cursor?: number;
+  path?: string;
+  payload?: Record<string, unknown>;
+  payloadFormat?: string;
+  provider?: string;
+  providerConfigKey?: string;
+}
+
+export interface AirtableWebhookPayloadPage {
+  cursor?: number;
+  mightHaveMore?: boolean;
+  payloadFormat?: string;
+  payloads: Record<string, unknown>[];
+}
+
+export interface AirtableMaterializedChangePayload extends AirtableWebhookPayloadPage {
+  baseId: string;
+  digest: string;
+  webhookId: string;
+  notificationId: string;
+  endpoint: string;
+  path: string;
+  data: Record<string, unknown>;
+}
+
+export interface AirtableFetchOnDemandOptions
+  extends Pick<AirtableAdapterConfig, 'apiUrl' | 'connectionId' | 'providerConfigKey'> {
+  cursor?: number;
+  defaultBaseId?: string;
+  query?: Record<string, string>;
+}
 
 export interface AirtableReadRequest {
   action: 'get_base' | 'get_record' | 'get_table_records';

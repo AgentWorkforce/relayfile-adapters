@@ -6,7 +6,9 @@ import {
   AIRTABLE_CONTENT_MAC_HEADER,
   AIRTABLE_TIMESTAMP_HEADER,
   assertValidAirtableWebhookSignature,
+  buildSummary,
   computeAirtableWebhookSignature,
+  normalizeAirtableNotification,
   normalizeAirtableWebhook,
   validateAirtableWebhookSignature,
   validateAirtableWebhookTimestamp,
@@ -131,4 +133,57 @@ test('rejects expired timestamp when timestamp freshness is required', () => {
 
   assert.equal(stale.ok, false);
   assert.equal(stale.reason, 'stale-timestamp');
+});
+
+test('normalizeAirtableNotification keeps the receive path shallow and derives a routing summary', () => {
+  const notification = normalizeAirtableNotification({
+    actionMetadata: {
+      sourceMetadata: {
+        user: {
+          id: 'usr_1',
+          name: 'Ada Lovelace',
+        },
+      },
+    },
+    baseId: 'app_base',
+    changedTablesById: {
+      tbl_tasks: {
+        changedFieldIds: ['fld_status'],
+        changedRecordsById: {
+          rec_1: {
+            current: {
+              cellValuesByFieldId: {
+                fld_name: 'Ship Airtable adapter',
+                fld_status: 'Done',
+              },
+            },
+          },
+        },
+      },
+    },
+    timestamp: '2026-05-12T01:00:00.000Z',
+    webhookId: 'ach_1',
+  }, {}, {
+    nowMs: Date.parse('2026-05-12T01:00:00.000Z'),
+  });
+
+  assert.equal(notification.baseId, 'app_base');
+  assert.equal(notification.kind, 'airtable.notification');
+  assert.equal(notification.webhookId, 'ach_1');
+  assert.equal(notification.path, '/airtable/bases/app_base/_notifications/ach_1.json');
+  assert.deepEqual(notification.changedFieldIds, ['fld_status', 'fld_name']);
+  assert.deepEqual(notification.changes, [
+    { fieldId: 'fld_name', recordId: 'rec_1', tableId: 'tbl_tasks', type: 'update' },
+    { fieldId: 'fld_status', recordId: 'rec_1', tableId: 'tbl_tasks', type: 'update' },
+  ]);
+
+  assert.deepEqual(buildSummary(notification), {
+    actor: {
+      displayName: 'Ada Lovelace',
+      id: 'usr_1',
+    },
+    fieldsChanged: ['fld_status', 'fld_name'],
+    tags: ['airtable', 'notification', 'webhook:ach_1', 'table:tbl_tasks'],
+    title: 'Ship Airtable adapter',
+  });
 });

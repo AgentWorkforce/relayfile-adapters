@@ -1,7 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import type { NormalizedWebhook } from './airtable-adapter.js';
-import { normalizeAirtableObjectType } from './path-mapper.js';
+import { airtableNotificationPath, normalizeAirtableObjectType } from './path-mapper.js';
+import type {
+  AirtableNotificationChange,
+  AirtableWebhookNotification,
+} from './types.js';
 
 export const AIRTABLE_PROVIDER = 'airtable';
 export const AIRTABLE_CONTENT_MAC_HEADER = 'x-airtable-content-mac';
@@ -73,6 +77,13 @@ export interface NormalizeAirtableWebhookOptions {
   webhookSecret?: string;
 }
 
+export interface NormalizeAirtableNotificationOptions extends NormalizeAirtableWebhookOptions {
+  defaultBaseId?: string;
+  defaultConnectionId?: string;
+  defaultProvider?: string;
+  defaultProviderConfigKey?: string;
+}
+
 export function normalizeAirtableWebhook(
   rawPayload: unknown,
   headers: AirtableWebhookHeaders = {},
@@ -122,6 +133,94 @@ export function normalizeAirtableWebhook(
   }
 
   return normalized;
+}
+
+export function normalizeAirtableNotification(
+  rawPayload: unknown,
+  headers: AirtableWebhookHeaders = {},
+  options: NormalizeAirtableNotificationOptions = {},
+): AirtableWebhookNotification {
+  const normalizedHeaders = normalizeHeaders(headers);
+  if (options.webhookSecret !== undefined) {
+    if (!isRawWebhookBody(rawPayload)) {
+      throw new Error('Airtable webhook signature validation requires the original raw request body.');
+    }
+    assertValidAirtableWebhookSignature(rawPayload, normalizedHeaders, options.webhookSecret);
+  }
+
+  const timestampResult = validateAirtableWebhookTimestamp(
+    rawPayload,
+    normalizedHeaders,
+    options.toleranceMs ?? DEFAULT_WEBHOOK_TOLERANCE_MS,
+    options.nowMs,
+    options.requireTimestamp ?? true,
+  );
+  if (!timestampResult.ok || timestampResult.webhookTimestamp === undefined) {
+    throw new Error(`Invalid Airtable webhook timestamp: ${timestampResult.reason ?? 'missing-timestamp'}`);
+  }
+
+  const payload = parseAirtableWebhookPayload(rawPayload);
+  const metadata = getRecord(payload.metadata);
+  const webhook = getRecord(payload.webhook);
+  const connection = extractAirtableConnectionMetadata(payload, normalizedHeaders);
+
+  const baseId =
+    readOptionalString(payload.baseId) ??
+    readOptionalString(payload.base_id) ??
+    readOptionalString(getRecord(payload.base)?.id) ??
+    readOptionalString(metadata?.baseId) ??
+    readOptionalString(metadata?.base_id) ??
+    options.defaultBaseId;
+  if (!baseId) {
+    throw new Error('Airtable notification payload is missing a base id.');
+  }
+
+  const webhookId =
+    readOptionalString(payload.webhookId) ??
+    readOptionalString(payload.webhook_id) ??
+    readOptionalString(webhook?.id) ??
+    readOptionalString(metadata?.webhookId) ??
+    readOptionalString(metadata?.webhook_id) ??
+    readOptionalString(getRecord(payload._webhook)?.webhookId) ??
+    readOptionalString(getRecord(payload._webhook)?.webhook_id) ??
+    readOptionalString(payload.id);
+  if (!webhookId) {
+    throw new Error('Airtable notification payload is missing a webhook id.');
+  }
+
+  const notificationId =
+    readOptionalString(payload.notificationId) ??
+    readOptionalString(payload.notification_id) ??
+    readOptionalString(metadata?.notificationId) ??
+    readOptionalString(metadata?.notification_id) ??
+    readOptionalString(payload.deliveryId) ??
+    readOptionalString(payload.delivery_id) ??
+    readOptionalString(normalizedHeaders[AIRTABLE_DELIVERY_HEADER]);
+  const cursor =
+    readOptionalNumber(payload.cursor) ??
+    readOptionalNumber(metadata?.cursor);
+  const connectionId = connection.connectionId ?? options.defaultConnectionId;
+  const payloadFormat =
+    readOptionalString(payload.payloadFormat) ??
+    readOptionalString(metadata?.payloadFormat);
+  const providerConfigKey = connection.providerConfigKey ?? options.defaultProviderConfigKey;
+
+  return {
+    baseId,
+    changedFieldIds: extractAirtableNotificationChangedFieldIds(payload),
+    changes: extractAirtableNotificationChanges(payload, 50),
+    ...(connectionId ? { connectionId } : {}),
+    ...(cursor !== undefined ? { cursor } : {}),
+    kind: 'airtable.notification',
+    ...(notificationId ? { notificationId } : {}),
+    path: airtableNotificationPath(baseId, webhookId),
+    payload,
+    ...(payloadFormat ? { payloadFormat } : {}),
+    provider: connection.provider ?? options.defaultProvider ?? AIRTABLE_PROVIDER,
+    ...(providerConfigKey ? { providerConfigKey } : {}),
+    timestamp: new Date(timestampResult.webhookTimestamp).toISOString(),
+    webhookId,
+  };
 }
 
 export function parseAirtableWebhookPayload(rawPayload: unknown): AirtableRecord {
@@ -323,6 +422,125 @@ export function extractAirtableObjectId(payload: unknown, objectType?: string): 
   }
 
   return objectId;
+}
+
+export function extractAirtableNotificationChangedFieldIds(payload: unknown): string[] {
+  const record = parseAirtableWebhookPayload(payload);
+  const metadata = getRecord(record.metadata);
+  const changedTablesById = getRecord(record.changedTablesById);
+  const fieldIds = new Set<string>();
+
+  addStringArray(fieldIds, record.changedFieldIds);
+  addStringArray(fieldIds, record.changed_field_ids);
+  addStringArray(fieldIds, metadata?.changedFieldIds);
+  addStringArray(fieldIds, metadata?.changed_field_ids);
+
+  if (changedTablesById) {
+    for (const tableChange of Object.values(changedTablesById)) {
+      const tableRecord = getRecord(tableChange);
+      if (!tableRecord) {
+        continue;
+      }
+
+      addStringArray(fieldIds, tableRecord.changedFieldIds);
+      addStringArray(fieldIds, tableRecord.changed_field_ids);
+
+      const changedRecordsById = getRecord(tableRecord.changedRecordsById);
+      if (!changedRecordsById) {
+        continue;
+      }
+
+      for (const recordChange of Object.values(changedRecordsById)) {
+        const changeRecord = getRecord(recordChange);
+        const currentFields = getRecord(getRecord(changeRecord?.current)?.cellValuesByFieldId);
+        const previousFields = getRecord(getRecord(changeRecord?.previous)?.cellValuesByFieldId);
+
+        if (currentFields) {
+          for (const fieldId of Object.keys(currentFields)) {
+            addStringValue(fieldIds, fieldId);
+          }
+        }
+
+        if (previousFields) {
+          for (const fieldId of Object.keys(previousFields)) {
+            addStringValue(fieldIds, fieldId);
+          }
+        }
+      }
+    }
+  }
+
+  return Array.from(fieldIds);
+}
+
+export function extractAirtableNotificationChanges(
+  payload: unknown,
+  limit = 50,
+): AirtableNotificationChange[] {
+  const record = parseAirtableWebhookPayload(payload);
+  const explicitChanges = asAirtableNotificationChanges(record.changes, limit);
+  if (explicitChanges.length > 0) {
+    return explicitChanges;
+  }
+
+  const changedTablesById = getRecord(record.changedTablesById);
+  if (!changedTablesById) {
+    return [];
+  }
+
+  const changes: AirtableNotificationChange[] = [];
+  for (const [tableId, tableChange] of Object.entries(changedTablesById)) {
+    if (changes.length >= limit) {
+      break;
+    }
+
+    const tableRecord = getRecord(tableChange);
+    if (!tableRecord) {
+      continue;
+    }
+
+    const changedRecordsById = getRecord(tableRecord.changedRecordsById);
+    if (changedRecordsById) {
+      for (const [recordId, recordChange] of Object.entries(changedRecordsById)) {
+        if (changes.length >= limit) {
+          break;
+        }
+
+        const changeRecord = getRecord(recordChange);
+        const fieldIds = new Set<string>();
+        const currentFields = getRecord(getRecord(changeRecord?.current)?.cellValuesByFieldId);
+        const previousFields = getRecord(getRecord(changeRecord?.previous)?.cellValuesByFieldId);
+        if (currentFields) {
+          for (const fieldId of Object.keys(currentFields)) {
+            addStringValue(fieldIds, fieldId);
+          }
+        }
+        if (previousFields) {
+          for (const fieldId of Object.keys(previousFields)) {
+            addStringValue(fieldIds, fieldId);
+          }
+        }
+
+        const type = readOptionalString(changeRecord?.type) ?? 'update';
+        if (fieldIds.size === 0) {
+          changes.push(compactObject({ recordId, tableId, type }) as AirtableNotificationChange);
+          continue;
+        }
+
+        for (const fieldId of fieldIds) {
+          changes.push(compactObject({ fieldId, recordId, tableId, type }) as AirtableNotificationChange);
+          if (changes.length >= limit) {
+            break;
+          }
+        }
+      }
+    }
+
+    addFieldChangesFromArray(changes, tableRecord.createdFieldIds, tableId, 'field.create', limit);
+    addFieldChangesFromArray(changes, tableRecord.destroyedFieldIds, tableId, 'field.delete', limit);
+  }
+
+  return changes.slice(0, limit);
 }
 
 export function computeAirtableWebhookSignature(rawPayload: unknown, secret: string): string {
@@ -630,10 +848,16 @@ function readHeaderValue(headers: Record<string, string>, keys: readonly string[
 
 function readOptionalTimestamp(value: unknown): number | undefined {
   const number = readOptionalNumber(value);
-  if (number === undefined) {
-    return undefined;
+  if (number !== undefined) {
+    return number < 10_000_000_000 ? number * 1000 : number;
   }
-  return number < 10_000_000_000 ? number * 1000 : number;
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
 }
 
 function readOptionalNumber(value: unknown): number | undefined {
@@ -645,6 +869,95 @@ function readOptionalNumber(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function addFieldChangesFromArray(
+  changes: AirtableNotificationChange[],
+  value: unknown,
+  tableId: string,
+  type: string,
+  limit: number,
+): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  for (const entry of value) {
+    const fieldId = readOptionalString(entry);
+    if (!fieldId) {
+      continue;
+    }
+
+    changes.push({ fieldId, tableId, type });
+    if (changes.length >= limit) {
+      return;
+    }
+  }
+}
+
+function addStringArray(target: Set<string>, value: unknown): void {
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  for (const entry of value) {
+    addStringValue(target, entry);
+  }
+}
+
+function addStringValue(target: Set<string>, value: unknown): void {
+  const string = readOptionalString(value);
+  if (string) {
+    target.add(string);
+  }
+}
+
+function asAirtableNotificationChanges(value: unknown, limit: number): AirtableNotificationChange[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const changes: AirtableNotificationChange[] = [];
+  for (const entry of value) {
+    if (changes.length >= limit) {
+      break;
+    }
+
+    const record = getRecord(entry);
+    if (!record) {
+      continue;
+    }
+
+    const tableId =
+      readOptionalString(record.tableId) ??
+      readOptionalString(record.table_id);
+    const recordId =
+      readOptionalString(record.recordId) ??
+      readOptionalString(record.record_id);
+    const type = readOptionalString(record.type);
+    const explicitFieldId =
+      readOptionalString(record.fieldId) ??
+      readOptionalString(record.field_id);
+
+    const fieldIds = new Set<string>();
+    addStringValue(fieldIds, explicitFieldId);
+    addStringArray(fieldIds, record.changedFieldIds);
+    addStringArray(fieldIds, record.changed_field_ids);
+
+    if (fieldIds.size === 0) {
+      changes.push(compactObject({ recordId, tableId, type }) as AirtableNotificationChange);
+      continue;
+    }
+
+    for (const fieldId of fieldIds) {
+      changes.push(compactObject({ fieldId, recordId, tableId, type }) as AirtableNotificationChange);
+      if (changes.length >= limit) {
+        break;
+      }
+    }
+  }
+
+  return changes;
 }
 
 function readOptionalString(value: unknown): string | undefined {

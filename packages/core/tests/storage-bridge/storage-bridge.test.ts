@@ -34,6 +34,7 @@ test("StorageBridgeEvent factory validates and enriches source metadata", () => 
   assert.equal(event.source, "s3");
   assert.equal(event.changeType, "created");
   assert.match(event.eventId, /^s3:/);
+  assert.equal(event.digest, "etag-1");
   assert.deepEqual(event.metadata.source, {
     source: "s3",
     accountId: "aws-prod",
@@ -100,6 +101,12 @@ test("StorageBridgeAdapterWorker fetches content, retries ingest, and emits webh
     changeType: "updated",
     relayfilePath: "/dropbox/acct_1/files/hello.txt",
     resourceId: "/hello.txt",
+    fingerprint: "dropbox-rev-1",
+    summary: {
+      title: "hello.txt",
+      status: "updated",
+      tags: ["dropbox"],
+    },
     workspaceId: "ws_123",
   });
 
@@ -112,10 +119,22 @@ test("StorageBridgeAdapterWorker fetches content, retries ingest, and emits webh
     contentBase64: Buffer.from("hello").toString("base64"),
     contentType: "text/plain",
     sizeBytes: null,
-    fingerprint: null,
+    fingerprint: "dropbox-rev-1",
     resourceId: "/hello.txt",
-    metadata: { provider: "dropbox" },
+    metadata: {
+      digest: "dropbox-rev-1",
+      provider: "dropbox",
+      summary: {
+        title: "hello.txt",
+        status: "updated",
+        tags: ["dropbox"],
+      },
+    },
   });
+  assert.equal(
+    result.envelope?.semantics.properties["storage_bridge.digest"],
+    "dropbox-rev-1",
+  );
 });
 
 test("buildStorageBridgeWebhookEnvelope maps deletes without fetching content", () => {

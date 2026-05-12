@@ -219,6 +219,8 @@ export function buildStorageBridgeWebhookEnvelope(input: {
   const bodyBase64 = body === null ? null : bodyToBuffer(body).toString("base64");
   const metadata = {
     ...event.metadata,
+    ...(event.digest ? { digest: event.digest } : {}),
+    ...(event.summary ? { summary: event.summary as Record<string, JsonValue> } : {}),
     ...(input.content?.metadata ?? {}),
   };
 
@@ -248,6 +250,7 @@ export function buildStorageBridgeWebhookEnvelope(input: {
         "storage_bridge.change_type": event.changeType,
         "storage_bridge.resource_id": event.resourceId,
         "storage_bridge.fingerprint": event.fingerprint,
+        "storage_bridge.digest": event.digest ?? event.fingerprint,
         "storage_bridge.delivery_id": event.eventId,
       },
     },

@@ -7,6 +7,7 @@ export { mapApprovalsToOperation } from './mr/approvals.js';
 export { parseDiffEntries, renderMergeRequestPatch } from './mr/diff-parser.js';
 export { mapDiscussionToOperation, mapDiscussionWebhookToOperation, buildDiscussionCreateBody } from './mr/discussions.js';
 export { ingestMergeRequest } from './mr/ingestion.js';
+export * from './summary.js';
 export {
   computeCommitCommentPath,
   computeGitLabPath,
