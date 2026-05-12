@@ -370,6 +370,10 @@ export function notionUsersIndexPath(): string {
   return `${NOTION_PATH_ROOT}/users/_index.json`;
 }
 
+export function notionRootIndexPath(): string {
+  return `${NOTION_PATH_ROOT}/_index.json`;
+}
+
 export function notionUserPath(userId: string, name?: string): string {
   return `${notionUsersCollectionPath()}/${nameWithId(name, userId)}.json`;
 }

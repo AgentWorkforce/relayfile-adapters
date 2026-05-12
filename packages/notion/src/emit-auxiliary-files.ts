@@ -65,6 +65,7 @@ import {
 } from '@relayfile/adapter-core';
 
 import { slugifyAlias } from './alias-slug.js';
+import { buildNotionRootIndexFile } from './index-emitter.js';
 import {
   notionByIdAliasPath,
   notionByNameAliasPath,
@@ -194,6 +195,11 @@ export async function emitNotionAuxiliaryFiles(
 
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/notion/_index.json` so `ls /notion/` reliably
+  // surfaces the top-level resource buckets, even for empty / single-bucket
+  // batches. Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(client, workspaceId, aggregate);
+
   if (pages.length === 0 && databases.length === 0 && users.length === 0) {
     return aggregate;
   }
@@ -209,6 +215,30 @@ export async function emitNotionAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- root index -------------------------------------------------------------
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildNotionRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- pages ------------------------------------------------------------------
