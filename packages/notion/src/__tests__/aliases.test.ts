@@ -3,14 +3,21 @@ import { describe, it } from 'node:test';
 
 import { slugifyAlias } from '../alias-slug.js';
 import { writeWorkspaceFiles } from '../bulk-ingest.js';
+import { buildIndexFiles } from '../index-emitter.js';
 import { ingestPageArtifacts } from '../pages/ingestion.js';
 import {
   notionByIdAliasPath,
+  notionByNameAliasPath,
   notionByTitleAliasPath,
+  notionDatabaseMetadataPath,
+  notionDatabasesCollectionPath,
   notionDatabasePagesCollectionPath,
+  notionStandalonePagePath,
   notionStandalonePagesCollectionPath,
+  notionUserPath,
+  notionUsersCollectionPath,
 } from '../path-mapper.js';
-import type { NotionPage, NotionRichText } from '../types.js';
+import type { NotionPage, NotionRichText, NotionVfsFile } from '../types.js';
 
 function createRelayClient() {
   const files = new Map<string, { content: string; revision: string }>();
@@ -87,6 +94,19 @@ function createText(content: string): NotionRichText {
       color: 'default',
     },
     href: null,
+  };
+}
+
+function vfsJsonFile(
+  path: string,
+  content: Record<string, unknown>,
+  aliasMetadata?: NotionVfsFile['aliasMetadata'],
+): NotionVfsFile {
+  return {
+    path,
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(content)}\n`,
+    aliasMetadata,
   };
 }
 
@@ -174,6 +194,101 @@ describe('notion aliases', () => {
 
     assert.strictEqual(byId.content, canonical.content);
     assert.strictEqual(byTitle.content, canonical.content);
+  });
+
+  it('preserves generated record indexes when bulk writes also materialize aliases', async () => {
+    const relay = createRelayClient();
+    const databaseId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+    const databaseTitle = 'Engineering Wiki';
+    const pageId = '11111111-2222-3333-4444-555555555555';
+    const pageTitle = 'Launch Checklist';
+    const userId = '99999999-aaaa-bbbb-cccc-dddddddddddd';
+    const userName = 'Alice Chen';
+    const sourceFiles: NotionVfsFile[] = [
+      vfsJsonFile(
+        notionDatabaseMetadataPath(databaseId, databaseTitle),
+        {
+          id: databaseId,
+          title: databaseTitle,
+          lastEditedTime: '2026-05-01T10:00:00.000Z',
+        },
+        {
+          scopePath: notionDatabasesCollectionPath(),
+          id: databaseId,
+          title: databaseTitle,
+          aliasKind: 'database',
+        },
+      ),
+      vfsJsonFile(
+        notionStandalonePagePath(pageId, pageTitle),
+        {
+          id: pageId,
+          title: pageTitle,
+          lastEditedTime: '2026-05-01T09:00:00.000Z',
+          parent: { type: 'workspace', workspace: true },
+        },
+        {
+          scopePath: notionStandalonePagesCollectionPath(),
+          id: pageId,
+          title: pageTitle,
+          aliasKind: 'page',
+        },
+      ),
+      vfsJsonFile(
+        notionUserPath(userId, userName),
+        {
+          id: userId,
+          name: userName,
+          lastEditedTime: '2026-05-01T08:00:00.000Z',
+        },
+        {
+          scopePath: notionUsersCollectionPath(),
+          id: userId,
+          name: userName,
+          aliasKind: 'user',
+        },
+      ),
+    ];
+
+    await writeWorkspaceFiles(relay.client as never, 'ws-notion', [
+      ...sourceFiles,
+      ...buildIndexFiles(sourceFiles),
+    ]);
+
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/databases/_index.json')).content), [
+      {
+        id: databaseId,
+        title: databaseTitle,
+        updated: '2026-05-01T10:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/pages/_index.json')).content), [
+      {
+        id: pageId,
+        title: pageTitle,
+        updated: '2026-05-01T09:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+    assert.deepEqual(JSON.parse((await relay.client.readFile('ws-notion', '/notion/users/_index.json')).content), [
+      {
+        id: userId,
+        title: userName,
+        updated: '2026-05-01T08:00:00.000Z',
+        parent_id: null,
+        parent_type: 'workspace',
+      },
+    ]);
+
+    assert.ok(relay.files.has(notionByIdAliasPath(notionDatabasesCollectionPath(), databaseId)));
+    assert.ok(relay.files.has(notionByTitleAliasPath(notionDatabasesCollectionPath(), databaseTitle, databaseId)));
+    assert.ok(relay.files.has(notionByIdAliasPath(notionStandalonePagesCollectionPath(), pageId)));
+    assert.ok(relay.files.has(notionByTitleAliasPath(notionStandalonePagesCollectionPath(), pageTitle, pageId)));
+    assert.ok(relay.files.has(notionByIdAliasPath(notionUsersCollectionPath(), userId)));
+    assert.ok(relay.files.has(notionByNameAliasPath(notionUsersCollectionPath(), userName, userId)));
   });
 
   it('slugging is deterministic, ASCII-folded, and strips traversal characters', () => {

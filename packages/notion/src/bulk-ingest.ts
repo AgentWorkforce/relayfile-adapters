@@ -49,6 +49,8 @@ export async function writeWorkspaceFiles(
   workspaceId: string,
   files: NotionVfsFile[],
 ): Promise<WriteQueuedResponse[]> {
+  const batchIndexPaths = new Set(files.filter((file) => isIndexPath(file.path)).map((file) => file.path));
+
   return Promise.all(
     files.map(async (file) => {
       const baseRevision = await resolveBaseRevision(relayClient, workspaceId, file.path);
@@ -61,7 +63,7 @@ export async function writeWorkspaceFiles(
         semantics: file.semantics,
       });
       if (file.aliasMetadata) {
-        await writeNotionAliases(relayClient, workspaceId, file);
+        await writeNotionAliases(relayClient, workspaceId, file, batchIndexPaths);
       }
       return response;
     }),
@@ -90,6 +92,7 @@ async function writeNotionAliases(
   relayClient: RelayFileClient,
   workspaceId: string,
   file: NotionVfsFile,
+  batchIndexPaths: ReadonlySet<string>,
 ): Promise<void> {
   // duplicate JSON write — RelayFile exposes file writes, not symlink primitives, so aliases store canonical bytes verbatim.
   const aliasMetadata = file.aliasMetadata;
@@ -98,8 +101,13 @@ async function writeNotionAliases(
   }
 
   const aliasKind = aliasMetadata.aliasKind ?? 'page';
+  const aliasIndexPath = `${aliasMetadata.scopePath}/_index.json`;
 
-  await writeNotionIndex(relayClient, workspaceId, aliasMetadata.scopePath, requiredRowsFor(aliasKind));
+  // Bulk ingest appends record indexes for these scopes; those indexes
+  // must own the `_index.json` shape when present in the same batch.
+  if (!batchIndexPaths.has(aliasIndexPath)) {
+    await writeNotionIndex(relayClient, workspaceId, aliasMetadata.scopePath, requiredRowsFor(aliasKind));
+  }
   await writeAliasFile(relayClient, workspaceId, notionByIdAliasPath(aliasMetadata.scopePath, aliasMetadata.id), file);
 
   // by-title for pages/databases, by-name for users. The label always
@@ -279,4 +287,8 @@ function parseIndexRows(existingContent: string | undefined): NotionIndexRow[] {
   } catch {
     return [];
   }
+}
+
+function isIndexPath(path: string): boolean {
+  return path.endsWith('/_index.json');
 }
