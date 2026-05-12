@@ -209,13 +209,16 @@ test('message and thread path mapping is deterministic', () => {
     '1711111222.000200',
   );
 
+  // v2 canonical filename is `meta.json` (matches adapter-github, adapter-linear,
+  // adapter-jira, adapter-confluence). adapter-slack <= 0.2.2 wrote `message.json`;
+  // readers should fall back via `slackMessageReadCandidatePaths`.
   assert.equal(
     adapter.computePath('message', messageId),
-    '/slack/channels/C123/messages/1711111111_000100/message.json',
+    '/slack/channels/C123/messages/1711111111_000100/meta.json',
   );
   assert.equal(
     computeSlackPath('message', messageId),
-    '/slack/channels/C123/messages/1711111111_000100/message.json',
+    '/slack/channels/C123/messages/1711111111_000100/meta.json',
   );
 
   assert.equal(
