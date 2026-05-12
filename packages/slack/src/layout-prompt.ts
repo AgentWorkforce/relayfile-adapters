@@ -9,9 +9,9 @@ Always run \`ls\` before constructing a path. v2 standardizes resource directory
 \`/slack/channels/_index.json\` and \`/slack/users/_index.json\` enumerate every channel and user with row \`{ id, title, updated }\` (plus \`is_bot\` for users).
 \`/slack/channels/<channelId>__<channelName>/\` owns per-channel records:
   - \`meta.json\`         — canonical channel record.
-  - \`messages/<ts>__<short_slug>/meta.json\` — canonical top-level message records.
+  - \`messages/<ts>/meta.json\` — canonical top-level message records. Message text is mutable, so the stable Slack timestamp is the directory key.
   - \`threads/<ts>/meta.json\` and \`threads/<ts>/replies/<ts>.json\` — thread roots and replies.
-  - \`messages/<ts>__<short_slug>/reactions/<emoji>--<userId>.json\` — reaction records.
+  - \`messages/<ts>/reactions/<emoji>--<userId>.json\` — reaction records.
 \`/slack/users/<userId>__<userName>/meta.json\` — canonical user record.
 \`/slack/users/by-name/<slug>.json\` and \`/slack/channels/by-name/<slug>.json\` — name-keyed alias files pointing to canonical records. Collisions are disambiguated with a short id-derived hash suffix (e.g. \`sam-3b1a9f7c.json\`).
 \`/slack/users/bots/<userId>__<userName>.json\` — alias subtree of bot users only, for \`ls\`-style discovery.
@@ -46,7 +46,7 @@ The \`is_bot\` flag lets you list humans without opening every user record:
 
 ## Back-compat: \`message.json\` → \`meta.json\`
 
-adapter-slack \`<= 0.2.2\` wrote messages to \`messages/<ts>/message.json\`. v2 writes \`messages/<ts>__<short_slug>/meta.json\`. Readers that may encounter either form should try the canonical \`meta.json\` first and fall back to \`message.json\`; see \`slackMessageReadCandidatePaths()\` in \`@relayfile/adapter-slack/path-mapper\`.
+adapter-slack \`<= 0.2.2\` wrote messages to \`messages/<ts>/message.json\`. v2 writes \`messages/<ts>/meta.json\`. Readers that may encounter either form should try the canonical \`meta.json\` first and fall back to \`message.json\`; see \`slackMessageReadCandidatePaths()\` in \`@relayfile/adapter-slack/path-mapper\`.
 
 ## JSONL And Querying
 

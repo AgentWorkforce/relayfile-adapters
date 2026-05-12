@@ -11,7 +11,7 @@ export const resources = [
   {
     name: "messages",
     path: "/slack/channels/{channelId}/messages",
-    pathPattern: /^\/slack\/channels\/[^\/]+\/messages(?:\/[^\/]+(?:\.json)?)?$/,
+    pathPattern: /^\/slack\/channels\/[^\/]+\/messages(?:\/[^\/]+(?:\.json|\/meta\.json)?)?$/,
     idPattern: /^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$/,
     schema: "discovery/slack/channels/{channelId}/messages/.schema.json",
     createExample: "discovery/slack/channels/{channelId}/messages/.create.example.json",

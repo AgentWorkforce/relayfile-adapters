@@ -47,22 +47,18 @@ test('userMetadataPath uses <id>__<slug> with display name', () => {
   assert.equal(userMetadataPath('U0123ABCDEF'), '/slack/users/U0123ABCDEF/meta.json');
 });
 
-test('messagePath emits <ts>__<slug>/meta.json with first ~40 chars of text', () => {
+test('messagePath emits stable <ts>/meta.json even when text is provided', () => {
   assert.equal(
     messagePath('C0ADE9B71CN', '1711111111.000100', 'Hello team — first message of the day!'),
-    '/slack/channels/C0ADE9B71CN/messages/1711111111_000100__hello-team-first-message-of-the-day/meta.json',
+    '/slack/channels/C0ADE9B71CN/messages/1711111111_000100/meta.json',
   );
 });
 
-test('messagePath truncates very long message text at a word boundary', () => {
-  const longText = 'this is a relatively long message that should be truncated to keep the directory segment readable';
-  const path = messagePath('C0ADE9B71CN', '1711111111.000100', longText);
-  // segment should be `<ts>__<slug>` where slug is <= 40 chars and ends on a word boundary.
-  const segment = path.split('/').at(-2)!;
-  const [tsToken, slug] = segment.split('__');
-  assert.equal(tsToken, '1711111111_000100');
-  assert.ok(slug && slug.length > 0 && slug.length <= 40);
-  assert.ok(!slug.endsWith('-'));
+test('messagePath remains stable when message text changes', () => {
+  assert.equal(
+    messagePath('C0ADE9B71CN', '1711111111.000100', 'original text'),
+    messagePath('C0ADE9B71CN', '1711111111.000100', 'edited text'),
+  );
 });
 
 test('messagePath bare-ts when no text is provided', () => {
@@ -76,7 +72,7 @@ test('messagePath bare-ts when no text is provided', () => {
 test('messagePath includes channel slug when channel name is provided', () => {
   assert.equal(
     messagePath('C0ADE9B71CN', '1711111111.000100', 'hi', 'general'),
-    '/slack/channels/C0ADE9B71CN__general/messages/1711111111_000100__hi/meta.json',
+    '/slack/channels/C0ADE9B71CN__general/messages/1711111111_000100/meta.json',
   );
 });
 
@@ -105,9 +101,12 @@ test('slackMessageReadCandidatePaths returns [v2, legacy] in order', () => {
   assert.equal(candidates.length, 2);
   assert.equal(
     candidates[0],
-    '/slack/channels/C0ADE9B71CN__general/messages/1711111111_000100__hello-world/meta.json',
+    '/slack/channels/C0ADE9B71CN__general/messages/1711111111_000100/meta.json',
   );
-  assert.ok(candidates[1]!.endsWith('/message.json'));
+  assert.equal(
+    candidates[1],
+    '/slack/channels/general--C0ADE9B71CN/messages/1711111111_000100/message.json',
+  );
 });
 
 test('index path helpers point at canonical _index.json locations', () => {

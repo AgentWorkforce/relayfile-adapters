@@ -96,3 +96,16 @@ test('buildSlackBotsAliasFile writes to /slack/users/bots/<id>__<slug>.json', ()
   assert.equal(parsed.is_bot, true);
   assert.equal(parsed.path, '/slack/users/B001__relayfile-bot/meta.json');
 });
+
+test('buildSlackBotsAliasFile rejects non-bot pointers', () => {
+  assert.throws(
+    () =>
+      buildSlackBotsAliasFile({
+        id: 'U001',
+        name: 'Human User',
+        is_bot: false,
+        path: '/slack/users/U001__human-user/meta.json',
+      }),
+    /requires pointer\.is_bot=true/,
+  );
+});

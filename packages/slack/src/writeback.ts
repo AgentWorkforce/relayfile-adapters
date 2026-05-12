@@ -7,6 +7,9 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 type JsonPrimitive = boolean | number | null | string;
 type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
 
+const MESSAGE_RECORD_PATH_PATTERN =
+  /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)(?:\.json|\/meta\.json)$/;
+
 /**
  * Resolve a relayfile writeback into a Slack Web API request.
  *
@@ -32,7 +35,7 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
   const route = classifyWrite(path, resources);
 
   if (route?.resource.name === 'messages') {
-    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    const messageMatch = path.match(MESSAGE_RECORD_PATH_PATTERN);
     if (route.kind === 'create' && messageMatch?.[1]) {
       return buildPostMessage(messageMatch[1], undefined, content);
     }
@@ -76,7 +79,7 @@ export function resolveDeleteRequest(path: string): SlackWritebackRequest {
   }
 
   if (route.resource.name === 'messages') {
-    const messageMatch = path.match(/^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\.json$/);
+    const messageMatch = path.match(MESSAGE_RECORD_PATH_PATTERN);
     if (messageMatch?.[1] && messageMatch[2]) {
       return buildDeleteMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]));
     }

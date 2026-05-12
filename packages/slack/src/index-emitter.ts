@@ -119,6 +119,10 @@ export function buildSlackUserByNameAliasFile(
  * content shape as the `by-name` alias.
  */
 export function buildSlackBotsAliasFile(pointer: SlackUserAliasPointer): SlackIndexFile {
+  if (!pointer.is_bot) {
+    throw new Error('buildSlackBotsAliasFile requires pointer.is_bot=true');
+  }
+
   return {
     path: slackBotsAliasPath(pointer.id, pointer.name),
     contentType: 'application/json; charset=utf-8',

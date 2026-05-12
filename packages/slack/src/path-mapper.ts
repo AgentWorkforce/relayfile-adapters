@@ -1,7 +1,6 @@
 import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 const SLACK_ROOT = '/slack';
-const MAX_MESSAGE_TEXT_SLUG_LENGTH = 40;
 
 export type SlackPathObjectType =
   | 'channel'
@@ -59,21 +58,6 @@ function slugify(value: string): string {
 }
 
 /**
- * Slugify a message body for a `<ts>__<slug>` directory segment. Truncates to
- * roughly the first {@link MAX_MESSAGE_TEXT_SLUG_LENGTH} chars and trims
- * trailing partial words so the slug stays readable.
- */
-function slugifyMessageText(text: string): string {
-  const slug = slugify(text).slice(0, MAX_MESSAGE_TEXT_SLUG_LENGTH);
-  if (slug.length < MAX_MESSAGE_TEXT_SLUG_LENGTH) {
-    return slug;
-  }
-  const cutIndex = slug.lastIndexOf('-');
-  const bounded = cutIndex > 0 ? slug.slice(0, cutIndex) : slug;
-  return bounded.replace(/^-+|-+$/g, '');
-}
-
-/**
  * Compose an `<id>__<slug>` segment, mirroring `github`'s `nameWithId` and the
  * convention used across v2 adapters. When `humanReadable` slugifies to empty
  * (no name available, emoji-only, etc.) returns the bare normalized id.
@@ -104,10 +88,8 @@ function channelSegmentLegacy(channelName: string | undefined, channelId: string
   return slug ? `${slug}--${normalizedId}` : normalizedId;
 }
 
-function messageSegmentV2(messageTs: string, messageText?: string): string {
-  const tsToken = slackTimestampToPathToken(messageTs);
-  const subjectSlug = messageText ? slugifyMessageText(messageText) : '';
-  return subjectSlug ? `${tsToken}__${subjectSlug}` : tsToken;
+function messageSegmentV2(messageTs: string): string {
+  return slackTimestampToPathToken(messageTs);
 }
 
 function joinPath(...segments: string[]): string {
@@ -270,20 +252,19 @@ export function channelMessagesDirectory(channelId: string, channelName?: string
  *
  * @param channelId - Slack channel id (e.g. `C0ADE9B71CN`).
  * @param messageTs - Slack timestamp (`<seconds>.<microseconds>`).
- * @param messageText - First ~40 chars of message text; used to build the
- *   `<ts>__<short_slug>` directory segment. Falls back to a bare `<ts>` dir
- *   when omitted (file uploads, deleted messages, etc.).
+ * @param _messageText - Reserved for backwards-compatible call sites. Message
+ *   paths intentionally ignore mutable text and use only the stable timestamp.
  * @param channelName - Slack channel name; used for the channel dir segment.
  */
 export function messagePath(
   channelId: string,
   messageTs: string,
-  messageText?: string,
+  _messageText?: string,
   channelName?: string,
 ): string {
   return joinPath(
     channelMessagesDirectory(channelId, channelName),
-    messageSegmentV2(messageTs, messageText),
+    messageSegmentV2(messageTs),
     'meta.json',
   );
 }
@@ -326,12 +307,12 @@ export function messageLegacyPath(
 export function slackMessageReadCandidatePaths(
   channelId: string,
   messageTs: string,
-  messageText?: string,
+  _messageText?: string,
   channelName?: string,
 ): string[] {
   return [
-    messagePath(channelId, messageTs, messageText, channelName),
-    messageLegacyPath(channelId, messageTs, messageText, channelName),
+    messagePath(channelId, messageTs, undefined, channelName),
+    messageLegacyPath(channelId, messageTs, undefined, channelName),
   ];
 }
 
