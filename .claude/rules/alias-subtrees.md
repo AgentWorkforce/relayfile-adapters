@@ -16,13 +16,13 @@ Do NOT add an alias for a key that already matches the canonical filename one-to
 
 ## Path shape
 
-```
+```text
 /<provider>/<resource>/by-<key>/<slug-or-key>__<id>.json
 ```
 
 For `by-state`, group records under a state subdirectory:
 
-```
+```text
 /<provider>/<resource>/by-state/<state>/<id>.json
 ```
 

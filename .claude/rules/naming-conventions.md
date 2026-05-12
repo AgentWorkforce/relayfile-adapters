@@ -25,7 +25,9 @@ Note the ID/slug order flips between the two shapes: flat puts the slug first (s
 Always go through `slugifyAlias` from `packages/github/src/alias-slug.ts`:
 
 - ASCII only, lowercase, hyphen-separated.
-- Truncate to 80 characters.
+- Truncate to 80 characters at a word boundary.
+- `slugifyAlias` implements and enforces this behavior; use it for canonical
+  and alias slugs instead of duplicating slug logic.
 - Empty input falls back to `untitled` (alias context) or the bare ID (canonical context).
 - Never roll your own slugifier.
 
