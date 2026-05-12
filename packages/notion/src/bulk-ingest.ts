@@ -4,7 +4,14 @@ import { ingestDatabaseArtifacts } from './databases/ingestion.js';
 import { buildIndexFiles } from './index-emitter.js';
 import { notionLayoutPromptFile } from './layout-prompt.js';
 import { ingestPageArtifacts, retrievePage } from './pages/ingestion.js';
-import { notionByIdAliasPath, notionByTitleAliasPath } from './path-mapper.js';
+import { ingestUserArtifacts } from './users/ingestion.js';
+import {
+  notionByIdAliasPath,
+  notionByNameAliasPath,
+  notionByTitleAliasPath,
+  notionPageByDatabaseAliasPath,
+  notionPageByParentAliasPath,
+} from './path-mapper.js';
 import { slugifyAlias } from './alias-slug.js';
 import type { NotionApiClient } from './client.js';
 import type { NotionVfsFile } from './types.js';
@@ -23,6 +30,16 @@ export async function collectWorkspaceFiles(client: NotionApiClient): Promise<No
       files.push(...(await ingestPageArtifacts(client, page)));
     }
   });
+
+  // Users are workspace-scoped (no per-database/per-page filter needed)
+  // and the /v1/users API returns the full visible directory in one
+  // paginated call. Tolerate auth/permission failures: an integration
+  // token without `read_user_info` scope still has a usable mount.
+  try {
+    files.push(...(await ingestUserArtifacts(client)));
+  } catch {
+    // intentionally swallow — see comment above
+  }
 
   return [...files, ...buildIndexFiles(files), notionLayoutPromptFile()];
 }
@@ -80,23 +97,83 @@ async function writeNotionAliases(
     return;
   }
 
-  await writeNotionIndex(relayClient, workspaceId, aliasMetadata.scopePath);
+  const aliasKind = aliasMetadata.aliasKind ?? 'page';
+
+  await writeNotionIndex(relayClient, workspaceId, aliasMetadata.scopePath, requiredRowsFor(aliasKind));
   await writeAliasFile(relayClient, workspaceId, notionByIdAliasPath(aliasMetadata.scopePath, aliasMetadata.id), file);
 
-  const title = aliasMetadata.title?.trim();
-  if (!title || !slugifyAlias(title)) {
+  // by-title for pages/databases, by-name for users. The label always
+  // slugs through the same helper and always carries the deterministic
+  // <slug>__<short_id> suffix, so duplicate titles cannot clobber.
+  const labelForAlias = aliasKind === 'user' ? aliasMetadata.name : aliasMetadata.title;
+  const trimmedLabel = labelForAlias?.trim();
+  if (trimmedLabel && slugifyAlias(trimmedLabel)) {
+    const titleAliasPath =
+      aliasKind === 'user'
+        ? notionByNameAliasPath(aliasMetadata.scopePath, trimmedLabel, aliasMetadata.id)
+        : notionByTitleAliasPath(aliasMetadata.scopePath, trimmedLabel, aliasMetadata.id);
+    // TODO(issue #106): remove stale by-title/by-name aliases when a record is
+    // renamed on re-ingest; this wave only writes the current alias.
+    await writeAliasFile(relayClient, workspaceId, titleAliasPath, file);
+  }
+
+  if (aliasKind !== 'page') {
     return;
   }
 
-  const baseAliasPath = notionByTitleAliasPath(aliasMetadata.scopePath, title, aliasMetadata.id);
-  const existingBaseContent = await readExistingContent(relayClient, workspaceId, baseAliasPath);
-  const aliasPath =
-    existingBaseContent !== undefined && existingBaseContent !== file.content
-      ? notionByTitleAliasPath(aliasMetadata.scopePath, title, aliasMetadata.id, true)
-      : baseAliasPath;
+  // Cross-reference: a page that lives in a database is also reachable
+  // at /notion/pages/by-database/<db-slug>__<db_short_id>/<page-slug>__<short_id>.json.
+  // Skip when the page has no title or database title to slug against.
+  if (
+    aliasMetadata.databaseId &&
+    aliasMetadata.databaseTitle &&
+    slugifyAlias(aliasMetadata.databaseTitle) &&
+    trimmedLabel &&
+    slugifyAlias(trimmedLabel)
+  ) {
+    const byDatabasePath = notionPageByDatabaseAliasPath(
+      aliasMetadata.databaseId,
+      aliasMetadata.id,
+      aliasMetadata.databaseTitle,
+      trimmedLabel,
+    );
+    await writeAliasFile(relayClient, workspaceId, byDatabasePath, file);
+  }
 
-  // TODO(issue #106): remove stale by-title aliases when a page title changes on re-ingest; this wave only writes the current alias.
-  await writeAliasFile(relayClient, workspaceId, aliasPath, file);
+  // Cross-reference: a child page is also reachable at
+  // /notion/pages/by-parent/<type>-<parent-slug>__<short_id>/<page-slug>__<short_id>.json.
+  // Workspace-rooted pages are intentionally skipped — the workspace
+  // by-parent bucket would collect every top-level page and lose its
+  // navigational value.
+  if (
+    aliasMetadata.parentType &&
+    aliasMetadata.parentType !== 'workspace' &&
+    aliasMetadata.parentId &&
+    trimmedLabel &&
+    slugifyAlias(trimmedLabel)
+  ) {
+    const byParentPath = notionPageByParentAliasPath(
+      aliasMetadata.parentType,
+      aliasMetadata.parentId,
+      aliasMetadata.id,
+      aliasMetadata.parentTitle,
+      trimmedLabel,
+    );
+    await writeAliasFile(relayClient, workspaceId, byParentPath, file);
+  }
+}
+
+function requiredRowsFor(aliasKind: 'page' | 'database' | 'user'): NotionIndexRow[] {
+  if (aliasKind === 'user') {
+    return [
+      { title: 'by-id', file: 'by-id/' },
+      { title: 'by-name', file: 'by-name/' },
+    ];
+  }
+  return [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ];
 }
 
 async function writeAliasFile(
@@ -116,23 +193,11 @@ async function writeAliasFile(
   });
 }
 
-async function readExistingContent(
-  relayClient: RelayFileClient,
-  workspaceId: string,
-  path: string,
-): Promise<string | undefined> {
-  try {
-    const existing = await relayClient.readFile(workspaceId, path);
-    return typeof existing.content === 'string' ? existing.content : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 async function writeNotionIndex(
   relayClient: RelayFileClient,
   workspaceId: string,
   scopePath: string,
+  requiredRows: NotionIndexRow[],
   options?: AtomicUpsertOptions,
 ): Promise<void> {
   const indexPath = `${scopePath}/_index.json`;
@@ -142,11 +207,7 @@ async function writeNotionIndex(
     vfs,
     indexPath,
     parseIndexRows,
-    (rows) =>
-      mergeIndexRowsList(rows, [
-        { title: 'by-id', file: 'by-id/' },
-        { title: 'by-title', file: 'by-title/' },
-      ]),
+    (rows) => mergeIndexRowsList(rows, requiredRows),
     (rows) => `${JSON.stringify({ rows }, null, 2)}\n`,
     options,
   );
