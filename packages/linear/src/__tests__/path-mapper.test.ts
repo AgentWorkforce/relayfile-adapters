@@ -132,5 +132,43 @@ describe('linear path-mapper', () => {
       const leaf = composed.split('/').pop()!.replace(/\.json$/u, '');
       assert.equal(decodeURIComponent(leaf), messyId);
     });
+
+    // AGENTS.md: every alias subtree needs a collision test. `by-uuid` keys
+    // only on the stable UUID, so the "collision" semantics here are the
+    // inverse of by-title/by-id: distinct UUIDs MUST produce distinct paths
+    // (the subtree's whole job is unambiguous lookup by uuid), and the same
+    // UUID MUST map to the same path regardless of any other field — that's
+    // what makes by-uuid the reconciliation anchor in the first place.
+    it('distinct UUIDs always produce distinct alias paths (no false collisions)', () => {
+      const uuidA = '8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e';
+      const uuidB = 'f0e1d2c3-b4a5-9687-7869-5a4b3c2d1e0f';
+      const pathA = linearByUuidAliasPath('/linear/issues', uuidA);
+      const pathB = linearByUuidAliasPath('/linear/issues', uuidB);
+      assert.notEqual(pathA, pathB);
+    });
+
+    it('same UUID maps to the same path (idempotent — by-uuid is the rename-stable anchor)', () => {
+      // This is the property that lets `planIssueDelete` and the
+      // reconciliation read in `planIssueWrite` find prior state from a
+      // tombstone that carries only `{ id, _deleted: true }`. If the path
+      // shifted with identifier / title / state, the by-uuid anchor
+      // would be useless and bcb45996 wouldn't fix anything.
+      const uuid = '8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e';
+      assert.equal(
+        linearByUuidAliasPath('/linear/issues', uuid),
+        linearByUuidAliasPath('/linear/issues', uuid),
+      );
+    });
+
+    it('keeps distinct paths across scopes for the same UUID (cross-scope safety)', () => {
+      // A UUID that happens to be reused across resource types (rare but
+      // not impossible if an operator reuses an id from one scope as a
+      // tombstone for another) must NOT alias to the same path. The
+      // `scope` prefix is what guarantees this — the test pins it.
+      const uuid = '8a3c9b50-22f0-4d2c-a07d-7e02d2cf6f9e';
+      const issueScope = linearByUuidAliasPath('/linear/issues', uuid);
+      const projectScope = linearByUuidAliasPath('/linear/projects', uuid);
+      assert.notEqual(issueScope, projectScope);
+    });
   });
 });
