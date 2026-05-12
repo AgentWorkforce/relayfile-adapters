@@ -51,6 +51,7 @@ import {
   type EmitWrite,
 } from '@relayfile/adapter-core';
 
+import { slugifyAlias } from './alias-slug.js';
 import {
   confluencePageByIdAliasPath,
   confluencePageByParentAliasPath,
@@ -170,7 +171,7 @@ async function emitPages(
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      return planPageDelete(record.id, priorReader);
+      return planPageDelete(record.id, priorReader, indexReconciler);
     }
     return planPageWrite(record, priorReader, indexReconciler, connectionId);
   });
@@ -227,6 +228,7 @@ async function planPageWrite(
 async function planPageDelete(
   id: string,
   priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<ConfluencePageIndexRow>,
 ): Promise<EmitPlan> {
   // For deletes we have no fresh payload, so we rely entirely on the prior
   // by-id alias to recover the alias fields. If the prior alias is missing
@@ -237,6 +239,12 @@ async function planPageDelete(
     extractPriorPageState,
   );
   const paths = pagePathsFor({ id, ...(prior ?? {}) });
+  // The index row must drop too — otherwise consumers reading
+  // `_index.json` see ghost entries for records whose canonical and alias
+  // files have already been removed. `IndexFileReconciler.remove` no-ops
+  // if the id isn't present, so this is safe even for "first-ever sync"
+  // deletes where no prior row existed.
+  indexReconciler.remove(id);
   return { deletes: paths.map((path) => ({ path })) };
 }
 
@@ -265,7 +273,7 @@ async function emitSpaces(
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      return planSpaceDelete(record.id, priorReader);
+      return planSpaceDelete(record.id, priorReader, indexReconciler);
     }
     return planSpaceWrite(record, priorReader, indexReconciler, connectionId);
   });
@@ -316,12 +324,15 @@ async function planSpaceWrite(
 async function planSpaceDelete(
   id: string,
   priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<ConfluenceSpaceIndexRow>,
 ): Promise<EmitPlan> {
   const prior = await priorReader.read<PriorSpaceState>(
     confluenceSpaceByIdAliasPath(id),
     extractPriorSpaceState,
   );
   const paths = spacePathsFor({ id, ...(prior ?? {}) });
+  // See `planPageDelete` — index row must drop alongside the files.
+  indexReconciler.remove(id);
   return { deletes: paths.map((path) => ({ path })) };
 }
 
@@ -495,13 +506,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Mirrors the in-adapter `slugifies` helper: skip by-title aliases for
- * titles that slug to nothing (emoji-only / punctuation-only). The by-id
- * alias still resolves those records.
+ * Skip by-title aliases for titles that slug to nothing (emoji-only /
+ * punctuation-only). The by-id alias still resolves those records.
+ *
+ * Delegates to the shared `slugifyAlias` per AGENTS.md "NEVER write a
+ * new slugifier" rule. `slugifyAlias` returns the literal string
+ * `'untitled'` as its empty-slug sentinel.
  */
 function slugifies(value: string): boolean {
-  const normalized = value.normalize('NFKD').replace(/[̀-ͯ]/g, '');
-  return /[a-zA-Z0-9]/u.test(normalized);
+  return slugifyAlias(value) !== 'untitled';
 }
 
 function accumulate(

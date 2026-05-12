@@ -236,6 +236,79 @@ describe('emitConfluenceAuxiliaryFiles', () => {
     assert.equal(result.deleted, expectedDeletes.length);
   });
 
+  it('drops the index row when a page is deleted (no ghost entries)', async () => {
+    // Regression for the Devin finding on PR #78: planPageDelete used to
+    // remove canonical + alias files but leave the index row in place, so
+    // `_index.json` accumulated entries for records whose meta.json had
+    // already been deleted. The reconciler must `.remove(id)` on the
+    // delete path too.
+    const priorPagePayload = {
+      payload: {
+        title: 'Release Plan',
+        status: 'current',
+        spaceId: '12345',
+      },
+    };
+    const priorIndex = [
+      { id: '98765', title: 'Release Plan', updated: '2026-05-12T00:00:00Z', status: 'current' },
+      { id: '11111', title: 'Other Page', updated: '2026-05-11T00:00:00Z', status: 'current' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [confluencePageByIdAliasPath('98765')]: JSON.stringify(priorPagePayload),
+        [confluencePagesIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    await emitConfluenceAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pages: [{ id: '98765', _deleted: true }],
+    });
+
+    // The index file got rewritten — without the deleted row but with
+    // the surviving entry intact.
+    const indexWrite = client.writes.find((w) => w.path === confluencePagesIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(
+      writtenRows.map((r) => r.id),
+      ['11111'],
+      'deleted page id should no longer appear in the index',
+    );
+  });
+
+  it('drops the index row when a space is deleted', async () => {
+    // Same regression as above, for spaces. planSpaceDelete must also
+    // `.remove(id)` on the index reconciler.
+    const priorSpacePayload = {
+      payload: { name: 'Engineering', key: 'ENG' },
+    };
+    const priorIndex = [
+      { id: '12345', title: 'Engineering', updated: '2026-05-12T00:00:00Z', key: 'ENG' },
+      { id: '22222', title: 'Marketing', updated: '2026-05-11T00:00:00Z', key: 'MKT' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [confluenceSpaceByIdAliasPath('12345')]: JSON.stringify(priorSpacePayload),
+        [confluenceSpacesIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    await emitConfluenceAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      spaces: [{ id: '12345', _deleted: true }],
+    });
+
+    const indexWrite = client.writes.find((w) => w.path === confluenceSpacesIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(
+      writtenRows.map((r) => r.id),
+      ['22222'],
+      'deleted space id should no longer appear in the index',
+    );
+  });
+
   it('captures per-path write failures in errors without aborting the fan-out', async () => {
     const failingPath = confluencePageByTitleAliasPath('Release Plan', '98765');
     const client = createClient({ failWriteOn: new Set([failingPath]) });
