@@ -1,4 +1,4 @@
-import { notionDatabaseMetadataPath } from '../path-mapper.js';
+import { notionDatabaseMetadataPath, notionDatabasesCollectionPath } from '../path-mapper.js';
 import { buildDatabaseQuery } from './query.js';
 import { ingestPageArtifacts } from '../pages/ingestion.js';
 import { richTextToPlainText } from '../pages/properties.js';
@@ -57,6 +57,17 @@ export async function ingestDatabaseArtifacts(
       path: notionDatabaseMetadataPath(databaseId, normalizedDatabase.title),
       contentType: 'application/json; charset=utf-8',
       content: `${JSON.stringify(normalizedDatabase, null, 2)}\n`,
+      // Emit alias metadata so the bulk writer materializes
+      // /notion/databases/by-id/<id>.json and
+      // /notion/databases/by-title/<slug>__<short_id>.json. Without this
+      // an agent has to know the database UUID to construct any write
+      // request — see writeback.ts which routes through the canonical id.
+      aliasMetadata: {
+        scopePath: notionDatabasesCollectionPath(),
+        title: normalizedDatabase.title || undefined,
+        id: databaseId,
+        aliasKind: 'database',
+      },
       semantics: buildDatabaseSemantics(database),
     },
   ];
