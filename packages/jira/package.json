@@ -11,6 +11,11 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
       "import": "./dist/path-mapper.js",
