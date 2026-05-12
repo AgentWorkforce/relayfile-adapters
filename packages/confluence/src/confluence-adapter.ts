@@ -10,7 +10,15 @@ export type {
 
 import {
   computeConfluencePath,
+  confluencePageByIdAliasPath,
+  confluencePageByParentAliasPath,
+  confluencePageBySpaceAliasPath,
+  confluencePageByStatePath,
+  confluencePageByTitleAliasPath,
   confluencePagePath,
+  confluenceSpaceByIdAliasPath,
+  confluenceSpaceByKeyAliasPath,
+  confluenceSpaceByTitleAliasPath,
   confluenceSpacePath,
 } from './path-mapper.js';
 import {
@@ -106,31 +114,40 @@ export class ConfluenceAdapter {
   async ingestWebhook(workspaceId: string, event: ConfluenceNormalizedEvent | Record<string, unknown>): Promise<IngestResult> {
     try {
       const normalized = this.normalizeEvent(event);
-      const path = this.pathForEvent(normalized);
+      const canonicalPath = this.pathForEvent(normalized);
+      const aliasPaths = this.aliasPathsForEvent(normalized);
+      const allPaths = [canonicalPath, ...aliasPaths];
+      const isDelete = this.isDeleteEvent(normalized);
+      const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
+      const content = this.renderContent(workspaceId, normalized, isDelete);
 
-      if (this.isDeleteEvent(normalized)) {
-        if (this.client.deleteFile) {
+      if (isDelete && this.client.deleteFile) {
+        let filesDeleted = 0;
+        for (const path of allPaths) {
           await this.client.deleteFile({ workspaceId, path });
-          return { filesWritten: 0, filesUpdated: 0, filesDeleted: 1, paths: [path], errors: [] };
+          filesDeleted += 1;
         }
+        return { filesWritten: 0, filesUpdated: 0, filesDeleted, paths: allPaths, errors: [] };
       }
 
-      const writeResult = await this.client.writeFile({
-        workspaceId,
-        path,
-        content: this.renderContent(workspaceId, normalized, this.isDeleteEvent(normalized)),
-        contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
-      });
+      let filesWritten = 0;
+      let filesUpdated = 0;
+      let filesDeleted = 0;
+      for (const path of allPaths) {
+        const result = await this.client.writeFile({
+          workspaceId,
+          path,
+          content,
+          contentType: JSON_CONTENT_TYPE,
+          semantics,
+        });
+        const counts = inferWriteCounts(result, isDelete);
+        filesWritten += counts.filesWritten;
+        filesUpdated += counts.filesUpdated;
+        filesDeleted += counts.filesDeleted;
+      }
 
-      const counts = inferWriteCounts(writeResult, this.isDeleteEvent(normalized));
-      return {
-        filesWritten: counts.filesWritten,
-        filesUpdated: counts.filesUpdated,
-        filesDeleted: counts.filesDeleted,
-        paths: [path],
-        errors: [],
-      };
+      return { filesWritten, filesUpdated, filesDeleted, paths: allPaths, errors: [] };
     } catch (error) {
       return {
         filesWritten: 0,
@@ -140,6 +157,61 @@ export class ConfluenceAdapter {
         errors: [{ path: '', error: error instanceof Error ? error.message : String(error) }],
       };
     }
+  }
+
+  /**
+   * Returns the by-* alias paths that should be written alongside the
+   * canonical record for an event. Aliases store the same bytes as the
+   * canonical path so any one of them resolves to the same JSON. Callers
+   * doing bulk materialization (e.g. `materializePageFiles`) reuse this so
+   * write-path and read-path stay symmetrical.
+   *
+   * Collision handling: `by-title` uses the canonical slugifier; when two
+   * pages share a title in the same scope, the second write wins (Confluence
+   * agents almost never lean on by-title for round-trip, so we keep the
+   * primary alias collision-free instead of forcing every reader to know the
+   * hash suffix). Callers that need the disambiguated form can compute it
+   * explicitly via `confluencePageByTitleAliasPath(title, id, true)`.
+   */
+  aliasPathsForEvent(event: ConfluenceNormalizedEvent): string[] {
+    const paths: string[] = [];
+    const id = event.objectId;
+
+    if (event.objectType === 'page') {
+      paths.push(confluencePageByIdAliasPath(id));
+      const title = readString(event.payload.title);
+      if (title && slugifies(title)) {
+        paths.push(confluencePageByTitleAliasPath(title, id));
+      }
+      const status = readString(event.payload.status);
+      if (status) {
+        paths.push(confluencePageByStatePath(status, id));
+      }
+      const spaceId = readString(event.payload.spaceId);
+      if (spaceId) {
+        paths.push(confluencePageBySpaceAliasPath(spaceId, id));
+      }
+      const parentId = readString(event.payload.parentId);
+      if (parentId) {
+        paths.push(confluencePageByParentAliasPath(parentId, id));
+      }
+      return paths;
+    }
+
+    if (event.objectType === 'space') {
+      paths.push(confluenceSpaceByIdAliasPath(id));
+      const name = readString(event.payload.name) ?? readString(event.payload.title);
+      if (name && slugifies(name)) {
+        paths.push(confluenceSpaceByTitleAliasPath(name, id));
+      }
+      const key = readString(event.payload.key);
+      if (key) {
+        paths.push(confluenceSpaceByKeyAliasPath(key));
+      }
+      return paths;
+    }
+
+    return paths;
   }
 
   writeBack(path: string, content: string) {
@@ -168,6 +240,41 @@ export class ConfluenceAdapter {
         payload: page,
       },
     };
+  }
+
+  /**
+   * Materialize a page into the canonical path plus its by-* alias paths.
+   * Callers performing bulk sync (cloud full-resync) should iterate the
+   * returned `paths` and write the same `payload` bytes to each — that's
+   * how the runtime contract treats aliases (duplicated bytes, single
+   * source of truth at the canonical path).
+   */
+  materializePageFiles(page: ConfluencePage): { paths: string[]; payload: Record<string, unknown> } {
+    const canonical = this.materializePage(page);
+    const aliases = this.aliasPathsForEvent({
+      provider: CONFLUENCE_PROVIDER_NAME,
+      eventType: 'page.synced',
+      objectType: 'page',
+      objectId: page.id,
+      payload: page as unknown as Record<string, unknown>,
+    });
+    return { paths: [canonical.path, ...aliases], payload: canonical.payload };
+  }
+
+  /**
+   * Materialize a space into the canonical path plus its by-* alias paths.
+   * See {@link materializePageFiles} for the bulk-sync contract.
+   */
+  materializeSpaceFiles(space: ConfluenceSpace): { paths: string[]; payload: Record<string, unknown> } {
+    const canonical = this.materializeSpace(space);
+    const aliases = this.aliasPathsForEvent({
+      provider: CONFLUENCE_PROVIDER_NAME,
+      eventType: 'space.synced',
+      objectType: 'space',
+      objectId: space.id,
+      payload: space as unknown as Record<string, unknown>,
+    });
+    return { paths: [canonical.path, ...aliases], payload: canonical.payload };
   }
 
   protected normalizeEvent(event: ConfluenceNormalizedEvent | Record<string, unknown>): ConfluenceNormalizedEvent {
@@ -269,6 +376,18 @@ function readString(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Returns true when the input contains enough alphanumeric content for the
+ * shared alias slugifier to produce a non-fallback result. We use this to
+ * skip emitting `by-title/untitled.json` aliases that would collide for
+ * every emoji-only / punctuation-only title — the by-id alias still resolves
+ * those records. Mirrors the NFKD + combining-mark strip from `alias-slug.ts`.
+ */
+function slugifies(value: string): boolean {
+  const normalized = value.normalize('NFKD').replace(/[̀-ͯ]/g, '');
+  return /[a-zA-Z0-9]/u.test(normalized);
 }
 
 function isConfluenceNormalizedEvent(value: unknown): value is ConfluenceNormalizedEvent {

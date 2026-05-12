@@ -16,5 +16,10 @@ describe('confluence layout prompt', () => {
     assert.match(file.content, /\/confluence\/spaces\//u);
     assert.match(file.content, /by-title/u);
     assert.match(file.content, /by-id/u);
+    assert.match(file.content, /by-state/u);
+    assert.match(file.content, /by-space/u);
+    assert.match(file.content, /by-parent/u);
+    assert.match(file.content, /by-key/u);
+    assert.match(file.content, /jq /u);
   });
 });

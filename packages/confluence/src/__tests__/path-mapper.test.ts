@@ -6,12 +6,15 @@ import {
   confluenceByIdAliasPath,
   confluenceByTitleAliasPath,
   confluencePageByIdAliasPath,
+  confluencePageByParentAliasPath,
+  confluencePageBySpaceAliasPath,
   confluencePageByStatePath,
   confluencePageByTitleAliasPath,
   confluencePagePath,
   confluencePagesIndexPath,
   confluenceProviderRootIndexPath,
   confluenceSpaceByIdAliasPath,
+  confluenceSpaceByKeyAliasPath,
   confluenceSpacePath,
   confluenceSpacesIndexPath,
   extractConfluenceIdFromPathSegment,
@@ -123,6 +126,28 @@ describe('confluence path-mapper', () => {
 
     it('rejects empty status names', () => {
       assert.throws(() => slugifyStatusName('   '));
+    });
+
+    it('emits a by-key alias path that preserves the space key verbatim', () => {
+      assert.equal(confluenceSpaceByKeyAliasPath('ENG'), '/confluence/spaces/by-key/ENG.json');
+      assert.equal(confluenceSpaceByKeyAliasPath('Ops Team'), '/confluence/spaces/by-key/Ops%20Team.json');
+    });
+
+    it('emits by-space and by-parent alias paths nested under the parent id segment', () => {
+      assert.equal(
+        confluencePageBySpaceAliasPath('12345', '98765'),
+        '/confluence/pages/by-space/12345/98765.json',
+      );
+      assert.equal(
+        confluencePageByParentAliasPath('44444', '98765'),
+        '/confluence/pages/by-parent/44444/98765.json',
+      );
+    });
+
+    it('round-trips by-space/by-parent leaves back to the canonical page id', () => {
+      const aliasPath = confluencePageBySpaceAliasPath('12345', '98765');
+      const leaf = aliasPath.split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(extractConfluenceIdFromPathSegment(leaf), '98765');
     });
   });
 

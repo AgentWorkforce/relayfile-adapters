@@ -233,6 +233,40 @@ export function confluenceSpaceByTitleAliasPath(title: string, id: string, colli
   return confluenceByTitleAliasPath(`${CONFLUENCE_PATH_ROOT}/spaces`, title, id, colliding);
 }
 
+/**
+ * `by-key/<KEY>.json` resolves a space by its globally-unique Confluence
+ * space key (e.g. `ENG`). The v2 `GET /spaces` endpoint accepts `keys=` as a
+ * filter so the key is a stable, human-meaningful identifier that agents
+ * actually paste — much more useful than the numeric id for spaces. Keys are
+ * preserved verbatim (case + punctuation) because Confluence treats them as
+ * opaque strings; we only percent-encode for path safety.
+ */
+export function confluenceSpaceByKeyAliasPath(spaceKey: string): string {
+  return `${CONFLUENCE_PATH_ROOT}/spaces/by-key/${encodeConfluencePathSegment(spaceKey)}.json`;
+}
+
+/**
+ * `by-parent/<parentId>/<pageId>.json` mirrors `by-state` but pivots on the
+ * page's parent — the most natural Confluence navigation primitive after the
+ * space tree. Pages without a parentId (top-level pages directly under a
+ * space's homepage) are not emitted here; consumers should use the canonical
+ * space-scoped path instead.
+ */
+export function confluencePageByParentAliasPath(parentId: string, pageId: string): string {
+  return `${CONFLUENCE_PATH_ROOT}/pages/by-parent/${encodeConfluencePathSegment(parentId)}/${encodeConfluencePathSegment(pageId)}.json`;
+}
+
+/**
+ * `by-space/<spaceId>/<pageId>.json` — flat alias keyed only on the space id
+ * so an agent can iterate every page in a space without resolving titles.
+ * The space-scoped canonical path `/confluence/spaces/<spaceId>/pages/<slug>__<id>.json`
+ * is still the human-friendly entry point; this alias is the deterministic
+ * lookup variant readers reach for with `ls`.
+ */
+export function confluencePageBySpaceAliasPath(spaceId: string, pageId: string): string {
+  return `${CONFLUENCE_PATH_ROOT}/pages/by-space/${encodeConfluencePathSegment(spaceId)}/${encodeConfluencePathSegment(pageId)}.json`;
+}
+
 export function computeConfluencePath(
   objectType: string,
   objectId: string,

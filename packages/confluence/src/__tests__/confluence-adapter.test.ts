@@ -9,7 +9,15 @@ import {
 } from '../confluence-adapter.js';
 import {
   computeConfluencePath,
+  confluencePageByIdAliasPath,
+  confluencePageByParentAliasPath,
+  confluencePageBySpaceAliasPath,
+  confluencePageByStatePath,
+  confluencePageByTitleAliasPath,
   confluencePagePath,
+  confluenceSpaceByIdAliasPath,
+  confluenceSpaceByKeyAliasPath,
+  confluenceSpaceByTitleAliasPath,
   confluenceSpacePath,
 } from '../path-mapper.js';
 import { resolveConfluenceReadRequest } from '../queries.js';
@@ -81,7 +89,7 @@ describe('ConfluenceAdapter', () => {
     );
   });
 
-  it('ingests page events with space relations and body comments', async () => {
+  it('ingests page events with space relations, body comments, and by-* alias fan-out', async () => {
     const client = createClient();
     const adapter = createAdapter(client);
 
@@ -95,16 +103,125 @@ describe('ConfluenceAdapter', () => {
         title: 'Release Plan',
         status: 'current',
         spaceId: '12345',
+        parentId: '44444',
         body: { storage: { value: '<p>Ship carefully.</p>', representation: 'storage' } },
       },
     });
 
-    assert.equal(result.filesWritten, 1);
-    assert.equal(client.writes[0]?.path, '/confluence/spaces/12345/pages/release-plan__98765.json');
+    const canonicalPath = '/confluence/spaces/12345/pages/release-plan__98765.json';
+    const expectedAliasPaths = [
+      confluencePageByIdAliasPath('98765'),
+      confluencePageByTitleAliasPath('Release Plan', '98765'),
+      confluencePageByStatePath('current', '98765'),
+      confluencePageBySpaceAliasPath('12345', '98765'),
+      confluencePageByParentAliasPath('44444', '98765'),
+    ];
+
+    // Canonical record + every applicable alias path are written with identical
+    // bytes — readers can pick whichever lookup primitive they have.
+    assert.equal(result.filesWritten, 1 + expectedAliasPaths.length);
+    assert.deepEqual(result.paths, [canonicalPath, ...expectedAliasPaths]);
+
+    const canonicalContent = client.writes.find((write) => write.path === canonicalPath)?.content;
+    assert.ok(canonicalContent, 'canonical content must be present');
+    for (const aliasPath of expectedAliasPaths) {
+      const aliasWrite = client.writes.find((write) => write.path === aliasPath);
+      assert.ok(aliasWrite, `alias ${aliasPath} must be written`);
+      assert.equal(aliasWrite?.content, canonicalContent, `alias ${aliasPath} bytes must match canonical`);
+    }
+
     assert.deepEqual(client.writes[0]?.semantics?.relations, [
       confluenceSpacePath('12345'),
+      confluencePagePath('44444'),
     ]);
     assert.equal(client.writes[0]?.semantics?.comments?.[0], 'Ship carefully.');
+  });
+
+  it('skips by-title alias when the page title slugs to nothing', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'confluence',
+      eventType: 'page.created',
+      objectType: 'page',
+      objectId: '11111',
+      payload: { id: '11111', title: '🚀🔥', status: 'current', spaceId: '12345' },
+    });
+
+    // by-id, by-state, by-space — no by-title, no by-parent.
+    const aliasPaths = client.writes.map((write) => write.path).filter((path) => path.includes('/by-'));
+    assert.deepEqual(aliasPaths, [
+      confluencePageByIdAliasPath('11111'),
+      confluencePageByStatePath('current', '11111'),
+      confluencePageBySpaceAliasPath('12345', '11111'),
+    ]);
+  });
+
+  it('emits space by-id, by-title, and by-key aliases on space ingest', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'confluence',
+      eventType: 'space.updated',
+      objectType: 'space',
+      objectId: '12345',
+      payload: { id: '12345', key: 'ENG', name: 'Engineering' },
+    });
+
+    const canonicalPath = '/confluence/spaces/engineering__12345.json';
+    const expectedAliasPaths = [
+      confluenceSpaceByIdAliasPath('12345'),
+      confluenceSpaceByTitleAliasPath('Engineering', '12345'),
+      confluenceSpaceByKeyAliasPath('ENG'),
+    ];
+
+    assert.deepEqual(client.writes.map((write) => write.path), [canonicalPath, ...expectedAliasPaths]);
+  });
+
+  it('deletes the canonical path and every alias on a delete event', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    const result = await adapter.ingestWebhook('workspace-1', {
+      provider: 'confluence',
+      eventType: 'page.deleted',
+      objectType: 'page',
+      objectId: '98765',
+      payload: { id: '98765', title: 'Release Plan', status: 'current', spaceId: '12345' },
+    });
+
+    const canonicalPath = '/confluence/spaces/12345/pages/release-plan__98765.json';
+    const expectedAliasPaths = [
+      confluencePageByIdAliasPath('98765'),
+      confluencePageByTitleAliasPath('Release Plan', '98765'),
+      confluencePageByStatePath('current', '98765'),
+      confluencePageBySpaceAliasPath('12345', '98765'),
+    ];
+
+    assert.equal(result.filesDeleted, 1 + expectedAliasPaths.length);
+    assert.deepEqual(client.deletes.map((d) => d.path), [canonicalPath, ...expectedAliasPaths]);
+  });
+
+  it('materializePageFiles returns the canonical path plus every applicable alias', () => {
+    const adapter = createAdapter();
+    const { paths } = adapter.materializePageFiles({
+      id: '98765',
+      title: 'Release Plan',
+      status: 'current',
+      spaceId: '12345',
+      parentId: '44444',
+    });
+
+    assert.deepEqual(paths, [
+      '/confluence/spaces/12345/pages/release-plan__98765.json',
+      confluencePageByIdAliasPath('98765'),
+      confluencePageByTitleAliasPath('Release Plan', '98765'),
+      confluencePageByStatePath('current', '98765'),
+      confluencePageBySpaceAliasPath('12345', '98765'),
+      confluencePageByParentAliasPath('44444', '98765'),
+    ]);
   });
 
   it('resolves Confluence read requests to Cloud REST API v2 paths', () => {
