@@ -64,6 +64,27 @@ test('buildSummary redacts Stripe card numbers and customer email addresses from
   assertSummaryWithinBudget(summary);
 });
 
+test('buildSummary does not fall back to unsafe Stripe object names when description is missing', () => {
+  const summary = buildSummary({
+    object: 'customer',
+    name: 'Jane Example',
+    status: 'active',
+    _stripe_event: {
+      eventType: 'customer.updated',
+      previousAttributes: {
+        email: 'old@example.com',
+      },
+    },
+  });
+
+  assert.deepEqual(summary, {
+    status: 'active',
+    fieldsChanged: ['email'],
+    tags: ['object:customer', 'event:customer.updated'],
+  });
+  assertSummaryWithinBudget(summary);
+});
+
 test('buildSummary caps oversized Stripe summaries under the 1 KB envelope budget', () => {
   const summary = buildSummary({
     type: 'payment_intent.processing',

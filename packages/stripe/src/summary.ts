@@ -12,7 +12,7 @@ export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const data = readRecord(payload.data);
   const event = readRecord(payload._stripe_event);
   const object = readRecord(data?.object) ?? payload;
-  const title = truncateText(readString(object.description) ?? readString(object.name), MAX_TITLE_LENGTH);
+  const title = truncateText(readString(object.description), MAX_TITLE_LENGTH);
   const status = truncateText(
     readString(object.status) ?? readString(payload.type) ?? readString(event?.eventType),
     MAX_TEXT_FIELD_LENGTH,

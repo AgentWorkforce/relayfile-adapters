@@ -4,6 +4,7 @@ export {
   sanitizeJiraRecordForStorage,
 } from './jira-adapter.js';
 export * from './summary.js';
+export * from './thread.js';
 export type {
   DeleteFileInput,
   FileSemantics,

@@ -13,27 +13,18 @@ function assertSummaryWithinBudget(summary: unknown): void {
   );
 }
 
-test('buildSummary derives ClickUp title, status, priority, tags, and history-driven fieldsChanged', () => {
+test('buildSummary derives Segment event title and type status', () => {
   const summary = buildSummary({
-    data: {
-      name: 'Triage runtime backlog',
-      status: { status: 'in progress' },
-      priority: { priority: 'high' },
-      tags: [{ name: 'ops' }, { name: 'grace@example.com' }],
+    type: 'track',
+    event: 'Order Completed',
+    properties: {
+      orderId: 'ord_123',
     },
-    history_items: [
-      {
-        field: 'status',
-      },
-    ],
   });
 
   assert.deepEqual(summary, {
-    title: 'Triage runtime backlog',
-    status: 'in progress',
-    priority: 'high',
-    tags: ['ops', '[redacted-email]'],
-    fieldsChanged: ['status'],
+    title: 'Order Completed',
+    status: 'track',
   });
   assertSummaryWithinBudget(summary);
 });

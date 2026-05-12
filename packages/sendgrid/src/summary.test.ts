@@ -13,27 +13,21 @@ function assertSummaryWithinBudget(summary: unknown): void {
   );
 }
 
-test('buildSummary derives ClickUp title, status, priority, tags, and history-driven fieldsChanged', () => {
+test('buildSummary derives SendGrid event title, subject tags, and sg_event_id fieldsChanged', () => {
   const summary = buildSummary({
-    data: {
-      name: 'Triage runtime backlog',
-      status: { status: 'in progress' },
-      priority: { priority: 'high' },
-      tags: [{ name: 'ops' }, { name: 'grace@example.com' }],
-    },
-    history_items: [
+    events: [
       {
-        field: 'status',
+        event: 'delivered',
+        subject: 'Launch plan for jane@example.com',
+        sg_event_id: 'evt_123',
       },
     ],
   });
 
   assert.deepEqual(summary, {
-    title: 'Triage runtime backlog',
-    status: 'in progress',
-    priority: 'high',
-    tags: ['ops', '[redacted-email]'],
-    fieldsChanged: ['status'],
+    title: 'delivered',
+    tags: ['Launch plan for [redacted-email]'],
+    fieldsChanged: ['evt_123'],
   });
   assertSummaryWithinBudget(summary);
 });

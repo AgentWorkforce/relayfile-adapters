@@ -10,9 +10,8 @@ const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const record = resolvePrimaryRecord(payload);
-  const records = resolveRecords(payload);
   const properties = readRecord(record.properties) ?? record;
-  const propertyNames = resolvePropertyNames(records);
+  const propertyNames = resolvePropertyNames(record);
   const title = truncateText(
     readString(properties.dealname) ?? readString(properties.firstname) ?? readString(properties.subject),
     MAX_TITLE_LENGTH,
@@ -61,26 +60,16 @@ function resolveRecords(payload: Record<string, unknown>): Record<string, unknow
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
 }
 
-function resolvePropertyNames(records: Record<string, unknown>[]): string[] {
+function resolvePropertyNames(record: Record<string, unknown>): string[] {
   return limitStrings(
-    records.flatMap((record) => {
-      const explicit = readString(record.propertyName) ?? readString(readRecord(record.change)?.propertyName);
-      if (explicit) {
-        return [explicit];
-      }
-
-      const changedProperties =
-        readArray(record.changedProperties)
-        ?? readArray(record.changed_properties)
-        ?? readArray(readRecord(record._webhook)?.changedProperties);
-      if (!changedProperties) {
-        return [];
-      }
-
-      return changedProperties
-        .map((entry) => readString(entry))
-        .filter((entry): entry is string => Boolean(entry));
-    }),
+    [
+      readString(record.propertyName),
+      readString(readRecord(record.change)?.propertyName),
+      readString(readRecord(record._webhook)?.propertyName),
+      ...readStringArray(record.changedProperties),
+      ...readStringArray(record.changed_properties),
+      ...readStringArray(readRecord(record._webhook)?.changedProperties),
+    ].filter((entry): entry is string => Boolean(entry)),
     MAX_FIELDS_CHANGED,
   );
 }
@@ -95,7 +84,7 @@ function buildActor(record: Record<string, unknown>): EventSummary['actor'] | un
   }
 
   const displayName = truncateText(
-    readString(record.updatedByUserName) ?? readString(record.sourceName),
+    cleanDisplayName(readString(record.updatedByUserName) ?? readString(record.sourceName)),
     MAX_TEXT_FIELD_LENGTH,
   );
   return displayName ? { id, displayName } : { id };
@@ -168,6 +157,24 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry))
+    : [];
+}
+
+function cleanDisplayName(value: string | undefined): string | undefined {
+  if (!value || looksLikeEmail(value)) {
+    return undefined;
+  }
+
+  return value.trim() || undefined;
+}
+
+function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function limitStrings(values: string[], max: number): string[] {

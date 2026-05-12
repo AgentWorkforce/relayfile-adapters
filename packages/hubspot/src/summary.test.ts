@@ -38,7 +38,7 @@ test('buildSummary derives HubSpot deal summary fields from properties and prope
   assertSummaryWithinBudget(summary);
 });
 
-test('buildSummary uses the first record for batched HubSpot payloads and redacts free-text PII', () => {
+test('buildSummary uses the first record for batched HubSpot payloads and keeps field changes per record', () => {
   const summary = buildSummary({
     records: [
       {
@@ -46,6 +46,7 @@ test('buildSummary uses the first record for batched HubSpot payloads and redact
         subscriptionType: 'deal.propertyChange',
         propertyName: 'dealstage',
         sourceId: 'src_1',
+        sourceName: 'ops@example.com',
         properties: {
           dealname: 'Renew jane@example.com via +1 555 123 4567',
           dealstage: 'qualifiedtobuy',
@@ -66,7 +67,7 @@ test('buildSummary uses the first record for batched HubSpot payloads and redact
     title: 'Renew [redacted-email] via [redacted-number]',
     status: 'qualifiedtobuy',
     actor: { id: 'src_1' },
-    fieldsChanged: ['dealstage', 'firstname', 'email'],
+    fieldsChanged: ['dealstage'],
     tags: ['subscription:deal.propertyChange', 'object:deal'],
   });
   assertSummaryWithinBudget(summary);

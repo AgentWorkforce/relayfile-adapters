@@ -81,3 +81,22 @@ test('buildSummary caps oversized Salesforce summaries under the 1 KB envelope b
   assert.match(summary.title ?? '', /\[redacted-email\]|\[redacted-number\]/);
   assertSummaryWithinBudget(summary);
 });
+
+test('buildSummary prioritizes Salesforce custom fields in fieldsChanged when mixed with standard fields', () => {
+  const summary = buildSummary({
+    data: {
+      Name: 'Strategic renewal',
+      Status__c: 'Working',
+      Priority__c: 'High',
+    },
+    changedFields: ['Status', 'Custom_Email__c', 'Priority', 'Custom_Phone__c'],
+  });
+
+  assert.deepEqual(summary, {
+    title: 'Strategic renewal',
+    status: 'Working',
+    priority: 'High',
+    fieldsChanged: ['Custom_Email__c', 'Custom_Phone__c', 'Status', 'Priority'],
+  });
+  assertSummaryWithinBudget(summary);
+});

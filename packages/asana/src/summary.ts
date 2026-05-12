@@ -13,7 +13,7 @@ export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const firstEvent = readRecord(readArray(payload.events)?.[0]);
   const resource = readRecord(firstEvent?.resource);
   const task = readRecord(payload.data) ?? readRecord(payload.task) ?? resource ?? payload;
-  const title = truncateText(readString(task.name) ?? readString(resource?.name), MAX_TITLE_LENGTH);
+  const title = truncateText(readString(task.name), MAX_TITLE_LENGTH);
   const status =
     typeof task.completed === 'boolean'
       ? task.completed ? 'done' : 'open'
@@ -146,28 +146,29 @@ function readString(value: unknown): string | undefined {
 
 function resolveFieldsChanged(events: unknown[]): string[] {
   return limitStrings(
-    events
-      .map((entry) => {
-        const record = readRecord(entry);
-        const change = readRecord(record?.change);
-        const action = readString(change?.action);
-        const actionRecord = readRecord(change?.action);
-        if (actionRecord) {
-          const added = readRecord(actionRecord.added_resource);
-          const removed = readRecord(actionRecord.removed_resource);
-          const resource =
-            readString(added?.resource_type)
-            ?? readString(removed?.resource_type)
-            ?? readString(added?.gid)
-            ?? readString(removed?.gid);
-          if (resource) {
-            return `resource:${resource}`;
-          }
-        }
+    events.flatMap((entry) => {
+      const record = readRecord(entry);
+      const change = readRecord(record?.change);
+      const field = readString(change?.field);
+      if (field) {
+        return [field];
+      }
 
-        return readString(change?.field) ?? action ?? readString(record?.action);
-      })
-      .filter((entry): entry is string => Boolean(entry)),
+      const action = change?.action;
+      if (typeof action === 'string' && action.trim().length > 0) {
+        return [action.trim()];
+      }
+
+      const actionRecord = readRecord(action);
+      if (actionRecord) {
+        return Object.keys(actionRecord)
+          .map((key) => key.trim())
+          .filter((key) => key.length > 0);
+      }
+
+      const recordAction = readString(record?.action);
+      return recordAction ? [recordAction] : [];
+    }),
     MAX_FIELDS_CHANGED,
   );
 }

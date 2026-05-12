@@ -59,6 +59,7 @@ export {
   type PipedriveWebhookHeaders,
   type PipedriveWebhookTimestampValidationResult,
 } from './webhook-normalizer.js';
+export * from './summary.js';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 export type * from './types.js';
 

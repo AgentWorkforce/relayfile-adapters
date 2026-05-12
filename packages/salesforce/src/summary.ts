@@ -114,14 +114,14 @@ function resolveFieldsChanged(
   payload: Record<string, unknown>,
   data: Record<string, unknown>,
 ): string[] {
-  const explicit = limitStrings(
+  const explicit = prioritizeCustomFields(limitStrings(
     [
       ...Object.keys(readRecord(payload.changes) ?? {}),
       ...readStringArray(payload.changedFields),
       ...readStringArray(readRecord(payload.ChangeEventHeader)?.changedFields),
     ],
     MAX_FIELDS_CHANGED,
-  );
+  ));
   if (explicit.length > 0) {
     return explicit;
   }
@@ -134,10 +134,10 @@ function resolveFieldsChanged(
     return [];
   }
 
-  return limitStrings(
+  return prioritizeCustomFields(limitStrings(
     Object.keys({ ...previous, ...data }).filter((key) => !isSameValue(previous[key], data[key])),
     MAX_FIELDS_CHANGED,
-  );
+  ));
 }
 
 function isSameValue(left: unknown, right: unknown): boolean {
@@ -173,6 +173,19 @@ function limitStrings(values: string[], max: number): string[] {
     if (output.length >= max) break;
   }
   return output;
+}
+
+function prioritizeCustomFields(values: string[]): string[] {
+  const custom = values.filter((value) => isCustomFieldName(value));
+  if (custom.length === 0 || custom.length === values.length) {
+    return values;
+  }
+
+  return [...custom, ...values.filter((value) => !isCustomFieldName(value))];
+}
+
+function isCustomFieldName(value: string): boolean {
+  return /__(?:c|r)$/u.test(value);
 }
 
 function redactFreeText(value: string): string {

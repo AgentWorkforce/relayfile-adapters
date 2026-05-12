@@ -13,27 +13,21 @@ function assertSummaryWithinBudget(summary: unknown): void {
   );
 }
 
-test('buildSummary derives ClickUp title, status, priority, tags, and history-driven fieldsChanged', () => {
+test('buildSummary derives Mixpanel event title with distinct_id stripped', () => {
   const summary = buildSummary({
+    type: 'event',
+    action: 'create',
     data: {
-      name: 'Triage runtime backlog',
-      status: { status: 'in progress' },
-      priority: { priority: 'high' },
-      tags: [{ name: 'ops' }, { name: 'grace@example.com' }],
-    },
-    history_items: [
-      {
-        field: 'status',
+      event: 'Signed Up user_123',
+      properties: {
+        distinct_id: 'user_123',
+        $insert_id: 'evt_123',
       },
-    ],
+    },
   });
 
   assert.deepEqual(summary, {
-    title: 'Triage runtime backlog',
-    status: 'in progress',
-    priority: 'high',
-    tags: ['ops', '[redacted-email]'],
-    fieldsChanged: ['status'],
+    title: 'Signed Up',
   });
   assertSummaryWithinBudget(summary);
 });

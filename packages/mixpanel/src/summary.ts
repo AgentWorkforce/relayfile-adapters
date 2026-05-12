@@ -3,21 +3,33 @@ import type { EventSummary as SharedEventSummary } from '@agent-relay/events';
 export type EventSummary = SharedEventSummary;
 
 const MAX_TITLE_LENGTH = 120;
-const MAX_TEXT_FIELD_LENGTH = 80;
 const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const data = readRecord(payload.payload) ?? payload;
-  const title = truncateText(readString(data.name), MAX_TITLE_LENGTH);
-  const status = truncateText(
-    readString(data.status) ?? (data.canceled === true ? 'canceled' : undefined),
-    MAX_TEXT_FIELD_LENGTH,
-  );
+  const data = readRecord(payload.data) ?? payload;
+  const distinctId =
+    readString(readRecord(data.properties)?.distinct_id)
+    ?? readString(readRecord(data.properties)?.$distinct_id)
+    ?? readString(data.distinct_id)
+    ?? readString(data.$distinct_id);
+  const title = truncateText(stripDistinctId(
+    readString(data.event) ?? readString(data.name) ?? readString(payload.event) ?? readString(payload.name),
+    distinctId,
+  ), MAX_TITLE_LENGTH);
 
   return finalizeSummary({
     ...(title ? { title } : {}),
-    ...(status ? { status } : {}),
   });
+}
+
+function stripDistinctId(value: string | undefined, distinctId: string | undefined): string | undefined {
+  if (!value || !distinctId) {
+    return value;
+  }
+
+  const escaped = distinctId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const normalized = value.replace(new RegExp(escaped, 'g'), ' ').replace(/\s+/g, ' ').trim();
+  return normalized || undefined;
 }
 
 function finalizeSummary(summary: EventSummary): EventSummary {
@@ -25,14 +37,13 @@ function finalizeSummary(summary: EventSummary): EventSummary {
 
   while (JSON.stringify(next).length >= MAX_SUMMARY_JSON_LENGTH) {
     if (trimText(next, 'title', 24)) continue;
-    if (trimText(next, 'status', 16)) continue;
     break;
   }
 
   return next;
 }
 
-function trimText(summary: EventSummary, key: 'title' | 'status', minLength: number): boolean {
+function trimText(summary: EventSummary, key: 'title', minLength: number): boolean {
   const current = summary[key];
   if (typeof current !== 'string') {
     return false;

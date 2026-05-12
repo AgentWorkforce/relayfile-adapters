@@ -11,7 +11,7 @@ const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const ticket = readRecord(payload.ticket) ?? payload;
-  const title = truncateText(readString(ticket.subject) ?? readString(ticket.title), MAX_TITLE_LENGTH);
+  const title = truncateText(readString(ticket.subject), MAX_TITLE_LENGTH);
   const status = truncateText(readString(ticket.status), MAX_TEXT_FIELD_LENGTH);
   const priority = truncateText(readString(ticket.priority), MAX_TEXT_FIELD_LENGTH);
   const labels = limitStrings(readStringArray(ticket.tags), MAX_LABELS);
@@ -77,15 +77,15 @@ function resolveFieldsChanged(
 
 function commentsChanged(payload: Record<string, unknown>, ticket: Record<string, unknown>): boolean {
   const currentComments = readArray(ticket.comments);
-  if (!currentComments || currentComments.length === 0) {
-    return false;
-  }
-
   const previousTicket = readRecord(payload.previous);
   const previousComments =
     readArray(previousTicket?.comments)
     ?? readArray(readRecord(readRecord(payload.before)?.ticket)?.comments)
     ?? readArray(readRecord(payload.before)?.comments);
+  if (!currentComments || currentComments.length === 0) {
+    return Array.isArray(previousComments) && previousComments.length > 0;
+  }
+
   if (!previousComments) {
     return true;
   }

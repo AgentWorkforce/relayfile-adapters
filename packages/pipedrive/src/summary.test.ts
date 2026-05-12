@@ -13,27 +13,22 @@ function assertSummaryWithinBudget(summary: unknown): void {
   );
 }
 
-test('buildSummary derives ClickUp title, status, priority, tags, and history-driven fieldsChanged', () => {
+test('buildSummary derives Pipedrive deal title, status, and pipeline tag', () => {
   const summary = buildSummary({
-    data: {
-      name: 'Triage runtime backlog',
-      status: { status: 'in progress' },
-      priority: { priority: 'high' },
-      tags: [{ name: 'ops' }, { name: 'grace@example.com' }],
-    },
-    history_items: [
-      {
-        field: 'status',
+    current: {
+      title: 'Enterprise renewal',
+      status: 'open',
+      pipeline_id: {
+        id: 17,
+        name: 'Enterprise',
       },
-    ],
+    },
   });
 
   assert.deepEqual(summary, {
-    title: 'Triage runtime backlog',
-    status: 'in progress',
-    priority: 'high',
-    tags: ['ops', '[redacted-email]'],
-    fieldsChanged: ['status'],
+    title: 'Enterprise renewal',
+    status: 'open',
+    tags: ['pipeline:Enterprise'],
   });
   assertSummaryWithinBudget(summary);
 });

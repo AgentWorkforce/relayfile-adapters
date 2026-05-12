@@ -108,3 +108,27 @@ test('buildSummary caps oversized Zendesk summaries under the 1 KB envelope budg
   assert.match(summary.title ?? '', /\[redacted-email\]|\[redacted-number\]/);
   assertSummaryWithinBudget(summary);
 });
+
+test('buildSummary marks Zendesk comments as changed when comments are removed', () => {
+  const summary = buildSummary({
+    ticket: {
+      subject: 'Resolved duplicate comment thread',
+      status: 'solved',
+      priority: 'normal',
+      comments: [],
+    },
+    previous: {
+      comments: [
+        { id: 1, body: 'Old internal note' },
+      ],
+    },
+  });
+
+  assert.deepEqual(summary, {
+    title: 'Resolved duplicate comment thread',
+    status: 'solved',
+    priority: 'normal',
+    fieldsChanged: ['comments'],
+  });
+  assertSummaryWithinBudget(summary);
+});

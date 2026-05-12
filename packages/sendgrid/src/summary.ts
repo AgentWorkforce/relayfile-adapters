@@ -9,25 +9,44 @@ const MAX_TEXT_FIELD_LENGTH = 80;
 const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const data = readRecord(payload.data) ?? readRecord(payload.payload) ?? payload;
-  const firstLineItem = readRecord(readArray(data.line_items)[0]);
-  const title = truncateText(
-    readString(data.name) ?? readString(data.title) ?? readString(firstLineItem?.title),
-    MAX_TITLE_LENGTH,
-  );
-  const status = truncateText(readString(data.fulfillment_status), MAX_TEXT_FIELD_LENGTH);
-  const tags = limitTexts(parseDelimitedTags(readString(data.tags)), MAX_TAGS, MAX_TEXT_FIELD_LENGTH);
+  const record = resolvePrimaryRecord(payload);
+  const title = truncateText(readString(record.event), MAX_TITLE_LENGTH);
+  const subject = resolveSubject(record);
+  const tags = limitTexts(subject ? [subject] : [], MAX_TAGS, MAX_TEXT_FIELD_LENGTH);
   const fieldsChanged = limitStrings(
-    [readString(payload.topic)].filter((value): value is string => Boolean(value)),
+    [readString(record.sg_event_id)].filter((value): value is string => Boolean(value)),
     MAX_FIELDS_CHANGED,
   );
 
   return finalizeSummary({
     ...(title ? { title } : {}),
-    ...(status ? { status } : {}),
     ...(tags.length > 0 ? { tags } : {}),
     ...(fieldsChanged.length > 0 ? { fieldsChanged } : {}),
   });
+}
+
+function resolvePrimaryRecord(payload: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(payload)) {
+    return readRecord(payload[0]) ?? {};
+  }
+
+  const events = readArray(payload.events);
+  if (events.length > 0) {
+    return readRecord(events[0]) ?? {};
+  }
+
+  return payload;
+}
+
+function resolveSubject(record: Record<string, unknown>): string | undefined {
+  const mail = readRecord(record.mail);
+  const personalizations = readArray(mail?.personalizations);
+  const firstPersonalization = readRecord(personalizations[0]);
+  return (
+    readString(record.subject)
+    ?? readString(mail?.subject)
+    ?? readString(firstPersonalization?.subject)
+  );
 }
 
 function finalizeSummary(summary: EventSummary): EventSummary {
@@ -41,7 +60,6 @@ function finalizeSummary(summary: EventSummary): EventSummary {
     if (trimArray(next, 'fieldsChanged')) continue;
     if (trimArray(next, 'tags')) continue;
     if (trimText(next, 'title', 24)) continue;
-    if (trimText(next, 'status', 16)) continue;
     break;
   }
 
@@ -63,7 +81,7 @@ function trimArray(summary: EventSummary, key: 'fieldsChanged' | 'tags'): boolea
   return true;
 }
 
-function trimText(summary: EventSummary, key: 'title' | 'status', minLength: number): boolean {
+function trimText(summary: EventSummary, key: 'title', minLength: number): boolean {
   const current = summary[key];
   if (typeof current !== 'string') {
     return false;
@@ -81,10 +99,6 @@ function trimText(summary: EventSummary, key: 'title' | 'status', minLength: num
     delete summary[key];
   }
   return true;
-}
-
-function parseDelimitedTags(value: string | undefined): string[] {
-  return value ? value.split(',').map((entry) => entry.trim()).filter(Boolean) : [];
 }
 
 function readArray(value: unknown): unknown[] {

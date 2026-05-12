@@ -13,27 +13,24 @@ function assertSummaryWithinBudget(summary: unknown): void {
   );
 }
 
-test('buildSummary derives ClickUp title, status, priority, tags, and history-driven fieldsChanged', () => {
+test('buildSummary derives Intercom conversation message title and state', () => {
   const summary = buildSummary({
+    type: 'notification_event',
     data: {
-      name: 'Triage runtime backlog',
-      status: { status: 'in progress' },
-      priority: { priority: 'high' },
-      tags: [{ name: 'ops' }, { name: 'grace@example.com' }],
-    },
-    history_items: [
-      {
-        field: 'status',
+      item: {
+        id: 'conv_123',
+        type: 'conversation',
+        state: 'open',
+        source: {
+          body: 'Hello from jane@example.com at +1 (415) 555-1212',
+        },
       },
-    ],
+    },
   });
 
   assert.deepEqual(summary, {
-    title: 'Triage runtime backlog',
-    status: 'in progress',
-    priority: 'high',
-    tags: ['ops', '[redacted-email]'],
-    fieldsChanged: ['status'],
+    title: 'Hello from [redacted-email] at [redacted-number]',
+    status: 'open',
   });
   assertSummaryWithinBudget(summary);
 });

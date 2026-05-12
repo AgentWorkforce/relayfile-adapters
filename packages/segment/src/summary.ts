@@ -7,12 +7,13 @@ const MAX_TEXT_FIELD_LENGTH = 80;
 const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const data = readRecord(payload.payload) ?? payload;
-  const title = truncateText(readString(data.name), MAX_TITLE_LENGTH);
-  const status = truncateText(
-    readString(data.status) ?? (data.canceled === true ? 'canceled' : undefined),
-    MAX_TEXT_FIELD_LENGTH,
+  const title = truncateText(
+    readString(payload.event)
+    ?? readString(payload.name)
+    ?? readString(readRecord(payload.context)?.page && readRecord(readRecord(payload.context)?.page)?.title),
+    MAX_TITLE_LENGTH,
   );
+  const status = truncateText(readString(payload.type), MAX_TEXT_FIELD_LENGTH);
 
   return finalizeSummary({
     ...(title ? { title } : {}),

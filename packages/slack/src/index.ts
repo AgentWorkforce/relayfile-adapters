@@ -19,6 +19,7 @@ export {
   SlackAdapter,
 } from './slack-adapter.js';
 export * from './summary.js';
+export * from './thread.js';
 
 export {
   SLACK_REQUEST_TIMESTAMP_HEADER,

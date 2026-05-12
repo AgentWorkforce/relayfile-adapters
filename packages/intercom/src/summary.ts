@@ -2,22 +2,38 @@ import type { EventSummary as SharedEventSummary } from '@agent-relay/events';
 
 export type EventSummary = SharedEventSummary;
 
-const MAX_TITLE_LENGTH = 120;
+const MAX_TITLE_LENGTH = 80;
 const MAX_TEXT_FIELD_LENGTH = 80;
 const MAX_SUMMARY_JSON_LENGTH = 1024;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const data = readRecord(payload.payload) ?? payload;
-  const title = truncateText(readString(data.name), MAX_TITLE_LENGTH);
-  const status = truncateText(
-    readString(data.status) ?? (data.canceled === true ? 'canceled' : undefined),
-    MAX_TEXT_FIELD_LENGTH,
-  );
+  const conversation = resolveConversation(payload);
+  const title = truncateText(resolveConversationMessage(conversation), MAX_TITLE_LENGTH);
+  const status = truncateText(readString(conversation.state), MAX_TEXT_FIELD_LENGTH);
 
   return finalizeSummary({
     ...(title ? { title } : {}),
     ...(status ? { status } : {}),
   });
+}
+
+function resolveConversation(payload: Record<string, unknown>): Record<string, unknown> {
+  const item = readRecord(payload.item) ?? readRecord(readRecord(payload.data)?.item);
+  if (item) {
+    return item;
+  }
+  return payload;
+}
+
+function resolveConversationMessage(conversation: Record<string, unknown>): string | undefined {
+  const source = readRecord(conversation.source);
+  const parts = readArray(readRecord(conversation.conversation_parts)?.data);
+
+  return (
+    readString(source?.body)
+    ?? readString(source?.subject)
+    ?? readString(readRecord(parts[0])?.body)
+  );
 }
 
 function finalizeSummary(summary: EventSummary): EventSummary {
@@ -50,6 +66,10 @@ function trimText(summary: EventSummary, key: 'title' | 'status', minLength: num
     delete summary[key];
   }
   return true;
+}
+
+function readArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {

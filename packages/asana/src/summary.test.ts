@@ -84,7 +84,7 @@ test('buildSummary derives completed status and redacts Asana free-text PII', ()
     actor: {
       id: 'usr_asana_2',
     },
-    fieldsChanged: ['resource:story'],
+    fieldsChanged: ['added_resource'],
     tags: ['action:changed', 'resource:task'],
   });
   assertSummaryWithinBudget(summary);

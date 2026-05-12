@@ -148,7 +148,9 @@ export function createStorageBridgeEvent<Source extends StorageBridgeSource>(
         ? { digest: input.fingerprint.trim() }
         : {}),
     metadata,
-    ...(input.summary ? { summary: input.summary } : {}),
+    ...(input.summary
+      ? { summary: input.summary }
+      : { summary: buildDefaultSummary(input) }),
     workspaceId: input.workspaceId ?? null,
   };
 
@@ -280,6 +282,29 @@ export function buildStorageBridgeEventId(input: {
     .slice(0, 32);
 
   return `${input.source}:${digest}`;
+}
+
+function buildDefaultSummary(
+  input: CreateStorageBridgeEventInput,
+): EventSummary {
+  const title = summarizeRelayfilePath(input.relayfilePath);
+  return {
+    ...(title ? { title } : {}),
+    status: input.changeType,
+    tags: [input.source],
+  };
+}
+
+function summarizeRelayfilePath(path: string): string | undefined {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const segments = trimmed.split("/").filter(Boolean);
+  const leaf = segments[segments.length - 1] ?? trimmed;
+  const normalized = leaf.replace(/\.json$/i, "").trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 export function toIsoTimestamp(value: string | Date): string {

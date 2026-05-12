@@ -40,6 +40,11 @@ test("StorageBridgeEvent factory validates and enriches source metadata", () => 
     accountId: "aws-prod",
     nativeEventId: "evt_123",
   });
+  assert.deepEqual(event.summary, {
+    title: "q1.csv",
+    status: "created",
+    tags: ["s3"],
+  });
 
   const s3Event = event as StorageBridgeEventForSource<"s3">;
   assert.equal(s3Event.source, "s3");

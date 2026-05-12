@@ -16,6 +16,7 @@ export * from './pages/properties.js';
 export * from './path-mapper.js';
 export * from './search.js';
 export * from './summary.js';
+export * from './thread.js';
 export * from './sync.js';
 export * from './types.js';
 export {
