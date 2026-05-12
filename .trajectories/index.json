@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-10T19:19:57.522Z",
+  "lastUpdated": "2026-05-12T01:36:53.866Z",
   "trajectories": {
     "traj_q7vhb9378uqk": {
       "title": "Wire Jira privacy-safe adapter storage",
@@ -327,6 +327,13 @@
       "completedAt": "2026-05-09T19:36:53.534Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_eq6nyund0mp5.json",
       "compactedInto": "compact_6bxhb5ypxvt2"
+    },
+    "traj_16jy5n5ejwmn": {
+      "title": "Track A: buildSummary() for Tier-1 providers",
+      "status": "completed",
+      "startedAt": "2026-05-12T01:29:12.191Z",
+      "completedAt": "2026-05-12T01:36:53.740Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_16jy5n5ejwmn.json"
     }
   }
 }

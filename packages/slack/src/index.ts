@@ -68,6 +68,8 @@ export {
   IntegrationAdapter,
   SlackAdapter,
 } from './slack-adapter.js';
+export * from './summary.js';
+export * from './thread.js';
 
 export { emitSlackAuxiliaryFiles } from './emit-auxiliary-files.js';
 export type {

@@ -3,6 +3,8 @@ export {
   JiraAdapter,
   sanitizeJiraRecordForStorage,
 } from './jira-adapter.js';
+export * from './summary.js';
+export * from './thread.js';
 export {
   JIRA_LAYOUT_PROMPT,
   jiraLayoutPromptFile,
