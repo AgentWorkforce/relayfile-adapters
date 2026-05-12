@@ -19,6 +19,7 @@ import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event
 import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
 
+export * from './emit-auxiliary-files.js';
 export * from './index-emitter.js';
 export * from './layout-prompt.js';
 
