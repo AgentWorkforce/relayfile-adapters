@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-slack",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Slack adapter scaffolding for Relayfile",
   "type": "module",
   "sideEffects": false,
@@ -62,7 +62,7 @@
     "directory": "packages/slack"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.15"
+    "@relayfile/adapter-core": "^0.2.16"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

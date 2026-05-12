@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/webhook-server",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Thin Hono webhook receiver for relayfile adapters",
   "type": "module",
   "sideEffects": false,
