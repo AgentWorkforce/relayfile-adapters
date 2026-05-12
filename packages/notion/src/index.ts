@@ -10,6 +10,7 @@ export * from './content/renderer.js';
 export * from './databases/ingestion.js';
 export * from './databases/query.js';
 export * from './discovery/index.js';
+export * from './emit-auxiliary-files.js';
 export * from './index-emitter.js';
 export * from './layout-prompt.js';
 export * from './pages/ingestion.js';
