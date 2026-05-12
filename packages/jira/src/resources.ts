@@ -7,6 +7,8 @@ export interface AdapterResourceConfig {
   readonly createExample: string;
 }
 
+const CREATE_ONLY_PATTERN = /^$/;
+
 export const resources = [
   {
     name: "comments",
@@ -20,7 +22,7 @@ export const resources = [
     name: "transitions",
     path: "/jira/issues/{issueIdOrKey}/transitions",
     pathPattern: /^\/jira\/issues\/[^\/]+\/transitions(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_.~-]+$/,
+    idPattern: CREATE_ONLY_PATTERN,
     schema: "discovery/jira/issues/{issueIdOrKey}/transitions/.schema.json",
     createExample: "discovery/jira/issues/{issueIdOrKey}/transitions/.create.example.json",
   },

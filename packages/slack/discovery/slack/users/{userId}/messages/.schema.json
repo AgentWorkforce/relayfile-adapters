@@ -63,6 +63,28 @@
       "format": "uri",
       "description": "Provider URL for the record.",
       "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Relayfile webhook metadata.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata.",
+      "readOnly": true,
+      "additionalProperties": true
     }
   },
   "additionalProperties": false,

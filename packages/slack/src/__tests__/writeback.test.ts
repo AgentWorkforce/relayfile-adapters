@@ -260,7 +260,7 @@ describe('slack writeback', () => {
   describe('post_dm', () => {
     it('opens a direct message conversation and carries the message payload', () => {
       const req = resolveWritebackRequest(
-        '/slack/users/U01ABC1234/messages/create request.json',
+        '/slack/users/U01ABC1234/messages/create.json',
         JSON.stringify({ text: 'Can you review this?', unfurl_links: false }),
       );
 
@@ -278,7 +278,7 @@ describe('slack writeback', () => {
 
     it('extracts canonical user id from <slug>--<id> paths', () => {
       const req = resolveWritebackRequest(
-        '/slack/users/khalid--U01ABC1234/messages/create request.json',
+        '/slack/users/khalid--U01ABC1234/messages/message.json',
         'Heads up from the deploy agent.',
       );
 

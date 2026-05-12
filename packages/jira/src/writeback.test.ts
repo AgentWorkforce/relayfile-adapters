@@ -6,7 +6,7 @@ import { resolveJiraWritebackRequest } from './writeback.js';
 describe('jira writeback', () => {
   it('resolves issue transition create writebacks', () => {
     const request = resolveJiraWritebackRequest(
-      '/jira/issues/ENG-42/transitions/create transition.json',
+      '/jira/issues/ENG-42/transitions/start-progress.json',
       JSON.stringify({ transition: { id: '31' } }),
     );
 
@@ -21,7 +21,7 @@ describe('jira writeback', () => {
   it('accepts a bare transition id payload', () => {
     const request = resolveJiraWritebackRequest(
       '/jira/issues/ENG-42/transitions/create transition.json',
-      '"41"',
+      '" 41 "',
     );
 
     assert.deepStrictEqual(request.body, { transition: { id: '41' } });

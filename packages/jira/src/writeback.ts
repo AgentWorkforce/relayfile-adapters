@@ -214,10 +214,11 @@ function buildProjectCreate(content: string): JiraWritebackRequest {
 
 function normalizeTransition(payload: unknown): { id: string } {
   if (typeof payload === 'string') {
-    if (!payload) {
+    const id = payload.trim();
+    if (!id) {
       throw new Error('issue transition writeback requires transition.id');
     }
-    return { id: payload };
+    return { id };
   }
   if (!isRecord(payload)) {
     throw new Error('issue transition writeback requires a transition object or id');
@@ -227,7 +228,7 @@ function normalizeTransition(payload: unknown): { id: string } {
   if (!id) {
     throw new Error('issue transition writeback requires transition.id');
   }
-  return { id };
+  return { id: id.trim() };
 }
 
 function buildProjectUpdate(projectIdOrKey: string, content: string): JiraWritebackRequest {
