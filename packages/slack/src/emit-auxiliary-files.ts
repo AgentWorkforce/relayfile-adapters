@@ -196,8 +196,35 @@ export async function emitSlackAuxiliaryFiles(
   // `ls /slack`-style discovery.
   await writeRootIndex(emitterClient, workspaceId, aggregate);
 
+  // Hydrate the channelName-by-id maps up front:
+  //   - `priorChannelNameById` is the snapshot from the existing
+  //     `_index.json` BEFORE this batch's writes apply. `emitChannels`
+  //     uses this for rename reconciliation (delete the stale alias whose
+  //     handle came from the prior row).
+  //   - `channelNameById` overlays the intra-batch channel writes on top.
+  //     Every message/thread/reply path is computed from THIS map so
+  //     writes and delete tombstones target identical paths — the
+  //     original review finding was that writes passed `record.channelName`
+  //     (yielding `<id>__<slug>`) while deletes omitted it (yielding bare
+  //     `<id>`), so tombstones missed the file they were trying to remove.
+  //     See PR #79 review thread.
+  const priorChannelNameById = await readPriorChannelNames(emitterClient, workspaceId);
+  const channelNameById = new Map(priorChannelNameById);
+  for (const record of channels) {
+    if (isChannelDelete(record)) continue;
+    const id = readNonEmptyString(record.id);
+    const name = readNonEmptyString(record.name);
+    if (id && name) channelNameById.set(id, name);
+  }
+
   if (channels.length > 0) {
-    const partial = await emitChannels(emitterClient, workspaceId, channels, input.connectionId);
+    const partial = await emitChannels(
+      emitterClient,
+      workspaceId,
+      channels,
+      input.connectionId,
+      priorChannelNameById,
+    );
     accumulate(aggregate, partial);
   }
   if (users.length > 0) {
@@ -205,11 +232,23 @@ export async function emitSlackAuxiliaryFiles(
     accumulate(aggregate, partial);
   }
   if (messages.length > 0) {
-    const partial = await emitMessages(emitterClient, workspaceId, messages, input.connectionId);
+    const partial = await emitMessages(
+      emitterClient,
+      workspaceId,
+      messages,
+      input.connectionId,
+      channelNameById,
+    );
     accumulate(aggregate, partial);
   }
   if (threads.length > 0) {
-    const partial = await emitThreads(emitterClient, workspaceId, threads, input.connectionId);
+    const partial = await emitThreads(
+      emitterClient,
+      workspaceId,
+      threads,
+      input.connectionId,
+      channelNameById,
+    );
     accumulate(aggregate, partial);
   }
   if (threadReplies.length > 0) {
@@ -218,6 +257,7 @@ export async function emitSlackAuxiliaryFiles(
       workspaceId,
       threadReplies,
       input.connectionId,
+      channelNameById,
     );
     accumulate(aggregate, partial);
   }
@@ -257,12 +297,19 @@ async function emitChannels(
   workspaceId: string,
   records: readonly SlackChannelEmitRecord[],
   connectionId: string | undefined,
+  /**
+   * Prior-name lookup hydrated once by the entry point from the existing
+   * channels `_index.json`. Slack's reconciliation anchor lives in the
+   * index row (not in a by-id alias file), so this map drives stale
+   * canonical / by-name deletes when a rename is detected.
+   */
+  priorNameById: ReadonlyMap<string, string>,
 ): Promise<EmitAuxiliaryFilesResult> {
-  // Build the prior-name lookup ONCE per batch by reading the existing
-  // `_index.json`. Slack's reconciliation anchor lives in the index row
-  // (not in a by-id alias file), so we hydrate the map up front and let
-  // every per-record planner consult it cheaply.
-  const priorNameById = await readPriorChannelNames(client, workspaceId);
+  // Intra-batch slug collision detection: when two channel records slug to
+  // the same value but carry different ids, every record sharing that slug
+  // must use the colliding-variant alias path so neither clobbers the
+  // other. Mirror the pattern in adapter-github's `nameWithId(existingNames)`.
+  const collidingChannelSlugs = computeCollidingChannelSlugs(records);
 
   const indexReconciler = new IndexFileReconciler<SlackChannelIndexRow>({
     client,
@@ -281,7 +328,13 @@ async function emitChannels(
     if (isChannelDelete(record)) {
       return planChannelDelete(record.id, priorNameById, indexReconciler);
     }
-    return planChannelWrite(record, priorNameById, indexReconciler, connectionId);
+    return planChannelWrite(
+      record,
+      priorNameById,
+      indexReconciler,
+      connectionId,
+      collidingChannelSlugs,
+    );
   });
 
   const indexResult = await indexReconciler.flush();
@@ -290,11 +343,42 @@ async function emitChannels(
   return fanOut;
 }
 
+/**
+ * Compute the set of slug values that appear with more than one distinct id
+ * in the channel batch. Names that slug to the empty-slug sentinel
+ * (`'untitled'`) are ignored — those records skip the by-name alias.
+ */
+function computeCollidingChannelSlugs(
+  records: readonly SlackChannelEmitRecord[],
+): ReadonlySet<string> {
+  const slugToIds = new Map<string, Set<string>>();
+  for (const record of records) {
+    if (isChannelDelete(record)) continue;
+    const id = readNonEmptyString(record.id);
+    const name = readNonEmptyString(record.name);
+    if (!id || !name) continue;
+    const slug = slugifyAlias(name);
+    if (slug === 'untitled') continue;
+    let ids = slugToIds.get(slug);
+    if (!ids) {
+      ids = new Set();
+      slugToIds.set(slug, ids);
+    }
+    ids.add(id);
+  }
+  const colliding = new Set<string>();
+  for (const [slug, ids] of slugToIds) {
+    if (ids.size > 1) colliding.add(slug);
+  }
+  return colliding;
+}
+
 function planChannelWrite(
   channel: SlackChannelRecord,
-  priorNameById: Map<string, string>,
+  priorNameById: ReadonlyMap<string, string>,
   indexReconciler: IndexFileReconciler<SlackChannelIndexRow>,
   connectionId: string | undefined,
+  collidingSlugs: ReadonlySet<string>,
 ): EmitPlan {
   const id = readNonEmptyString(channel.id);
   if (!id) return {};
@@ -309,14 +393,20 @@ function planChannelWrite(
   writes.push({ path: canonical, content, contentType: JSON_CONTENT_TYPE });
 
   if (name && slugifies(name)) {
+    const colliding = collidingSlugs.has(slugifyAlias(name));
     writes.push({
-      path: slackByNameChannelAliasPath(name, id),
+      path: slackByNameChannelAliasPath(name, id, colliding),
       content,
       contentType: JSON_CONTENT_TYPE,
     });
   }
 
   // Reconcile rename: stale canonical + stale by-name from the prior handle.
+  // Note: cross-batch collision state isn't tracked, so the rename targets
+  // the non-colliding variant only. If a prior write happened to be the
+  // colliding variant, a separate sync run will land the new state cleanly
+  // — the stale colliding file is a known minor leak documented in
+  // AGENTS.md follow-ups.
   const prior = priorNameById.get(id);
   if (prior && prior !== name) {
     deletes.push({ path: channelMetadataPath(id, prior) });
@@ -336,7 +426,7 @@ function planChannelWrite(
 
 function planChannelDelete(
   id: string,
-  priorNameById: Map<string, string>,
+  priorNameById: ReadonlyMap<string, string>,
   indexReconciler: IndexFileReconciler<SlackChannelIndexRow>,
 ): EmitPlan {
   const deletes: EmitDelete[] = [];
@@ -366,6 +456,12 @@ async function emitUsers(
   // by-id alias read per user.
   const prior = await readPriorUserState(client, workspaceId);
 
+  // Intra-batch slug collision detection for the `by-name` alias. Slack
+  // user display names are non-unique by design (multiple humans named
+  // "Sam"), so the second writer of a colliding slug must land at the
+  // hash-disambiguated variant rather than clobbering the first.
+  const collidingUserSlugs = computeCollidingUserSlugs(records);
+
   const indexReconciler = new IndexFileReconciler<SlackUserIndexRow>({
     client,
     workspaceId,
@@ -383,13 +479,46 @@ async function emitUsers(
     if (isUserDelete(record)) {
       return planUserDelete(record.id, prior, indexReconciler);
     }
-    return planUserWrite(record, prior, indexReconciler, connectionId);
+    return planUserWrite(record, prior, indexReconciler, connectionId, collidingUserSlugs);
   });
 
   const indexResult = await indexReconciler.flush();
   fanOut.written += indexResult.written;
   fanOut.errors.push(...indexResult.errors);
   return fanOut;
+}
+
+/**
+ * Compute the set of slug values that appear with more than one distinct id
+ * in the user batch. Slug derives from the handle when present, falling back
+ * to display name — matching `planUserWrite`'s `slugSource` derivation.
+ */
+function computeCollidingUserSlugs(
+  records: readonly SlackUserEmitRecord[],
+): ReadonlySet<string> {
+  const slugToIds = new Map<string, Set<string>>();
+  for (const record of records) {
+    if (isUserDelete(record)) continue;
+    const id = readNonEmptyString(record.id);
+    if (!id) continue;
+    const handle = readUserHandle(record);
+    const displayName = readUserDisplayName(record) ?? handle;
+    const slugSource = handle ?? displayName;
+    if (!slugSource) continue;
+    const slug = slugifyAlias(slugSource);
+    if (slug === 'untitled') continue;
+    let ids = slugToIds.get(slug);
+    if (!ids) {
+      ids = new Set();
+      slugToIds.set(slug, ids);
+    }
+    ids.add(id);
+  }
+  const colliding = new Set<string>();
+  for (const [slug, ids] of slugToIds) {
+    if (ids.size > 1) colliding.add(slug);
+  }
+  return colliding;
 }
 
 interface PriorUserState {
@@ -405,6 +534,7 @@ function planUserWrite(
   prior: Map<string, PriorUserState>,
   indexReconciler: IndexFileReconciler<SlackUserIndexRow>,
   connectionId: string | undefined,
+  collidingSlugs: ReadonlySet<string>,
 ): EmitPlan {
   const id = readNonEmptyString(user.id);
   if (!id) return {};
@@ -423,8 +553,9 @@ function planUserWrite(
   writes.push({ path: canonical, content, contentType: JSON_CONTENT_TYPE });
 
   if (slugSource && slugifies(slugSource)) {
+    const colliding = collidingSlugs.has(slugifyAlias(slugSource));
     writes.push({
-      path: slackByNameUserAliasPath(slugSource, id),
+      path: slackByNameUserAliasPath(slugSource, id, colliding),
       content,
       contentType: JSON_CONTENT_TYPE,
     });
@@ -499,12 +630,27 @@ async function emitMessages(
   workspaceId: string,
   records: readonly SlackMessageEmitRecord[],
   connectionId: string | undefined,
+  channelNameById: ReadonlyMap<string, string>,
 ): Promise<EmitAuxiliaryFilesResult> {
   return runEmitBatch(client, workspaceId, records, (record) => {
+    // Derive channelName uniformly for writes and deletes from the shared
+    // `channelNameById` map (prior `_index.json` + intra-batch channel
+    // writes), falling back to whatever the record itself carries. This
+    // closes the PR #79 review finding where writes used `record.channelName`
+    // (yielding `<id>__<slug>`) while deletes omitted it (yielding bare
+    // `<id>`), so a tombstone never matched the file it was meant to
+    // remove.
+    const channelName = resolveChannelName(
+      channelNameById,
+      record.channelId,
+      (record as { channelName?: string }).channelName,
+    );
     if (isMessageDelete(record)) {
-      return { deletes: [{ path: messagePath(record.channelId, record.ts) }] };
+      return {
+        deletes: [{ path: messagePath(record.channelId, record.ts, undefined, channelName) }],
+      };
     }
-    const path = messagePath(record.channelId, record.ts, undefined, record.channelName);
+    const path = messagePath(record.channelId, record.ts, undefined, channelName);
     const content = renderContent(
       'message',
       `${record.channelId}:${record.ts}`,
@@ -521,12 +667,18 @@ async function emitThreads(
   workspaceId: string,
   records: readonly SlackThreadEmitRecord[],
   connectionId: string | undefined,
+  channelNameById: ReadonlyMap<string, string>,
 ): Promise<EmitAuxiliaryFilesResult> {
   return runEmitBatch(client, workspaceId, records, (record) => {
+    const channelName = resolveChannelName(
+      channelNameById,
+      record.channelId,
+      (record as { channelName?: string }).channelName,
+    );
     if (isThreadDelete(record)) {
-      return { deletes: [{ path: threadPath(record.channelId, record.threadTs) }] };
+      return { deletes: [{ path: threadPath(record.channelId, record.threadTs, channelName) }] };
     }
-    const path = threadPath(record.channelId, record.threadTs, record.channelName);
+    const path = threadPath(record.channelId, record.threadTs, channelName);
     const content = renderContent(
       'thread',
       `${record.channelId}:${record.threadTs}`,
@@ -543,12 +695,25 @@ async function emitThreadReplies(
   workspaceId: string,
   records: readonly SlackThreadReplyEmitRecord[],
   connectionId: string | undefined,
+  channelNameById: ReadonlyMap<string, string>,
 ): Promise<EmitAuxiliaryFilesResult> {
   return runEmitBatch(client, workspaceId, records, (record) => {
+    const channelName = resolveChannelName(
+      channelNameById,
+      record.channelId,
+      (record as { channelName?: string }).channelName,
+    );
     if (isThreadReplyDelete(record)) {
       return {
         deletes: [
-          { path: threadReplyPath(record.channelId, record.threadTs, record.replyTs) },
+          {
+            path: threadReplyPath(
+              record.channelId,
+              record.threadTs,
+              record.replyTs,
+              channelName,
+            ),
+          },
         ],
       };
     }
@@ -556,7 +721,7 @@ async function emitThreadReplies(
       record.channelId,
       record.threadTs,
       record.replyTs,
-      record.channelName,
+      channelName,
     );
     const content = renderContent(
       'thread_reply',
@@ -567,6 +732,29 @@ async function emitThreadReplies(
     );
     return { writes: [{ path, content, contentType: JSON_CONTENT_TYPE }] };
   });
+}
+
+/**
+ * Pick the channelName segment to use when computing a message / thread /
+ * reply path. Preference order:
+ *
+ *   1. The shared `channelNameById` map — prior index + intra-batch channel
+ *      writes. This is the authoritative source for write/delete uniformity.
+ *   2. The record's own `channelName` field — fallback for the case where
+ *      the channels index hasn't been hydrated (no `readFile` on the client
+ *      AND no channel records in this batch).
+ *   3. `undefined` — produces bare `<id>` path segments. Both writes and
+ *      deletes degrade to this together, so they still target the same
+ *      file.
+ */
+function resolveChannelName(
+  channelNameById: ReadonlyMap<string, string>,
+  channelId: string,
+  recordChannelName: string | undefined,
+): string | undefined {
+  const fromMap = channelNameById.get(channelId);
+  if (fromMap) return fromMap;
+  return readNonEmptyString(recordChannelName);
 }
 
 /* -------------------------------------------------------------------------- */
