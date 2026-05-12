@@ -1,82 +1,89 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dropbox file",
   "type": "object",
-  "additionalProperties": true,
   "required": [
     "path_display"
   ],
   "properties": {
-    "id": {
-      "description": "Provider id.",
-      "readOnly": true
-    },
-    "name": {
-      "type": "string",
-      "description": "File name."
-    },
-    "path_lower": {
-      "type": "string",
-      "description": "Lowercase Dropbox path."
-    },
     "path_display": {
       "type": "string",
-      "description": "Display Dropbox path."
-    },
-    "client_modified": {
-      "type": "string",
-      "description": "Client modified timestamp."
-    },
-    "server_modified": {
-      "type": "string",
-      "description": "Server modified timestamp."
-    },
-    "rev": {
-      "type": "string",
-      "description": "Dropbox revision."
-    },
-    "size": {
-      "type": "number",
-      "description": "File size in bytes."
-    },
-    "is_downloadable": {
-      "type": "boolean",
-      "description": "Whether file can be downloaded."
-    },
-    "content_hash": {
-      "type": "string",
-      "description": "Dropbox content hash."
+      "description": "Dropbox display path."
     },
     "contentBase64": {
       "type": "string",
-      "description": "Base64 encoded file content."
+      "description": "Base64 content."
     },
     "mode": {
-      "enum": [
-        "add",
-        "overwrite",
-        "update"
-      ],
-      "description": "Dropbox upload mode."
+      "type": "string",
+      "description": "Upload mode."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
     },
     "createdAt": {
+      "type": "string",
+      "format": "date-time",
       "description": "Provider creation timestamp.",
       "readOnly": true
     },
     "updatedAt": {
-      "description": "Provider update timestamp.",
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
       "readOnly": true
     },
     "url": {
-      "description": "Provider URL.",
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
       "readOnly": true
     },
     "_webhook": {
-      "description": "Relayfile webhook metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     },
     "_connection": {
-      "description": "Relayfile connection metadata.",
-      "readOnly": true
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

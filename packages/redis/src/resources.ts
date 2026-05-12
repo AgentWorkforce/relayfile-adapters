@@ -10,9 +10,9 @@ export interface AdapterResourceConfig {
 export const resources = [
   {
     name: "keys",
-    path: "/redis/{db}",
-    pathPattern: /^\/redis\/[^\/]+(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^.+$/,
+    path: "/redis/keys",
+    pathPattern: /^\/redis\/keys(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/redis/keys/.schema.json",
     createExample: "discovery/redis/keys/.create.example.json",
   },
@@ -20,13 +20,13 @@ export const resources = [
     name: "listeners",
     path: "/redis/listeners",
     pathPattern: /^\/redis\/listeners(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[0-9]+$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/redis/listeners/.schema.json",
     createExample: "discovery/redis/listeners/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

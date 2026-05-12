@@ -1,7 +1,7 @@
 {
-  "title": "Follow up on deploy v1",
-  "body": "Track the remaining deployment checklist.",
+  "title": "Replace example issue title",
+  "body": "Replace example issue body.",
   "labels": [
-    "deploy-v1"
+    "triage"
   ]
 }

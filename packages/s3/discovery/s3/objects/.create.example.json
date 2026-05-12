@@ -1,5 +1,4 @@
 {
   "Bucket": "rf-bucket",
-  "Key": "logs/app.log",
-  "BodyBase64": "SU5GTyBhcHAgc3RhcnRlZA=="
+  "Key": "logs/app.log"
 }

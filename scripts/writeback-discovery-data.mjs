@@ -110,8 +110,9 @@ export const adapters = [
           description: 'Milestone number or title.',
           oneOf: [{ type: 'number' }, { type: 'string' }],
         },
+        state: en(['open', 'closed'], 'Issue state when updating an existing issue.'),
       }, { title: 'Replace example issue title', body: 'Replace example issue body.', labels: ['triage'] }),
-      endpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'Create GitHub issue comment', 'Creates a comment on a GitHub issue.', ['body'], {
+      endpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'Create GitHub issue comment', 'Creates or updates a GitHub issue comment.', ['body'], {
         body: str('Comment body.'),
       }, { body: 'Replace example comment body.' }),
       endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/new.json', 'Submit GitHub pull request review', 'Submits a pull request review with optional inline comments.', ['event', 'body', 'comments'], {
@@ -348,7 +349,7 @@ export const adapters = [
     ],
     endpoints: [
       endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, slackContentRequirement()),
-      endpoint('/slack/users/{userId}/messages/new.json', 'Post Slack direct message', 'Opens or reuses a direct message conversation and posts a Slack message.', [], slackMessageProps(), { text: 'Replace example direct message text.' }, slackContentRequirement()),
+      endpoint('/slack/users/{userId}/messages/new.json', 'Post Slack direct message', 'Opens or reuses a direct message conversation and posts a Slack message.', [], slackDirectMessageProps(), { text: 'Replace example direct message text.' }, slackContentRequirement()),
       endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }, slackContentRequirement()),
       endpoint('/slack/channels/{channelId}/messages/{messageTs}/reactions/new.json', 'Add Slack reaction', 'Adds an emoji reaction to a Slack message.', [], {
         name: str('Emoji name without surrounding colons. `reaction` is also accepted.'),
@@ -745,6 +746,11 @@ function slackMessageProps() {
     unfurl_media: bool('Whether Slack should unfurl media.'),
     mrkdwn: bool('Whether Slack should parse mrkdwn in text.'),
   };
+}
+
+function slackDirectMessageProps() {
+  const { channel, thread_ts, ...properties } = slackMessageProps();
+  return properties;
 }
 
 function slackContentRequirement() {

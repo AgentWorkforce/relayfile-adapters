@@ -10,9 +10,9 @@ export interface AdapterResourceConfig {
 export const resources = [
   {
     name: "items",
-    path: "/sharepoint/{siteId}/{driveId}/items",
-    pathPattern: /^\/sharepoint\/[^\/]+\/[^\/]+\/items(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9!._-]+$/,
+    path: "/sharepoint/items",
+    pathPattern: /^\/sharepoint\/items(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/sharepoint/items/.schema.json",
     createExample: "discovery/sharepoint/items/.create.example.json",
   },
@@ -20,13 +20,13 @@ export const resources = [
     name: "subscriptions",
     path: "/sharepoint/subscriptions",
     pathPattern: /^\/sharepoint\/subscriptions(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_-]+$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/sharepoint/subscriptions/.schema.json",
     createExample: "discovery/sharepoint/subscriptions/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

@@ -1,7 +1,4 @@
 {
   "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123/queue",
-  "Bucket": "rf-bucket",
-  "Events": [
-    "s3:ObjectCreated:*"
-  ]
+  "Bucket": "rf-bucket"
 }

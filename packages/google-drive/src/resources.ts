@@ -12,7 +12,7 @@ export const resources = [
     name: "files",
     path: "/google-drive/files",
     pathPattern: /^\/google-drive\/files(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_-]+$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/google-drive/files/.schema.json",
     createExample: "discovery/google-drive/files/.create.example.json",
   },
@@ -20,13 +20,13 @@ export const resources = [
     name: "channels",
     path: "/google-drive/channels",
     pathPattern: /^\/google-drive\/channels(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_-]+$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/google-drive/channels/.schema.json",
     createExample: "discovery/google-drive/channels/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }
