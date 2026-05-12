@@ -7,19 +7,20 @@ const MAX_TAGS = 8;
 const MAX_TITLE_LENGTH = 120;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const attributes = readRecord(payload.attributes);
+  const data = readRecord(payload.data) ?? payload;
+  const attributes = readRecord(data.attributes) ?? readRecord(payload.attributes);
   const title = truncateText(
-    readString(payload.Subject) ?? readString(payload.Name) ?? readString(payload.Title),
+    readString(data.Subject) ?? readString(data.Name) ?? readString(data.Title),
     MAX_TITLE_LENGTH,
   );
-  const status = readString(payload.Status) ?? readString(payload.State);
-  const priority = readString(payload.Priority);
-  const fieldsChanged = limitStrings(Object.keys(readRecord(payload.changes) ?? {}), MAX_FIELDS_CHANGED);
+  const status = readString(data.Status) ?? readString(data.State);
+  const priority = readString(data.Priority);
+  const fieldsChanged = resolveFieldsChanged(payload, data);
   const tags = limitStrings([
     ...(readString(attributes?.type) ? [`object:${readString(attributes?.type)}`] : []),
-    ...(readString(payload.RecordTypeId) ? [`record_type:${readString(payload.RecordTypeId)}`] : []),
+    ...(readString(data.RecordTypeId) ? [`record_type:${readString(data.RecordTypeId)}`] : []),
   ], MAX_TAGS);
-  const actor = buildActor(payload);
+  const actor = buildActor(data);
 
   return {
     ...(title ? { title } : {}),
@@ -36,6 +37,33 @@ function buildActor(payload: Record<string, unknown>): EventSummary['actor'] | u
   return id ? { id } : undefined;
 }
 
+function resolveFieldsChanged(
+  payload: Record<string, unknown>,
+  data: Record<string, unknown>,
+): string[] {
+  const explicit = limitStrings([
+    ...Object.keys(readRecord(payload.changes) ?? {}),
+    ...readStringArray(payload.changedFields),
+    ...readStringArray(readRecord(payload.ChangeEventHeader)?.changedFields),
+  ], MAX_FIELDS_CHANGED);
+  if (explicit.length > 0) {
+    return explicit;
+  }
+
+  const previous =
+    readRecord(payload.previous)
+    ?? readRecord(payload.previousData)
+    ?? readRecord(readRecord(payload.before)?.data);
+  if (!previous) {
+    return [];
+  }
+
+  return limitStrings(
+    Object.keys({ ...previous, ...data }).filter((key) => JSON.stringify(previous[key]) !== JSON.stringify(data[key])),
+    MAX_FIELDS_CHANGED,
+  );
+}
+
 function readRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -44,6 +72,12 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry))
+    : [];
 }
 
 function limitStrings(values: string[], max: number): string[] {

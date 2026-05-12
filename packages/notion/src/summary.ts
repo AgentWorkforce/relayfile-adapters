@@ -3,6 +3,7 @@ import type { EventSummary as SharedEventSummary } from '@agent-relay/events';
 export type EventSummary = SharedEventSummary;
 
 const MAX_TITLE_LENGTH = 120;
+const MAX_LABELS = 8;
 const MAX_FIELDS_CHANGED = 12;
 const MAX_TAGS = 8;
 
@@ -25,9 +26,11 @@ export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const summary: EventSummary = {};
   const title = truncateText(resolveTitle(payload, properties), MAX_TITLE_LENGTH);
   const status = truncateText(resolveStatus(properties), MAX_TITLE_LENGTH);
+  const labels = resolveLabels(properties);
 
   if (title) summary.title = title;
   if (status) summary.status = status;
+  if (labels.length > 0) summary.labels = labels;
   if (actor) summary.actor = actor;
   if (fieldsChanged.length > 0) summary.fieldsChanged = fieldsChanged;
   if (tags.length > 0) summary.tags = tags;
@@ -206,6 +209,39 @@ function resolveStatus(properties: Record<string, unknown> | undefined): string 
   }
 
   return undefined;
+}
+
+function resolveLabels(properties: Record<string, unknown> | undefined): string[] {
+  if (!properties) {
+    return [];
+  }
+
+  const labels: string[] = [];
+  for (const property of Object.values(properties)) {
+    const record = readRecord(property);
+    if (!record) {
+      continue;
+    }
+
+    if (readString(record.type) === 'multi_select') {
+      for (const entry of readArray(record.multi_select) ?? []) {
+        const name = readString(readRecord(entry)?.name);
+        if (name) {
+          labels.push(name);
+        }
+      }
+      continue;
+    }
+
+    if (readString(record.type) === 'select') {
+      const name = readString(readRecord(record.select)?.name);
+      if (name && /tag|label|area|team/i.test(readString(record.name) ?? '')) {
+        labels.push(name);
+      }
+    }
+  }
+
+  return limitStrings(labels, MAX_LABELS);
 }
 
 function resolveTitle(

@@ -13,7 +13,7 @@ export function buildSummary(payload: Record<string, unknown>): EventSummary {
   const status = readString(ticket.status);
   const priority = readString(ticket.priority);
   const labels = limitStrings(readStringArray(ticket.tags), MAX_LABELS);
-  const fieldsChanged = limitStrings(Object.keys(readRecord(payload.changes) ?? {}), MAX_FIELDS_CHANGED);
+  const fieldsChanged = resolveFieldsChanged(payload, ticket);
   const tags = limitStrings([
     ...(readString(ticket.type) ? [`type:${readString(ticket.type)}`] : []),
     ...(readString(ticket.group_id) ? [`group:${readString(ticket.group_id)}`] : []),
@@ -38,6 +38,33 @@ export function buildSummary(payload: Record<string, unknown>): EventSummary {
   };
 }
 
+function resolveFieldsChanged(
+  payload: Record<string, unknown>,
+  ticket: Record<string, unknown>,
+): string[] {
+  const changed: string[] = [];
+
+  for (const comment of readArray(ticket.comments)) {
+    const record = readRecord(comment);
+    const field =
+      readString(record?.field)
+      ?? readString(record?.type)
+      ?? (record ? 'comments' : undefined);
+    if (field && !changed.includes(field)) {
+      changed.push(field);
+    }
+    if (changed.length >= MAX_FIELDS_CHANGED) {
+      return changed;
+    }
+  }
+
+  return limitStrings([
+    ...changed,
+    ...Object.keys(readRecord(payload.changes) ?? {}),
+    ...Object.keys(readRecord(payload.previous) ?? {}),
+  ], MAX_FIELDS_CHANGED);
+}
+
 function buildActor(record: Record<string, unknown> | undefined): EventSummary['actor'] | undefined {
   if (!record) return undefined;
   const id = readString(record.id) ?? readString(record.user_id) ?? readString(record.email);
@@ -54,6 +81,10 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function readStringArray(value: unknown): string[] {

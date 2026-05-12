@@ -1,12 +1,6 @@
-export type EventSummary = {
-  title?: string;
-  status?: string;
-  priority?: string;
-  labels?: string[];
-  actor?: { id: string; displayName?: string };
-  fieldsChanged?: string[];
-  tags?: string[];
-};
+import type { EventSummary as SharedEventSummary } from '@agent-relay/events';
+
+export type EventSummary = SharedEventSummary;
 
 const MAX_LABELS = 8;
 const MAX_TITLE_LENGTH = 120;
@@ -14,9 +8,15 @@ const MAX_FIELDS_CHANGED = 12;
 const MAX_TAGS = 8;
 
 export function buildSummary(payload: Record<string, unknown>): EventSummary {
-  const actor = buildActor(readRecord(payload.actionBy) ?? readRecord(readRecord(payload._webhook)?.actor));
+  const webhook = readRecord(payload._webhook);
+  const actor = buildActor(
+    readRecord(payload.actionBy) ?? readRecord(webhook?.actionBy) ?? readRecord(webhook?.actor),
+  );
   const labels = limitStrings(readLabelNames(payload.labels), MAX_LABELS);
-  const fieldsChanged = diffPreviousData(readRecord(payload.previousData) ?? readRecord(readRecord(payload._webhook)?.previousData), payload);
+  const fieldsChanged = diffPreviousData(
+    readRecord(payload.previousData) ?? readRecord(webhook?.previousData),
+    payload,
+  );
   const summary: EventSummary = {};
   const title = truncateText(readString(payload.title) ?? readString(payload.name), MAX_TITLE_LENGTH);
   const status =
