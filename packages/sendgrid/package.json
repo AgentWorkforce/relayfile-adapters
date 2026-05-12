@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-sendgrid",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "SendGrid adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
