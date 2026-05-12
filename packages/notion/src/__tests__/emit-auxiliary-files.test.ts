@@ -548,6 +548,92 @@ describe('emitNotionAuxiliaryFiles', () => {
     assert.ok(writtenPaths.has(aliasC));
   });
 
+  it('keeps distinct by-title paths for same-title databases with different UUIDs', async () => {
+    // AGENTS.md: every alias subtree needs a collision test. Pages were
+    // already covered; databases share the same `notionByTitleAliasPath`
+    // helper but with a distinct scope, so the collision-safe suffix logic
+    // must hold for them too. Inline UUIDs are used here because the
+    // module-scope `DATABASE_A`/`DATABASE_B` constants share their trailing
+    // 12 hex digits — `aliasShortId` keys on the last 8 hex chars, so
+    // those two would alias to the same short suffix and the assertion
+    // below would be meaningless.
+    const databaseAlpha = 'a1111111-2222-3333-4444-aaaaaaaaaaaa';
+    const databaseBeta = 'b1111111-2222-3333-4444-bbbbbbbbbbbb';
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      databases: [
+        { id: databaseAlpha, title: 'Engineering' },
+        { id: databaseBeta, title: 'Engineering' },
+      ],
+    });
+
+    const writtenPaths = new Set(client.writes.map((w) => w.path));
+    const aliasA = notionByTitleAliasPath(DATABASES_SCOPE, 'Engineering', databaseAlpha);
+    const aliasB = notionByTitleAliasPath(DATABASES_SCOPE, 'Engineering', databaseBeta);
+    assert.notEqual(aliasA, aliasB);
+    assert.ok(writtenPaths.has(aliasA));
+    assert.ok(writtenPaths.has(aliasB));
+  });
+
+  it('keeps distinct by-name paths for same-name users with different UUIDs', async () => {
+    // User `name` collisions are common in real Notion workspaces (humans
+    // and bots regularly share display names). The by-name alias subtree
+    // must produce distinct paths via `aliasShortId` for every UUID. As
+    // with the database collision test above, fresh inline UUIDs with
+    // distinct tails are needed because the module-scope `USER_A`/
+    // `USER_B` constants would short-id to the same suffix.
+    const userAlpha = 'd1111111-2222-3333-4444-aaaaaaaaaaaa';
+    const userBeta = 'e1111111-2222-3333-4444-bbbbbbbbbbbb';
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      users: [
+        { id: userAlpha, name: 'Sam Carter', is_bot: false },
+        { id: userBeta, name: 'Sam Carter', is_bot: true },
+      ],
+    });
+
+    const writtenPaths = new Set(client.writes.map((w) => w.path));
+    const aliasA = notionByNameAliasPath(USERS_SCOPE, 'Sam Carter', userAlpha);
+    const aliasB = notionByNameAliasPath(USERS_SCOPE, 'Sam Carter', userBeta);
+    assert.notEqual(aliasA, aliasB);
+    assert.ok(writtenPaths.has(aliasA));
+    assert.ok(writtenPaths.has(aliasB));
+  });
+
+  it('does NOT emit a by-parent alias for database-rooted pages', async () => {
+    // Regression for CodeRabbit src:505: the prior `parentType !== 'workspace'`
+    // guard let database-rooted pages slip into `/notion/pages/by-parent/`,
+    // duplicating their by-database alias with the same database id. The
+    // guard now requires `parentType === 'page'`. A database-parent page
+    // should appear in by-database but never by-parent.
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pages: [
+        {
+          id: PAGE_A,
+          title: 'Release Plan',
+          parent: { type: 'database_id', database_id: DATABASE_A } as const,
+          databaseTitle: 'Tasks',
+        },
+      ],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    // by-database alias still lands.
+    assert.ok(
+      writtenPaths.some((p) => p.startsWith('/notion/pages/by-database/')),
+      'expected by-database alias for database-rooted page',
+    );
+    // by-parent must not be emitted.
+    assert.ok(
+      !writtenPaths.some((p) => p.startsWith('/notion/pages/by-parent/')),
+      'database-rooted page must not emit a by-parent alias',
+    );
+  });
+
   it('skips reconciliation when the client has no readFile but still emits the new alias set', async () => {
     const client = createClient({ noRead: true });
     await emitNotionAuxiliaryFiles(client, {

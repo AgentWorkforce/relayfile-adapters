@@ -493,12 +493,19 @@ function pagePathsFor(args: { id: string } & PriorPageState, pagesScope: string)
     paths.push(notionPageByDatabaseAliasPath(databaseId, id, databaseTitle, title));
   }
 
-  // by-parent: skip workspace-rooted pages (matches bulk-ingest.ts L156-158).
-  // The helper accepts an undefined parent title and falls back to the
-  // UUID slug, so we don't need to skip when only parentTitle is absent.
+  // by-parent: only for pages whose parent is another page. Database-rooted
+  // pages already get a by-database alias (the previous branch), and
+  // workspace-rooted pages have no meaningful parent to key on — both must
+  // be excluded here. The earlier `parentType !== 'workspace'` guard was
+  // too permissive: it also admitted `parentType === 'database'`, so a
+  // database row emitted BOTH by-database AND by-parent aliases pointing at
+  // the same database id, polluting `/notion/pages/by-parent/`. The
+  // `PriorPageState.parentType` union only enumerates `'database' | 'page'
+  // | 'workspace'` because the adapter normalizes Notion's raw `block_id`
+  // parents to `'page'` during ingestion (blocks always live under pages),
+  // so a `parentType === 'page'` test is sufficient and exhaustive.
   if (
-    parentType &&
-    parentType !== 'workspace' &&
+    parentType === 'page' &&
     parentId &&
     title &&
     slugifies(title)
