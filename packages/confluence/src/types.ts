@@ -106,9 +106,25 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  // Optional: when present, `ingestWebhook` reconciles stale aliases on
+  // updates by reading the stable by-id alias (keyed only on the object id,
+  // so it survives renames) and diffing the prior alias set against the
+  // newly-computed one. Implementations that don't expose readFile keep
+  // working — reconciliation simply degrades to "no-op", which matches the
+  // previous behavior where stale aliases accumulated.
+  readFile?(input: ReadFileInput): Promise<ReadFileResult | null | undefined>;
 }
 
 export interface ConfluenceNormalizedEvent {
