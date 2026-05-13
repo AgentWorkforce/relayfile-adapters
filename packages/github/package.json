@@ -21,11 +21,6 @@
       "import": "./dist/adapter.js",
       "default": "./dist/adapter.js"
     },
-    "./alias-slug": {
-      "types": "./dist/alias-slug.d.ts",
-      "import": "./dist/alias-slug.js",
-      "default": "./dist/alias-slug.js"
-    },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",
