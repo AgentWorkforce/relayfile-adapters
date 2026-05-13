@@ -63,7 +63,7 @@ import {
   type EmitWrite,
 } from '@relayfile/adapter-core';
 
-import { slugifyAlias } from './alias-slug.js';
+import { hasAliasSlug } from './alias-slug.js';
 import { buildLinearRootIndexFile } from './index-emitter.js';
 import {
   LINEAR_PATH_ROOT,
@@ -72,12 +72,16 @@ import {
   linearByUuidAliasPath,
   linearCommentPath,
   linearCommentsIndexPath,
+  linearCyclesIndexPath,
   linearCyclePath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearMilestonesIndexPath,
   linearMilestonePath,
+  linearProjectsIndexPath,
   linearProjectPath,
+  linearRoadmapsIndexPath,
   linearRoadmapPath,
   linearTeamPath,
   linearTeamsIndexPath,
@@ -86,7 +90,11 @@ import {
 } from './path-mapper.js';
 import {
   linearCommentIndexRow,
+  linearCycleIndexRow,
   linearIssueIndexRow,
+  linearMilestoneIndexRow,
+  linearProjectIndexRow,
+  linearRoadmapIndexRow,
   linearTeamIndexRow,
   linearUserIndexRow,
   type LinearBaseIndexRow,
@@ -162,42 +170,50 @@ export async function emitLinearAuxiliaryFiles(
   const cycles = input.cycles ?? [];
   const milestones = input.milestones ?? [];
   const roadmaps = input.roadmaps ?? [];
+  const hasIssues = hasOwn(input, 'issues');
+  const hasComments = hasOwn(input, 'comments');
+  const hasUsers = hasOwn(input, 'users');
+  const hasTeams = hasOwn(input, 'teams');
+  const hasProjects = hasOwn(input, 'projects');
+  const hasCycles = hasOwn(input, 'cycles');
+  const hasMilestones = hasOwn(input, 'milestones');
+  const hasRoadmaps = hasOwn(input, 'roadmaps');
 
   if (
-    issues.length === 0 &&
-    comments.length === 0 &&
-    users.length === 0 &&
-    teams.length === 0 &&
-    projects.length === 0 &&
-    cycles.length === 0 &&
-    milestones.length === 0 &&
-    roadmaps.length === 0
+    !hasIssues &&
+    !hasComments &&
+    !hasUsers &&
+    !hasTeams &&
+    !hasProjects &&
+    !hasCycles &&
+    !hasMilestones &&
+    !hasRoadmaps
   ) {
     return aggregate;
   }
 
-  if (issues.length > 0) {
+  if (hasIssues) {
     accumulate(aggregate, await emitIssues(client, workspaceId, issues, input.connectionId));
   }
-  if (comments.length > 0) {
+  if (hasComments) {
     accumulate(aggregate, await emitComments(client, workspaceId, comments, input.connectionId));
   }
-  if (users.length > 0) {
+  if (hasUsers) {
     accumulate(aggregate, await emitUsers(client, workspaceId, users, input.connectionId));
   }
-  if (teams.length > 0) {
+  if (hasTeams) {
     accumulate(aggregate, await emitTeams(client, workspaceId, teams, input.connectionId));
   }
-  if (projects.length > 0) {
+  if (hasProjects) {
     accumulate(aggregate, await emitProjects(client, workspaceId, projects, input.connectionId));
   }
-  if (cycles.length > 0) {
+  if (hasCycles) {
     accumulate(aggregate, await emitCycles(client, workspaceId, cycles, input.connectionId));
   }
-  if (milestones.length > 0) {
+  if (hasMilestones) {
     accumulate(aggregate, await emitMilestones(client, workspaceId, milestones, input.connectionId));
   }
-  if (roadmaps.length > 0) {
+  if (hasRoadmaps) {
     accumulate(aggregate, await emitRoadmaps(client, workspaceId, roadmaps, input.connectionId));
   }
 
@@ -236,6 +252,10 @@ async function emitIssues(
   records: readonly LinearIssueEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, linearIssuesIndexPath());
+  }
+
   const indexReconciler = new IndexFileReconciler<LinearIssueIndexRow>({
     client,
     workspaceId,
@@ -397,8 +417,7 @@ function issuePathsFor(args: {
   if (identifier) {
     paths.push(linearByIdAliasPath(ISSUES_SCOPE, identifier));
   }
-  // by-title alias — skip when title slugs to empty (`slugifyAlias` returns
-  // the literal `'untitled'` sentinel in that case).
+  // by-title alias — skip when the title has no valid alias slug.
   if (title && slugifies(title)) {
     paths.push(linearByTitleAliasPath(ISSUES_SCOPE, title, id));
   }
@@ -436,6 +455,10 @@ async function emitComments(
   records: readonly LinearCommentEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, linearCommentsIndexPath());
+  }
+
   const indexReconciler = new IndexFileReconciler<LinearBaseIndexRow>({
     client,
     workspaceId,
@@ -530,10 +553,10 @@ async function emitProjects(
   records: readonly LinearProjectEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
-  // Projects don't ship an `_index.json` in the current adapter (no
-  // index-emitter bucket), so we only emit the canonical record.
-  return emitCanonicalOnlyResource(client, workspaceId, records, {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearProjectsIndexPath(),
     canonicalPath: (id) => linearProjectPath(id),
+    indexRow: (record) => linearProjectIndexRow(record),
     objectType: 'project',
     connectionId,
   });
@@ -545,8 +568,10 @@ async function emitCycles(
   records: readonly LinearCycleEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
-  return emitCanonicalOnlyResource(client, workspaceId, records, {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearCyclesIndexPath(),
     canonicalPath: (id) => linearCyclePath(id),
+    indexRow: (record) => linearCycleIndexRow(record),
     objectType: 'cycle',
     connectionId,
   });
@@ -558,8 +583,10 @@ async function emitMilestones(
   records: readonly LinearMilestoneEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
-  return emitCanonicalOnlyResource(client, workspaceId, records, {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearMilestonesIndexPath(),
     canonicalPath: (id) => linearMilestonePath(id),
+    indexRow: (record) => linearMilestoneIndexRow(record),
     objectType: 'milestone',
     connectionId,
   });
@@ -571,8 +598,10 @@ async function emitRoadmaps(
   records: readonly LinearRoadmapEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
-  return emitCanonicalOnlyResource(client, workspaceId, records, {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearRoadmapsIndexPath(),
     canonicalPath: (id) => linearRoadmapPath(id),
+    indexRow: (record) => linearRoadmapIndexRow(record),
     objectType: 'roadmap',
     connectionId,
   });
@@ -592,6 +621,10 @@ async function emitFlatResource<TRecord extends { id: string }>(
   records: readonly (TRecord | { id: string; _deleted: true })[],
   opts: FlatResourceOptions<TRecord>,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, opts.indexPath);
+  }
+
   const indexReconciler = new IndexFileReconciler<LinearBaseIndexRow>({
     client,
     workspaceId,
@@ -626,36 +659,6 @@ async function emitFlatResource<TRecord extends { id: string }>(
   fanOut.written += indexResult.written;
   fanOut.errors.push(...indexResult.errors);
   return fanOut;
-}
-
-interface CanonicalOnlyResourceOptions {
-  canonicalPath: (id: string) => string;
-  objectType: string;
-  connectionId: string | undefined;
-}
-
-async function emitCanonicalOnlyResource<TRecord extends { id: string }>(
-  client: AuxiliaryEmitterClient,
-  workspaceId: string,
-  records: readonly (TRecord | { id: string; _deleted: true })[],
-  opts: CanonicalOnlyResourceOptions,
-): Promise<EmitAuxiliaryFilesResult> {
-  return runEmitBatch(client, workspaceId, records, async (record) => {
-    if (isDeleteRecord(record)) {
-      return { deletes: [{ path: opts.canonicalPath(record.id) }] };
-    }
-    const id = readNonEmptyString(record.id);
-    if (!id) return {};
-    return {
-      writes: [
-        {
-          path: opts.canonicalPath(id),
-          content: renderContent(opts.objectType, record, opts.connectionId, false),
-          contentType: JSON_CONTENT_TYPE,
-        },
-      ],
-    };
-  });
 }
 
 // -- shared helpers ---------------------------------------------------------
@@ -731,16 +734,41 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+async function writeEmptyIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<EmitAuxiliaryFilesResult> {
+  try {
+    await client.writeFile({
+      workspaceId,
+      path,
+      content: '[]\n',
+      contentType: JSON_CONTENT_TYPE,
+    });
+    return { written: 1, deleted: 0, errors: [] };
+  } catch (error) {
+    return {
+      written: 0,
+      deleted: 0,
+      errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
+    };
+  }
+}
+
 /**
  * Skip by-title aliases for titles that slug to nothing (emoji-only /
  * punctuation-only). The by-id alias still resolves those records.
  *
- * Delegates to the shared `slugifyAlias` per AGENTS.md "NEVER write a
- * new slugifier" rule. `slugifyAlias` returns the literal string
- * `'untitled'` as its empty-slug sentinel.
+ * Delegates to the shared alias-slug helper per AGENTS.md "NEVER write a
+ * new slugifier" rule.
  */
 function slugifies(value: string): boolean {
-  return slugifyAlias(value) !== 'untitled';
+  return hasAliasSlug(value);
 }
 
 function accumulate(

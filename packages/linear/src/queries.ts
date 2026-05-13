@@ -1,4 +1,11 @@
-import type { LinearTeam, LinearUser } from './types.js';
+import type {
+  LinearCycle,
+  LinearMilestone,
+  LinearProject,
+  LinearRoadmap,
+  LinearTeam,
+  LinearUser,
+} from './types.js';
 
 const LINEAR_PAGE_INFO_FIELDS = `
         hasNextPage
@@ -571,6 +578,50 @@ export function linearTeamIndexRow(team: LinearTeam): LinearBaseIndexRow {
     id: team.id,
     title: normalizeIndexTitle(team.name) || normalizeIndexTitle(team.key),
     updated: normalizeUpdated(team.updatedAt, team.updated_at, team.createdAt, team.created_at),
+  };
+}
+
+export function linearProjectIndexRow(project: LinearProject): LinearBaseIndexRow {
+  return {
+    id: project.id,
+    title: normalizeIndexTitle(project.name),
+    updated: normalizeUpdated(project.updatedAt, project.updated_at, project.createdAt, project.created_at),
+  };
+}
+
+export function linearCycleIndexRow(cycle: LinearCycle): LinearBaseIndexRow {
+  return {
+    id: cycle.id,
+    title: normalizeIndexTitle(cycle.name) || (typeof cycle.number === 'number' ? String(cycle.number) : ''),
+    updated: normalizeUpdated(
+      cycle.updatedAt,
+      cycle.updated_at,
+      cycle.createdAt,
+      cycle.created_at,
+      cycle.startsAt,
+      cycle.endsAt,
+    ),
+  };
+}
+
+export function linearMilestoneIndexRow(milestone: LinearMilestone): LinearBaseIndexRow {
+  return {
+    id: milestone.id,
+    title: normalizeIndexTitle(milestone.name),
+    updated: normalizeUpdated(
+      milestone.updatedAt,
+      milestone.updated_at,
+      milestone.createdAt,
+      milestone.created_at,
+    ),
+  };
+}
+
+export function linearRoadmapIndexRow(roadmap: LinearRoadmap): LinearBaseIndexRow {
+  return {
+    id: roadmap.id,
+    title: normalizeIndexTitle(roadmap.name),
+    updated: normalizeUpdated(roadmap.updatedAt, roadmap.updated_at, roadmap.createdAt, roadmap.created_at),
   };
 }
 

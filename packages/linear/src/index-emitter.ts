@@ -1,13 +1,25 @@
 import {
+  linearCyclesIndexPath,
   linearCommentsIndexPath,
   linearIssuesIndexPath,
+  linearMilestonesIndexPath,
+  linearProjectsIndexPath,
   linearRootIndexPath,
+  linearRoadmapsIndexPath,
   linearTeamsIndexPath,
   linearUsersIndexPath,
 } from './path-mapper.js';
 import type { LinearBaseIndexRow, LinearIssueIndexRow } from './queries.js';
 
-export type LinearIndexBucket = 'comments' | 'issues' | 'teams' | 'users';
+export type LinearIndexBucket =
+  | 'comments'
+  | 'cycles'
+  | 'issues'
+  | 'milestones'
+  | 'projects'
+  | 'roadmaps'
+  | 'teams'
+  | 'users';
 
 export interface LinearIndexFile {
   path: string;
@@ -45,7 +57,7 @@ export function buildLinearRootIndexFile(
 }
 
 export function buildLinearIndexFile(
-  bucket: 'comments' | 'teams' | 'users',
+  bucket: 'comments' | 'cycles' | 'milestones' | 'projects' | 'roadmaps' | 'teams' | 'users',
   rows: LinearBaseIndexRow[],
 ): LinearIndexFile;
 export function buildLinearIndexFile(
@@ -70,6 +82,14 @@ function indexPathForBucket(bucket: LinearIndexBucket): string {
       return linearIssuesIndexPath();
     case 'comments':
       return linearCommentsIndexPath();
+    case 'cycles':
+      return linearCyclesIndexPath();
+    case 'milestones':
+      return linearMilestonesIndexPath();
+    case 'projects':
+      return linearProjectsIndexPath();
+    case 'roadmaps':
+      return linearRoadmapsIndexPath();
     case 'users':
       return linearUsersIndexPath();
     case 'teams':

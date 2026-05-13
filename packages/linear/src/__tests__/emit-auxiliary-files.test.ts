@@ -15,9 +15,11 @@ import {
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearCyclesIndexPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearProjectsIndexPath,
   linearProjectPath,
   linearRootIndexPath,
   linearTeamPath,
@@ -114,6 +116,23 @@ describe('emitLinearAuxiliaryFiles', () => {
       client.writes.some((w) => w.path === linearRootIndexPath()),
       'expected /linear/_index.json root index write',
     );
+  });
+
+  it('writes an empty index for an explicit empty cycle bucket', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      cycles: [],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 2);
+    assert.deepEqual(
+      client.writes.map((w) => w.path),
+      [linearRootIndexPath(), linearCyclesIndexPath()],
+    );
+    assert.deepEqual(JSON.parse(client.files.get(linearCyclesIndexPath())!), []);
   });
 
   it('writes the canonical path plus by-uuid, by-id, by-title, by-state aliases plus index row for an issue', async () => {
@@ -309,7 +328,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.equal(rows[0]!.title, 'Engineering');
   });
 
-  it('writes canonical project file only (no index file today)', async () => {
+  it('writes canonical project file plus index row', async () => {
     const client = createClient();
     await emitLinearAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -324,8 +343,11 @@ describe('emitLinearAuxiliaryFiles', () => {
 
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearProjectPath('project-1')));
-    // No project index file is emitted (no path-mapper helper today).
-    assert.ok(!writtenPaths.some((p) => p.endsWith('/projects/_index.json')));
+    assert.ok(writtenPaths.includes(linearProjectsIndexPath()));
+    const rows = JSON.parse(client.files.get(linearProjectsIndexPath())!) as Array<{ id: string; title: string }>;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, 'project-1');
+    assert.equal(rows[0]!.title, 'Roadmap');
   });
 
   it('delete tombstone for an issue removes canonical + every prior alias and drops the index row', async () => {
@@ -477,6 +499,19 @@ describe('emitLinearAuxiliaryFiles', () => {
     // No by-title alias because the slug would collapse to empty.
     const byTitleEmitted = writtenPaths.some((p) => p.includes('/by-title/'));
     assert.equal(byTitleEmitted, false);
+  });
+
+  it('writes by-title alias for literal Untitled issue titles', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ id: 'issue-untitled', identifier: 'AGE-2', title: 'Untitled' }],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(
+      writtenPaths.includes(linearByTitleAliasPath(ISSUES_SCOPE, 'Untitled', 'issue-untitled')),
+    );
   });
 
   it('handles a mixed batch: issue create + rename + delete in one call', async () => {

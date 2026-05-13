@@ -3,14 +3,22 @@ import { describe, it } from 'node:test';
 
 import { buildLinearIndexFile } from '../index-emitter.js';
 import {
+  linearCyclePath,
   linearCommentPath,
   linearIssuePath,
+  linearProjectPath,
+  linearRoadmapPath,
+  linearMilestonePath,
   linearTeamPath,
   linearUserPath,
 } from '../path-mapper.js';
 import {
   linearCommentIndexRow,
+  linearCycleIndexRow,
   linearIssueIndexRow,
+  linearMilestoneIndexRow,
+  linearProjectIndexRow,
+  linearRoadmapIndexRow,
   linearTeamIndexRow,
   linearUserIndexRow,
 } from '../queries.js';
@@ -78,12 +86,45 @@ describe('linear index emission', () => {
     const commentIndex = buildLinearIndexFile('comments', commentRows);
     const userIndex = buildLinearIndexFile('users', userRows);
     const teamIndex = buildLinearIndexFile('teams', teamRows);
+    const projectIndex = buildLinearIndexFile('projects', [
+      linearProjectIndexRow({
+        id: 'project-1',
+        name: 'Roadmap',
+        updatedAt: '2026-04-03T13:00:00.000Z',
+      }),
+    ]);
+    const cycleIndex = buildLinearIndexFile('cycles', [
+      linearCycleIndexRow({
+        id: 'cycle-1',
+        number: 5,
+        name: 'Cycle 5',
+        updatedAt: '2026-04-03T14:00:00.000Z',
+      }),
+    ]);
+    const milestoneIndex = buildLinearIndexFile('milestones', [
+      linearMilestoneIndexRow({
+        id: 'milestone-1',
+        name: 'Beta',
+        updatedAt: '2026-04-03T15:00:00.000Z',
+      }),
+    ]);
+    const roadmapIndex = buildLinearIndexFile('roadmaps', [
+      linearRoadmapIndexRow({
+        id: 'roadmap-1',
+        name: 'Platform',
+        updatedAt: '2026-04-03T16:00:00.000Z',
+      }),
+    ]);
 
     assert.deepEqual(issueIndex, issueIndexAgain);
     assert.equal(issueIndex.path, '/linear/issues/_index.json');
     assert.equal(commentIndex.path, '/linear/comments/_index.json');
     assert.equal(userIndex.path, '/linear/users/_index.json');
     assert.equal(teamIndex.path, '/linear/teams/_index.json');
+    assert.equal(projectIndex.path, '/linear/projects/_index.json');
+    assert.equal(cycleIndex.path, '/linear/cycles/_index.json');
+    assert.equal(milestoneIndex.path, '/linear/milestones/_index.json');
+    assert.equal(roadmapIndex.path, '/linear/roadmaps/_index.json');
     assert.equal(issueIndex.contentType, 'application/json; charset=utf-8');
 
     assert.deepEqual(JSON.parse(issueIndex.content), [
@@ -119,6 +160,10 @@ describe('linear index emission', () => {
     assert.equal(linearCommentPath('comment-1'), '/linear/comments/comment-1.json');
     assert.equal(linearUserPath('user-1'), '/linear/users/user-1.json');
     assert.equal(linearTeamPath('team-1'), '/linear/teams/team-1.json');
+    assert.equal(linearProjectPath('project-1'), '/linear/projects/project-1.json');
+    assert.equal(linearCyclePath('cycle-1'), '/linear/cycles/cycle-1.json');
+    assert.equal(linearMilestonePath('milestone-1'), '/linear/milestones/milestone-1.json');
+    assert.equal(linearRoadmapPath('roadmap-1'), '/linear/roadmaps/roadmap-1.json');
   });
 
   it('emits an empty index when a linear bucket has no records', () => {

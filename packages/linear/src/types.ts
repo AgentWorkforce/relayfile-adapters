@@ -167,6 +167,10 @@ export interface LinearCycle {
   startsAt?: string | null;
   endsAt?: string | null;
   completedAt?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface LinearComment {
