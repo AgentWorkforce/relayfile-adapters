@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-asana",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Asana adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "directory": "packages/asana"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.18"
+    "@relayfile/adapter-core": "^0.2.19"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

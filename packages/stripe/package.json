@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-stripe",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Stripe adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
