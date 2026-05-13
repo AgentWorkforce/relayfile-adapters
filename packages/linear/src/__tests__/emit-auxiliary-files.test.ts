@@ -15,9 +15,11 @@ import {
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearCyclesIndexPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearProjectsIndexPath,
   linearProjectPath,
   linearTeamPath,
   linearTeamsIndexPath,
@@ -87,6 +89,19 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
     assert.equal(client.writes.length, 0);
     assert.equal(client.deletes.length, 0);
+  });
+
+  it('writes an empty index for an explicit empty cycle bucket', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      cycles: [],
+    });
+
+    assert.deepEqual(result, { written: 1, deleted: 0, errors: [] });
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, linearCyclesIndexPath());
+    assert.deepEqual(JSON.parse(client.files.get(linearCyclesIndexPath())!), []);
   });
 
   it('writes the canonical path plus by-uuid, by-id, by-title, by-state aliases plus index row for an issue', async () => {
@@ -282,7 +297,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.equal(rows[0]!.title, 'Engineering');
   });
 
-  it('writes canonical project file only (no index file today)', async () => {
+  it('writes canonical project file plus index row', async () => {
     const client = createClient();
     await emitLinearAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -297,8 +312,11 @@ describe('emitLinearAuxiliaryFiles', () => {
 
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearProjectPath('project-1')));
-    // No project index file is emitted (no path-mapper helper today).
-    assert.ok(!writtenPaths.some((p) => p.endsWith('/projects/_index.json')));
+    assert.ok(writtenPaths.includes(linearProjectsIndexPath()));
+    const rows = JSON.parse(client.files.get(linearProjectsIndexPath())!) as Array<{ id: string; title: string }>;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, 'project-1');
+    assert.equal(rows[0]!.title, 'Roadmap');
   });
 
   it('delete tombstone for an issue removes canonical + every prior alias and drops the index row', async () => {

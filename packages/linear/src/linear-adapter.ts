@@ -25,7 +25,11 @@ import {
   type LinearBaseIndexRow,
   type LinearIssueIndexRow,
   linearCommentIndexRow,
+  linearCycleIndexRow,
   linearIssueIndexRow,
+  linearMilestoneIndexRow,
+  linearProjectIndexRow,
+  linearRoadmapIndexRow,
   linearTeamIndexRow,
   linearUserIndexRow,
 } from './queries.js';
@@ -943,6 +947,14 @@ function bucketForObjectType(objectType: string): LinearIndexBucket | undefined 
       return 'issues';
     case 'comment':
       return 'comments';
+    case 'cycle':
+      return 'cycles';
+    case 'milestone':
+      return 'milestones';
+    case 'project':
+      return 'projects';
+    case 'roadmap':
+      return 'roadmaps';
     case 'team':
       return 'teams';
     case 'user':
@@ -966,6 +978,14 @@ function buildIndexRow(
       return linearIssueIndexRow(payload as unknown as Parameters<typeof linearIssueIndexRow>[0]);
     case 'comments':
       return linearCommentIndexRow(payload as unknown as Parameters<typeof linearCommentIndexRow>[0]);
+    case 'cycles':
+      return linearCycleIndexRow(payload as unknown as Parameters<typeof linearCycleIndexRow>[0]);
+    case 'milestones':
+      return linearMilestoneIndexRow(payload as unknown as Parameters<typeof linearMilestoneIndexRow>[0]);
+    case 'projects':
+      return linearProjectIndexRow(payload as unknown as Parameters<typeof linearProjectIndexRow>[0]);
+    case 'roadmaps':
+      return linearRoadmapIndexRow(payload as unknown as Parameters<typeof linearRoadmapIndexRow>[0]);
     case 'teams':
       return linearTeamIndexRow(payload as unknown as Parameters<typeof linearTeamIndexRow>[0]);
     case 'users':
@@ -982,6 +1002,14 @@ function buildIndexFileForBucket(
       return buildLinearIndexFile('issues', rows as LinearIssueIndexRow[]);
     case 'comments':
       return buildLinearIndexFile('comments', rows as LinearBaseIndexRow[]);
+    case 'cycles':
+      return buildLinearIndexFile('cycles', rows as LinearBaseIndexRow[]);
+    case 'milestones':
+      return buildLinearIndexFile('milestones', rows as LinearBaseIndexRow[]);
+    case 'projects':
+      return buildLinearIndexFile('projects', rows as LinearBaseIndexRow[]);
+    case 'roadmaps':
+      return buildLinearIndexFile('roadmaps', rows as LinearBaseIndexRow[]);
     case 'teams':
       return buildLinearIndexFile('teams', rows as LinearBaseIndexRow[]);
     case 'users':

@@ -262,8 +262,16 @@ export function linearProjectPath(projectId: string): string {
   return `${LINEAR_PATH_ROOT}/projects/${encodeLinearPathSegment(projectId)}.json`;
 }
 
+export function linearProjectsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/projects/_index.json`;
+}
+
 export function linearCyclePath(cycleId: string): string {
   return `${LINEAR_PATH_ROOT}/cycles/${encodeLinearPathSegment(cycleId)}.json`;
+}
+
+export function linearCyclesIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/cycles/_index.json`;
 }
 
 export function linearTeamPath(teamId: string): string {
@@ -286,8 +294,16 @@ export function linearMilestonePath(milestoneId: string): string {
   return `${LINEAR_PATH_ROOT}/milestones/${encodeLinearPathSegment(milestoneId)}.json`;
 }
 
+export function linearMilestonesIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/milestones/_index.json`;
+}
+
 export function linearRoadmapPath(roadmapId: string): string {
   return `${LINEAR_PATH_ROOT}/roadmaps/${encodeLinearPathSegment(roadmapId)}.json`;
+}
+
+export function linearRoadmapsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/roadmaps/_index.json`;
 }
 
 export function linearByTitleAliasPath(scope: string, title: string, id: string, colliding = false): string {
