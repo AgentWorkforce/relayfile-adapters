@@ -9,9 +9,9 @@
  *
  * What this module deliberately does *not* know:
  * - Anything provider-specific (no Slack/Jira/Notion/Confluence switches).
- * - How to render index rows or build LAYOUT.md — those live in each
- *   adapter so the canonical shape is owned by the adapter that also owns
- *   the underlying record schema.
+ * - How to slugify titles, render index rows, or build LAYOUT.md — those
+ *   live in each adapter so the canonical shape is owned by the adapter
+ *   that also owns the underlying record schema.
  * - Schema validation. Records arrive cleaned (post-stripNangoMetadata);
  *   the caller is responsible for filtering deleted tombstones into the
  *   delete branch.
