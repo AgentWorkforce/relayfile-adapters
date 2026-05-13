@@ -12,8 +12,9 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
  *   POST /linear/issues/<draft>.json                         → issueCreate
  *   PATCH/PUT /linear/issues/<slug>--<uuid>.json             → issueUpdate
  *
- * The path-mapper emits issue paths as `<slug>--<32-hex>`. We reverse the
- * suffix to recover the canonical UUID Linear's API requires.
+ * The path-mapper emits issue paths as `<slug>__<uuid>` and older mounts may
+ * still have `<slug>--<32-hex>`. We reverse the suffix to recover the
+ * canonical UUID Linear's API requires.
  */
 export function resolveWritebackRequest(path: string, content: string): LinearWritebackRequest {
   const route = classifyWrite(path, resources);
@@ -64,8 +65,8 @@ export function resolveDeleteRequest(path: string): LinearWritebackRequest {
  * Reverse the path-mapper's `<slug>--<id>` encoding.
  *
  * Path-mapper emits segments in two shapes:
- *   - `<slug>--<32-hex>`  when a title is present (the common case).
- *     Reformatted to canonical UUID 8-4-4-4-12.
+ *   - `<slug>__<uuid>` or `<slug>--<32-hex>` when a title is present.
+ *     Returned or reformatted to canonical UUID 8-4-4-4-12.
  *   - bare `<id>`         when no title is available. Decoded and passed
  *                         through; the GraphQL layer validates.
  *
@@ -76,6 +77,9 @@ export function resolveDeleteRequest(path: string): LinearWritebackRequest {
  */
 function extractLinearId(segment: string): string {
   const decoded = decodeURIComponent(segment);
+
+  const sluggedUuid = /(?:--|__)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(decoded);
+  if (sluggedUuid?.[1]) return sluggedUuid[1];
 
   const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32?.[1]) return formatUuid(slugged32[1]);

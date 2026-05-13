@@ -32,6 +32,18 @@ describe('linear writeback', () => {
       assert.strictEqual(input.doNotSubscribeToIssue, true);
     });
 
+    it('extracts a dashed UUID from canonical mounted issue paths', () => {
+      const req = resolveWritebackRequest(
+        `/linear/issues/relayfile-specific-tests__${PAGE_UUID}/comments/review-note.json`,
+        JSON.stringify({ body: 'from canonical path' }),
+      );
+      const input = (req.body.variables as {
+        input: { issueId: string; body: string };
+      }).input;
+      assert.strictEqual(input.issueId, PAGE_UUID);
+      assert.strictEqual(input.body, 'from canonical path');
+    });
+
     it('rejects a missing body in JSON form', () => {
       assert.throws(
         () =>
