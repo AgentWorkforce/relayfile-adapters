@@ -73,6 +73,8 @@ function isCanonicalStandalonePageSegment(segment: string): boolean {
  * Routes:
  *   - PATCH /notion/databases/<db>/pages/<slug>--<id>.json       → page properties
  *   - PATCH /notion/pages/<slug>--<id>.json                       → page properties (top-level)
+ *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/properties.json → page properties
+ *   - PATCH /notion/pages/<slug>--<id>/properties.json             → page properties (top-level)
  *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/content.md  → page markdown
  *   - PATCH /notion/pages/<slug>--<id>/content.md                  → page markdown (top-level)
  *   - POST  /notion/databases/<db>/pages/<slug>--<id>/comments.json → comment create
@@ -99,6 +101,16 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
   if (route === null && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
+  }
+
+  const databasePropertiesMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/properties\.json$/);
+  if (databasePropertiesMatch) {
+    return buildPagePropertiesWriteback(extractNotionId(databasePropertiesMatch[2]), content);
+  }
+
+  const standalonePropertiesMatch = path.match(/^\/notion\/pages\/([^/]+)\/properties\.json$/);
+  if (standalonePropertiesMatch) {
+    return buildPagePropertiesWriteback(extractNotionId(standalonePropertiesMatch[1]), content);
   }
 
   const databaseContentMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/content\.md$/);
@@ -362,4 +374,3 @@ function rejectReadOnlyFields(payload: Record<string, unknown>): void {
     }
   }
 }
-

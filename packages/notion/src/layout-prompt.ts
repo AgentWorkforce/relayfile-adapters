@@ -26,6 +26,7 @@ titles can collide and the canonical filenames append a UUID suffix.
 │   ├── _index.json                    ← { id, title, updated, parent_id, parent_type }
 │   ├── <slug>__<id>.json              ← canonical page record (UUID-named)
 │   ├── <slug>__<id>/
+│   │   ├── properties.json            ← page property writeback alias
 │   │   ├── content.md                 ← page body as markdown
 │   │   ├── comments.json              ← page comments
 │   │   └── blocks/<block-id>.json     ← raw block JSON
@@ -137,7 +138,10 @@ curl -X PATCH "https://api.notion.com/v1/pages/$id" -d '{ "archived": true }'
 When writing back through the relayfile mount itself, the canonical path
 encodes the UUID — \`PATCH /notion/pages/<slug>__<id>.json\` — so writeback
 strips the slug and recovers the UUID from the trailing 32-hex segment
-(see \`writeback.ts:extractNotionId\`).
+(see \`writeback.ts:extractNotionId\`). Agents may also write the same
+property update payload to \`properties.json\` beside a page directory, such
+as \`/notion/pages/<slug>__<id>/properties.json\` or
+\`/notion/databases/<db>/pages/<slug>__<id>/properties.json\`.
 
 ## Common commands
 
