@@ -182,6 +182,41 @@ export function jiraIssueByStatePath(stateName: string, id: string): string {
   return `${JIRA_PATH_ROOT}/issues/by-state/${encodeJiraPathSegment(slug)}/${encodeJiraPathSegment(id)}.json`;
 }
 
+/**
+ * `by-assignee/<accountId>/<issueId>.json` — grouped by the Atlassian
+ * `accountId` of the assignee (a stable 24-char identifier in Jira Cloud).
+ * Issues without an assignee are not emitted under this prefix. When an
+ * issue is re-assigned, aux-file emission deletes the prior path via the
+ * by-id reconciliation read, so this alias always reflects the current
+ * assignment.
+ */
+export function jiraIssueByAssigneeAliasPath(accountId: string, issueId: string): string {
+  return `${JIRA_PATH_ROOT}/issues/by-assignee/${encodeJiraPathSegment(accountId)}/${encodeJiraPathSegment(issueId)}.json`;
+}
+
+// -- Project alias paths ---------------------------------------------------
+
+/**
+ * Stable reconciliation anchor for projects. The canonical
+ * `<slug>__<id>.json` filename embeds the (mutable) project name; this
+ * alias is keyed only on the immutable id so readers can resolve a
+ * project from its id without scanning. Mirrors the role of
+ * `jiraIssueByIdAliasPath` for projects, enabling canonical-delete on
+ * tombstones.
+ */
+export function jiraProjectByIdAliasPath(id: string): string {
+  return `${JIRA_PATH_ROOT}/projects/by-id/${encodeJiraPathSegment(id)}.json`;
+}
+
+// -- Sprint alias paths ----------------------------------------------------
+
+/**
+ * Stable reconciliation anchor for sprints. See `jiraProjectByIdAliasPath`.
+ */
+export function jiraSprintByIdAliasPath(id: string): string {
+  return `${JIRA_PATH_ROOT}/sprints/by-id/${encodeJiraPathSegment(id)}.json`;
+}
+
 export function extractJiraIdFromPathSegment(segment: string): string {
   const decoded = decodeURIComponent(segment);
   const currentMatch = /__([^/]+)$/u.exec(decoded);

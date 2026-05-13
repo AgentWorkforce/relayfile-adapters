@@ -54,14 +54,17 @@ import {
 import { sanitizeJiraRecordForStorage } from './jira-adapter.js';
 import {
   jiraCommentPath,
+  jiraIssueByAssigneeAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraIssuesIndexPath,
+  jiraProjectByIdAliasPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
   jiraRootIndexPath,
+  jiraSprintByIdAliasPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from './path-mapper.js';
@@ -270,14 +273,30 @@ async function planIssueWrite(
 
   const fields = isRecord(issue.fields) ? issue.fields : {};
   const statusObject = isRecord(fields.status) ? fields.status : {};
+  const assigneeObject = isRecord(fields.assignee) ? fields.assignee : {};
   const summary = readNonEmptyString((fields as { summary?: unknown }).summary);
   const status = readNonEmptyString((statusObject as { name?: unknown }).name);
   const key = readNonEmptyString((issue as { key?: unknown }).key);
+  const assigneeAccountId = readNonEmptyString(
+    (assigneeObject as { accountId?: unknown }).accountId,
+  );
 
   const safe = sanitizeJiraRecordForStorage(issue as unknown as Record<string, unknown>);
+  // `sanitizeJiraRecordForStorage` strips the entire `fields.assignee` user
+  // record as PII, but the bare `accountId` is an opaque Atlassian id
+  // (no PII) and is required to compute stale `by-assignee/...` paths
+  // when the issue is reassigned. Hoist it onto `fields.assigneeAccountId`
+  // so `extractPriorIssueState` can read it back on the next emit.
+  if (assigneeAccountId) {
+    const safeFields = isRecord(safe.fields)
+      ? safe.fields
+      : ({} as Record<string, unknown>);
+    safeFields.assigneeAccountId = assigneeAccountId;
+    safe.fields = safeFields;
+  }
   const content = renderObjectContent(safe, 'issue', id, connectionId, false);
 
-  const newPaths = issuePathsFor({ id, summary, status, key });
+  const newPaths = issuePathsFor({ id, summary, status, key, assigneeAccountId });
 
   // Reconciliation: read prior by-id to recover summary/status/key and
   // diff against the new alias set. by-id is the stable anchor and is
@@ -326,10 +345,11 @@ interface PriorIssueState {
   summary?: string | undefined;
   status?: string | undefined;
   key?: string | undefined;
+  assigneeAccountId?: string | undefined;
 }
 
 function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
-  const { id, summary, status, key } = args;
+  const { id, summary, status, key, assigneeAccountId } = args;
   const paths: string[] = [];
   // Canonical: `<slug>__<id>.json` — uses the issue summary for the slug,
   // falling back to the key when summary is missing (matches the existing
@@ -343,6 +363,9 @@ function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
   if (status) {
     paths.push(jiraIssueByStatePath(status, id));
   }
+  if (assigneeAccountId) {
+    paths.push(jiraIssueByAssigneeAliasPath(assigneeAccountId, id));
+  }
   return paths;
 }
 
@@ -355,6 +378,12 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     summary: readNonEmptyString((fields as { summary?: unknown }).summary),
     status: readNonEmptyString((status as { name?: unknown }).name),
     key: readNonEmptyString((payload as { key?: unknown }).key),
+    // The full `fields.assignee` user object is redacted by
+    // `sanitizeJiraRecordForStorage`; `planIssueWrite` hoists the bare
+    // `accountId` to `fields.assigneeAccountId` for reconciliation reads.
+    assigneeAccountId: readNonEmptyString(
+      (fields as { assigneeAccountId?: unknown }).assigneeAccountId,
+    ),
   };
 }
 
@@ -377,18 +406,13 @@ async function emitProjects(
     }),
   });
 
+  const priorReader = new PriorAliasReader(client, workspaceId);
+
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      indexReconciler.remove(record.id);
-      // Projects don't currently emit alias subtrees; the canonical path
-      // alone is enough to drop. Without a prior by-id alias the canonical
-      // filename is unknown (slug-from-name), so we omit a file delete
-      // here — the index removal is the durable cleanup. Callers that
-      // need the exact canonical-path delete should also queue a pages
-      // tombstone or extend this with a `_priorName` field in a follow-up.
-      return {};
+      return planProjectDelete(record.id, priorReader, indexReconciler);
     }
-    return planProjectWrite(record, indexReconciler, connectionId);
+    return planProjectWrite(record, priorReader, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -398,11 +422,31 @@ async function emitProjects(
   return fanOut;
 }
 
-function planProjectWrite(
+interface PriorProjectState {
+  name?: string | undefined;
+}
+
+function projectPathsFor(args: { id: string } & PriorProjectState): string[] {
+  const { id, name } = args;
+  return [jiraProjectPath(id, name), jiraProjectByIdAliasPath(id)];
+}
+
+function extractPriorProjectState(parsed: Record<string, unknown>): PriorProjectState | null {
+  const payload = pickPayload(parsed);
+  if (!payload) return null;
+  return {
+    name:
+      readNonEmptyString((payload as { name?: unknown }).name) ??
+      readNonEmptyString((payload as { key?: unknown }).key),
+  };
+}
+
+async function planProjectWrite(
   project: JiraProject,
+  priorReader: PriorAliasReader,
   indexReconciler: IndexFileReconciler<JiraProjectIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const id = readNonEmptyString(project.id);
   if (!id) {
     return {};
@@ -411,13 +455,40 @@ function planProjectWrite(
   const safe = sanitizeJiraRecordForStorage(project as unknown as Record<string, unknown>);
   const content = renderObjectContent(safe, 'project', id, connectionId, false);
 
-  const writes: EmitWrite[] = [
-    { path: jiraProjectPath(id, name), content, contentType: JSON_CONTENT_TYPE },
-  ];
+  const newPaths = projectPathsFor({ id, name });
+
+  // Reconciliation: read prior by-id to recover the previous name so a
+  // rename invalidates the stale canonical `<slug>__<id>.json`.
+  const prior = await priorReader.read<PriorProjectState>(
+    jiraProjectByIdAliasPath(id),
+    extractPriorProjectState,
+  );
+  const stalePaths = prior ? diffPaths(projectPathsFor({ id, ...prior }), newPaths) : [];
+
+  const writes: EmitWrite[] = newPaths.map((path) => ({
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+  }));
+  const deletes: EmitDelete[] = stalePaths.map((path) => ({ path }));
 
   indexReconciler.upsert(jiraProjectIndexRow(project));
 
-  return { writes };
+  return { writes, deletes };
+}
+
+async function planProjectDelete(
+  id: string,
+  priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<JiraProjectIndexRow>,
+): Promise<EmitPlan> {
+  const prior = await priorReader.read<PriorProjectState>(
+    jiraProjectByIdAliasPath(id),
+    extractPriorProjectState,
+  );
+  const paths = projectPathsFor({ id, ...(prior ?? {}) });
+  indexReconciler.remove(id);
+  return { deletes: paths.map((path) => ({ path })) };
 }
 
 // -- Sprints ---------------------------------------------------------------
@@ -439,12 +510,13 @@ async function emitSprints(
     }),
   });
 
+  const priorReader = new PriorAliasReader(client, workspaceId);
+
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      indexReconciler.remove(String(record.id));
-      return {};
+      return planSprintDelete(String(record.id), priorReader, indexReconciler);
     }
-    return planSprintWrite(record, indexReconciler, connectionId);
+    return planSprintWrite(record, priorReader, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -454,11 +526,29 @@ async function emitSprints(
   return fanOut;
 }
 
-function planSprintWrite(
+interface PriorSprintState {
+  name?: string | undefined;
+}
+
+function sprintPathsFor(args: { id: string } & PriorSprintState): string[] {
+  const { id, name } = args;
+  return [jiraSprintPath(id, name), jiraSprintByIdAliasPath(id)];
+}
+
+function extractPriorSprintState(parsed: Record<string, unknown>): PriorSprintState | null {
+  const payload = pickPayload(parsed);
+  if (!payload) return null;
+  return {
+    name: readNonEmptyString((payload as { name?: unknown }).name),
+  };
+}
+
+async function planSprintWrite(
   sprint: JiraSprint,
+  priorReader: PriorAliasReader,
   indexReconciler: IndexFileReconciler<JiraSprintIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const id = readNonEmptyString(String(sprint.id));
   if (!id) {
     return {};
@@ -467,13 +557,39 @@ function planSprintWrite(
   const safe = sanitizeJiraRecordForStorage(sprint as unknown as Record<string, unknown>);
   const content = renderObjectContent(safe, 'sprint', id, connectionId, false);
 
-  const writes: EmitWrite[] = [
-    { path: jiraSprintPath(id, name), content, contentType: JSON_CONTENT_TYPE },
-  ];
+  const newPaths = sprintPathsFor({ id, name });
+
+  // Reconciliation: see `planProjectWrite`.
+  const prior = await priorReader.read<PriorSprintState>(
+    jiraSprintByIdAliasPath(id),
+    extractPriorSprintState,
+  );
+  const stalePaths = prior ? diffPaths(sprintPathsFor({ id, ...prior }), newPaths) : [];
+
+  const writes: EmitWrite[] = newPaths.map((path) => ({
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+  }));
+  const deletes: EmitDelete[] = stalePaths.map((path) => ({ path }));
 
   indexReconciler.upsert(jiraSprintIndexRow(sprint));
 
-  return { writes };
+  return { writes, deletes };
+}
+
+async function planSprintDelete(
+  id: string,
+  priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<JiraSprintIndexRow>,
+): Promise<EmitPlan> {
+  const prior = await priorReader.read<PriorSprintState>(
+    jiraSprintByIdAliasPath(id),
+    extractPriorSprintState,
+  );
+  const paths = sprintPathsFor({ id, ...(prior ?? {}) });
+  indexReconciler.remove(id);
+  return { deletes: paths.map((path) => ({ path })) };
 }
 
 // -- Comments --------------------------------------------------------------

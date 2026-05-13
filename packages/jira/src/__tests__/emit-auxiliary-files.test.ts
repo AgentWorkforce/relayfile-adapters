@@ -10,14 +10,17 @@ import type {
 import type { EmitReadInput, EmitReadResult } from '@relayfile/adapter-core';
 import {
   jiraCommentPath,
+  jiraIssueByAssigneeAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraIssuesIndexPath,
+  jiraProjectByIdAliasPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
   jiraRootIndexPath,
+  jiraSprintByIdAliasPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from '../path-mapper.js';
@@ -276,7 +279,7 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(jiraIssueByStatePath('In Progress', '10001')));
   });
 
-  it('writes canonical + index row for a project record', async () => {
+  it('writes canonical + by-id + index row for a project record', async () => {
     const client = createClient();
     await emitJiraAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -284,7 +287,14 @@ describe('emitJiraAuxiliaryFiles', () => {
     });
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraProjectPath('99', 'Kanban Project')));
+    assert.ok(writtenPaths.includes(jiraProjectByIdAliasPath('99')));
     assert.ok(writtenPaths.includes(jiraProjectsIndexPath()));
+
+    // Canonical and by-id bytes are identical.
+    assert.equal(
+      client.files.get(jiraProjectByIdAliasPath('99')),
+      client.files.get(jiraProjectPath('99', 'Kanban Project')),
+    );
 
     const rows = JSON.parse(client.files.get(jiraProjectsIndexPath())!) as Array<{
       id: string;
@@ -297,7 +307,34 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.equal(rows[0]!.key, 'KAN');
   });
 
-  it('writes canonical + index row for a sprint record', async () => {
+  it('reconciles stale canonical when a project is renamed', async () => {
+    const priorOnDisk = {
+      provider: 'jira',
+      objectType: 'project',
+      objectId: '99',
+      deleted: false,
+      payload: { id: '99', key: 'KAN', name: 'Old Name' },
+    };
+    const client = createClient({
+      initialFiles: {
+        [jiraProjectByIdAliasPath('99')]: JSON.stringify(priorOnDisk),
+      },
+    });
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{ id: '99', key: 'KAN', name: 'New Name' }],
+    });
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(
+      deletedPaths.includes(jiraProjectPath('99', 'Old Name')),
+      'expected old canonical path to be deleted on rename',
+    );
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(jiraProjectPath('99', 'New Name')));
+    assert.ok(writtenPaths.includes(jiraProjectByIdAliasPath('99')));
+  });
+
+  it('writes canonical + by-id + index row for a sprint record', async () => {
     const client = createClient();
     await emitJiraAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -305,7 +342,13 @@ describe('emitJiraAuxiliaryFiles', () => {
     });
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraSprintPath('7', 'Sprint 7')));
+    assert.ok(writtenPaths.includes(jiraSprintByIdAliasPath('7')));
     assert.ok(writtenPaths.includes(jiraSprintsIndexPath()));
+
+    assert.equal(
+      client.files.get(jiraSprintByIdAliasPath('7')),
+      client.files.get(jiraSprintPath('7', 'Sprint 7')),
+    );
 
     const rows = JSON.parse(client.files.get(jiraSprintsIndexPath())!) as Array<{
       id: string;
@@ -314,6 +357,76 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, '7');
     assert.equal(rows[0]!.title, 'Sprint 7');
+  });
+
+  it('reconciles stale canonical when a sprint is renamed', async () => {
+    const priorOnDisk = {
+      provider: 'jira',
+      objectType: 'sprint',
+      objectId: '7',
+      deleted: false,
+      payload: { id: 7, name: 'Sprint 7 — Old' },
+    };
+    const client = createClient({
+      initialFiles: {
+        [jiraSprintByIdAliasPath('7')]: JSON.stringify(priorOnDisk),
+      },
+    });
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      sprints: [{ id: 7, name: 'Sprint 7 — New' }],
+    });
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(
+      deletedPaths.includes(jiraSprintPath('7', 'Sprint 7 — Old')),
+      'expected old canonical path to be deleted on rename',
+    );
+  });
+
+  it('emits by-assignee alias when an issue has an assignee, and reconciles on reassign', async () => {
+    // First emit: issue assigned to user A.
+    const client = createClient();
+    const issueA = {
+      id: '20001',
+      key: 'KAN-77',
+      fields: {
+        summary: 'Routing bug',
+        status: { name: 'To Do' },
+        assignee: { accountId: 'acct-aaaa', displayName: 'Alice' },
+      },
+    };
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [issueA],
+    });
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(
+      writtenPaths.includes(jiraIssueByAssigneeAliasPath('acct-aaaa', '20001')),
+      'expected by-assignee/acct-aaaa/20001.json on first emit',
+    );
+
+    // Second emit: same issue reassigned to user B; the old by-assignee
+    // alias must be deleted via by-id reconciliation.
+    client.writes.length = 0;
+    client.deletes.length = 0;
+    const issueB = {
+      ...issueA,
+      fields: { ...issueA.fields, assignee: { accountId: 'acct-bbbb', displayName: 'Bob' } },
+    };
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [issueB],
+    });
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(
+      deletedPaths.includes(jiraIssueByAssigneeAliasPath('acct-aaaa', '20001')),
+      'expected stale by-assignee alias to be deleted on reassign',
+    );
+    const writtenPaths2 = client.writes.map((w) => w.path);
+    assert.ok(
+      writtenPaths2.includes(jiraIssueByAssigneeAliasPath('acct-bbbb', '20001')),
+      'expected new by-assignee alias on reassign',
+    );
   });
 
   it('writes a comment at the nested /jira/issues/<issueIdOrKey>/comments path', async () => {
