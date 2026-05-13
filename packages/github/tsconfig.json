@@ -17,7 +17,6 @@
   "files": [
     "src/adapter.ts",
     "src/index.ts",
-    "src/alias-slug.ts",
     "src/config.ts",
     "src/types.ts",
     "src/resources.ts",

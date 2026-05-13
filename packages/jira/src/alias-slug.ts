@@ -1,1 +1,1 @@
-export { aliasCollisionSuffix, slugifyAlias } from '@relayfile/adapter-github/alias-slug';
+export { aliasCollisionSuffix, slugifyAlias } from '@relayfile/adapter-core';
