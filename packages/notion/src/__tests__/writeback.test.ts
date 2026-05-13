@@ -109,6 +109,39 @@ describe('writeback rule matching', () => {
     assert.strictEqual(request.endpoint, '/v1/pages/00000000-0000-0000-0000-000000000001');
   });
 
+  it('maps properties.json aliases to PATCH /v1/pages/{id}', () => {
+    const content = JSON.stringify({
+      properties: {
+        Name: { id: 'title', type: 'title', value: 'Properties alias update' },
+      },
+    });
+
+    const databasePageRequest = resolveWritebackRequest(
+      '/notion/databases/db-1/pages/release-notes__00000000000000000000000000000001/properties.json',
+      content,
+    );
+    const standalonePageRequest = resolveWritebackRequest(
+      '/notion/pages/00000000-0000-0000-0000-000000000002/properties.json',
+      content,
+    );
+
+    assert.strictEqual(databasePageRequest.action, 'update_page_properties');
+    assert.strictEqual(databasePageRequest.method, 'PATCH');
+    assert.strictEqual(databasePageRequest.endpoint, '/v1/pages/00000000-0000-0000-0000-000000000001');
+    assert.deepStrictEqual(databasePageRequest.body.properties, standalonePageRequest.body.properties);
+    assert.strictEqual(standalonePageRequest.action, 'update_page_properties');
+    assert.strictEqual(standalonePageRequest.method, 'PATCH');
+    assert.strictEqual(standalonePageRequest.endpoint, '/v1/pages/00000000-0000-0000-0000-000000000002');
+    assert.throws(
+      () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page/properties.json', content),
+      /No Notion writeback rule matched/,
+    );
+    assert.throws(
+      () => resolveWritebackRequest('/notion/pages/draft-page/properties.json', content),
+      /No Notion writeback rule matched/,
+    );
+  });
+
   it('maps markdown and comments writeback paths', () => {
     const markdown = resolveWritebackRequest('/notion/pages/page-1/content.md', '# Updated');
     const comment = resolveWritebackRequest('/notion/pages/page-1/comments.json', '"Looks good"');
