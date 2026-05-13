@@ -1,6 +1,8 @@
 // Public barrel for runtime helpers, normalizers, and exported types.
 export * from './linear-adapter.js';
+export * from './digest.js';
 export * from './index-emitter.js';
+export * from './layout.js';
 export * from './layout-prompt.js';
 export * from './path-mapper.js';
 export * from './summary.js';

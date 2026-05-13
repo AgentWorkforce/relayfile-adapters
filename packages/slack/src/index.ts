@@ -46,6 +46,7 @@ export {
   SLACK_LAYOUT_PROMPT,
   slackLayoutPromptFile,
 } from './layout-prompt.js';
+export * from './layout.js';
 
 export {
   buildSlackBotsAliasFile,
@@ -68,6 +69,7 @@ export {
   IntegrationAdapter,
   SlackAdapter,
 } from './slack-adapter.js';
+export * from './digest.js';
 export * from './summary.js';
 export * from './thread.js';
 

@@ -3,12 +3,14 @@ export {
   JiraAdapter,
   sanitizeJiraRecordForStorage,
 } from './jira-adapter.js';
+export * from './digest.js';
 export * from './summary.js';
 export * from './thread.js';
 export {
   JIRA_LAYOUT_PROMPT,
   jiraLayoutPromptFile,
 } from './layout-prompt.js';
+export * from './layout.js';
 export type {
   DeleteFileInput,
   FileSemantics,

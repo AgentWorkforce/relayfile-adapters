@@ -1,6 +1,7 @@
 export {
   ConfluenceAdapter,
 } from './confluence-adapter.js';
+export * from './digest.js';
 export type {
   ConnectionProvider,
   IngestError,
@@ -53,6 +54,7 @@ export {
   confluenceLayoutPromptFile,
   CONFLUENCE_LAYOUT_PROMPT,
 } from './layout-prompt.js';
+export * from './layout.js';
 export * from './summary.js';
 
 export {

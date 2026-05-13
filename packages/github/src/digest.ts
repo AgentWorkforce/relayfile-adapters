@@ -1,0 +1,100 @@
+export interface DigestWindow {
+  readonly from: string;
+  readonly to: string;
+}
+
+export interface DigestChangeEvent {
+  readonly id?: string;
+  readonly timestamp?: string;
+  readonly occurredAt?: string;
+  readonly eventType?: string;
+  readonly type?: string;
+  readonly action?: string;
+  readonly canonicalPath?: string;
+  readonly path?: string;
+}
+
+export interface DigestContext {
+  readonly provider: string;
+  readonly window: DigestWindow;
+  changeEvents(filter?: {
+    providers?: string[];
+    paths?: string[];
+  }): Promise<readonly DigestChangeEvent[]>;
+}
+
+export interface DigestBullet {
+  readonly text: string;
+  readonly canonicalPath: string;
+}
+
+export interface DigestSection {
+  readonly provider: string;
+  readonly bullets: readonly DigestBullet[];
+}
+
+export type DigestHandler = (ctx: DigestContext) => Promise<DigestSection | null>;
+
+export const digest: DigestHandler = async (ctx) => {
+  const events = await ctx.changeEvents({ providers: [ctx.provider] });
+  const bullets = events
+    .filter(hasCanonicalPath)
+    .slice()
+    .sort(compareEvents)
+    .map((event) => {
+      const canonicalPath = normalizeDigestPath(event.canonicalPath);
+      return {
+        text: `${githubIdentifier(canonicalPath)} ${pastTense(event)}`,
+        canonicalPath,
+      };
+    });
+
+  return bullets.length === 0 ? null : { provider: ctx.provider, bullets };
+};
+
+function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
+  return (
+    typeof event.canonicalPath === 'string'
+    && (event.canonicalPath === 'github' || event.canonicalPath.startsWith('github/') || event.canonicalPath.startsWith('/github/'))
+  );
+}
+
+function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
+  return (
+    eventTime(left).localeCompare(eventTime(right))
+    || (left.id ?? '').localeCompare(right.id ?? '')
+    || (left.canonicalPath ?? '').localeCompare(right.canonicalPath ?? '')
+  );
+}
+
+function eventTime(event: DigestChangeEvent): string {
+  return event.timestamp ?? event.occurredAt ?? '';
+}
+
+function normalizeDigestPath(path: string): string {
+  return path.replace(/^\/+/u, '');
+}
+
+function githubIdentifier(path: string): string {
+  const segments = path.split('/').filter(Boolean);
+  const segment = segments.at(-1) === 'meta.json' || segments.at(-1) === 'metadata.json'
+    ? segments.at(-2) ?? path
+    : segments.at(-1) ?? path;
+  const basename = segment.replace(/\.[^.]+$/u, '');
+  const separatorIndex = basename.lastIndexOf('__');
+  return separatorIndex > 0 ? `#${basename.slice(0, separatorIndex)}` : basename;
+}
+
+function pastTense(event: DigestChangeEvent): string {
+  const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
+  if (/(open|opened|create|created|add|added|write|written)/u.test(action)) {
+    return 'was opened';
+  }
+  if (/(close|closed|merge|merged)/u.test(action)) {
+    return 'was closed';
+  }
+  if (/(delete|deleted|remove|removed)/u.test(action)) {
+    return 'was deleted';
+  }
+  return 'was updated';
+}

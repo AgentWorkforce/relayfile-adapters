@@ -20,7 +20,9 @@ import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
 
 export * from './emit-auxiliary-files.js';
+export * from './digest.js';
 export * from './index-emitter.js';
+export * from './layout.js';
 export * from './layout-prompt.js';
 export * from './summary.js';
 export * from './thread.js';
