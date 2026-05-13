@@ -61,7 +61,7 @@ import {
   type EmitWrite,
 } from '@relayfile/adapter-core';
 
-import { slugifyAlias } from './alias-slug.js';
+import { hasAliasSlug } from './alias-slug.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
@@ -385,8 +385,7 @@ function issuePathsFor(args: {
   if (identifier) {
     paths.push(linearByIdAliasPath(ISSUES_SCOPE, identifier));
   }
-  // by-title alias — skip when title slugs to empty (`slugifyAlias` returns
-  // the literal `'untitled'` sentinel in that case).
+  // by-title alias — skip when title slugs to empty.
   if (title && slugifies(title)) {
     paths.push(linearByTitleAliasPath(ISSUES_SCOPE, title, id));
   }
@@ -733,12 +732,12 @@ async function writeEmptyIndex(
  * Skip by-title aliases for titles that slug to nothing (emoji-only /
  * punctuation-only). The by-id alias still resolves those records.
  *
- * Delegates to the shared `slugifyAlias` per AGENTS.md "NEVER write a
- * new slugifier" rule. `slugifyAlias` returns the literal string
- * `'untitled'` as its empty-slug sentinel.
+ * Delegates to the shared alias-slug normalizer per AGENTS.md "NEVER write
+ * a new slugifier" rule. This must not compare against `slugifyAlias`
+ * output because `untitled` is both the empty-slug sentinel and a valid slug.
  */
 function slugifies(value: string): boolean {
-  return slugifyAlias(value) !== 'untitled';
+  return hasAliasSlug(value);
 }
 
 function accumulate(

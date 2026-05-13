@@ -470,6 +470,19 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.equal(byTitleEmitted, false);
   });
 
+  it('writes by-title alias for literal Untitled issue titles', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ id: 'issue-untitled', identifier: 'AGE-2', title: 'Untitled' }],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(
+      writtenPaths.includes(linearByTitleAliasPath(ISSUES_SCOPE, 'Untitled', 'issue-untitled')),
+    );
+  });
+
   it('handles a mixed batch: issue create + rename + delete in one call', async () => {
     const priorRenamePayload = {
       payload: {

@@ -4,6 +4,14 @@ const COMBINING_MARKS_PATTERN = /[\u0300-\u036f]/g;
 const MAX_ALIAS_SLUG_LENGTH = 80;
 
 export function slugifyAlias(input: string): string {
+  return normalizeAliasSlug(input) || 'untitled';
+}
+
+export function hasAliasSlug(input: string): boolean {
+  return normalizeAliasSlug(input).length > 0;
+}
+
+function normalizeAliasSlug(input: string): string {
   const normalized = input
     .normalize('NFKD')
     .replace(COMBINING_MARKS_PATTERN, '')
@@ -12,7 +20,7 @@ export function slugifyAlias(input: string): string {
     .slice(0, MAX_ALIAS_SLUG_LENGTH)
     .replace(/^-+|-+$/g, '');
 
-  return normalized || 'untitled';
+  return normalized;
 }
 
 export function aliasCollisionSuffix(id: string): string {
