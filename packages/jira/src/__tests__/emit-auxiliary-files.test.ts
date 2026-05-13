@@ -103,6 +103,19 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.equal(client.deletes.length, 0);
   });
 
+  it('writes an empty index for an explicit empty sprint bucket', async () => {
+    const client = createClient();
+    const result = await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      sprints: [],
+    });
+
+    assert.deepEqual(result, { written: 1, deleted: 0, errors: [] });
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, jiraSprintsIndexPath());
+    assert.deepEqual(JSON.parse(client.files.get(jiraSprintsIndexPath())!), []);
+  });
+
   it('writes canonical + by-id + by-key + by-state for an issue plus an index row', async () => {
     const client = createClient();
     const issue = makeIssue({

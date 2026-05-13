@@ -140,28 +140,27 @@ export async function emitJiraAuxiliaryFiles(
   const projects = input.projects ?? [];
   const sprints = input.sprints ?? [];
   const comments = input.comments ?? [];
+  const hasIssues = hasOwn(input, 'issues');
+  const hasProjects = hasOwn(input, 'projects');
+  const hasSprints = hasOwn(input, 'sprints');
+  const hasComments = hasOwn(input, 'comments');
 
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
-  if (
-    issues.length === 0 &&
-    projects.length === 0 &&
-    sprints.length === 0 &&
-    comments.length === 0
-  ) {
+  if (!hasIssues && !hasProjects && !hasSprints && !hasComments) {
     return aggregate;
   }
 
-  if (issues.length > 0) {
+  if (hasIssues) {
     accumulate(aggregate, await emitIssues(emitterClient, workspaceId, issues, input.connectionId));
   }
-  if (projects.length > 0) {
+  if (hasProjects) {
     accumulate(aggregate, await emitProjects(emitterClient, workspaceId, projects, input.connectionId));
   }
-  if (sprints.length > 0) {
+  if (hasSprints) {
     accumulate(aggregate, await emitSprints(emitterClient, workspaceId, sprints, input.connectionId));
   }
-  if (comments.length > 0) {
+  if (hasComments && comments.length > 0) {
     accumulate(aggregate, await emitComments(emitterClient, workspaceId, comments, input.connectionId));
   }
 
@@ -176,6 +175,10 @@ async function emitIssues(
   records: readonly JiraIssueEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, jiraIssuesIndexPath());
+  }
+
   const indexReconciler = new IndexFileReconciler<JiraIssueIndexRow>({
     client,
     workspaceId,
@@ -312,6 +315,10 @@ async function emitProjects(
   records: readonly JiraProjectEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, jiraProjectsIndexPath());
+  }
+
   const indexReconciler = new IndexFileReconciler<JiraProjectIndexRow>({
     client,
     workspaceId,
@@ -374,6 +381,10 @@ async function emitSprints(
   records: readonly JiraSprintEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
+  if (records.length === 0) {
+    return writeEmptyIndex(client, workspaceId, jiraSprintsIndexPath());
+  }
+
   const indexReconciler = new IndexFileReconciler<JiraSprintIndexRow>({
     client,
     workspaceId,
@@ -532,7 +543,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function accumulate(
+function hasOwn<T extends object>(value: T, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+async function writeEmptyIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<EmitAuxiliaryFilesResult> {
+  try {
+    await client.writeFile({
+      workspaceId,
+      path,
+      content: '[]\n',
+      contentType: JSON_CONTENT_TYPE,
+    });
+    return { written: 1, deleted: 0, errors: [] };
+  } catch (error) {
+    return {
+      written: 0,
+      deleted: 0,
+      errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
+    };
+  }
+}
+
+  function accumulate(
   aggregate: EmitAuxiliaryFilesResult,
   partial: EmitAuxiliaryFilesResult,
 ): void {
