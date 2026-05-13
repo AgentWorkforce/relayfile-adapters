@@ -38,16 +38,9 @@ export function encodeJiraPathSegment(value: string): string {
   return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
 }
 
-function slugify(value: string): string {
-  return value
-    .replace(/[{}]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-}
-
 function titleSegmentWithId(title: string | undefined, id: string): string {
-  const slug = title ? slugify(title) : '';
+  const aliasSlug = title ? slugifyAlias(title) : '';
+  const slug = aliasSlug === 'untitled' ? '' : aliasSlug;
   // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "__"
   // separator between slug and ID is the disambiguator. Slugs never contain
   // "__" because slugify collapses any non-alphanumeric run into a single

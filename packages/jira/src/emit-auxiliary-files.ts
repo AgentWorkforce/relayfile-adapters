@@ -329,19 +329,23 @@ async function emitProjects(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
+  const priorRows = await readIndexRows<JiraProjectIndexRow>(
+    client,
+    workspaceId,
+    jiraProjectsIndexPath(),
+  );
+  const priorRowsById = new Map(priorRows.map((row) => [row.id, row]));
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
       indexReconciler.remove(record.id);
-      // Projects don't currently emit alias subtrees; the canonical path
-      // alone is enough to drop. Without a prior by-id alias the canonical
-      // filename is unknown (slug-from-name), so we omit a file delete
-      // here — the index removal is the durable cleanup. Callers that
-      // need the exact canonical-path delete should also queue a pages
-      // tombstone or extend this with a `_priorName` field in a follow-up.
-      return {};
+      return {
+        deletes: [
+          { path: jiraProjectPath(record.id, priorRowsById.get(record.id)?.title) },
+        ],
+      };
     }
-    return planProjectWrite(record, indexReconciler, connectionId);
+    return planProjectWrite(record, priorRowsById, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -353,6 +357,7 @@ async function emitProjects(
 
 function planProjectWrite(
   project: JiraProject,
+  priorRowsById: ReadonlyMap<string, JiraProjectIndexRow>,
   indexReconciler: IndexFileReconciler<JiraProjectIndexRow>,
   connectionId: string | undefined,
 ): EmitPlan {
@@ -367,10 +372,15 @@ function planProjectWrite(
   const writes: EmitWrite[] = [
     { path: jiraProjectPath(id, name), content, contentType: JSON_CONTENT_TYPE },
   ];
+  const priorTitle = priorRowsById.get(id)?.title;
+  const stalePath = priorTitle && priorTitle !== name
+    ? jiraProjectPath(id, priorTitle)
+    : undefined;
+  const deletes: EmitDelete[] = stalePath ? [{ path: stalePath }] : [];
 
   indexReconciler.upsert(jiraProjectIndexRow(project));
 
-  return { writes };
+  return { writes, deletes };
 }
 
 // -- Sprints ---------------------------------------------------------------
@@ -395,13 +405,24 @@ async function emitSprints(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
+  const priorRows = await readIndexRows<JiraSprintIndexRow>(
+    client,
+    workspaceId,
+    jiraSprintsIndexPath(),
+  );
+  const priorRowsById = new Map(priorRows.map((row) => [row.id, row]));
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      indexReconciler.remove(String(record.id));
-      return {};
+      const id = String(record.id);
+      indexReconciler.remove(id);
+      return {
+        deletes: [
+          { path: jiraSprintPath(id, priorRowsById.get(id)?.title) },
+        ],
+      };
     }
-    return planSprintWrite(record, indexReconciler, connectionId);
+    return planSprintWrite(record, priorRowsById, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -413,6 +434,7 @@ async function emitSprints(
 
 function planSprintWrite(
   sprint: JiraSprint,
+  priorRowsById: ReadonlyMap<string, JiraSprintIndexRow>,
   indexReconciler: IndexFileReconciler<JiraSprintIndexRow>,
   connectionId: string | undefined,
 ): EmitPlan {
@@ -427,10 +449,15 @@ function planSprintWrite(
   const writes: EmitWrite[] = [
     { path: jiraSprintPath(id, name), content, contentType: JSON_CONTENT_TYPE },
   ];
+  const priorTitle = priorRowsById.get(id)?.title;
+  const stalePath = priorTitle && priorTitle !== name
+    ? jiraSprintPath(id, priorTitle)
+    : undefined;
+  const deletes: EmitDelete[] = stalePath ? [{ path: stalePath }] : [];
 
   indexReconciler.upsert(jiraSprintIndexRow(sprint));
 
-  return { writes };
+  return { writes, deletes };
 }
 
 // -- Comments --------------------------------------------------------------
@@ -569,7 +596,38 @@ async function writeEmptyIndex(
   }
 }
 
-  function accumulate(
+async function readIndexRows<TRow extends { id: string }>(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<TRow[]> {
+  if (!client.readFile) {
+    return [];
+  }
+  let raw: { content: string } | null | undefined;
+  try {
+    raw = await client.readFile({ workspaceId, path });
+  } catch {
+    return [];
+  }
+  if (!raw?.content) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.content);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  return parsed.filter((row): row is TRow => (
+    isRecord(row) && typeof (row as { id?: unknown }).id === 'string'
+  ));
+}
+
+function accumulate(
   aggregate: EmitAuxiliaryFilesResult,
   partial: EmitAuxiliaryFilesResult,
 ): void {
