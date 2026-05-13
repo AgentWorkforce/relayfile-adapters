@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-slack",
-  "version": "0.2.5",
+  "version": "0.2.8",
   "description": "Slack adapter scaffolding for Relayfile",
   "type": "module",
   "sideEffects": false,
@@ -38,7 +38,7 @@
     "discovery"
   ],
   "scripts": {
-    "test": "node --import tsx --test src/__tests__/*.test.ts",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "build": "npm run build --workspace @relayfile/adapter-core && tsc",
@@ -62,7 +62,7 @@
     "directory": "packages/slack"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.15"
+    "@relayfile/adapter-core": "^0.2.18"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

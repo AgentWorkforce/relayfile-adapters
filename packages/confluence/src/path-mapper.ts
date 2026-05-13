@@ -200,6 +200,12 @@ export function confluenceProviderRootIndexPath(): string {
   return `${CONFLUENCE_PATH_ROOT}/_index.json`;
 }
 
+/** Alias for {@link confluenceProviderRootIndexPath} — matches the
+ *  cross-adapter `<provider>RootIndexPath` naming convention. */
+export function confluenceRootIndexPath(): string {
+  return confluenceProviderRootIndexPath();
+}
+
 export function confluencePageByStatePath(status: string, pageId: string): string {
   return `${CONFLUENCE_PATH_ROOT}/pages/by-state/${slugifyStatusName(status)}/${encodeConfluencePathSegment(pageId)}.json`;
 }

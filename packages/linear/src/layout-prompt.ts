@@ -9,6 +9,8 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 
 Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\` and \`/linear/issues/by-state/<state>/<TEAM-123>.json\` are additional lookups.
 
+Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\` and \`/linear/issues/by-state/<state>/<TEAM-123>.json\` are additional lookups.
+
 ## Indexes
 
 \`/linear/issues/_index.json\` rows use:

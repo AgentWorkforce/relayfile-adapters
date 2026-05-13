@@ -26,11 +26,13 @@
  *   * **user**, **team** — canonical `/linear/users/<id>.json` /
  *     `/linear/teams/<id>.json`, index row `{ id, title, updated }`.
  *
- *   * **project** — canonical `/linear/projects/<id>.json` plus
- *     `/linear/projects/_index.json`.
+ *   * **project** — canonical `/linear/projects/<id>.json`. No index file
+ *     today; the helper exists in the path-mapper but no `_index.json`
+ *     emitter is wired in. We still emit the canonical file so cloud's
+ *     existing project sync surfaces survive the port.
  *
- *   * **cycle**, **milestone**, **roadmap** — canonical paths plus sibling
- *     `_index.json` files so zero-record syncs still materialize their roots.
+ *   * **cycle**, **milestone**, **roadmap** — canonical paths only. Same
+ *     rationale as projects.
  *
  * Reconciliation: every issue write reads the prior by-uuid alias (the
  * stable anchor keyed on `issue.id`, always emitted) to recover the
@@ -62,6 +64,7 @@ import {
 } from '@relayfile/adapter-core';
 
 import { hasAliasSlug } from './alias-slug.js';
+import { buildLinearRootIndexFile } from './index-emitter.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
@@ -154,6 +157,11 @@ export async function emitLinearAuxiliaryFiles(
   const workspaceId = input.workspaceId;
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/linear/_index.json` so `ls /linear/` reliably
+  // surfaces the top-level resource buckets, even for empty / single-bucket
+  // batches. Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(client, workspaceId, aggregate);
+
   const issues = input.issues ?? [];
   const comments = input.comments ?? [];
   const users = input.users ?? [];
@@ -210,6 +218,30 @@ export async function emitLinearAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- root index -------------------------------------------------------------
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildLinearRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- issues -----------------------------------------------------------------
@@ -385,7 +417,7 @@ function issuePathsFor(args: {
   if (identifier) {
     paths.push(linearByIdAliasPath(ISSUES_SCOPE, identifier));
   }
-  // by-title alias — skip when title slugs to empty.
+  // by-title alias — skip when the title has no valid alias slug.
   if (title && slugifies(title)) {
     paths.push(linearByTitleAliasPath(ISSUES_SCOPE, title, id));
   }
@@ -732,9 +764,8 @@ async function writeEmptyIndex(
  * Skip by-title aliases for titles that slug to nothing (emoji-only /
  * punctuation-only). The by-id alias still resolves those records.
  *
- * Delegates to the shared alias-slug normalizer per AGENTS.md "NEVER write
- * a new slugifier" rule. This must not compare against `slugifyAlias`
- * output because `untitled` is both the empty-slug sentinel and a valid slug.
+ * Delegates to the shared alias-slug helper per AGENTS.md "NEVER write a
+ * new slugifier" rule.
  */
 function slugifies(value: string): boolean {
   return hasAliasSlug(value);

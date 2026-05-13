@@ -73,6 +73,10 @@ export function airtableRecordPath(baseId: string, tableId: string, recordId: st
   return `${AIRTABLE_PATH_ROOT}/bases/${encodeAirtablePathSegment(baseId)}/tables/${encodeAirtablePathSegment(tableId)}/records/${encodeAirtablePathSegment(recordId)}.json`;
 }
 
+export function airtableNotificationPath(baseId: string, webhookId: string): string {
+  return `${AIRTABLE_PATH_ROOT}/bases/${encodeAirtablePathSegment(baseId)}/_notifications/${encodeAirtablePathSegment(webhookId)}.json`;
+}
+
 export function computeAirtablePath(
   objectType: string,
   objectId: string,
@@ -126,6 +130,21 @@ export function parseAirtablePath(path: string): {
   }
 
   throw new Error(`No Airtable path rule matched ${path}`);
+}
+
+export function parseAirtableNotificationPath(path: string): {
+  baseId: string;
+  webhookId: string;
+} {
+  const notificationMatch = path.match(/^\/airtable\/bases\/([^/]+)\/_notifications\/([^/]+)\.json$/);
+  if (notificationMatch?.[1] && notificationMatch[2]) {
+    return {
+      baseId: decodeURIComponent(notificationMatch[1]),
+      webhookId: decodeURIComponent(notificationMatch[2]),
+    };
+  }
+
+  throw new Error(`No Airtable notification path rule matched ${path}`);
 }
 
 function resolveBaseId(baseId: string | undefined): string {

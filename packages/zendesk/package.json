@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-zendesk",
-  "version": "0.2.3",
+  "version": "0.2.6",
   "description": "Zendesk adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "directory": "packages/zendesk"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.15"
+    "@relayfile/adapter-core": "^0.2.18"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
