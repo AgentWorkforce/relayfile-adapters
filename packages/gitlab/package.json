@@ -25,7 +25,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.20"
+    "@relayfile/adapter-core": "^0.2.21"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
