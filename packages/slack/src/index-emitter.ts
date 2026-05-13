@@ -24,6 +24,15 @@ export interface SlackUserIndexRow {
   title: string;
   updated: string;
   is_bot: boolean;
+  /**
+   * Slack user handle (the `name` field from the Slack API user object).
+   * Persisted alongside `title` so rename reconciliation has an unambiguous
+   * prior handle to compute the stale `by-name` alias path from — `title`
+   * carries the display name which can be ambiguous and isn't always the
+   * slug source. Optional for back-compat with rows written by adapters
+   * `<= 0.2.5` that did not persist this field.
+   */
+  name?: string;
 }
 
 export interface SlackRootIndexRow {

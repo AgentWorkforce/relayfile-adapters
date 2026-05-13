@@ -2,6 +2,7 @@ import {
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
   githubReposIndexPath,
+  githubRootIndexPath,
 } from './path-mapper.js';
 import type { VfsLike } from './files/content-fetcher.js';
 
@@ -16,10 +17,30 @@ export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   state: string;
 }
 
+export interface GitHubRootIndexRow {
+  id: string;
+  title: string;
+}
+
 export interface GitHubIndexFile {
   path: string;
   contentType: 'application/json; charset=utf-8';
   content: string;
+}
+
+/**
+ * Build `/github/_index.json` — a static listing of top-level resource roots
+ * the GitHub adapter exposes. Mirrors the slack pattern so an agent can
+ * `ls /github/` and orient.
+ */
+export function buildGitHubRootIndexFile(
+  rows: GitHubRootIndexRow[] = [{ id: 'repos', title: 'Repositories' }],
+): GitHubIndexFile {
+  return {
+    path: githubRootIndexPath(),
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(rows)}\n`,
+  };
 }
 
 export function buildRepoIndexFile(rows: GitHubRepoIndexRow[]): GitHubIndexFile {

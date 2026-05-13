@@ -68,6 +68,23 @@ export {
   IntegrationAdapter,
   SlackAdapter,
 } from './slack-adapter.js';
+export * from './summary.js';
+export * from './thread.js';
+
+export { emitSlackAuxiliaryFiles } from './emit-auxiliary-files.js';
+export type {
+  SlackChannelEmitRecord,
+  SlackChannelRecord,
+  SlackEmitAuxiliaryFilesInput,
+  SlackMessageEmitRecord,
+  SlackMessageRecord,
+  SlackThreadEmitRecord,
+  SlackThreadRecord,
+  SlackThreadReplyEmitRecord,
+  SlackThreadReplyRecord,
+  SlackUserEmitRecord,
+  SlackUserRecord,
+} from './emit-auxiliary-files.js';
 
 export {
   SLACK_REQUEST_TIMESTAMP_HEADER,

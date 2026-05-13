@@ -34,6 +34,19 @@ export type JsonValue =
 
 export type StorageBridgeMetadata = Record<string, JsonValue>;
 
+export interface EventSummary {
+  readonly title?: string;
+  readonly status?: string;
+  readonly priority?: string;
+  readonly labels?: readonly string[];
+  readonly actor?: {
+    readonly id: string;
+    readonly displayName?: string;
+  };
+  readonly fieldsChanged?: readonly string[];
+  readonly tags?: readonly string[];
+}
+
 export interface StorageBridgeEvent {
   readonly eventId: string;
   readonly occurredAt: string;
@@ -44,7 +57,9 @@ export interface StorageBridgeEvent {
   readonly resourceId: string;
   readonly sizeBytes: number | null;
   readonly fingerprint: string | null;
+  readonly digest?: string;
   readonly metadata: StorageBridgeMetadata;
+  readonly summary?: EventSummary;
   readonly workspaceId: string | null;
 }
 
@@ -76,7 +91,9 @@ export interface CreateStorageBridgeEventInput<
   readonly resourceId: string;
   readonly sizeBytes?: number | null;
   readonly fingerprint?: string | null;
+  readonly digest?: string;
   readonly metadata?: StorageBridgeMetadata;
+  readonly summary?: EventSummary;
   readonly workspaceId?: string | null;
   readonly sourceMetadata?: Omit<StorageBridgeSourceMetadata, "source">;
 }
@@ -125,7 +142,15 @@ export function createStorageBridgeEvent<Source extends StorageBridgeSource>(
     resourceId: input.resourceId,
     sizeBytes: input.sizeBytes ?? null,
     fingerprint: input.fingerprint ?? null,
+    ...(input.digest?.trim()
+      ? { digest: input.digest.trim() }
+      : input.fingerprint?.trim()
+        ? { digest: input.fingerprint.trim() }
+        : {}),
     metadata,
+    ...(input.summary
+      ? { summary: input.summary }
+      : { summary: buildDefaultSummary(input) }),
     workspaceId: input.workspaceId ?? null,
   };
 
@@ -199,8 +224,19 @@ export function validateStorageBridgeEvent(
     issues.push("fingerprint must be a string or null");
   }
 
+  if (
+    value.digest !== undefined &&
+    (typeof value.digest !== "string" || value.digest.trim().length === 0)
+  ) {
+    issues.push("digest must be a non-empty string when provided");
+  }
+
   if (!isRecord(value.metadata)) {
     issues.push("metadata must be an object");
+  }
+
+  if (value.summary !== undefined && !isRecord(value.summary)) {
+    issues.push("summary must be an object when provided");
   }
 
   if (value.workspaceId !== null && typeof value.workspaceId !== "string") {
@@ -246,6 +282,29 @@ export function buildStorageBridgeEventId(input: {
     .slice(0, 32);
 
   return `${input.source}:${digest}`;
+}
+
+function buildDefaultSummary(
+  input: CreateStorageBridgeEventInput,
+): EventSummary {
+  const title = summarizeRelayfilePath(input.relayfilePath);
+  return {
+    ...(title ? { title } : {}),
+    status: input.changeType,
+    tags: [input.source],
+  };
+}
+
+function summarizeRelayfilePath(path: string): string | undefined {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const segments = trimmed.split("/").filter(Boolean);
+  const leaf = segments[segments.length - 1] ?? trimmed;
+  const normalized = leaf.replace(/\.json$/i, "").trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 export function toIsoTimestamp(value: string | Date): string {

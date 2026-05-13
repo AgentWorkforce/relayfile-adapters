@@ -10,6 +10,7 @@ export * from './content/renderer.js';
 export * from './databases/ingestion.js';
 export * from './databases/query.js';
 export * from './discovery/index.js';
+export * from './emit-auxiliary-files.js';
 export * from './index-emitter.js';
 export * from './layout-prompt.js';
 export * from './pages/ingestion.js';
@@ -17,6 +18,8 @@ export * from './pages/properties.js';
 export * from './path-mapper.js';
 export * from './users/ingestion.js';
 export * from './search.js';
+export * from './summary.js';
+export * from './thread.js';
 export * from './sync.js';
 export * from './types.js';
 export {

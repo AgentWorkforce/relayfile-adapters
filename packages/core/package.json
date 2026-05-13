@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-core",
-  "version": "0.2.15",
+  "version": "0.2.18",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/src/index.js",
@@ -14,9 +14,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist/tests/round-trip && tsc -p tsconfig.json",
     "clean": "rm -rf dist",
-    "test": "npm run build && node --test dist/tests/**/*.test.js dist/src/**/*.test.js",
+    "test": "node --test dist/tests/**/*.test.js dist/src/**/*.test.js",
     "test:round-trip": "vitest run tests/round-trip",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit"

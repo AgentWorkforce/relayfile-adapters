@@ -54,13 +54,17 @@ import {
 import { sanitizeJiraRecordForStorage } from './jira-adapter.js';
 import {
   jiraCommentPath,
+  jiraIssueByAssigneeAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraIssuesIndexPath,
+  jiraProjectByIdAliasPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
+  jiraRootIndexPath,
+  jiraSprintByIdAliasPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from './path-mapper.js';
@@ -147,6 +151,11 @@ export async function emitJiraAuxiliaryFiles(
 
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/jira/_index.json` so `ls /jira/` reliably surfaces
+  // the top-level resource buckets, even for empty / single-bucket batches.
+  // Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(emitterClient, workspaceId, aggregate);
+
   if (!hasIssues && !hasProjects && !hasSprints && !hasComments) {
     return aggregate;
   }
@@ -165,6 +174,54 @@ export async function emitJiraAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- Root index ------------------------------------------------------------
+
+export interface JiraRootIndexRow {
+  id: string;
+  title: string;
+}
+
+/**
+ * Build `/jira/_index.json` — a static listing of top-level resource roots
+ * the Jira adapter exposes. Mirrors the slack pattern so an agent can
+ * `ls /jira/` and discover the available buckets.
+ */
+export function buildJiraRootIndexFile(
+  rows: JiraRootIndexRow[] = [
+    { id: 'issues', title: 'Issues' },
+    { id: 'projects', title: 'Projects' },
+    { id: 'sprints', title: 'Sprints' },
+  ],
+): { path: string; content: string; contentType: typeof JSON_CONTENT_TYPE } {
+  return {
+    path: jiraRootIndexPath(),
+    content: `${JSON.stringify(rows)}\n`,
+    contentType: JSON_CONTENT_TYPE,
+  };
+}
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildJiraRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- Issues ----------------------------------------------------------------
@@ -219,14 +276,30 @@ async function planIssueWrite(
 
   const fields = isRecord(issue.fields) ? issue.fields : {};
   const statusObject = isRecord(fields.status) ? fields.status : {};
+  const assigneeObject = isRecord(fields.assignee) ? fields.assignee : {};
   const summary = readNonEmptyString((fields as { summary?: unknown }).summary);
   const status = readNonEmptyString((statusObject as { name?: unknown }).name);
   const key = readNonEmptyString((issue as { key?: unknown }).key);
+  const assigneeAccountId = readNonEmptyString(
+    (assigneeObject as { accountId?: unknown }).accountId,
+  );
 
   const safe = sanitizeJiraRecordForStorage(issue as unknown as Record<string, unknown>);
+  // `sanitizeJiraRecordForStorage` strips the entire `fields.assignee` user
+  // record as PII, but the bare `accountId` is an opaque Atlassian id
+  // (no PII) and is required to compute stale `by-assignee/...` paths
+  // when the issue is reassigned. Hoist it onto `fields.assigneeAccountId`
+  // so `extractPriorIssueState` can read it back on the next emit.
+  if (assigneeAccountId) {
+    const safeFields = isRecord(safe.fields)
+      ? safe.fields
+      : ({} as Record<string, unknown>);
+    safeFields.assigneeAccountId = assigneeAccountId;
+    safe.fields = safeFields;
+  }
   const content = renderObjectContent(safe, 'issue', id, connectionId, false);
 
-  const newPaths = issuePathsFor({ id, summary, status, key });
+  const newPaths = issuePathsFor({ id, summary, status, key, assigneeAccountId });
 
   // Reconciliation: read prior by-id to recover summary/status/key and
   // diff against the new alias set. by-id is the stable anchor and is
@@ -275,10 +348,11 @@ interface PriorIssueState {
   summary?: string | undefined;
   status?: string | undefined;
   key?: string | undefined;
+  assigneeAccountId?: string | undefined;
 }
 
 function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
-  const { id, summary, status, key } = args;
+  const { id, summary, status, key, assigneeAccountId } = args;
   const paths: string[] = [];
   // Canonical: `<slug>__<id>.json` — uses the issue summary for the slug,
   // falling back to the key when summary is missing (matches the existing
@@ -292,6 +366,9 @@ function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
   if (status) {
     paths.push(jiraIssueByStatePath(status, id));
   }
+  if (assigneeAccountId) {
+    paths.push(jiraIssueByAssigneeAliasPath(assigneeAccountId, id));
+  }
   return paths;
 }
 
@@ -304,6 +381,12 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     summary: readNonEmptyString((fields as { summary?: unknown }).summary),
     status: readNonEmptyString((status as { name?: unknown }).name),
     key: readNonEmptyString((payload as { key?: unknown }).key),
+    // The full `fields.assignee` user object is redacted by
+    // `sanitizeJiraRecordForStorage`; `planIssueWrite` hoists the bare
+    // `accountId` to `fields.assigneeAccountId` for reconciliation reads.
+    assigneeAccountId: readNonEmptyString(
+      (fields as { assigneeAccountId?: unknown }).assigneeAccountId,
+    ),
   };
 }
 
@@ -329,23 +412,14 @@ async function emitProjects(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
-  const priorRows = await readIndexRows<JiraProjectIndexRow>(
-    client,
-    workspaceId,
-    jiraProjectsIndexPath(),
-  );
-  const priorRowsById = new Map(priorRows.map((row) => [row.id, row]));
+
+  const priorReader = new PriorAliasReader(client, workspaceId);
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      indexReconciler.remove(record.id);
-      return {
-        deletes: [
-          { path: jiraProjectPath(record.id, priorRowsById.get(record.id)?.title) },
-        ],
-      };
+      return planProjectDelete(record.id, priorReader, indexReconciler);
     }
-    return planProjectWrite(record, priorRowsById, indexReconciler, connectionId);
+    return planProjectWrite(record, priorReader, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -355,12 +429,31 @@ async function emitProjects(
   return fanOut;
 }
 
-function planProjectWrite(
+interface PriorProjectState {
+  name?: string | undefined;
+}
+
+function projectPathsFor(args: { id: string } & PriorProjectState): string[] {
+  const { id, name } = args;
+  return [jiraProjectPath(id, name), jiraProjectByIdAliasPath(id)];
+}
+
+function extractPriorProjectState(parsed: Record<string, unknown>): PriorProjectState | null {
+  const payload = pickPayload(parsed);
+  if (!payload) return null;
+  return {
+    name:
+      readNonEmptyString((payload as { name?: unknown }).name) ??
+      readNonEmptyString((payload as { key?: unknown }).key),
+  };
+}
+
+async function planProjectWrite(
   project: JiraProject,
-  priorRowsById: ReadonlyMap<string, JiraProjectIndexRow>,
+  priorReader: PriorAliasReader,
   indexReconciler: IndexFileReconciler<JiraProjectIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const id = readNonEmptyString(project.id);
   if (!id) {
     return {};
@@ -369,18 +462,40 @@ function planProjectWrite(
   const safe = sanitizeJiraRecordForStorage(project as unknown as Record<string, unknown>);
   const content = renderObjectContent(safe, 'project', id, connectionId, false);
 
-  const writes: EmitWrite[] = [
-    { path: jiraProjectPath(id, name), content, contentType: JSON_CONTENT_TYPE },
-  ];
-  const priorTitle = priorRowsById.get(id)?.title;
-  const stalePath = priorTitle && priorTitle !== name
-    ? jiraProjectPath(id, priorTitle)
-    : undefined;
-  const deletes: EmitDelete[] = stalePath ? [{ path: stalePath }] : [];
+  const newPaths = projectPathsFor({ id, name });
+
+  // Reconciliation: read prior by-id to recover the previous name so a
+  // rename invalidates the stale canonical `<slug>__<id>.json`.
+  const prior = await priorReader.read<PriorProjectState>(
+    jiraProjectByIdAliasPath(id),
+    extractPriorProjectState,
+  );
+  const stalePaths = prior ? diffPaths(projectPathsFor({ id, ...prior }), newPaths) : [];
+
+  const writes: EmitWrite[] = newPaths.map((path) => ({
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+  }));
+  const deletes: EmitDelete[] = stalePaths.map((path) => ({ path }));
 
   indexReconciler.upsert(jiraProjectIndexRow(project));
 
   return { writes, deletes };
+}
+
+async function planProjectDelete(
+  id: string,
+  priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<JiraProjectIndexRow>,
+): Promise<EmitPlan> {
+  const prior = await priorReader.read<PriorProjectState>(
+    jiraProjectByIdAliasPath(id),
+    extractPriorProjectState,
+  );
+  const paths = projectPathsFor({ id, ...(prior ?? {}) });
+  indexReconciler.remove(id);
+  return { deletes: paths.map((path) => ({ path })) };
 }
 
 // -- Sprints ---------------------------------------------------------------
@@ -405,24 +520,14 @@ async function emitSprints(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
-  const priorRows = await readIndexRows<JiraSprintIndexRow>(
-    client,
-    workspaceId,
-    jiraSprintsIndexPath(),
-  );
-  const priorRowsById = new Map(priorRows.map((row) => [row.id, row]));
+
+  const priorReader = new PriorAliasReader(client, workspaceId);
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
-      const id = String(record.id);
-      indexReconciler.remove(id);
-      return {
-        deletes: [
-          { path: jiraSprintPath(id, priorRowsById.get(id)?.title) },
-        ],
-      };
+      return planSprintDelete(String(record.id), priorReader, indexReconciler);
     }
-    return planSprintWrite(record, priorRowsById, indexReconciler, connectionId);
+    return planSprintWrite(record, priorReader, indexReconciler, connectionId);
   });
 
   const indexResult = await indexReconciler.flush();
@@ -432,12 +537,29 @@ async function emitSprints(
   return fanOut;
 }
 
-function planSprintWrite(
+interface PriorSprintState {
+  name?: string | undefined;
+}
+
+function sprintPathsFor(args: { id: string } & PriorSprintState): string[] {
+  const { id, name } = args;
+  return [jiraSprintPath(id, name), jiraSprintByIdAliasPath(id)];
+}
+
+function extractPriorSprintState(parsed: Record<string, unknown>): PriorSprintState | null {
+  const payload = pickPayload(parsed);
+  if (!payload) return null;
+  return {
+    name: readNonEmptyString((payload as { name?: unknown }).name),
+  };
+}
+
+async function planSprintWrite(
   sprint: JiraSprint,
-  priorRowsById: ReadonlyMap<string, JiraSprintIndexRow>,
+  priorReader: PriorAliasReader,
   indexReconciler: IndexFileReconciler<JiraSprintIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const id = readNonEmptyString(String(sprint.id));
   if (!id) {
     return {};
@@ -446,18 +568,39 @@ function planSprintWrite(
   const safe = sanitizeJiraRecordForStorage(sprint as unknown as Record<string, unknown>);
   const content = renderObjectContent(safe, 'sprint', id, connectionId, false);
 
-  const writes: EmitWrite[] = [
-    { path: jiraSprintPath(id, name), content, contentType: JSON_CONTENT_TYPE },
-  ];
-  const priorTitle = priorRowsById.get(id)?.title;
-  const stalePath = priorTitle && priorTitle !== name
-    ? jiraSprintPath(id, priorTitle)
-    : undefined;
-  const deletes: EmitDelete[] = stalePath ? [{ path: stalePath }] : [];
+  const newPaths = sprintPathsFor({ id, name });
+
+  // Reconciliation: see `planProjectWrite`.
+  const prior = await priorReader.read<PriorSprintState>(
+    jiraSprintByIdAliasPath(id),
+    extractPriorSprintState,
+  );
+  const stalePaths = prior ? diffPaths(sprintPathsFor({ id, ...prior }), newPaths) : [];
+
+  const writes: EmitWrite[] = newPaths.map((path) => ({
+    path,
+    content,
+    contentType: JSON_CONTENT_TYPE,
+  }));
+  const deletes: EmitDelete[] = stalePaths.map((path) => ({ path }));
 
   indexReconciler.upsert(jiraSprintIndexRow(sprint));
 
   return { writes, deletes };
+}
+
+async function planSprintDelete(
+  id: string,
+  priorReader: PriorAliasReader,
+  indexReconciler: IndexFileReconciler<JiraSprintIndexRow>,
+): Promise<EmitPlan> {
+  const prior = await priorReader.read<PriorSprintState>(
+    jiraSprintByIdAliasPath(id),
+    extractPriorSprintState,
+  );
+  const paths = sprintPathsFor({ id, ...(prior ?? {}) });
+  indexReconciler.remove(id);
+  return { deletes: paths.map((path) => ({ path })) };
 }
 
 // -- Comments --------------------------------------------------------------
@@ -594,37 +737,6 @@ async function writeEmptyIndex(
       errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
     };
   }
-}
-
-async function readIndexRows<TRow extends { id: string }>(
-  client: AuxiliaryEmitterClient,
-  workspaceId: string,
-  path: string,
-): Promise<TRow[]> {
-  if (!client.readFile) {
-    return [];
-  }
-  let raw: { content: string } | null | undefined;
-  try {
-    raw = await client.readFile({ workspaceId, path });
-  } catch {
-    return [];
-  }
-  if (!raw?.content) {
-    return [];
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.content);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) {
-    return [];
-  }
-  return parsed.filter((row): row is TRow => (
-    isRecord(row) && typeof (row as { id?: unknown }).id === 'string'
-  ));
 }
 
 function accumulate(

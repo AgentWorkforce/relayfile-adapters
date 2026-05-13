@@ -8,6 +8,8 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 \`/linear/issues/\`, \`/linear/comments/\`, \`/linear/users/\`, and \`/linear/teams/\` each own their canonical JSON records plus a sibling \`_index.json\`.
 Other integration-owned trees include \`/linear/projects/\`, \`/linear/cycles/\`, \`/linear/milestones/\`, and \`/linear/roadmaps/\`.
 
+Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\` and \`/linear/issues/by-state/<state>/<TEAM-123>.json\` are additional lookups.
+
 ## Indexes
 
 \`/linear/issues/_index.json\` rows use:

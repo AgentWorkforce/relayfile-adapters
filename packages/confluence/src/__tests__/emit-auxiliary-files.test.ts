@@ -11,6 +11,7 @@ import {
   confluencePageByTitleAliasPath,
   confluencePagePath,
   confluencePagesIndexPath,
+  confluenceRootIndexPath,
   confluenceSpaceByIdAliasPath,
   confluenceSpaceByKeyAliasPath,
   confluenceSpaceByTitleAliasPath,
@@ -70,12 +71,32 @@ function createClient(options: {
 }
 
 describe('emitConfluenceAuxiliaryFiles', () => {
-  it('returns a zero result on empty input', async () => {
+  it('always writes /confluence/_index.json root index on empty input', async () => {
     const client = createClient();
     const result = await emitConfluenceAuxiliaryFiles(client, { workspaceId: 'ws-1' });
-    assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
-    assert.equal(client.writes.length, 0);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 1);
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, confluenceRootIndexPath());
+    const rows = JSON.parse(client.files.get(confluenceRootIndexPath())!);
+    assert.deepEqual(rows, [
+      { id: 'pages', title: 'Pages' },
+      { id: 'spaces', title: 'Spaces' },
+    ]);
     assert.equal(client.deletes.length, 0);
+  });
+
+  it('emits /confluence/_index.json alongside non-empty buckets', async () => {
+    const client = createClient();
+    await emitConfluenceAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      spaces: [{ id: 'sp-1', name: 'Engineering' }],
+    });
+    assert.ok(
+      client.writes.some((w) => w.path === confluenceRootIndexPath()),
+      'expected /confluence/_index.json root index write',
+    );
   });
 
   it('writes the canonical path plus every applicable page alias plus the index row', async () => {
@@ -93,8 +114,8 @@ describe('emitConfluenceAuxiliaryFiles', () => {
     });
 
     // Page emits 6 files (canonical + by-id + by-title + by-state + by-space + by-parent),
-    // plus 1 index file write.
-    assert.equal(result.written, 7);
+    // plus 1 pages index write, plus 1 root index write.
+    assert.equal(result.written, 8);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
@@ -228,9 +249,12 @@ describe('emitConfluenceAuxiliaryFiles', () => {
     }
 
     // No content writes happened for the tombstone, but the index file
-    // flush still runs (with 0 mutations queued, so no write).
+    // flush still runs (with 0 mutations queued, so no write). The root
+    // `/confluence/_index.json` is also written unconditionally.
     const contentWrites = client.writes.filter(
-      (w) => w.path !== confluencePagesIndexPath(),
+      (w) =>
+        w.path !== confluencePagesIndexPath() &&
+        w.path !== confluenceRootIndexPath(),
     );
     assert.equal(contentWrites.length, 0);
     assert.equal(result.deleted, expectedDeletes.length);

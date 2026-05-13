@@ -126,6 +126,10 @@ export function githubReposIndexPath(): string {
   return `${GITHUB_ROOT}/_index.json`;
 }
 
+export function githubRootIndexPath(): string {
+  return `${GITHUB_PATH_ROOT}/_index.json`;
+}
+
 export function githubRepositoryMetadataPath(owner: string, repo: string): string {
   return `${githubRepoPrefix(owner, repo)}/metadata.json`;
 }

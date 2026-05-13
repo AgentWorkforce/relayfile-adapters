@@ -60,6 +60,7 @@ export {
   type ClickUpWebhookSignatureValidationResult,
   type ClickUpWebhookTimestampValidationResult,
 } from './webhook-normalizer.js';
+export * from './summary.js';
 export type {
   ClickUpAdapterConfig,
   ClickUpCustomField,

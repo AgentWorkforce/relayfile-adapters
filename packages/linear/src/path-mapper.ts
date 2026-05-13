@@ -246,6 +246,10 @@ export function linearIssuesIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/issues/_index.json`;
 }
 
+export function linearRootIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/_index.json`;
+}
+
 export function linearIssueByStatePath(stateName: string, identifier: string): string {
   return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
 }
@@ -303,6 +307,20 @@ export function linearByTitleAliasPath(scope: string, title: string, id: string,
 
 export function linearByIdAliasPath(scope: string, identifier: string): string {
   return `${scope}/by-id/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+/**
+ * Stable UUID-keyed alias for Linear records. Used as the reconciliation
+ * anchor when computing prior state, because the Linear UUID (`issue.id`)
+ * is always present even on bare delete tombstones, whereas the human-readable
+ * `identifier` (e.g. `TEAM-123`) may be missing on partial payloads or on
+ * issues that were created without one. The existing `linearByIdAliasPath`
+ * remains the human-readable lookup alias keyed on `identifier` when
+ * available — both are emitted side-by-side for issues so consumers can
+ * resolve a record by either key.
+ */
+export function linearByUuidAliasPath(scope: string, uuid: string): string {
+  return `${scope}/by-uuid/${encodeLinearPathSegment(uuid)}.json`;
 }
 
 export function computeLinearPath(objectType: string, objectId: string, humanReadable?: string): string {

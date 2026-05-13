@@ -81,19 +81,37 @@ Relayfile's Jira webhook actions should use `jira-relay` and Jira Cloud OAuth dy
 
 Do not treat `/rest/api/3/webhook` as an absolute endpoint for OAuth connections; call the full gateway endpoint `/ex/jira/{cloudId}/rest/api/3/webhook`. Do not use the legacy admin endpoint `/rest/webhooks/1.0/webhook` for OAuth connections; production dryrun rejected that surface with a scope mismatch. With the updated production Jira connection, listing dynamic webhooks through the gateway path succeeded and returned an empty list.
 
-Minimum classic scopes for the current Relayfile Jira surface include:
+### Jira OAuth scope set (hybrid classic + granular)
+
+`jira-relay` uses a **hybrid classic + granular** Atlassian OAuth 2.0 scope set. The split is dictated by Atlassian's own OpenAPI spec (https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json) which marks each endpoint's scopes as either **stable** (`security` block) or **Beta** (`x-atlassian-oauth2-scopes`):
+
+- **`/rest/agile/1.0/*` (Jira Software)** — granular scopes are stable. `fetch-sprints` uses pure granular (`read:board-scope:jira-software`, `read:sprint:jira-software`, `read:project:jira`).
+- **`/rest/api/3/*` (Jira platform v3)** — classic `read:jira-work` / `write:jira-work` / `manage:jira-webhook` are still the stable required scopes. Their granular alternatives are marked Beta; a pure-granular token 401s with `Unauthorized; scope does not match` against `/rest/api/3/search/jql`, `/rest/api/3/project/search`, `/rest/api/3/issue`, and the dynamic-webhook endpoints. Declare classic *and* granular alongside each other so the granular path activates whenever Atlassian promotes Beta to stable, without further code changes.
+
+**Classic (stable, currently required):**
 
 - `read:jira-work`
 - `write:jira-work`
-- `read:jira-user`
-- `manage:jira-project`
-- `manage:jira-configuration`
 - `manage:jira-webhook`
 - `offline_access`
 
-For granular OAuth configurations, map the dynamic webhook actions to Atlassian's webhook read/write/delete scopes and the supporting JQL, field, and project read scopes.
+**Granular Jira Software (stable):**
 
-Source: https://developer.atlassian.com/cloud/jira/platform/webhooks/#registering-a-webhook-using-the-jira-rest-api--other-integrations-
+- `read:board-scope:jira-software`
+- `read:sprint:jira-software`
+
+**Granular Jira platform v3 (Beta — declared for forward-compatibility):**
+
+- Reads: `read:jql:jira`, `read:issue:jira`, `read:issue-meta:jira`, `read:issue-details:jira`, `read:issue.changelog:jira`, `read:issue-link:jira`, `read:status:jira`, `read:issue-type:jira`, `read:issue-type-hierarchy:jira`, `read:comment:jira`, `read:attachment:jira`, `read:project:jira`, `read:project.property:jira`, `read:project-category:jira`, `read:project-version:jira`, `read:project.component:jira`, `read:user:jira`, `read:application-role:jira`, `read:avatar:jira`, `read:group:jira`, `read:audit-log:jira`, `read:field:jira`, `read:field-configuration:jira`, `read:webhook:jira`
+- Writes: `write:issue:jira`, `write:comment:jira`, `write:comment.property:jira`, `write:attachment:jira`, `write:webhook:jira`, `delete:webhook:jira`
+
+The legacy admin `/rest/webhooks/1.0/webhook` surface is not used for OAuth connections; production dryrun rejected it with `Unauthorized; scope does not match`. Connections must be deleted and re-authorized after scope changes — tokens do not gain scopes retroactively. The authoritative per-endpoint mapping (which sync/action uses which scope) lives in `cloud/nango-integrations/INTEGRATION_SCOPES.md`.
+
+Sources:
+
+- Atlassian Jira platform v3 OpenAPI spec: https://dac-static.atlassian.com/cloud/jira/platform/swagger-v3.v3.json
+- Atlassian Jira Software OpenAPI spec: https://developer.atlassian.com/cloud/jira/software/swagger.v3.json
+- Webhook registration reference: https://developer.atlassian.com/cloud/jira/platform/webhooks/#registering-a-webhook-using-the-jira-rest-api--other-integrations-
 
 ## Linear Webhooks
 

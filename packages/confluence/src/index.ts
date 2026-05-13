@@ -53,6 +53,7 @@ export {
   confluenceLayoutPromptFile,
   CONFLUENCE_LAYOUT_PROMPT,
 } from './layout-prompt.js';
+export * from './summary.js';
 
 export {
   emitConfluenceAuxiliaryFiles,
