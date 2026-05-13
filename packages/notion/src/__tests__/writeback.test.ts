@@ -132,6 +132,14 @@ describe('writeback rule matching', () => {
     assert.strictEqual(standalonePageRequest.action, 'update_page_properties');
     assert.strictEqual(standalonePageRequest.method, 'PATCH');
     assert.strictEqual(standalonePageRequest.endpoint, '/v1/pages/00000000-0000-0000-0000-000000000002');
+    assert.throws(
+      () => resolveWritebackRequest('/notion/databases/db-1/pages/draft-page/properties.json', content),
+      /No Notion writeback rule matched/,
+    );
+    assert.throws(
+      () => resolveWritebackRequest('/notion/pages/draft-page/properties.json', content),
+      /No Notion writeback rule matched/,
+    );
   });
 
   it('maps markdown and comments writeback paths', () => {

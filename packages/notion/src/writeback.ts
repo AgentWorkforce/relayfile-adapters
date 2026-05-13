@@ -104,12 +104,12 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   }
 
   const databasePropertiesMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/properties\.json$/);
-  if (databasePropertiesMatch) {
+  if (databasePropertiesMatch && isCanonicalStandalonePageSegment(databasePropertiesMatch[2])) {
     return buildPagePropertiesWriteback(extractNotionId(databasePropertiesMatch[2]), content);
   }
 
   const standalonePropertiesMatch = path.match(/^\/notion\/pages\/([^/]+)\/properties\.json$/);
-  if (standalonePropertiesMatch) {
+  if (standalonePropertiesMatch && isCanonicalStandalonePageSegment(standalonePropertiesMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePropertiesMatch[1]), content);
   }
 
