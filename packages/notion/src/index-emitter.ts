@@ -2,9 +2,40 @@ import {
   notionDatabasePagesIndexPath,
   notionDatabasesIndexPath,
   notionPagesIndexPath,
+  notionRootIndexPath,
   notionUsersIndexPath,
 } from './path-mapper.js';
 import type { NotionVfsFile } from './types.js';
+
+export interface NotionRootIndexRow {
+  id: string;
+  title: string;
+}
+
+export interface NotionRootIndexFile {
+  path: string;
+  contentType: 'application/json; charset=utf-8';
+  content: string;
+}
+
+/**
+ * Build `/notion/_index.json` — a static listing of top-level resource roots
+ * the Notion adapter exposes. Mirrors the slack pattern so an agent can
+ * `ls /notion/` and discover the available buckets.
+ */
+export function buildNotionRootIndexFile(
+  rows: NotionRootIndexRow[] = [
+    { id: 'pages', title: 'Pages' },
+    { id: 'databases', title: 'Databases' },
+    { id: 'users', title: 'Users' },
+  ],
+): NotionRootIndexFile {
+  return {
+    path: notionRootIndexPath(),
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify(rows)}\n`,
+  };
+}
 
 /**
  * `_index.json` row schema.

@@ -58,6 +58,7 @@ import {
 
 import { slugifyAlias } from './alias-slug.js';
 import {
+  buildGitHubRootIndexFile,
   buildRepoIndexFile,
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
@@ -190,6 +191,11 @@ export async function emitGitHubAuxiliaryFiles(
   const reviewComments = input.reviewComments ?? [];
   const checkRuns = input.checkRuns ?? [];
   const commits = input.commits ?? [];
+
+  // Always emit the root index, even for empty / single-bucket batches, so
+  // `ls /github/` reliably surfaces the top-level resource buckets. Mirrors
+  // the slack pattern from `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(client, workspaceId, aggregate);
 
   if (
     pullRequests.length === 0 &&
@@ -366,6 +372,34 @@ export async function emitGitHubAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// ---------------------------------------------------------------------------
+// Root index
+// ---------------------------------------------------------------------------
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildGitHubRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({ path: file.path, error: stringifyError(error) });
+  }
+}
+
+function stringifyError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 // ---------------------------------------------------------------------------

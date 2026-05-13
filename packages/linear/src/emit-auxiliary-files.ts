@@ -64,6 +64,7 @@ import {
 } from '@relayfile/adapter-core';
 
 import { slugifyAlias } from './alias-slug.js';
+import { buildLinearRootIndexFile } from './index-emitter.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
@@ -148,6 +149,11 @@ export async function emitLinearAuxiliaryFiles(
   const workspaceId = input.workspaceId;
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/linear/_index.json` so `ls /linear/` reliably
+  // surfaces the top-level resource buckets, even for empty / single-bucket
+  // batches. Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(client, workspaceId, aggregate);
+
   const issues = input.issues ?? [];
   const comments = input.comments ?? [];
   const users = input.users ?? [];
@@ -196,6 +202,30 @@ export async function emitLinearAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- root index -------------------------------------------------------------
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildLinearRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- issues -----------------------------------------------------------------

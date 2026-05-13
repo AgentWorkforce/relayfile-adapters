@@ -17,6 +17,7 @@ import {
   jiraIssuesIndexPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
+  jiraRootIndexPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from '../path-mapper.js';
@@ -95,12 +96,33 @@ function makeIssue(over: {
 }
 
 describe('emitJiraAuxiliaryFiles', () => {
-  it('returns a zero result on empty input', async () => {
+  it('always writes /jira/_index.json root index on empty input', async () => {
     const client = createClient();
     const result = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1' });
-    assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
-    assert.equal(client.writes.length, 0);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 1);
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, jiraRootIndexPath());
+    const rows = JSON.parse(client.files.get(jiraRootIndexPath())!);
+    assert.deepEqual(rows, [
+      { id: 'issues', title: 'Issues' },
+      { id: 'projects', title: 'Projects' },
+      { id: 'sprints', title: 'Sprints' },
+    ]);
     assert.equal(client.deletes.length, 0);
+  });
+
+  it('emits /jira/_index.json alongside non-empty buckets', async () => {
+    const client = createClient();
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [makeIssue({ id: '10001', key: 'KAN-1', summary: 'x' })],
+    });
+    assert.ok(
+      client.writes.some((w) => w.path === jiraRootIndexPath()),
+      'expected /jira/_index.json root index write',
+    );
   });
 
   it('writes canonical + by-id + by-key + by-state for an issue plus an index row', async () => {
@@ -119,8 +141,8 @@ describe('emitJiraAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // 4 file writes (canonical + by-id + by-key + by-state) + 1 index write.
-    assert.equal(result.written, 5);
+    // 4 file writes (canonical + by-id + by-key + by-state) + 1 issues index + 1 root index.
+    assert.equal(result.written, 6);
     assert.deepEqual(result.errors, []);
 
     const expectedFilePaths = [
@@ -304,7 +326,7 @@ describe('emitJiraAuxiliaryFiles', () => {
     });
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraCommentPath('500', 'KAN-42')));
-    assert.equal(writtenPaths[0], '/jira/issues/KAN-42/comments/500.json');
+    assert.ok(writtenPaths.includes('/jira/issues/KAN-42/comments/500.json'));
   });
 
   it('drops the index row when an issue tombstone arrives (no ghost entries)', async () => {

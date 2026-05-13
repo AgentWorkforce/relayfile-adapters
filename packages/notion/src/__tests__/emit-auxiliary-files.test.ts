@@ -21,6 +21,7 @@ import {
   notionPageByDatabaseAliasPath,
   notionPageByParentAliasPath,
   notionPagesIndexPath,
+  notionRootIndexPath,
   notionStandalonePagePath,
   notionStandalonePagesCollectionPath,
   notionUserPath,
@@ -96,12 +97,33 @@ const DATABASES_SCOPE = notionDatabasesCollectionPath();
 const USERS_SCOPE = notionUsersCollectionPath();
 
 describe('emitNotionAuxiliaryFiles', () => {
-  it('returns a zero result on empty input', async () => {
+  it('always writes /notion/_index.json root index on empty input', async () => {
     const client = createClient();
     const result = await emitNotionAuxiliaryFiles(client, { workspaceId: 'ws-1' });
-    assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
-    assert.equal(client.writes.length, 0);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 1);
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, notionRootIndexPath());
+    const rows = JSON.parse(client.files.get(notionRootIndexPath())!);
+    assert.deepEqual(rows, [
+      { id: 'pages', title: 'Pages' },
+      { id: 'databases', title: 'Databases' },
+      { id: 'users', title: 'Users' },
+    ]);
     assert.equal(client.deletes.length, 0);
+  });
+
+  it('emits /notion/_index.json alongside non-empty buckets', async () => {
+    const client = createClient();
+    await emitNotionAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      users: [{ id: USER_A, name: 'Khaliq' }],
+    });
+    assert.ok(
+      client.writes.some((w) => w.path === notionRootIndexPath()),
+      'expected /notion/_index.json root index write',
+    );
   });
 
   it('writes canonical + by-id + by-title + by-database for a database-rooted page', async () => {

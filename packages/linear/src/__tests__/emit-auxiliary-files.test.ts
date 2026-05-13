@@ -19,6 +19,7 @@ import {
   linearIssuePath,
   linearIssuesIndexPath,
   linearProjectPath,
+  linearRootIndexPath,
   linearTeamPath,
   linearTeamsIndexPath,
   linearUserPath,
@@ -81,12 +82,38 @@ function createClient(
 }
 
 describe('emitLinearAuxiliaryFiles', () => {
-  it('returns a zero result on empty input', async () => {
+  it('always writes /linear/_index.json root index on empty input', async () => {
     const client = createClient();
     const result = await emitLinearAuxiliaryFiles(client, { workspaceId: 'ws-1' });
-    assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
-    assert.equal(client.writes.length, 0);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 1);
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, linearRootIndexPath());
+    const rows = JSON.parse(client.files.get(linearRootIndexPath())!);
+    assert.deepEqual(rows, [
+      { id: 'issues', title: 'Issues' },
+      { id: 'comments', title: 'Comments' },
+      { id: 'teams', title: 'Teams' },
+      { id: 'users', title: 'Users' },
+      { id: 'projects', title: 'Projects' },
+      { id: 'cycles', title: 'Cycles' },
+      { id: 'milestones', title: 'Milestones' },
+      { id: 'roadmaps', title: 'Roadmaps' },
+    ]);
     assert.equal(client.deletes.length, 0);
+  });
+
+  it('emits /linear/_index.json alongside non-empty buckets', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      teams: [{ id: 'team-1', name: 'Core' }],
+    });
+    assert.ok(
+      client.writes.some((w) => w.path === linearRootIndexPath()),
+      'expected /linear/_index.json root index write',
+    );
   });
 
   it('writes the canonical path plus by-uuid, by-id, by-title, by-state aliases plus index row for an issue', async () => {
@@ -103,8 +130,8 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // Issue emits 5 files (canonical + by-uuid + by-id + by-title + by-state) + 1 index.
-    assert.equal(result.written, 6);
+    // Issue emits 5 files (canonical + by-uuid + by-id + by-title + by-state) + 1 issues index + 1 root index.
+    assert.equal(result.written, 7);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [

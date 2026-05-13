@@ -66,6 +66,7 @@ import {
   confluenceSpacePath,
   confluenceSpacesIndexPath,
 } from './path-mapper.js';
+import { buildConfluenceRootIndexFile } from './index-emitter.js';
 import {
   confluencePageIndexRow,
   confluenceSpaceIndexRow,
@@ -129,6 +130,11 @@ export async function emitConfluenceAuxiliaryFiles(
 
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/confluence/_index.json` so `ls /confluence/`
+  // reliably surfaces the top-level resource buckets, even for empty /
+  // single-bucket batches. Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(emitterClient, workspaceId, aggregate);
+
   if (pages.length === 0 && spaces.length === 0) {
     return aggregate;
   }
@@ -144,6 +150,30 @@ export async function emitConfluenceAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- root index -------------------------------------------------------------
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildConfluenceRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- pages ------------------------------------------------------------------

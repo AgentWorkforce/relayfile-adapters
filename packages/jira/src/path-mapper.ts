@@ -129,6 +129,10 @@ export function computeJiraPath(objectType: string, objectId: string, title?: st
  */
 // -- Index paths -----------------------------------------------------------
 
+export function jiraRootIndexPath(): string {
+  return `${JIRA_PATH_ROOT}/_index.json`;
+}
+
 export function jiraIssuesIndexPath(): string {
   return `${JIRA_PATH_ROOT}/issues/_index.json`;
 }

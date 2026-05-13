@@ -61,6 +61,7 @@ import {
   jiraIssuesIndexPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
+  jiraRootIndexPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from './path-mapper.js';
@@ -143,6 +144,11 @@ export async function emitJiraAuxiliaryFiles(
 
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
 
+  // Always emit the root `/jira/_index.json` so `ls /jira/` reliably surfaces
+  // the top-level resource buckets, even for empty / single-bucket batches.
+  // Mirrors `emitSlackAuxiliaryFiles`.
+  await writeRootIndex(emitterClient, workspaceId, aggregate);
+
   if (
     issues.length === 0 &&
     projects.length === 0 &&
@@ -166,6 +172,54 @@ export async function emitJiraAuxiliaryFiles(
   }
 
   return aggregate;
+}
+
+// -- Root index ------------------------------------------------------------
+
+export interface JiraRootIndexRow {
+  id: string;
+  title: string;
+}
+
+/**
+ * Build `/jira/_index.json` — a static listing of top-level resource roots
+ * the Jira adapter exposes. Mirrors the slack pattern so an agent can
+ * `ls /jira/` and discover the available buckets.
+ */
+export function buildJiraRootIndexFile(
+  rows: JiraRootIndexRow[] = [
+    { id: 'issues', title: 'Issues' },
+    { id: 'projects', title: 'Projects' },
+    { id: 'sprints', title: 'Sprints' },
+  ],
+): { path: string; content: string; contentType: typeof JSON_CONTENT_TYPE } {
+  return {
+    path: jiraRootIndexPath(),
+    content: `${JSON.stringify(rows)}\n`,
+    contentType: JSON_CONTENT_TYPE,
+  };
+}
+
+async function writeRootIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const file = buildJiraRootIndexFile();
+  try {
+    await client.writeFile({
+      workspaceId,
+      path: file.path,
+      content: file.content,
+      contentType: file.contentType,
+    });
+    aggregate.written += 1;
+  } catch (error) {
+    aggregate.errors.push({
+      path: file.path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 // -- Issues ----------------------------------------------------------------

@@ -23,6 +23,7 @@ import {
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
   githubReviewPath,
+  githubRootIndexPath,
 } from '../path-mapper.js';
 
 interface CapturingClient extends AuxiliaryEmitterClient {
@@ -74,12 +75,42 @@ function createClient(
 }
 
 describe('emitGitHubAuxiliaryFiles', () => {
-  it('returns a zero result on empty input', async () => {
+  it('always writes the /github/_index.json root index on empty input', async () => {
     const client = createClient();
     const result = await emitGitHubAuxiliaryFiles(client, { workspaceId: 'ws-1' });
-    assert.deepEqual(result, { written: 0, deleted: 0, errors: [] });
-    assert.equal(client.writes.length, 0);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.equal(result.written, 1);
+    assert.equal(client.writes.length, 1);
+    assert.equal(client.writes[0]!.path, githubRootIndexPath());
     assert.equal(client.deletes.length, 0);
+    const rows = JSON.parse(client.files.get(githubRootIndexPath())!);
+    assert.deepEqual(rows, [{ id: 'repos', title: 'Repositories' }]);
+  });
+
+  it('emits /github/_index.json alongside non-empty buckets', async () => {
+    const client = createClient();
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 7,
+          title: 'feat',
+          state: 'open',
+          updated_at: '2026-05-12T00:00:00Z',
+        },
+      ],
+    });
+    assert.deepEqual(result.errors, []);
+    const rootIndex = githubRootIndexPath();
+    assert.ok(
+      client.writes.some((w) => w.path === rootIndex),
+      'expected /github/_index.json to be written',
+    );
+    const rows = JSON.parse(client.files.get(rootIndex)!);
+    assert.deepEqual(rows, [{ id: 'repos', title: 'Repositories' }]);
   });
 
   it('writes canonical meta.json + by-id + by-title aliases plus the per-repo pulls index for a PR', async () => {
@@ -352,7 +383,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     // No content write happened for the tombstone itself — only the index flush.
     const contentWrites = client.writes.filter(
-      (w) => w.path !== githubRepoPullsIndexPath('acme', 'widgets'),
+      (w) =>
+        w.path !== githubRepoPullsIndexPath('acme', 'widgets') &&
+        w.path !== githubRootIndexPath(),
     );
     assert.equal(contentWrites.length, 0);
 
