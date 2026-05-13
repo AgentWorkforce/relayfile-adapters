@@ -65,9 +65,14 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     it('url-encodes accountId and issueId segments', () => {
       // Atlassian accountIds are opaque tokens; the helper must not silently
       // accept characters that would break the path. URI-encoding the
-      // segments (matching the rest of path-mapper) guarantees a safe leaf.
-      const path = jiraIssueByAssigneeAliasPath('acct/with slash', '10001');
+      // segments (matching the rest of path-mapper) guarantees a safe leaf
+      // for BOTH segments — assigneeId AND issueId.
+      const path = jiraIssueByAssigneeAliasPath('acct/with slash', '100/01');
       assert.ok(path.includes('acct%2Fwith%20slash'));
+      assert.ok(
+        path.endsWith('/100%2F01.json'),
+        `expected issueId segment to be URI-encoded, got: ${path}`,
+      );
     });
   });
 
