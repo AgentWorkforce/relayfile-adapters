@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-calendly",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Calendly adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
