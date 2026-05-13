@@ -8,7 +8,7 @@ Every adapter under `packages/<name>` MUST:
 - Emit a provider-specific `LAYOUT.md` at the root of its provider tree (e.g. `/<provider>/LAYOUT.md`) of at least ~1000 bytes describing the tree, naming convention, indexes, aliases, and copy-pasteable `jq`/`ls` examples. The 250-300 byte generic fallback is not acceptable for any shipping adapter.
 - Emit `_index.json` files at each resource root listing all materialized records. The row schema MUST include `{ id, title, updated }` at a minimum; additional fields are encouraged when they enable filterless reads (e.g. `state`, `key`, `is_bot`, `parent_id`).
 - Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path resolves to the canonical record; alias content is the minimal pointer `{ id, canonicalPath, ...minimal pointer fields }`.
-- Use `packages/github/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. NEVER write a new slugifier.
+- Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
 ### Naming convention
 
@@ -24,7 +24,7 @@ Slug rules (always go through `slugifyAlias`):
 - ASCII only, lowercase, hyphen-separated.
 - Truncate to 80 characters at a word boundary.
 - Empty slugs fall back to the bare ID (or `untitled` for aliases).
-- Never roll your own slugifier; reuse `packages/github/src/alias-slug.ts`.
+- Never roll your own slugifier; reuse `packages/core/src/alias-slug.ts`.
 
 ID format: whatever the provider's stable ID is (UUID, numeric, string key). Do not normalize provider IDs.
 

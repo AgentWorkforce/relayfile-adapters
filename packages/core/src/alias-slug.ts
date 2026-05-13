@@ -9,10 +9,17 @@ export function slugifyAlias(input: string): string {
     .replace(COMBINING_MARKS_PATTERN, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .slice(0, MAX_ALIAS_SLUG_LENGTH)
     .replace(/^-+|-+$/g, '');
 
-  return normalized || 'untitled';
+  if (normalized.length <= MAX_ALIAS_SLUG_LENGTH) {
+    return normalized || 'untitled';
+  }
+
+  const head = normalized.slice(0, MAX_ALIAS_SLUG_LENGTH);
+  const boundary = head.lastIndexOf('-');
+  const truncated = (boundary > 0 ? head.slice(0, boundary) : head).replace(/-+$/g, '');
+
+  return truncated || 'untitled';
 }
 
 export function aliasCollisionSuffix(id: string): string {
