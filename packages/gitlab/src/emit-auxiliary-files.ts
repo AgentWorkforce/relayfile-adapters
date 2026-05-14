@@ -1,0 +1,430 @@
+import {
+  EMIT_AUXILIARY_JSON_CONTENT_TYPE,
+  IndexFileReconciler,
+  PriorAliasReader,
+  runEmitBatch,
+  type AuxiliaryEmitterClient,
+  type EmitAuxiliaryFilesResult,
+  type EmitError,
+  type EmitPlan,
+  type EmitWrite,
+} from '@relayfile/adapter-core';
+
+import {
+  buildGitLabProjectResourceIndexFile,
+  buildGitLabProjectsIndexFile,
+  buildGitLabRootIndexFile,
+  type GitLabProjectIndexRow,
+  type GitLabRecordIndexRow,
+} from './index-emitter.js';
+import { gitLabLayoutPromptFile } from './layout-prompt.js';
+import {
+  computeMetadataPath,
+  gitLabByIdAliasPath,
+  gitLabByRefAliasPath,
+  gitLabByStatusAliasPath,
+  gitLabByTitleAliasPath,
+  gitLabProjectResourceIndexPath,
+  gitLabProjectsIndexPath,
+  type GitLabIndexedResourceType,
+} from './path-mapper.js';
+
+const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
+
+export interface GitLabRecordContext {
+  projectPath?: string;
+  project_path?: string;
+  path_with_namespace?: string;
+  project?: { path_with_namespace?: string };
+  [key: string]: unknown;
+}
+
+export interface GitLabMergeRequestEmitRecord extends GitLabRecordContext {
+  iid: number | string;
+  title?: string;
+  state?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabIssueEmitRecord extends GitLabRecordContext {
+  iid: number | string;
+  title?: string;
+  state?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabPipelineEmitRecord extends GitLabRecordContext {
+  id: number | string;
+  ref?: string;
+  status?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabCommitEmitRecord extends GitLabRecordContext {
+  id?: string;
+  sha?: string;
+  title?: string;
+  committed_date?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabDeploymentEmitRecord extends GitLabRecordContext {
+  id: number | string;
+  status?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabTagEmitRecord extends GitLabRecordContext {
+  ref: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
+export interface GitLabEmitAuxiliaryFilesInput {
+  workspaceId: string;
+  mergeRequests?: readonly GitLabMergeRequestEmitRecord[];
+  issues?: readonly GitLabIssueEmitRecord[];
+  pipelines?: readonly GitLabPipelineEmitRecord[];
+  commits?: readonly GitLabCommitEmitRecord[];
+  deployments?: readonly GitLabDeploymentEmitRecord[];
+  tags?: readonly GitLabTagEmitRecord[];
+  connectionId?: string;
+}
+
+export async function emitGitLabAuxiliaryFiles(
+  client: AuxiliaryEmitterClient,
+  input: GitLabEmitAuxiliaryFilesInput,
+): Promise<EmitAuxiliaryFilesResult> {
+  const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
+  const workspaceId = input.workspaceId;
+
+  await writeStaticFiles(client, workspaceId, aggregate);
+
+  const priorReader = new PriorAliasReader(client, workspaceId);
+  const projects = new IndexFileReconciler<GitLabProjectIndexRow>({
+    client,
+    workspaceId,
+    path: gitLabProjectsIndexPath(),
+    builder: (rows) => buildGitLabProjectsIndexFile(rows),
+  });
+  const recordReconcilers = new Map<string, IndexFileReconciler<GitLabRecordIndexRow>>();
+
+  const getRecordReconciler = (projectPath: string, objectType: GitLabIndexedResourceType) => {
+    const key = `${projectPath}\0${objectType}`;
+    let reconciler = recordReconcilers.get(key);
+    if (!reconciler) {
+      reconciler = new IndexFileReconciler<GitLabRecordIndexRow>({
+        client,
+        workspaceId,
+        path: gitLabProjectResourceIndexPath(projectPath, objectType),
+        builder: (rows) => buildGitLabProjectResourceIndexFile(projectPath, objectType, rows),
+      });
+      recordReconcilers.set(key, reconciler);
+    }
+    return reconciler;
+  };
+
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.mergeRequests ?? [], async (record) =>
+    planTitledDirectoryRecord(record, 'merge_requests', record.iid, priorReader, projects, getRecordReconciler, input.connectionId),
+  ));
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.issues ?? [], async (record) =>
+    planTitledDirectoryRecord(record, 'issues', record.iid, priorReader, projects, getRecordReconciler, input.connectionId),
+  ));
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.pipelines ?? [], async (record) =>
+    planPipelineRecord(record, projects, getRecordReconciler, input.connectionId),
+  ));
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.commits ?? [], async (record) =>
+    planCommitRecord(record, priorReader, projects, getRecordReconciler, input.connectionId),
+  ));
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.deployments ?? [], async (record) =>
+    planDeploymentRecord(record, projects, getRecordReconciler, input.connectionId),
+  ));
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, input.tags ?? [], async (record) =>
+    planTagRecord(record, projects, getRecordReconciler, input.connectionId),
+  ));
+
+  const projectFlush = await projects.flush();
+  aggregate.written += projectFlush.written;
+  aggregate.errors.push(...projectFlush.errors);
+
+  for (const reconciler of recordReconcilers.values()) {
+    const flush = await reconciler.flush();
+    aggregate.written += flush.written;
+    aggregate.errors.push(...flush.errors);
+  }
+
+  return aggregate;
+}
+
+async function writeStaticFiles(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  for (const file of [buildGitLabRootIndexFile(), gitLabLayoutPromptFile()]) {
+    try {
+      await client.writeFile({
+        workspaceId,
+        path: file.path,
+        content: file.content,
+        contentType: file.contentType,
+      });
+      aggregate.written += 1;
+    } catch (error) {
+      aggregate.errors.push({ path: file.path, error: stringifyError(error) });
+    }
+  }
+}
+
+async function planTitledDirectoryRecord(
+  record: GitLabMergeRequestEmitRecord | GitLabIssueEmitRecord,
+  objectType: 'merge_requests' | 'issues',
+  objectId: number | string,
+  priorReader: PriorAliasReader,
+  projects: IndexFileReconciler<GitLabProjectIndexRow>,
+  getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
+  connectionId: string | undefined,
+): Promise<EmitPlan> {
+  const projectPath = extractProjectPath(record);
+  if (!projectPath) return {};
+
+  const id = String(objectId);
+  const title = readNonEmptyString(record.title) ?? id;
+  const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
+  const byIdPath = gitLabByIdAliasPath(projectPath, objectType, id);
+  const prior = await priorReader.read<{ title?: string }>(byIdPath, (parsed) => ({
+    title: readNonEmptyString(parsed.title),
+  }));
+  const deletes = prior?.title && prior.title !== title
+    ? [
+        { path: computeMetadataPath(projectPath, objectType, id, prior.title) },
+        { path: gitLabByTitleAliasPath(projectPath, objectType, prior.title, id) },
+      ]
+    : [];
+
+  upsertProject(projects, projectPath, readUpdatedAt(record));
+  getReconciler(projectPath, objectType).upsert({
+    id,
+    title,
+    updated: readUpdatedAt(record),
+    iid: Number(id),
+    state: readNonEmptyString(record.state),
+  });
+
+  return {
+    deletes,
+    writes: [
+      canonicalWrite(canonicalPath, objectType, record, connectionId),
+      aliasWrite(byIdPath, id, canonicalPath, { title }),
+      aliasWrite(gitLabByTitleAliasPath(projectPath, objectType, title, id), id, canonicalPath, { title }),
+    ],
+  };
+}
+
+function planPipelineRecord(
+  record: GitLabPipelineEmitRecord,
+  projects: IndexFileReconciler<GitLabProjectIndexRow>,
+  getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
+  connectionId: string | undefined,
+): EmitPlan {
+  const projectPath = extractProjectPath(record);
+  if (!projectPath) return {};
+  const id = String(record.id);
+  const ref = readNonEmptyString(record.ref);
+  const status = readNonEmptyString(record.status);
+  const canonicalPath = computeMetadataPath(projectPath, 'pipelines', id, ref);
+
+  upsertProject(projects, projectPath, readUpdatedAt(record));
+  getReconciler(projectPath, 'pipelines').upsert({
+    id,
+    title: ref ? `Pipeline ${id} (${ref})` : `Pipeline ${id}`,
+    updated: readUpdatedAt(record),
+    status,
+    ref,
+  });
+
+  const writes: EmitWrite[] = [
+    canonicalWrite(canonicalPath, 'pipeline', record, connectionId),
+    aliasWrite(gitLabByIdAliasPath(projectPath, 'pipelines', id), id, canonicalPath, { ref, status }),
+  ];
+  if (ref) writes.push(aliasWrite(gitLabByRefAliasPath(projectPath, 'pipelines', ref, id), id, canonicalPath, { ref, status }));
+  if (status) writes.push(aliasWrite(gitLabByStatusAliasPath(projectPath, 'pipelines', status, id), id, canonicalPath, { ref, status }));
+  return { writes };
+}
+
+async function planCommitRecord(
+  record: GitLabCommitEmitRecord,
+  priorReader: PriorAliasReader,
+  projects: IndexFileReconciler<GitLabProjectIndexRow>,
+  getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
+  connectionId: string | undefined,
+): Promise<EmitPlan> {
+  const projectPath = extractProjectPath(record);
+  const id = readNonEmptyString(record.sha) ?? readNonEmptyString(record.id);
+  if (!projectPath || !id) return {};
+  const title = readNonEmptyString(record.title) ?? id.slice(0, 12);
+  const canonicalPath = computeMetadataPath(projectPath, 'commits', id, title);
+  const byIdPath = gitLabByIdAliasPath(projectPath, 'commits', id);
+  const prior = await priorReader.read<{ title?: string }>(byIdPath, (parsed) => ({
+    title: readNonEmptyString(parsed.title),
+  }));
+  const deletes = prior?.title && prior.title !== title
+    ? [
+        { path: computeMetadataPath(projectPath, 'commits', id, prior.title) },
+        { path: gitLabByTitleAliasPath(projectPath, 'commits', prior.title, id) },
+      ]
+    : [];
+
+  upsertProject(projects, projectPath, readUpdatedAt(record));
+  getReconciler(projectPath, 'commits').upsert({
+    id,
+    title,
+    updated: readUpdatedAt(record),
+    sha: id,
+  });
+
+  return {
+    deletes,
+    writes: [
+      canonicalWrite(canonicalPath, 'commit', record, connectionId),
+      aliasWrite(byIdPath, id, canonicalPath, { title }),
+      aliasWrite(gitLabByTitleAliasPath(projectPath, 'commits', title, id), id, canonicalPath, { title }),
+    ],
+  };
+}
+
+function planDeploymentRecord(
+  record: GitLabDeploymentEmitRecord,
+  projects: IndexFileReconciler<GitLabProjectIndexRow>,
+  getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
+  connectionId: string | undefined,
+): EmitPlan {
+  const projectPath = extractProjectPath(record);
+  if (!projectPath) return {};
+  const id = String(record.id);
+  const status = readNonEmptyString(record.status);
+  const canonicalPath = computeMetadataPath(projectPath, 'deployments', id);
+
+  upsertProject(projects, projectPath, readUpdatedAt(record));
+  getReconciler(projectPath, 'deployments').upsert({
+    id,
+    title: `Deployment ${id}`,
+    updated: readUpdatedAt(record),
+    status,
+  });
+
+  const writes: EmitWrite[] = [canonicalWrite(canonicalPath, 'deployment', record, connectionId)];
+  if (status) writes.push(aliasWrite(gitLabByStatusAliasPath(projectPath, 'deployments', status, id), id, canonicalPath, { status }));
+  return { writes };
+}
+
+function planTagRecord(
+  record: GitLabTagEmitRecord,
+  projects: IndexFileReconciler<GitLabProjectIndexRow>,
+  getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
+  connectionId: string | undefined,
+): EmitPlan {
+  const projectPath = extractProjectPath(record);
+  if (!projectPath) return {};
+  const id = record.ref;
+  const canonicalPath = computeMetadataPath(projectPath, 'tags', id, id);
+
+  upsertProject(projects, projectPath, readUpdatedAt(record));
+  getReconciler(projectPath, 'tags').upsert({
+    id,
+    title: id,
+    updated: readUpdatedAt(record),
+    ref: id,
+  });
+
+  return {
+    writes: [
+      canonicalWrite(canonicalPath, 'tag', record, connectionId),
+      aliasWrite(gitLabByRefAliasPath(projectPath, 'tags', id, id), id, canonicalPath, { ref: id }),
+    ],
+  };
+}
+
+function canonicalWrite(
+  path: string,
+  objectType: string,
+  payload: Record<string, unknown>,
+  connectionId: string | undefined,
+): EmitWrite {
+  return {
+    path,
+    content: renderContent(objectType, payload, connectionId),
+    contentType: JSON_CONTENT_TYPE,
+  };
+}
+
+function aliasWrite(path: string, id: string, canonicalPath: string, extra: Record<string, unknown>): EmitWrite {
+  return {
+    path,
+    content: `${JSON.stringify({ id, canonicalPath, ...stripUndefined(extra) })}\n`,
+    contentType: JSON_CONTENT_TYPE,
+  };
+}
+
+function renderContent(
+  objectType: string,
+  payload: Record<string, unknown>,
+  connectionId: string | undefined,
+): string {
+  return `${JSON.stringify({
+    provider: 'gitlab',
+    objectType,
+    ...(connectionId ? { connectionId } : {}),
+    ...payload,
+  }, null, 2)}\n`;
+}
+
+function upsertProject(
+  reconciler: IndexFileReconciler<GitLabProjectIndexRow>,
+  projectPath: string,
+  updated: string,
+): void {
+  reconciler.upsert({ id: projectPath, title: projectPath, updated });
+}
+
+function extractProjectPath(record: GitLabRecordContext): string | null {
+  return (
+    readNonEmptyString(record.projectPath)
+    ?? readNonEmptyString(record.project_path)
+    ?? readNonEmptyString(record.path_with_namespace)
+    ?? readNonEmptyString(record.project?.path_with_namespace)
+    ?? null
+  );
+}
+
+function readUpdatedAt(record: Record<string, unknown>): string {
+  return (
+    readNonEmptyString(record.updated_at)
+    ?? readNonEmptyString(record.updatedAt)
+    ?? readNonEmptyString(record.committed_date)
+    ?? ''
+  );
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function stripUndefined(record: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined));
+}
+
+function accumulate(target: EmitAuxiliaryFilesResult, partial: EmitAuxiliaryFilesResult): void {
+  target.written += partial.written;
+  target.deleted += partial.deleted;
+  target.errors.push(...(partial.errors as EmitError[]));
+}
+
+function stringifyError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

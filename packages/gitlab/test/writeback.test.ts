@@ -12,7 +12,7 @@ describe('GitLabWritebackHandler', () => {
 
     const result = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/merge_requests/42/metadata.json',
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
       JSON.stringify({ title: 'Updated title' }),
     );
 
@@ -29,12 +29,12 @@ describe('GitLabWritebackHandler', () => {
 
     const discussion = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/merge_requests/42/discussions/draft@discussion.json',
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/draft@discussion.json',
       JSON.stringify({ body: 'LGTM' }),
     );
     const issueNote = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/comments/draft@note.json',
+      '/gitlab/projects/acme/api/issues/7__fix-bug/comments/draft@note.json',
       JSON.stringify({ body: 'Needs follow-up' }),
     );
 
@@ -48,12 +48,12 @@ describe('GitLabWritebackHandler', () => {
 
     const missingBody = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/comments/draft@note.json',
+      '/gitlab/projects/acme/api/issues/7__fix-bug/comments/draft@note.json',
       JSON.stringify({}),
     );
     const readOnly = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/metadata.json',
+      '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
       JSON.stringify({ id: '7', title: 'Updated issue' }),
     );
 
@@ -71,25 +71,25 @@ describe('GitLabWritebackHandler', () => {
 
     const update = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/metadata.json',
+      '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
       JSON.stringify({ title: 'Updated issue' }),
     );
     const invalid = await handler.writeBack(
       'workspace-1',
-      '/gitlab/projects/acme/api/issues/7/comments/11.json',
+      '/gitlab/projects/acme/api/issues/7__fix-bug/comments/11.json',
       JSON.stringify({ body: 'edit existing note' }),
     );
 
     assert.deepStrictEqual(update, { success: true, externalId: '7' });
     assert.deepStrictEqual(invalid, {
       success: false,
-      error: 'Unsupported GitLab writeback path: /gitlab/projects/acme/api/issues/7/comments/11.json',
+      error: 'Unsupported GitLab writeback path: /gitlab/projects/acme/api/issues/7__fix-bug/comments/11.json',
     });
   });
 
   it('maps canonical discussion and note paths to DELETE requests', () => {
     assert.deepStrictEqual(
-      resolveDeleteRequest('/gitlab/projects/acme/api/issues/7/comments/11.json'),
+      resolveDeleteRequest('/gitlab/projects/acme/api/issues/7__fix-bug/comments/11.json'),
       {
         action: 'delete_issue_note',
         method: 'DELETE',
@@ -97,7 +97,7 @@ describe('GitLabWritebackHandler', () => {
       },
     );
     assert.deepStrictEqual(
-      resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42/discussions/discussion-1.json'),
+      resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json'),
       {
         action: 'delete_merge_request_discussion',
         method: 'DELETE',
@@ -105,7 +105,7 @@ describe('GitLabWritebackHandler', () => {
       },
     );
     assert.throws(
-      () => resolveDeleteRequest('/gitlab/projects/acme/api/issues/7/comments/draft@note.json'),
+      () => resolveDeleteRequest('/gitlab/projects/acme/api/issues/7__fix-bug/comments/draft@note.json'),
       /Unsupported GitLab delete writeback path/,
     );
   });

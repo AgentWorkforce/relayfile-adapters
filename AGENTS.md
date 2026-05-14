@@ -10,6 +10,20 @@ Every adapter under `packages/<name>` MUST:
 - Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path resolves to the canonical record; alias content is the minimal pointer `{ id, canonicalPath, ...minimal pointer fields }`.
 - Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
+### Generated adapter path templates are not authoritative
+
+Older mapping specs and generated workflow prompts may still contain the legacy
+`/<provider>/<resource>/<id>/metadata.json` shape. Treat those as historical
+scaffolding only. Before shipping any adapter path change, compare every emitted
+canonical path against the contract below:
+
+- Entities with child artifacts MUST use directory records ending in `meta.json`.
+- Entities without child artifacts MUST use flat `.json` records.
+- If a generated template disagrees with `path-mapper.ts`, update the template,
+  README, discovery docs, and tests in the same PR.
+- Add a regression test that fails on the legacy `metadata.json` shape whenever
+  the entity owns child files.
+
 ### Naming convention
 
 The cross-adapter joiner between a human-readable slug and the provider's stable ID is **`<slug>__<id>`** (double underscore). The shape depends on whether the entity owns child files:

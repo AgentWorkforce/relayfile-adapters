@@ -7,6 +7,11 @@ export { mapApprovalsToOperation } from './mr/approvals.js';
 export { parseDiffEntries, renderMergeRequestPatch } from './mr/diff-parser.js';
 export { mapDiscussionToOperation, mapDiscussionWebhookToOperation, buildDiscussionCreateBody } from './mr/discussions.js';
 export { ingestMergeRequest } from './mr/ingestion.js';
+export * from './digest.js';
+export * from './emit-auxiliary-files.js';
+export * from './index-emitter.js';
+export * from './layout.js';
+export * from './layout-prompt.js';
 export * from './summary.js';
 export {
   computeCommitCommentPath,
@@ -20,6 +25,16 @@ export {
   computeSnippetCommentPath,
   decodeProjectPath,
   encodeProjectPath,
+  gitLabByIdAliasPath,
+  gitLabByRefAliasPath,
+  gitLabByStatusAliasPath,
+  gitLabByTitleAliasPath,
+  gitLabFlatRecordFilename,
+  gitLabProjectPrefix,
+  gitLabProjectResourceIndexPath,
+  gitLabProjectsIndexPath,
+  gitLabRecordDirectorySegment,
+  gitLabRootIndexPath,
   parseGitLabPath,
 } from './path-mapper.js';
 export { ingestPipeline } from './pipeline/ingestion.js';
@@ -86,6 +101,13 @@ export type {
   WritebackPathTarget,
   WritebackResult,
 } from './types.js';
-export type { GitLabResourceType, ParsedGitLabPath } from './path-mapper.js';
+export type {
+  GitLabDirectoryResourceType,
+  GitLabFlatResourceType,
+  GitLabIndexedResourceType,
+  GitLabResourceType,
+  GitLabTitledResourceType,
+  ParsedGitLabPath,
+} from './path-mapper.js';
 
 export * from './resources.js';

@@ -63,14 +63,14 @@ Design the adapter with these components:
 
 **1. VFS Path Mapping (gitlab.mapping.yaml)**:
 \`\`\`
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/metadata.json
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/diff.patch
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/{id}.json
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/approvals.json
-/gitlab/projects/{namespace}/{project}/issues/{iid}/metadata.json
-/gitlab/projects/{namespace}/{project}/commits/{sha}/metadata.json
-/gitlab/projects/{namespace}/{project}/pipelines/{id}/metadata.json
-/gitlab/projects/{namespace}/{project}/pipelines/{id}/jobs/{id}.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/diff.patch
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/discussions/{id}.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/approvals.json
+/gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/commits/{sha}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/meta.json
+/gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/jobs/{id}.json
 \`\`\`
 
 **2. Webhook Normalization** — GitLab webhook event types:
@@ -95,9 +95,9 @@ Each maps to WebhookInput: { provider: 'gitlab', objectType, objectId, eventType
 - Webhook verification: X-Gitlab-Token header (shared secret, not HMAC)
 
 **4. Writeback rules**:
-- /gitlab/.../merge_requests/{iid}/metadata.json → PUT /api/v4/projects/:id/merge_requests/:iid
-- /gitlab/.../merge_requests/{iid}/discussions/ → POST /api/v4/projects/:id/merge_requests/:iid/discussions
-- /gitlab/.../issues/{iid}/metadata.json → PUT /api/v4/projects/:id/issues/:iid
+- /gitlab/.../merge_requests/{iid}__{slug}/meta.json → PUT /api/v4/projects/:id/merge_requests/:iid
+- /gitlab/.../merge_requests/{iid}__{slug}/discussions/ → POST /api/v4/projects/:id/merge_requests/:iid/discussions
+- /gitlab/.../issues/{iid}__{slug}/meta.json → PUT /api/v4/projects/:id/issues/:iid
 
 **5. File structure**:
 \`\`\`

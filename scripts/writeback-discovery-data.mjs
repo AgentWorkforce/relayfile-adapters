@@ -153,14 +153,14 @@ export const adapters = [
     overview:
       'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, and jobs under `/gitlab`, with writeback routes for merge request discussions and issue notes.',
     readPaths: [
-      ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/metadata.json', 'Merge request metadata.'],
-      ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/discussions/<discussionId>.json', 'Merge request discussions.'],
-      ['/gitlab/projects/<namespace>/<project>/issues/<iid>/metadata.json', 'Issue metadata.'],
-      ['/gitlab/projects/<namespace>/<project>/pipelines/<pipelineId>/jobs/<jobId>.json', 'Pipeline job records.'],
+      ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/meta.json', 'Merge request metadata.'],
+      ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/discussions/<discussionId>.json', 'Merge request discussions.'],
+      ['/gitlab/projects/<namespace>/<project>/issues/<iid>__<slug>/meta.json', 'Issue metadata.'],
+      ['/gitlab/projects/<namespace>/<project>/pipelines/<pipelineId>__<ref>/jobs/<jobId>.json', 'Pipeline job records.'],
     ],
     endpoints: [
-      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}/discussions/new.json', 'Create GitLab merge request discussion', 'Creates a discussion on a merge request.', ['body'], gitlabNoteProps(), { body: 'Replace example discussion body.' }),
-      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}/comments/new.json', 'Create GitLab issue note', 'Creates a note on an issue.', ['body'], gitlabNoteProps(), { body: 'Replace example note body.' }),
+      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/new.json', 'Create GitLab merge request discussion', 'Creates a discussion on a merge request.', ['body'], gitlabNoteProps(), { body: 'Replace example discussion body.' }),
+      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json', 'Create GitLab issue note', 'Creates a note on an issue.', ['body'], gitlabNoteProps(), { body: 'Replace example note body.' }),
     ],
   },
   {

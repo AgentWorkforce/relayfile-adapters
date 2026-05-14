@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gitlab/issue-comment",
+  "title": "GitLab issue comment",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": ["integer", "string"],
+      "readOnly": true,
+      "description": "GitLab note ID assigned by the server."
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Markdown note body."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional import timestamp when supported by GitLab."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "description": "GitLab server timestamp for the most recent note update."
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "description": "Relayfile-normalized creation timestamp."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "readOnly": true,
+      "description": "Relayfile-normalized update timestamp."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "readOnly": true,
+      "description": "Provider URL for the note when available."
+    },
+    "_webhook": {
+      "type": "object",
+      "readOnly": true,
+      "description": "Webhook metadata attached by Relayfile."
+    },
+    "_connection": {
+      "type": "object",
+      "readOnly": true,
+      "description": "Connection metadata attached by Relayfile."
+    }
+  },
+  "required": ["body"]
+}

@@ -28,7 +28,7 @@ For `by-state`, group records under a state subdirectory:
 
 ## Collision handling
 
-Always use `aliasCollisionSuffix` from `packages/github/src/alias-slug.ts` (an 8-char hex of `sha256(id)`). Append it to the alias slug whenever a slug collides with an existing alias. NEVER pick "first writer wins" — the alias must be deterministic across sync runs so that re-emitting the same entity produces the same alias path.
+Always use `aliasCollisionSuffix` from `packages/core/src/alias-slug.ts` (an 8-char hex of `sha256(id)`). Append it to the alias slug whenever a slug collides with an existing alias. NEVER pick "first writer wins" — the alias must be deterministic across sync runs so that re-emitting the same entity produces the same alias path.
 
 ## Alias file content
 

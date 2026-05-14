@@ -19,13 +19,13 @@ export async function ingestPipeline(
 
   return [
     {
-      path: computeMetadataPath(projectPath, 'pipelines', pipelineId),
+      path: computeMetadataPath(projectPath, 'pipelines', pipelineId, pipeline.ref),
       mode: pipelineMode,
       content: JSON.stringify(pipeline, null, 2),
       contentType: 'application/json',
     },
     ...jobs.map((job) => ({
-      path: computePipelineJobPath(projectPath, pipelineId, job.id),
+      path: computePipelineJobPath(projectPath, pipelineId, job.id, pipeline.ref),
       mode: mapJobStatusToOperationMode(job.status),
       content: JSON.stringify(job, null, 2),
       contentType: 'application/json' as const,

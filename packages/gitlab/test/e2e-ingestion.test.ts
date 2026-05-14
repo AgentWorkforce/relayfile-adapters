@@ -104,10 +104,10 @@ describe('GitLabAdapter e2e ingestion', () => {
 
     assert.deepStrictEqual(result.errors, []);
     assert.deepStrictEqual(result.paths, [
-      '/gitlab/projects/acme/api/merge_requests/42/metadata.json',
-      '/gitlab/projects/acme/api/merge_requests/42/diff.patch',
-      '/gitlab/projects/acme/api/merge_requests/42/discussions/discussion-1.json',
-      '/gitlab/projects/acme/api/merge_requests/42/approvals.json',
+      '/gitlab/projects/acme/api/merge_requests/42__add-feature/meta.json',
+      '/gitlab/projects/acme/api/merge_requests/42__add-feature/diff.patch',
+      '/gitlab/projects/acme/api/merge_requests/42__add-feature/discussions/discussion-1.json',
+      '/gitlab/projects/acme/api/merge_requests/42__add-feature/approvals.json',
     ]);
     assert.strictEqual(result.filesWritten, 4);
     assert.strictEqual(

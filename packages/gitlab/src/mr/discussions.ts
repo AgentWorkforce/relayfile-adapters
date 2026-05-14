@@ -17,9 +17,10 @@ export function mapDiscussionToOperation(
   mergeRequestIid: number,
   discussion: GitLabDiscussion,
   mode: IngestOperation['mode'] = 'write',
+  mergeRequestTitle?: string | null,
 ): IngestOperation {
   return {
-    path: computeMergeRequestDiscussionPath(projectPath, mergeRequestIid, discussion.id),
+    path: computeMergeRequestDiscussionPath(projectPath, mergeRequestIid, discussion.id, mergeRequestTitle),
     mode,
     content: serializeDiscussion(discussion),
     contentType: 'application/json',
@@ -39,9 +40,10 @@ export function mapDiscussionWebhookToOperation(
 ): IngestOperation {
   const mergeRequestIid = webhook.merge_request?.iid ?? webhook.object_attributes.noteable_iid ?? 0;
   const discussionId = webhook.object_attributes.discussion_id ?? String(webhook.object_attributes.id);
+  const mergeRequestTitle = webhook.merge_request?.title;
 
   return {
-    path: computeMergeRequestDiscussionPath(projectPath, mergeRequestIid, discussionId),
+    path: computeMergeRequestDiscussionPath(projectPath, mergeRequestIid, discussionId, mergeRequestTitle),
     mode: 'write',
     content: JSON.stringify(
       {

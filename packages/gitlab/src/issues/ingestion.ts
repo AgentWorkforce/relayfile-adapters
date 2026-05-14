@@ -13,7 +13,7 @@ export async function ingestIssue(
 
   return [
     {
-      path: computeMetadataPath(projectPath, 'issues', issueIid),
+      path: computeMetadataPath(projectPath, 'issues', issueIid, issue.title),
       mode,
       content: JSON.stringify(issue, null, 2),
       contentType: 'application/json',
@@ -27,7 +27,7 @@ export function mapIssueNoteToOperation(
   webhook: GitLabNoteWebhook,
 ): IngestOperation {
   return {
-    path: computeIssueCommentPath(projectPath, issueIid, webhook.object_attributes.id),
+    path: computeIssueCommentPath(projectPath, issueIid, webhook.object_attributes.id, webhook.issue?.title),
     mode: 'write',
     content: JSON.stringify(webhook.object_attributes, null, 2),
     contentType: 'application/json',

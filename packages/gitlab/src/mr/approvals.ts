@@ -6,9 +6,10 @@ export function mapApprovalsToOperation(
   mergeRequestIid: number,
   approvalState: GitLabApprovalState,
   mode: IngestOperation['mode'] = 'update',
+  mergeRequestTitle?: string | null,
 ): IngestOperation {
   return {
-    path: computeMergeRequestApprovalsPath(projectPath, mergeRequestIid),
+    path: computeMergeRequestApprovalsPath(projectPath, mergeRequestIid, mergeRequestTitle),
     mode,
     content: JSON.stringify(approvalState, null, 2),
     contentType: 'application/json',
