@@ -15,12 +15,19 @@ import type { GitLabSupportedEvent, GitLabWebhookPayload } from '../types.js';
 function pathToObjectId(path: string): string {
   const parsed = parseGitLabPath(path);
   if (!parsed) {
-    return path.replace(/^\/gitlab\/projects\//, '').replace(/\/(?:meta|metadata)\.json$/, '');
+    return path
+      .replace(/^\/gitlab\/projects\//, '')
+      .replace(/\/(?:meta|metadata)\.json$/, '')
+      .replace(/\.json$/, '');
   }
-  const suffix = parsed.subResource && parsed.subResource !== 'meta.json' && parsed.subResource !== 'metadata.json'
-    ? `/${parsed.subResource}${parsed.subResourceId ? `/${parsed.subResourceId}.json` : ''}`
-    : '';
-  return `${parsed.projectPath}/${parsed.objectType}/${parsed.objectId}${suffix}`;
+  const segments = path.split('/').filter(Boolean);
+  const objectIndex = segments.findIndex((segment) => segment === parsed.objectType);
+  const objectPath = segments
+    .slice(objectIndex + 1)
+    .join('/')
+    .replace(/\/(?:meta|metadata)\.json$/, '')
+    .replace(/\.json$/, '');
+  return `${parsed.projectPath}/${parsed.objectType}/${objectPath}`;
 }
 
 export function normalizeWebhook(
@@ -178,5 +185,6 @@ export function normalizeWebhook(
 }
 
 export function computePathFromWebhook(payload: GitLabWebhookPayload, eventType: GitLabSupportedEvent): string {
-  return computeGitLabPath(normalizeWebhook(payload, eventType).objectType, normalizeWebhook(payload, eventType).objectId);
+  const normalized = normalizeWebhook(payload, eventType);
+  return computeGitLabPath(normalized.objectType, normalized.objectId);
 }

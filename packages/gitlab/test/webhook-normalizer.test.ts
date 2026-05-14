@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeWebhook } from '../src/webhook/normalizer.js';
+import { computePathFromWebhook, normalizeWebhook } from '../src/webhook/normalizer.js';
 import type {
   GitLabBuildWebhook,
   GitLabDeploymentWebhook,
@@ -44,8 +44,12 @@ describe('normalizeWebhook', () => {
     const result = normalizeWebhook(payload, 'merge_request.open');
     assert.strictEqual(result.provider, 'gitlab');
     assert.strictEqual(result.objectType, 'merge_requests');
-    assert.strictEqual(result.objectId, 'acme/api/merge_requests/42');
+    assert.strictEqual(result.objectId, 'acme/api/merge_requests/42__mr');
     assert.strictEqual(result.eventType, 'merge_request.open');
+    assert.strictEqual(
+      computePathFromWebhook(payload, 'merge_request.open'),
+      '/gitlab/projects/acme/api/merge_requests/42__mr/meta.json',
+    );
   });
 
   it('normalizes note events for merge requests, issues, commits, and snippets', () => {
@@ -76,7 +80,7 @@ describe('normalizeWebhook', () => {
       },
     } as GitLabNoteWebhook;
 
-    assert.ok(normalizeWebhook(base, 'note.MergeRequest').objectId.includes('merge_requests/42/discussions/abc'));
+    assert.ok(normalizeWebhook(base, 'note.MergeRequest').objectId.includes('merge_requests/42__mr/discussions/abc'));
     assert.ok(
       normalizeWebhook(
         {
@@ -95,7 +99,7 @@ describe('normalizeWebhook', () => {
           },
         },
         'note.Issue',
-      ).objectId.includes('issues/7/comments/99'),
+      ).objectId.includes('issues/7__issue/comments/99'),
     );
     assert.ok(
       normalizeWebhook(
@@ -114,7 +118,7 @@ describe('normalizeWebhook', () => {
           },
         },
         'note.Commit',
-      ).objectId.includes('commits/abc123/comments/99'),
+      ).objectId.includes('commits/abc123__commit/comments/99'),
     );
     assert.ok(
       normalizeWebhook(
@@ -150,7 +154,7 @@ describe('normalizeWebhook', () => {
           object_attributes: { id: 4, ref: 'main', sha: 'sha', status: 'success' },
         } as GitLabPipelineWebhook,
         'pipeline.success',
-      ).objectId.includes('pipelines/4'),
+      ).objectId.includes('pipelines/4__main'),
     );
 
     assert.ok(
@@ -172,7 +176,7 @@ describe('normalizeWebhook', () => {
           },
         } as GitLabIssueWebhook,
         'issue.open',
-      ).objectId.includes('issues/5'),
+      ).objectId.includes('issues/5__issue'),
     );
 
     assert.ok(
@@ -188,19 +192,20 @@ describe('normalizeWebhook', () => {
       ).objectId.includes('deployments/7'),
     );
 
-    assert.ok(
-      normalizeWebhook(
-        {
-          object_kind: 'build',
-          project,
-          build_id: 12,
-          build_name: 'test',
-          build_stage: 'test',
-          build_status: 'success',
-          pipeline_id: 88,
-        } as GitLabBuildWebhook,
-        'build.success',
-      ).objectId.includes('pipelines/88/jobs/12'),
+    const buildPayload = {
+      object_kind: 'build',
+      project,
+      build_id: 12,
+      build_name: 'test',
+      build_stage: 'test',
+      build_status: 'success',
+      pipeline_id: 88,
+      ref: 'main',
+    } as GitLabBuildWebhook;
+    assert.ok(normalizeWebhook(buildPayload, 'build.success').objectId.includes('pipelines/88__main/jobs/12'));
+    assert.strictEqual(
+      computePathFromWebhook(buildPayload, 'build.success'),
+      '/gitlab/projects/acme/api/pipelines/88__main/jobs/12.json',
     );
 
     assert.ok(
@@ -214,7 +219,7 @@ describe('normalizeWebhook', () => {
           ref: 'refs/tags/v1.0.0',
         } as GitLabTagPushWebhook,
         'tag_push',
-      ).objectId.includes('tags/refs/tags/v1.0.0'),
+      ).objectId.includes('tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0'),
     );
   });
 });

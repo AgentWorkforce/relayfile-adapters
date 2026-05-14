@@ -74,40 +74,52 @@ describe('path mapper', () => {
 
   it('computes paths from composite object ids', () => {
     assert.strictEqual(
-      computeGitLabPath('merge_requests', 'acme/api/merge_requests/42'),
-      '/gitlab/projects/acme/api/merge_requests/42/meta.json',
+      computeGitLabPath('merge_requests', 'acme/api/merge_requests/42', { title: 'Add OAuth' }),
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('issues', 'acme/api/issues/7'),
-      '/gitlab/projects/acme/api/issues/7/meta.json',
+      computeGitLabPath('merge_requests', 'acme/api/merge_requests/42__add-oauth'),
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('commits', 'acme/api/commits/abc123'),
-      '/gitlab/projects/acme/api/commits/abc123/meta.json',
+      computeGitLabPath('merge_requests', 'acme/api/merge_requests/42', { slug: 'add-oauth' }),
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('pipelines', 'acme/api/pipelines/9'),
-      '/gitlab/projects/acme/api/pipelines/9/meta.json',
+      computeGitLabPath('issues', 'acme/api/issues/7', { title: 'Fix Bug' }),
+      '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('jobs', 'acme/api/pipelines/9/jobs/10.json'),
-      '/gitlab/projects/acme/api/pipelines/9/jobs/10.json',
+      computeGitLabPath('commits', 'acme/api/commits/abc123', { title: 'Initial commit' }),
+      '/gitlab/projects/acme/api/commits/abc123__initial-commit/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('discussions', 'acme/api/merge_requests/42/discussions/abc.json'),
-      '/gitlab/projects/acme/api/merge_requests/42/discussions/abc.json',
+      computeGitLabPath('pipelines', 'acme/api/pipelines/9', { ref: 'main' }),
+      '/gitlab/projects/acme/api/pipelines/9__main/meta.json',
     );
     assert.strictEqual(
-      computeGitLabPath('issue_notes', 'acme/api/issues/7/comments/8.json'),
-      '/gitlab/projects/acme/api/issues/7/comments/8.json',
+      computeGitLabPath('jobs', 'acme/api/pipelines/9__main/jobs/10.json'),
+      '/gitlab/projects/acme/api/pipelines/9__main/jobs/10.json',
     );
     assert.strictEqual(
-      computeGitLabPath('commit_notes', 'acme/api/commits/abc123/comments/8.json'),
-      '/gitlab/projects/acme/api/commits/abc123/comments/8.json',
+      computeGitLabPath('discussions', 'acme/api/merge_requests/42__add-oauth/discussions/abc.json'),
+      '/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/abc.json',
+    );
+    assert.strictEqual(
+      computeGitLabPath('issue_notes', 'acme/api/issues/7__fix-bug/comments/8.json'),
+      '/gitlab/projects/acme/api/issues/7__fix-bug/comments/8.json',
+    );
+    assert.strictEqual(
+      computeGitLabPath('commit_notes', 'acme/api/commits/abc123__initial-commit/comments/8.json'),
+      '/gitlab/projects/acme/api/commits/abc123__initial-commit/comments/8.json',
     );
     assert.strictEqual(
       computeGitLabPath('snippet_notes', 'acme/api/snippets/12/comments/8.json'),
       '/gitlab/projects/acme/api/snippets/12/comments/8.json',
+    );
+    assert.strictEqual(
+      computeGitLabPath('tags', 'acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0'),
+      '/gitlab/projects/acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0.json',
     );
   });
 

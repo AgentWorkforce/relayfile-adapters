@@ -23,7 +23,7 @@ webhooks:
   pipeline:
     path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{object_attributes.id}}__{{object_attributes.ref}}/meta.json
   build:
-    path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{pipeline_id}}/jobs/{{build_id}}.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{pipeline_id}}__{{ref}}/jobs/{{build_id}}.json
   issue:
     path: /gitlab/projects/{{project.path_with_namespace}}/issues/{{object_attributes.iid}}__{{object_attributes.title}}/meta.json
   deployment:

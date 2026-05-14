@@ -17,6 +17,12 @@ export type GitLabFlatResourceType = 'deployments' | 'tags';
 export type GitLabIndexedResourceType = GitLabDirectoryResourceType | GitLabFlatResourceType;
 export type GitLabTitledResourceType = 'commits' | 'issues' | 'merge_requests';
 
+export interface GitLabPathContext {
+  ref?: string | null;
+  slug?: string | null;
+  title?: string | null;
+}
+
 const RESOURCE_SEGMENTS = new Set<GitLabResourceType>([
   'commits',
   'deployments',
@@ -93,6 +99,9 @@ export function gitLabRecordDirectorySegment(
   title?: string | null,
 ): string {
   const id = String(objectId).trim();
+  if (id.includes('__')) {
+    return id;
+  }
   const slug = title ? slugifyAlias(title) : '';
   return slug ? `${encodeGitLabPathSegment(id)}__${encodeGitLabPathSegment(slug)}` : encodeGitLabPathSegment(id);
 }
@@ -101,7 +110,10 @@ export function gitLabFlatRecordFilename(
   objectId: number | string,
   title?: string | null,
 ): string {
-  const id = String(objectId).trim();
+  const id = String(objectId).trim().replace(/\.json$/, '');
+  if (id.includes('__')) {
+    return `${id}.json`;
+  }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);
   if (!slug || slug === 'untitled' || slug === id) {
     return `${encodeGitLabPathSegment(id)}.json`;
@@ -275,34 +287,58 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
   };
 }
 
-export function computeGitLabPath(objectType: string, objectId: string): string {
+export function computeGitLabPath(
+  objectType: string,
+  objectId: string,
+  context: GitLabPathContext = {},
+): string {
   const jsonlessObjectId = objectId.replace(/\.json$/, '');
 
   if (objectType === 'jobs') {
     const match = jsonlessObjectId.match(/^(.*)\/pipelines\/([^/]+)\/jobs\/([^/]+)$/);
     if (match) {
-      return computePipelineJobPath(match[1], decodeURIComponent(match[2]), decodeURIComponent(match[3]));
+      return computePipelineJobPath(
+        match[1],
+        decodeParentResourceSegment(match[2]),
+        decodeURIComponent(match[3]),
+        refPathContext(context),
+      );
     }
   }
 
   if (objectType === 'discussions') {
     const match = jsonlessObjectId.match(/^(.*)\/merge_requests\/([^/]+)\/discussions\/([^/]+)$/);
     if (match) {
-      return computeMergeRequestDiscussionPath(match[1], decodeURIComponent(match[2]), decodeURIComponent(match[3]));
+      return computeMergeRequestDiscussionPath(
+        match[1],
+        decodeParentResourceSegment(match[2]),
+        decodeURIComponent(match[3]),
+        titlePathContext(context),
+      );
     }
   }
 
   if (objectType === 'issue_notes') {
     const match = jsonlessObjectId.match(/^(.*)\/issues\/([^/]+)\/comments\/([^/]+)$/);
     if (match) {
-      return computeIssueCommentPath(match[1], decodeURIComponent(match[2]), decodeURIComponent(match[3]));
+      return computeIssueCommentPath(
+        match[1],
+        decodeParentResourceSegment(match[2]),
+        decodeURIComponent(match[3]),
+        titlePathContext(context),
+      );
     }
   }
 
   if (objectType === 'commit_notes') {
     const match = jsonlessObjectId.match(/^(.*)\/commits\/([^/]+)\/comments\/([^/]+)$/);
     if (match) {
-      return computeCommitCommentPath(match[1], decodeURIComponent(match[2]), decodeURIComponent(match[3]));
+      return computeCommitCommentPath(
+        match[1],
+        decodeParentResourceSegment(match[2]),
+        decodeURIComponent(match[3]),
+        titlePathContext(context),
+      );
     }
   }
 
@@ -328,20 +364,32 @@ export function computeGitLabPath(objectType: string, objectId: string): string 
 
   switch (objectType) {
     case 'merge_requests':
-      return computeMetadataPath(projectPath, 'merge_requests', resourceId);
+      return computeMetadataPath(projectPath, 'merge_requests', resourceId, titlePathContext(context));
     case 'issues':
-      return computeMetadataPath(projectPath, 'issues', resourceId);
+      return computeMetadataPath(projectPath, 'issues', resourceId, titlePathContext(context));
     case 'commits':
-      return computeMetadataPath(projectPath, 'commits', resourceId);
+      return computeMetadataPath(projectPath, 'commits', resourceId, titlePathContext(context));
     case 'pipelines':
-      return computeMetadataPath(projectPath, 'pipelines', resourceId);
+      return computeMetadataPath(projectPath, 'pipelines', resourceId, refPathContext(context));
     case 'deployments':
       return computeMetadataPath(projectPath, 'deployments', resourceId);
     case 'tags':
-      return computeMetadataPath(projectPath, 'tags', resourceId);
+      return computeMetadataPath(projectPath, 'tags', resourceId, refPathContext(context));
     default:
       return computeCanonicalPath('gitlab', objectType, objectId);
   }
+}
+
+function decodeParentResourceSegment(segment: string): string {
+  return segment.includes('__') ? segment : decodeURIComponent(segment);
+}
+
+function titlePathContext(context: GitLabPathContext): string | null | undefined {
+  return context.title ?? context.slug;
+}
+
+function refPathContext(context: GitLabPathContext): string | null | undefined {
+  return context.ref ?? context.slug;
 }
 
 function decodeObjectId(objectType: GitLabResourceType, segment: string): string {

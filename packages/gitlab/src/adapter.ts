@@ -12,6 +12,7 @@ import {
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  type GitLabPathContext,
 } from './path-mapper.js';
 import { ingestPipeline } from './pipeline/ingestion.js';
 import { mapJobStatusToOperationMode, mapPipelineStatusToOperationMode } from './pipeline/job-mapper.js';
@@ -125,8 +126,8 @@ export class GitLabAdapter extends IntegrationAdapter {
     return handler(this, normalized, payload);
   }
 
-  computePath(objectType: string, objectId: string): string {
-    return computeGitLabPath(objectType, objectId);
+  computePath(objectType: string, objectId: string, context?: GitLabPathContext): string {
+    return computeGitLabPath(objectType, objectId, context);
   }
 
   computeSemantics(
