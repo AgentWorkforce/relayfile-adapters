@@ -15,7 +15,7 @@ export async function ingestCommit(
 
   return [
     {
-      path: computeMetadataPath(projectPath, 'commits', sha),
+      path: computeMetadataPath(projectPath, 'commits', sha, commit.title),
       mode,
       content: JSON.stringify(commit, null, 2),
       contentType: 'application/json',
@@ -29,7 +29,7 @@ export function mapCommitNoteToOperation(
   webhook: GitLabNoteWebhook,
 ): IngestOperation {
   return {
-    path: computeCommitCommentPath(projectPath, sha, webhook.object_attributes.id),
+    path: computeCommitCommentPath(projectPath, sha, webhook.object_attributes.id, webhook.commit?.title),
     mode: 'write',
     content: JSON.stringify(webhook.object_attributes, null, 2),
     contentType: 'application/json',

@@ -25,7 +25,7 @@ export class GitLabWritebackHandler {
     }
 
     const route = classifyWrite(path, resources);
-    const isMetadataPath = parsed.subResource === 'metadata.json' || parsed.subResource === undefined;
+    const isMetadataPath = parsed.subResource === 'meta.json' || parsed.subResource === 'metadata.json' || parsed.subResource === undefined;
 
     if (parsed.objectType === 'merge_requests' && isMetadataPath) {
       return {
@@ -211,4 +211,3 @@ function requireString(payload: Record<string, unknown>, key: string, label: str
     throw new Error(`GitLab ${label} create writeback requires \`${key}\``);
   }
 }
-

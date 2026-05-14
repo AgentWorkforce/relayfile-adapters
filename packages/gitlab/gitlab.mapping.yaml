@@ -4,68 +4,68 @@ adapter:
   baseUrl: https://gitlab.com/api/v4
 webhooks:
   merge_request:
-    path: /gitlab/projects/{{project.path_with_namespace}}/merge_requests/{{object_attributes.iid}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/merge_requests/{{object_attributes.iid}}__{{object_attributes.title}}/meta.json
   note:
     merge_request:
       match: object_attributes.noteable_type == "MergeRequest"
-      path: /gitlab/projects/{{project.path_with_namespace}}/merge_requests/{{merge_request.iid}}/discussions/{{object_attributes.discussion_id}}.json
+      path: /gitlab/projects/{{project.path_with_namespace}}/merge_requests/{{merge_request.iid}}__{{merge_request.title}}/discussions/{{object_attributes.discussion_id}}.json
     issue:
       match: object_attributes.noteable_type == "Issue"
-      path: /gitlab/projects/{{project.path_with_namespace}}/issues/{{issue.iid}}/comments/{{object_attributes.id}}.json
+      path: /gitlab/projects/{{project.path_with_namespace}}/issues/{{issue.iid}}__{{issue.title}}/comments/{{object_attributes.id}}.json
     commit:
       match: object_attributes.noteable_type == "Commit"
-      path: /gitlab/projects/{{project.path_with_namespace}}/commits/{{commit.id}}/comments/{{object_attributes.id}}.json
+      path: /gitlab/projects/{{project.path_with_namespace}}/commits/{{commit.id}}__{{commit.title}}/comments/{{object_attributes.id}}.json
     snippet:
       match: object_attributes.noteable_type == "Snippet"
       path: /gitlab/projects/{{project.path_with_namespace}}/snippets/{{object_attributes.noteable_id}}/comments/{{object_attributes.id}}.json
   push:
-    path: /gitlab/projects/{{project.path_with_namespace}}/commits/{{after}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/commits/{{after}}/meta.json
   pipeline:
-    path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{object_attributes.id}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{object_attributes.id}}__{{object_attributes.ref}}/meta.json
   build:
     path: /gitlab/projects/{{project.path_with_namespace}}/pipelines/{{pipeline_id}}/jobs/{{build_id}}.json
   issue:
-    path: /gitlab/projects/{{project.path_with_namespace}}/issues/{{object_attributes.iid}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/issues/{{object_attributes.iid}}__{{object_attributes.title}}/meta.json
   deployment:
-    path: /gitlab/projects/{{project.path_with_namespace}}/deployments/{{id}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/deployments/{{id}}.json
   tag_push:
-    path: /gitlab/projects/{{project.path_with_namespace}}/tags/{{ref}}/metadata.json
+    path: /gitlab/projects/{{project.path_with_namespace}}/tags/{{ref_slug}}__{{encoded_ref}}.json
 resources:
   merge_request:
     endpoint: GET /projects/{project_id}/merge_requests/{iid}
-    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/metadata.json
+    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/meta.json
   merge_request_diffs:
     endpoint: GET /projects/{project_id}/merge_requests/{iid}/diffs
-    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/diff.patch
+    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/diff.patch
   merge_request_discussions:
     endpoint: GET /projects/{project_id}/merge_requests/{iid}/discussions
-    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/{discussion_id}.json
+    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/discussions/{discussion_id}.json
     iterate: true
   merge_request_approvals:
     endpoint: GET /projects/{project_id}/merge_requests/{iid}/approvals
-    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/approvals.json
+    path: /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/approvals.json
   issue:
     endpoint: GET /projects/{project_id}/issues/{iid}
-    path: /gitlab/projects/{namespace}/{project}/issues/{iid}/metadata.json
+    path: /gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/meta.json
   commit:
     endpoint: GET /projects/{project_id}/repository/commits/{sha}
-    path: /gitlab/projects/{namespace}/{project}/commits/{sha}/metadata.json
+    path: /gitlab/projects/{namespace}/{project}/commits/{sha}__{slug}/meta.json
   pipeline:
     endpoint: GET /projects/{project_id}/pipelines/{pipeline_id}
-    path: /gitlab/projects/{namespace}/{project}/pipelines/{id}/metadata.json
+    path: /gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/meta.json
   pipeline_jobs:
     endpoint: GET /projects/{project_id}/pipelines/{pipeline_id}/jobs
-    path: /gitlab/projects/{namespace}/{project}/pipelines/{id}/jobs/{job_id}.json
+    path: /gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/jobs/{job_id}.json
     iterate: true
 writebacks:
   merge_request_update:
-    match: /gitlab/projects/*/merge_requests/*/metadata.json
+    match: /gitlab/projects/*/merge_requests/*/meta.json
     endpoint: PUT /projects/{project_id}/merge_requests/{iid}
   merge_request_discussion:
     match: /gitlab/projects/*/merge_requests/*/discussions/*.json
     endpoint: POST /projects/{project_id}/merge_requests/{iid}/discussions
   issue_update:
-    match: /gitlab/projects/*/issues/*/metadata.json
+    match: /gitlab/projects/*/issues/*/meta.json
     endpoint: PUT /projects/{project_id}/issues/{iid}
   issue_note:
     match: /gitlab/projects/*/issues/*/comments/*.json

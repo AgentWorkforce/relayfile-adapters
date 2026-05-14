@@ -22,7 +22,7 @@ Note the ID/slug order flips between the two shapes: flat puts the slug first (s
 
 ## Slug rules
 
-Always go through `slugifyAlias` from `packages/github/src/alias-slug.ts`:
+Always go through `slugifyAlias` from `packages/core/src/alias-slug.ts`:
 
 - ASCII only, lowercase, hyphen-separated.
 - Truncate to 80 characters at a word boundary.

@@ -214,7 +214,7 @@ describe('normalizeWebhook', () => {
           ref: 'refs/tags/v1.0.0',
         } as GitLabTagPushWebhook,
         'tag_push',
-      ).objectId.includes('tags/refs%2Ftags%2Fv1.0.0'),
+      ).objectId.includes('tags/refs/tags/v1.0.0'),
     );
   });
 });

@@ -8,11 +8,19 @@ import {
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  parseGitLabPath,
 } from '../path-mapper.js';
 import type { GitLabSupportedEvent, GitLabWebhookPayload } from '../types.js';
 
 function pathToObjectId(path: string): string {
-  return path.replace(/^\/gitlab\/projects\//, '').replace(/\/metadata\.json$/, '');
+  const parsed = parseGitLabPath(path);
+  if (!parsed) {
+    return path.replace(/^\/gitlab\/projects\//, '').replace(/\/(?:meta|metadata)\.json$/, '');
+  }
+  const suffix = parsed.subResource && parsed.subResource !== 'meta.json' && parsed.subResource !== 'metadata.json'
+    ? `/${parsed.subResource}${parsed.subResourceId ? `/${parsed.subResourceId}.json` : ''}`
+    : '';
+  return `${parsed.projectPath}/${parsed.objectType}/${parsed.objectId}${suffix}`;
 }
 
 export function normalizeWebhook(
@@ -23,7 +31,12 @@ export function normalizeWebhook(
 
   switch (payload.object_kind) {
     case 'merge_request': {
-      const path = computeMetadataPath(projectPath, 'merge_requests', payload.object_attributes.iid);
+      const path = computeMetadataPath(
+        projectPath,
+        'merge_requests',
+        payload.object_attributes.iid,
+        payload.object_attributes.title,
+      );
       return {
         provider: 'gitlab',
         objectType: 'merge_requests',
@@ -41,6 +54,7 @@ export function normalizeWebhook(
           projectPath,
           payload.merge_request?.iid ?? note.noteable_iid ?? 0,
           note.discussion_id ?? String(note.id),
+          payload.merge_request?.title,
         );
         return {
           provider: 'gitlab',
@@ -53,7 +67,7 @@ export function normalizeWebhook(
         };
       }
       if (note.noteable_type === 'Issue') {
-        const path = computeIssueCommentPath(projectPath, payload.issue?.iid ?? note.noteable_iid ?? 0, note.id);
+        const path = computeIssueCommentPath(projectPath, payload.issue?.iid ?? note.noteable_iid ?? 0, note.id, payload.issue?.title);
         return {
           provider: 'gitlab',
           objectType: 'issue_notes',
@@ -65,7 +79,7 @@ export function normalizeWebhook(
         };
       }
       if (note.noteable_type === 'Commit') {
-        const path = computeCommitCommentPath(projectPath, payload.commit?.id ?? '', note.id);
+        const path = computeCommitCommentPath(projectPath, payload.commit?.id ?? '', note.id, payload.commit?.title);
         return {
           provider: 'gitlab',
           objectType: 'commit_notes',
@@ -100,7 +114,7 @@ export function normalizeWebhook(
       };
     }
     case 'pipeline': {
-      const path = computeMetadataPath(projectPath, 'pipelines', payload.object_attributes.id);
+      const path = computeMetadataPath(projectPath, 'pipelines', payload.object_attributes.id, payload.object_attributes.ref);
       return {
         provider: 'gitlab',
         objectType: 'pipelines',
@@ -112,7 +126,7 @@ export function normalizeWebhook(
       };
     }
     case 'issue': {
-      const path = computeMetadataPath(projectPath, 'issues', payload.object_attributes.iid);
+      const path = computeMetadataPath(projectPath, 'issues', payload.object_attributes.iid, payload.object_attributes.title);
       return {
         provider: 'gitlab',
         objectType: 'issues',
@@ -137,7 +151,7 @@ export function normalizeWebhook(
     }
     case 'build':
     case 'job': {
-      const path = computePipelineJobPath(projectPath, payload.pipeline_id ?? 0, payload.build_id);
+      const path = computePipelineJobPath(projectPath, payload.pipeline_id ?? 0, payload.build_id, payload.ref);
       return {
         provider: 'gitlab',
         objectType: 'jobs',
@@ -149,7 +163,7 @@ export function normalizeWebhook(
       };
     }
     case 'tag_push': {
-      const path = computeMetadataPath(projectPath, 'tags', payload.ref);
+      const path = computeMetadataPath(projectPath, 'tags', payload.ref, payload.ref);
       return {
         provider: 'gitlab',
         objectType: 'tags',

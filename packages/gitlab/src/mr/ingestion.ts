@@ -28,20 +28,20 @@ export async function ingestMergeRequest(
 
   return [
     {
-      path: computeMetadataPath(projectPath, 'merge_requests', mergeRequestIid),
+      path: computeMetadataPath(projectPath, 'merge_requests', mergeRequestIid, mergeRequest.title),
       mode,
       content: JSON.stringify(mergeRequest, null, 2),
       contentType: 'application/json',
     },
     {
-      path: computeMergeRequestDiffPath(projectPath, mergeRequestIid),
+      path: computeMergeRequestDiffPath(projectPath, mergeRequestIid, mergeRequest.title),
       mode,
       content: renderMergeRequestPatch(diffs),
       contentType: 'text/plain',
     },
     ...discussions.map((discussion) =>
-      mapDiscussionToOperation(projectPath, mergeRequestIid, discussion, mode),
+      mapDiscussionToOperation(projectPath, mergeRequestIid, discussion, mode, mergeRequest.title),
     ),
-    mapApprovalsToOperation(projectPath, mergeRequestIid, approvals, mode),
+    mapApprovalsToOperation(projectPath, mergeRequestIid, approvals, mode, mergeRequest.title),
   ];
 }

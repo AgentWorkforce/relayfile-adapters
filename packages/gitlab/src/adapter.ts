@@ -10,6 +10,7 @@ import { mapDiscussionWebhookToOperation } from './mr/discussions.js';
 import {
   computeGitLabPath,
   computeMetadataPath,
+  computePipelineJobPath,
   computeSnippetCommentPath,
 } from './path-mapper.js';
 import { ingestPipeline } from './pipeline/ingestion.js';
@@ -264,7 +265,7 @@ export class GitLabAdapter extends IntegrationAdapter {
     const pipelineId = jobPayload.pipeline_id ?? 0;
     const operations: IngestOperation[] = [
       {
-        path: computeMetadataPath(projectPath, 'pipelines', pipelineId),
+        path: computeMetadataPath(projectPath, 'pipelines', pipelineId, jobPayload.ref),
         mode: 'update',
         content: JSON.stringify(
           {
@@ -279,10 +280,7 @@ export class GitLabAdapter extends IntegrationAdapter {
         contentType: 'application/json',
       },
       {
-        path: this.computePath('pipelines', `${projectPath}/pipelines/${pipelineId}`).replace(
-          '/metadata.json',
-          `/jobs/${encodeURIComponent(String(jobPayload.build_id))}.json`,
-        ),
+        path: computePipelineJobPath(projectPath, pipelineId, jobPayload.build_id, jobPayload.ref),
         mode: mapJobStatusToOperationMode(jobPayload.build_status),
         content: JSON.stringify(jobPayload, null, 2),
         contentType: 'application/json',
@@ -326,7 +324,7 @@ export class GitLabAdapter extends IntegrationAdapter {
     const tagPayload = payload as GitLabTagPushWebhook;
     return fromOperations([
       {
-        path: computeMetadataPath(tagPayload.project.path_with_namespace, 'tags', tagPayload.ref),
+        path: computeMetadataPath(tagPayload.project.path_with_namespace, 'tags', tagPayload.ref, tagPayload.ref),
         mode: 'write',
         content: JSON.stringify(tagPayload, null, 2),
         contentType: 'application/json',

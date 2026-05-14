@@ -69,19 +69,30 @@ const result = await adapter.routeWebhook(payload, undefined, headers);
 ## VFS path structure
 
 ```text
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/metadata.json
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/diff.patch
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/{id}.json
-/gitlab/projects/{namespace}/{project}/merge_requests/{iid}/approvals.json
-/gitlab/projects/{namespace}/{project}/issues/{iid}/metadata.json
-/gitlab/projects/{namespace}/{project}/issues/{iid}/comments/{id}.json
-/gitlab/projects/{namespace}/{project}/commits/{sha}/metadata.json
-/gitlab/projects/{namespace}/{project}/commits/{sha}/comments/{id}.json
+/gitlab/LAYOUT.md
+/gitlab/_index.json
+/gitlab/projects/_index.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/diff.patch
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/discussions/{id}.json
+/gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/approvals.json
+/gitlab/projects/{namespace}/{project}/merge_requests/by-id/{iid}.json
+/gitlab/projects/{namespace}/{project}/merge_requests/by-title/{slug}__{iid}.json
+/gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/comments/{id}.json
+/gitlab/projects/{namespace}/{project}/issues/by-id/{iid}.json
+/gitlab/projects/{namespace}/{project}/issues/by-title/{slug}__{iid}.json
+/gitlab/projects/{namespace}/{project}/commits/{sha}__{slug}/meta.json
+/gitlab/projects/{namespace}/{project}/commits/{sha}__{slug}/comments/{id}.json
 /gitlab/projects/{namespace}/{project}/snippets/{id}/comments/{id}.json
-/gitlab/projects/{namespace}/{project}/pipelines/{id}/metadata.json
-/gitlab/projects/{namespace}/{project}/pipelines/{id}/jobs/{id}.json
-/gitlab/projects/{namespace}/{project}/deployments/{id}/metadata.json
-/gitlab/projects/{namespace}/{project}/tags/{ref}/metadata.json
+/gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/meta.json
+/gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/jobs/{id}.json
+/gitlab/projects/{namespace}/{project}/pipelines/by-ref/{ref-slug}__{id}.json
+/gitlab/projects/{namespace}/{project}/pipelines/by-status/{status}/{id}.json
+/gitlab/projects/{namespace}/{project}/deployments/{id}.json
+/gitlab/projects/{namespace}/{project}/deployments/by-status/{status}/{id}.json
+/gitlab/projects/{namespace}/{project}/tags/{slug}__{encoded-ref}.json
+/gitlab/projects/{namespace}/{project}/tags/by-ref/{ref-slug}__{encoded-ref}.json
 ```
 
 ## Writeback paths
@@ -90,10 +101,10 @@ File-native writeback uses canonical filenames for updates and any
 non-canonical ("draft") filename to create new records. `new.json` has
 no special runtime meaning — see `docs/migration/file-native-writeback.md`.
 
-- `PUT /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/metadata.json`
-- `POST /gitlab/projects/{namespace}/{project}/merge_requests/{iid}/discussions/<draft>.json`
-- `PUT /gitlab/projects/{namespace}/{project}/issues/{iid}/metadata.json`
-- `POST /gitlab/projects/{namespace}/{project}/issues/{iid}/comments/<draft>.json`
+- `PUT /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/meta.json`
+- `POST /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/discussions/<draft>.json`
+- `PUT /gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/meta.json`
+- `POST /gitlab/projects/{namespace}/{project}/issues/{iid}__{slug}/comments/<draft>.json`
 
 ## Comparison with the GitHub adapter
 
