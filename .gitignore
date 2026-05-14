@@ -4,6 +4,7 @@ dist/
 .agent-relay/
 .relay/
 .workflow-artifacts/
+.codex/
 
 # Compiled test artifacts
 packages/*/tests/**/*.js

@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GitHub issue comment",
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents.",
   "type": "object",
   "required": [
     "body"
@@ -8,7 +9,7 @@
   "properties": {
     "body": {
       "type": "string",
-      "description": "Comment body."
+      "description": "The contents of the comment."
     },
     "id": {
       "type": "string",
@@ -77,5 +78,10 @@
     }
   },
   "additionalProperties": false,
-  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+  "x-relayfile-source": {
+    "operationId": "issues/create-comment",
+    "sourceKind": "openapi",
+    "sourcePath": "scripts/integration-contracts/github/source/openapi.yaml",
+    "sourceUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml"
+  }
 }

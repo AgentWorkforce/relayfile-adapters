@@ -101,36 +101,50 @@ export const adapters = [
       ['/github/repos/<owner>/<repo>/commits/<sha>/metadata.json', 'Commit metadata.'],
     ],
     endpoints: [
-      endpoint('/github/repos/{owner}/{repo}/issues/new.json', 'Create GitHub issue', 'Creates a GitHub issue.', ['title'], {
-        title: str('Issue title.'),
-        body: str('Issue body.'),
-        labels: arr(str('Label name.'), 'Issue labels.'),
-        assignees: arr(str('GitHub login.'), 'Issue assignees.'),
-        milestone: {
-          description: 'Milestone number or title.',
-          oneOf: [{ type: 'number' }, { type: 'string' }],
+      contractEndpoint('/github/repos/{owner}/{repo}/issues/new.json', 'issues/create', { title: 'Replace example issue title', body: 'Replace example issue body.', labels: ['triage'] }, {
+        title: 'Create GitHub issue',
+        description: 'Creates a GitHub issue.',
+        schemaOverrides: {
+          properties: {
+            milestone: {
+              description: 'Milestone number or title.',
+            },
+            state: en(['open', 'closed'], 'Issue state when updating an existing issue.'),
+          },
         },
-        state: en(['open', 'closed'], 'Issue state when updating an existing issue.'),
-      }, { title: 'Replace example issue title', body: 'Replace example issue body.', labels: ['triage'] }),
-      endpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'Create GitHub issue comment', 'Creates or updates a GitHub issue comment.', ['body'], {
-        body: str('Comment body.'),
-      }, { body: 'Replace example comment body.' }),
-      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/new.json', 'Submit GitHub pull request review', 'Submits a pull request review with optional inline comments.', ['event', 'body', 'comments'], {
-        event: en(['APPROVE', 'COMMENT', 'REQUEST_CHANGES'], 'Review event to submit.'),
-        body: str('Top-level review body.'),
-        comments: arr(obj('Inline review comment.', {
-          path: str('Repository-relative file path.'),
-          line: int('Line number on the selected side.', { minimum: 1 }),
-          side: en(['LEFT', 'RIGHT'], 'Diff side for the comment. Defaults to RIGHT.'),
-          body: str('Inline comment body.'),
-          suggestion: str('Optional suggested replacement text appended to the comment body.'),
-        }, { required: ['path', 'line', 'body'] }), 'Inline review comments. Use an empty array for a body-only review.'),
-        metadata: obj('Optional submission metadata.', {
-          commitSha: str('Commit SHA to anchor the review to.'),
-          connectionId: str('Relayfile connection id override.'),
-          providerConfigKey: str('GitHub provider config key override.'),
-        }),
-      }, { event: 'COMMENT', body: 'Replace example review body.', comments: [] }),
+      }),
+      contractEndpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'issues/create-comment', { body: 'Replace example comment body.' }, {
+        title: 'Create GitHub issue comment',
+        description: 'Creates or updates a GitHub issue comment.',
+      }),
+      contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/new.json', 'pulls/create-review', { event: 'COMMENT', body: 'Replace example review body.', comments: [] }, {
+        title: 'Submit GitHub pull request review',
+        description: 'Submits a pull request review with optional inline comments.',
+        schemaOverrides: {
+          required: ['event', 'body', 'comments'],
+          properties: {
+            comments: {
+              items: {
+                type: 'object',
+                required: ['path', 'line', 'body'],
+                properties: {
+                  line: int('Line number on the selected side.', { minimum: 1 }),
+                  side: en(['LEFT', 'RIGHT'], 'Diff side for the comment. Defaults to RIGHT.'),
+                  start_line: int('First line for a multi-line comment.', { minimum: 1 }),
+                  start_side: en(['LEFT', 'RIGHT'], 'Diff side for the first line of a multi-line comment.'),
+                  suggestion: str('Optional suggested replacement text appended to the comment body.'),
+                },
+                additionalProperties: true,
+              },
+            },
+            metadata: obj('Optional submission metadata.', {
+              commitSha: str('Commit SHA to anchor the review to.'),
+              connectionId: str('Relayfile connection id override.'),
+              providerConfigKey: str('GitHub provider config key override.'),
+            }),
+          },
+        },
+      }),
     ],
   },
   {
@@ -542,6 +556,19 @@ function endpoint(path, title, description, required, properties, example, schem
       additionalProperties: false,
     },
     example,
+  };
+}
+
+function contractEndpoint(path, operationId, example, options = {}) {
+  return {
+    path,
+    example,
+    ...(options.title ? { title: options.title } : {}),
+    ...(options.description ? { description: options.description } : {}),
+    contract: {
+      operationId,
+      ...(options.schemaOverrides ? { schemaOverrides: options.schemaOverrides } : {}),
+    },
   };
 }
 

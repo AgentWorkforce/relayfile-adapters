@@ -1,45 +1,123 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GitHub issue",
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents.",
   "type": "object",
   "required": [
     "title"
   ],
   "properties": {
     "title": {
-      "type": "string",
-      "description": "Issue title."
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "description": "The title of the issue."
     },
     "body": {
       "type": "string",
-      "description": "Issue body."
+      "description": "The contents of the issue."
+    },
+    "assignee": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Login for the user that this issue should be assigned to. _NOTE: Only users with push access can set the assignee for new issues. The assignee is silently dropped otherwise. **This field is closing down.**_"
+    },
+    "milestone": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "description": "The `number` of the milestone to associate this issue with. _NOTE: Only users with push access can set the milestone for new issues. The milestone is silently dropped otherwise._"
+        }
+      ],
+      "description": "Milestone number or title."
     },
     "labels": {
       "type": "array",
-      "description": "Issue labels.",
+      "description": "Labels to associate with this issue. _NOTE: Only users with push access can set labels for new issues. Labels are silently dropped otherwise._",
       "items": {
-        "type": "string",
-        "description": "Label name."
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
       }
     },
     "assignees": {
       "type": "array",
-      "description": "Issue assignees.",
+      "description": "Logins for Users to assign to this issue. _NOTE: Only users with push access can set assignees for new issues. Assignees are silently dropped otherwise._",
       "items": {
-        "type": "string",
-        "description": "GitHub login."
+        "type": "string"
       }
     },
-    "milestone": {
-      "description": "Milestone number or title.",
-      "oneOf": [
-        {
-          "type": "number"
+    "issue_field_values": {
+      "type": "array",
+      "description": "An array of issue field values to set on this issue. Each field value must include the field ID and the value to set. Issue fields are only available for organization-owned repositories with the feature enabled. Field values are silently dropped otherwise.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field_id": {
+            "type": "integer",
+            "description": "The ID of the issue field to set"
+          },
+          "value": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "The value to set for the field"
+          }
         },
-        {
-          "type": "string"
-        }
-      ]
+        "required": [
+          "field_id",
+          "value"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The name of the issue type to associate with this issue. _NOTE: Only users with push access can set the type for new issues. The type is silently dropped otherwise._",
+      "example": "Epic"
     },
     "state": {
       "enum": [
@@ -115,5 +193,10 @@
     }
   },
   "additionalProperties": false,
-  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+  "x-relayfile-source": {
+    "operationId": "issues/create",
+    "sourceKind": "openapi",
+    "sourcePath": "scripts/integration-contracts/github/source/openapi.yaml",
+    "sourceUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml"
+  }
 }

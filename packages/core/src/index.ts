@@ -23,3 +23,4 @@ export * from "./storage-bridge/index.js";
 export * from "./atomic-index/index.js";
 export * from "./emit-auxiliary/index.js";
 export * from "./alias-slug.js";
+export * from "./layout-contract.js";

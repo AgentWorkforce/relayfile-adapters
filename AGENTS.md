@@ -94,6 +94,8 @@ Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with a
 
 New resources must not introduce a magic `new.json` create path. Creates happen by writing a valid JSON document to any non-canonical filename in the resource directory; edits happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`. When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
 
+Tracking docs are part of the adapter contract. When adding a new integration, adding/removing writeback resources, or changing whether an endpoint is backed by OpenAPI, JSON Schema, Postman, provider docs, or inline code, update `docs/writeback-spec-coverage.md` in the same PR. If a change affects any other integration tracking document, such as scope/permission inventories, schema provenance notes, provider capability matrices, or generated discovery coverage, update that tracking doc alongside the code and mention the doc update in the PR summary.
+
 <!-- PRPM_MANIFEST_START -->
 
 <skills_system priority="1">

@@ -1,0 +1,23 @@
+{
+  "kind": "openapi",
+  "title": "GitHub REST API writeback operations",
+  "sourcePath": "./source/openapi.yaml",
+  "sourceUrl": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml",
+  "operations": [
+    {
+      "operationId": "issues/create",
+      "summary": "Create an issue",
+      "description": "Creates a GitHub issue in the named repository."
+    },
+    {
+      "operationId": "issues/create-comment",
+      "summary": "Create an issue comment",
+      "description": "Creates a GitHub issue comment."
+    },
+    {
+      "operationId": "pulls/create-review",
+      "summary": "Create a review for a pull request",
+      "description": "Submits a GitHub pull request review with optional inline comments."
+    }
+  ]
+}

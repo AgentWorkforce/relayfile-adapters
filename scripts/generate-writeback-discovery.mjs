@@ -2,17 +2,23 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  escapeMarkdownTableCell,
+  fullRecordSchema,
+  normalizeWritebackDiscoveryData,
+} from './writeback-discovery-normalizer.mjs';
 import { adapters } from './writeback-discovery-data.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const normalizedAdapters = normalizeWritebackDiscoveryData(adapters).adapters;
 
-for (const adapter of adapters) {
+for (const adapter of normalizedAdapters) {
   const adapterRoot = join(root, 'packages', adapter.slug, 'discovery', adapter.slug);
   await writeDiscoveryFile(join(adapterRoot, '.adapter.md'), renderAdapterReadme(adapter));
   await writeDiscoveryFile(join(root, 'packages', adapter.slug, 'src', 'resources.ts'), renderResourcesTs(adapter));
 
   for (const endpoint of adapter.endpoints) {
-    const resource = resourceMetadata(adapter, endpoint);
+    const resource = endpoint.resource;
     await writeDiscoveryFile(
       join(root, 'packages', adapter.slug, 'discovery', resource.schemaPath.slice(1)),
       `${JSON.stringify(fullRecordSchema(endpoint.schema), null, 2)}\n`,
@@ -30,7 +36,7 @@ async function writeDiscoveryFile(path, content) {
 }
 
 function renderAdapterReadme(adapter) {
-  const resources = adapter.endpoints.map((endpoint) => resourceMetadata(adapter, endpoint));
+  const resources = adapter.resources;
   const lines = [
     `# ${adapter.title}`,
     '',
@@ -69,7 +75,7 @@ function renderAdapterReadme(adapter) {
 }
 
 function renderEndpointContract(endpoint) {
-  const resource = resourceMetadata({ slug: '' }, endpoint);
+  const resource = endpoint.resource;
   const required = new Set(endpoint.schema.required ?? []);
   const fieldNames = Object.keys(endpoint.schema.properties ?? {});
   const optional = fieldNames.filter((fieldName) => !required.has(fieldName));
@@ -174,7 +180,7 @@ function describeEnum(schema) {
 }
 
 function renderResourcesTs(adapter) {
-  const resources = adapter.endpoints.map((endpoint) => resourceMetadata(adapter, endpoint));
+  const resources = adapter.resources;
   const lines = [
     'export interface AdapterResourceConfig {',
     '  readonly name: string;',
@@ -206,183 +212,4 @@ function renderResourcesTs(adapter) {
   ];
 
   return lines.join('\n');
-}
-
-function fullRecordSchema(schema) {
-  const properties = {
-    ...schema.properties,
-    id: readOnlyString('Provider canonical record id.'),
-    createdAt: readOnlyString('Provider creation timestamp.', 'date-time'),
-    updatedAt: readOnlyString('Provider last update timestamp.', 'date-time'),
-    url: readOnlyString('Provider URL for the record.', 'uri'),
-    identifier: readOnlyString('Provider human-readable identifier or key.'),
-    provider: readOnlyString('Relayfile provider name.'),
-    objectType: readOnlyString('Relayfile object type.'),
-    objectId: readOnlyString('Relayfile object id.'),
-    workspaceId: readOnlyString('Relayfile workspace id.'),
-    connectionId: readOnlyString('Relayfile connection id.'),
-    _webhook: {
-      type: 'object',
-      description: 'Provider webhook metadata captured during sync.',
-      readOnly: true,
-      additionalProperties: true,
-    },
-    _connection: {
-      type: 'object',
-      description: 'Relayfile connection metadata captured during sync.',
-      readOnly: true,
-      additionalProperties: true,
-    },
-  };
-
-  return {
-    ...schema,
-    title: schema.title.replace(/^Create /, ''),
-    description: 'Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents.',
-    properties,
-    additionalProperties: false,
-  };
-}
-
-function readOnlyString(description, format) {
-  return {
-    type: 'string',
-    ...(format ? { format } : {}),
-    description,
-    readOnly: true,
-  };
-}
-
-function resourceMetadata(adapter, endpoint) {
-  const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
-  return {
-    name: resourceNameFor(adapter.slug, resourcePath),
-    resourcePath,
-    schemaPath: `${resourcePath}/.schema.json`,
-    examplePath: `${resourcePath}/.create.example.json`,
-    description: endpoint.description,
-    pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapter.slug, resourcePath)),
-    ...idPatternFor(adapter.slug, resourcePath),
-  };
-}
-
-function resourceNameFor(adapterSlug, resourcePath) {
-  if (adapterSlug === 'github' && resourcePath.includes('/issues/') && resourcePath.endsWith('/comments')) {
-    return 'issue-comments';
-  }
-  if (adapterSlug === 'slack' && resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
-    return 'direct-messages';
-  }
-  return resourcePath.split('/').filter(Boolean).at(-1) ?? adapterSlug;
-}
-
-function pathPatternSourceFor(adapterSlug, resourcePath) {
-  if (adapterSlug === 'slack' && resourcePath === '/slack/channels/{channelId}/messages') {
-    return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
-  }
-
-  const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
-    if (segment === '{projectPath}') {
-      return '.+?';
-    }
-    if (/^\{[^}]+\}$/.test(segment)) {
-      return '[^/]+';
-    }
-    return escapeRegex(segment);
-  });
-  return `^/${resourceSegments.join('/')}(?:/[^/]+(?:\\.json)?)?$`;
-}
-
-function idPatternFor(adapterSlug, resourcePath) {
-  // Patterns must stay in lockstep with each adapter's `src/resources.ts`.
-  // Path-mappers emit canonical filenames as either `<id>` or
-  // `<slug>(?:--|__)<id>`, so most adapters allow an optional slug prefix.
-  // Editors: when adjusting an idPattern in resources.ts, mirror the change
-  // here — the discovery generator overwrites resources.ts on regeneration.
-  if (adapterSlug === 'linear') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
-  }
-  if (adapterSlug === 'notion') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
-  }
-  if (adapterSlug === 'slack') {
-    if (resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
-      return pattern('^$');
-    }
-    if (resourcePath === '/slack/channels/{channelId}/messages') {
-      return pattern('^(?:meta|(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?)$');
-    }
-    if (resourcePath.endsWith('/replies')) {
-      return pattern('^(?:[A-Za-z0-9_.:-]+--)?\\d{10,}(?:_\\d+)?$');
-    }
-    return pattern('^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$');
-  }
-  if (adapterSlug === 'gitlab') {
-    return pattern('^[A-Za-z0-9_.:-]+$');
-  }
-  if (adapterSlug === 'github') {
-    if (resourcePath.endsWith('/issues')) {
-      return pattern('^[1-9]\\d*$');
-    }
-    return pattern('^\\d+$');
-  }
-  if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
-  }
-  if (adapterSlug === 'jira') {
-    if (resourcePath.endsWith('/transitions')) {
-      return pattern('^$');
-    }
-    // Accept both the current `<slug>__<id>` joiner and the legacy
-    // `<slug>--<id>` joiner so existing mounts written before the
-    // cross-adapter convention migration keep resolving. Mirrors
-    // confluence's tolerant pattern.
-    return resourcePath.includes('/comments')
-      ? pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?\\d+$')
-      : pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__)(?:[A-Z][A-Z0-9]+(?:-\\d+)?|\\d+)|[A-Z][A-Z0-9]+-\\d+|\\d+)$');
-  }
-  if (adapterSlug === 'salesforce') {
-    return pattern('^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$');
-  }
-  if (adapterSlug === 'teams') {
-    return pattern('^[A-Za-z0-9_.=!-]+$');
-  }
-  if (adapterSlug === 'clickup') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$');
-  }
-  if (adapterSlug === 'confluence') {
-    return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?\\d+$');
-  }
-  if (adapterSlug === 'intercom') {
-    return pattern('^[A-Za-z0-9_-]+$');
-  }
-  if (adapterSlug === 'zendesk') {
-    return pattern('^\\d+$');
-  }
-  if (adapterSlug === 'google-calendar') {
-    return pattern('^[a-v0-9]{5,1024}$');
-  }
-  return pattern('^[A-Za-z0-9_.:-]+$');
-}
-
-function pattern(source, flags = '') {
-  return {
-    idPatternLiteral: patternLiteral(source, flags),
-    idPatternSource: source,
-  };
-}
-
-// GitHub markdown tables split cells on every literal `|`, so a regex like
-// `(a|b)` would render as four columns. Backslash-escape pipes inside the
-// inline-code cell so the table stays intact.
-function escapeMarkdownTableCell(value) {
-  return value.replace(/\|/g, '\\|');
-}
-
-function patternLiteral(source, flags = '') {
-  return `/${source.replaceAll('/', '\\/')}/${flags}`;
-}
-
-function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
