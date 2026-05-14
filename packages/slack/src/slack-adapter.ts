@@ -160,7 +160,7 @@ export class SlackAdapter extends IntegrationAdapter {
     const links = extractLinks(joinedText);
     const reactionSummaries = extractReactions(payload);
     const channelId = readString(payload.channel);
-    const userId = readString(payload.user);
+    const userId = readUserId(payload);
     const itemUserId = readString(payload.item_user);
     const threadTs = readString(payload.thread_ts);
     const messageTs = readString(payload.ts) ?? readString(payload.event_ts);
@@ -363,7 +363,7 @@ export class SlackAdapter extends IntegrationAdapter {
         return objectId ?? event.objectId;
       }
       case 'user':
-        return readString(payload.user) ?? readString(asRecord(payload.user)?.id) ?? event.objectId;
+        return readUserId(payload) ?? event.objectId;
       case 'file':
         return readString(payload.file) ?? event.objectId;
       case 'file_comment':
@@ -409,7 +409,7 @@ export class SlackAdapter extends IntegrationAdapter {
     }
 
     if (objectType === 'user') {
-      const userId = readString(payload.user) ?? readString(asRecord(payload.user)?.id);
+      const userId = readUserId(payload);
       if (userId) {
         return userMetadataPath(userId, readUserName(payload));
       }
@@ -547,6 +547,9 @@ function inferCanonicalObjectType(
   }
   if (explicit === 'channel') {
     return 'channel';
+  }
+  if (explicit === 'user') {
+    return 'user';
   }
 
   if (payload.type === 'message') {
@@ -733,6 +736,10 @@ function readFileName(payload: Record<string, unknown>): string | undefined {
     ?? readString(payload.file_name)
     ?? readString(payload.fileName)
     ?? undefined;
+}
+
+function readUserId(payload: Record<string, unknown>): string | null {
+  return readString(payload.user) ?? readString(asRecord(payload.user)?.id);
 }
 
 function readUserName(payload: Record<string, unknown>): string | undefined {

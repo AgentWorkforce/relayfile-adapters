@@ -467,6 +467,48 @@ test('computeSemantics extracts mentions, links, reactions, and thread depth', (
   assert.ok(rootThreadSemantics.comments?.includes('thread_depth:0'));
 });
 
+test('computeSemantics extracts user ids from Slack user objects', () => {
+  const adapter = createAdapter();
+
+  const semantics = adapter.computeSemantics('user', 'U234', {
+    type: 'team_join',
+    event_ts: '1711111000.001200',
+    user: { id: 'U234', name: 'joined-user' },
+  });
+
+  assert.equal(semantics.properties?.user_id, 'U234');
+  assert.ok(semantics.relations?.includes('user:U234'));
+});
+
+test('ingestWebhook keeps explicit user events canonical as users', async () => {
+  const writes: Parameters<RelayFileClientLike['writeFile']>[0][] = [];
+  const adapter = createAdapter({
+    async writeFile(input) {
+      writes.push(input);
+      return {};
+    },
+  });
+
+  const result = await adapter.ingestWebhook('workspace-id', {
+    provider: 'slack',
+    eventType: 'user.joined',
+    objectType: 'message',
+    objectId: 'fallback-object-id',
+    payload: {
+      type: 'message',
+      text: 'Malformed payload shape should not override explicit user event type.',
+      user: { id: 'U234', name: 'joined-user' },
+    },
+  });
+
+  assert.deepEqual(result.paths, ['/slack/users/U234__joined-user/meta.json']);
+  assert.equal(writes[0]?.path, '/slack/users/U234__joined-user/meta.json');
+  assert.equal(writes[0]?.semantics?.properties?.object_type, 'user');
+  assert.equal(writes[0]?.semantics?.properties?.object_id, 'U234');
+  assert.equal(writes[0]?.semantics?.properties?.user_id, 'U234');
+  assert.ok(writes[0]?.semantics?.relations?.includes('user:U234'));
+});
+
 test('barrel exports compile and import cleanly', async () => {
   const barrel = await import('../index.js');
 
