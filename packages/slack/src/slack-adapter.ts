@@ -105,15 +105,22 @@ interface MaterializedSlackObject {
 const SUPPORTED_EVENTS = [
   'channel.archived',
   'channel.created',
+  'channel.deleted',
   'channel.member_joined',
   'channel.member_left',
   'channel.renamed',
   'channel.unarchived',
+  'group.archived',
+  'group.deleted',
+  'group.renamed',
+  'group.unarchived',
   'message.created',
   'message.deleted',
   'message.updated',
   'reaction.added',
   'reaction.removed',
+  'user.changed',
+  'user.joined',
 ] as const;
 
 const USER_MENTION_PATTERN = /<@([A-Z0-9]+)(?:\|[^>]+)?>/g;
@@ -356,7 +363,7 @@ export class SlackAdapter extends IntegrationAdapter {
         return objectId ?? event.objectId;
       }
       case 'user':
-        return readString(payload.user) ?? event.objectId;
+        return readString(payload.user) ?? readString(asRecord(payload.user)?.id) ?? event.objectId;
       case 'file':
         return readString(payload.file) ?? event.objectId;
       case 'file_comment':
@@ -402,7 +409,7 @@ export class SlackAdapter extends IntegrationAdapter {
     }
 
     if (objectType === 'user') {
-      const userId = readString(payload.user);
+      const userId = readString(payload.user) ?? readString(asRecord(payload.user)?.id);
       if (userId) {
         return userMetadataPath(userId, readUserName(payload));
       }
@@ -555,22 +562,35 @@ function inferCanonicalObjectType(
     return 'reaction';
   }
 
-  if (typeof payload.type === 'string' && payload.type.startsWith('channel_')) {
+  if (
+    typeof payload.type === 'string'
+    && (payload.type.startsWith('channel_')
+      || payload.type.startsWith('group_')
+      || payload.type === 'member_joined_channel'
+      || payload.type === 'member_left_channel')
+  ) {
     return 'channel';
+  }
+
+  if (payload.type === 'team_join' || payload.type === 'user_change') {
+    return 'user';
   }
 
   return null;
 }
 
-function normalizeSlackEventType(eventType: string): 'channel' | 'message' | 'reaction' | null {
+function normalizeSlackEventType(eventType: string): 'channel' | 'message' | 'reaction' | 'user' | null {
   if (eventType.startsWith('reaction.')) {
     return 'reaction';
   }
-  if (eventType.startsWith('channel.')) {
+  if (eventType.startsWith('channel.') || eventType.startsWith('group.')) {
     return 'channel';
   }
   if (eventType.startsWith('message.')) {
     return 'message';
+  }
+  if (eventType.startsWith('user.')) {
+    return 'user';
   }
   return null;
 }
