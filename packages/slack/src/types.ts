@@ -54,19 +54,31 @@ export const SLACK_REACTION_ITEM_TYPES = ['file', 'file_comment', 'message'] as 
 export const SLACK_CHANNEL_EVENT_TYPES = [
   'channel_archive',
   'channel_created',
+  'channel_deleted',
   'channel_rename',
   'channel_unarchive',
   'member_joined_channel',
   'member_left_channel',
 ] as const;
+export const SLACK_GROUP_EVENT_TYPES = [
+  'group_archive',
+  'group_deleted',
+  'group_rename',
+  'group_unarchive',
+] as const;
+export const SLACK_USER_EVENT_TYPES = ['team_join', 'user_change'] as const;
 
 export type SlackChannelType = (typeof SLACK_CHANNEL_TYPES)[number];
 export type SlackEnvelopeEventType = (typeof SLACK_ENVELOPE_EVENT_TYPES)[number];
 export type SlackMessageSubtype = (typeof SLACK_MESSAGE_SUBTYPES)[number];
 export type SlackReactionItemType = (typeof SLACK_REACTION_ITEM_TYPES)[number];
 export type SlackChannelEventType = (typeof SLACK_CHANNEL_EVENT_TYPES)[number];
+export type SlackGroupEventType = (typeof SLACK_GROUP_EVENT_TYPES)[number];
+export type SlackUserEventType = (typeof SLACK_USER_EVENT_TYPES)[number];
 export type SlackEventType =
   | SlackChannelEventType
+  | SlackGroupEventType
+  | SlackUserEventType
   | 'message'
   | 'reaction_added'
   | 'reaction_removed';
@@ -115,6 +127,18 @@ export interface SlackChannel {
   is_im?: boolean;
   is_mpim?: boolean;
   is_private?: boolean;
+}
+
+export interface SlackUser {
+  id: string;
+  deleted?: boolean;
+  is_bot?: boolean;
+  name?: string;
+  profile?: Record<string, unknown>;
+  real_name?: string;
+  team_id?: string;
+  tz?: string;
+  updated?: number;
 }
 
 export interface SlackEventBase {
@@ -183,6 +207,13 @@ export interface SlackChannelArchiveEvent extends SlackEventBase {
   user?: string;
 }
 
+export interface SlackChannelDeletedEvent extends SlackEventBase {
+  type: 'channel_deleted';
+  channel: string;
+  event_ts: string;
+  user?: string;
+}
+
 export interface SlackChannelUnarchiveEvent extends SlackEventBase {
   type: 'channel_unarchive';
   channel: string;
@@ -209,19 +240,66 @@ export interface SlackMemberLeftChannelEvent extends SlackEventBase {
   user: string;
 }
 
+export interface SlackGroupArchiveEvent extends SlackEventBase {
+  type: 'group_archive';
+  channel: string;
+  event_ts: string;
+  user?: string;
+}
+
+export interface SlackGroupDeletedEvent extends SlackEventBase {
+  type: 'group_deleted';
+  channel: string;
+  event_ts: string;
+  user?: string;
+}
+
+export interface SlackGroupRenameEvent extends SlackEventBase {
+  type: 'group_rename';
+  channel: Pick<SlackChannel, 'created' | 'id' | 'name'>;
+  event_ts: string;
+}
+
+export interface SlackGroupUnarchiveEvent extends SlackEventBase {
+  type: 'group_unarchive';
+  channel: string;
+  event_ts: string;
+  user?: string;
+}
+
+export interface SlackTeamJoinEvent extends Omit<SlackEventBase, 'user'> {
+  type: 'team_join';
+  event_ts: string;
+  user: SlackUser;
+}
+
+export interface SlackUserChangeEvent extends Omit<SlackEventBase, 'user'> {
+  type: 'user_change';
+  event_ts: string;
+  user: SlackUser;
+}
+
 export type SlackChannelEvent =
   | SlackChannelArchiveEvent
   | SlackChannelCreatedEvent
+  | SlackChannelDeletedEvent
   | SlackChannelRenameEvent
   | SlackChannelUnarchiveEvent
+  | SlackGroupArchiveEvent
+  | SlackGroupDeletedEvent
+  | SlackGroupRenameEvent
+  | SlackGroupUnarchiveEvent
   | SlackMemberJoinedChannelEvent
   | SlackMemberLeftChannelEvent;
+
+export type SlackUserEvent = SlackTeamJoinEvent | SlackUserChangeEvent;
 
 export type SlackEvent =
   | SlackChannelEvent
   | SlackMessageEvent
   | SlackReactionAddedEvent
-  | SlackReactionRemovedEvent;
+  | SlackReactionRemovedEvent
+  | SlackUserEvent;
 
 export interface SlackEnvelopeBase {
   api_app_id?: string;

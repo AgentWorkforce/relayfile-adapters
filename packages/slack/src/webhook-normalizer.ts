@@ -397,14 +397,28 @@ function mapSlackEventType(event: Record<string, unknown>): string {
       return 'channel.archived';
     case 'channel_created':
       return 'channel.created';
+    case 'channel_deleted':
+      return 'channel.deleted';
     case 'channel_rename':
       return 'channel.renamed';
     case 'channel_unarchive':
       return 'channel.unarchived';
+    case 'group_archive':
+      return 'group.archived';
+    case 'group_deleted':
+      return 'group.deleted';
+    case 'group_rename':
+      return 'group.renamed';
+    case 'group_unarchive':
+      return 'group.unarchived';
     case 'member_joined_channel':
       return 'channel.member_joined';
     case 'member_left_channel':
       return 'channel.member_left';
+    case 'team_join':
+      return 'user.joined';
+    case 'user_change':
+      return 'user.changed';
     default:
       return type?.replace(/_/g, '.') ?? 'unknown';
   }
@@ -424,11 +438,19 @@ function inferSlackObjectType(
       return 'reaction';
     case 'channel_archive':
     case 'channel_created':
+    case 'channel_deleted':
     case 'channel_rename':
     case 'channel_unarchive':
+    case 'group_archive':
+    case 'group_deleted':
+    case 'group_rename':
+    case 'group_unarchive':
     case 'member_joined_channel':
     case 'member_left_channel':
       return 'channel';
+    case 'team_join':
+    case 'user_change':
+      return 'user';
     default:
       return type ?? 'event';
   }
@@ -474,7 +496,11 @@ function inferSlackObjectId(
         ?? readString(asRecord(event.channel)?.id)
         ?? fallback;
     case 'user':
-      return readString(payload.user) ?? fallback;
+      return readString(payload.user)
+        ?? readString(asRecord(payload.user)?.id)
+        ?? readString(event.user)
+        ?? readString(asRecord(event.user)?.id)
+        ?? fallback;
     case 'file':
       return readString(payload.file) ?? fallback;
     case 'file_comment':
