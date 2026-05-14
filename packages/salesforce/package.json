@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-salesforce",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Salesforce adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -60,7 +60,7 @@
     "directory": "packages/salesforce"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.2.21"
+    "@relayfile/adapter-core": "^0.2.22"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
