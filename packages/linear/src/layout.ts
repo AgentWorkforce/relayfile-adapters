@@ -25,7 +25,10 @@ export type LayoutManifestProvider = () => LayoutManifest;
 export const layoutManifest: LayoutManifestProvider = () => ({
   provider: 'linear',
   filenameConvention: '<identifier>__<uuid>.json',
-  aliasSegments: ['by-id', 'by-title', 'by-state'],
+  // Top-level aliasSegments is the union of every resource's alias segments
+  // so consumers that inspect only the manifest root can discover all
+  // lookup keys. `by-name` belongs here because `linear/teams` exposes it.
+  aliasSegments: ['by-id', 'by-name', 'by-title', 'by-state'],
   resources: [
     {
       path: 'linear/issues',

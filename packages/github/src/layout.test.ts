@@ -9,7 +9,7 @@ test('layoutManifest exposes GitHub resources with canonical aliases and writeba
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'github');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-title']);
+  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-name', 'by-title']);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {
@@ -22,6 +22,19 @@ test('layoutManifest exposes GitHub resources with canonical aliases and writeba
       assert.ok(writeback.path.startsWith('github/'));
       assert.doesNotMatch(writeback.path, /^\//u);
       assert.match(writeback.schemaId, /^github\/[a-z-]+$/u);
+    }
+  }
+});
+
+test('layoutManifest top-level aliasSegments contains the union of all resource alias segments', () => {
+  const manifest = layoutManifest();
+  const declared = new Set(manifest.aliasSegments);
+  for (const resource of manifest.resources) {
+    for (const alias of resource.aliasSegments) {
+      assert.ok(
+        declared.has(alias),
+        `top-level aliasSegments missing ${alias} declared by resource ${resource.path}`,
+      );
     }
   }
 });

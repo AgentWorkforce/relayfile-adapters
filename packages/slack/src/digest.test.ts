@@ -18,5 +18,10 @@ test('digest returns null for Slack M1 no-op activity windows', async () => {
     },
   };
 
-  assert.equal(await digest(ctx), null);
+  // Determinism: two runs over the same fixture produce byte-identical
+  // results (WI 2 acceptance criterion 4 in the workspace-primitives spec).
+  const first = await digest(ctx);
+  const second = await digest(ctx);
+  assert.deepEqual(second, first);
+  assert.equal(first, null);
 });

@@ -25,7 +25,10 @@ export type LayoutManifestProvider = () => LayoutManifest;
 export const layoutManifest: LayoutManifestProvider = () => ({
   provider: 'github',
   filenameConvention: '<number>__<slug>/meta.json',
-  aliasSegments: ['by-id', 'by-title'],
+  // Top-level aliasSegments is the union of every resource's alias segments
+  // so consumers that inspect only the manifest root can discover all
+  // lookup keys. `by-name` belongs here because `github/repos` exposes it.
+  aliasSegments: ['by-id', 'by-name', 'by-title'],
   resources: [
     {
       path: 'github/repos',

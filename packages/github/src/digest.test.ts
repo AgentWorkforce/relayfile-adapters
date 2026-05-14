@@ -45,6 +45,34 @@ test('digest returns deterministic GitHub bullets sorted by event time and id', 
   });
 });
 
+test('digest classifies "reopened" as updated, not opened (word-boundary regex)', async () => {
+  const ctx: DigestContext = {
+    provider: 'github',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'reopened',
+          canonicalPath: 'github/repos/acme/api/issues/42__add-login/meta.json',
+        },
+      ];
+    },
+  };
+
+  const result = await digest(ctx);
+  assert.deepEqual(result, {
+    provider: 'github',
+    bullets: [
+      {
+        text: '#42 was updated',
+        canonicalPath: 'github/repos/acme/api/issues/42__add-login/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty GitHub event window', async () => {
   const ctx: DigestContext = {
     provider: 'github',

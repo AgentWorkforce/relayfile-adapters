@@ -60,8 +60,13 @@ function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent 
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
+  // Compare parsed timestamps in ms rather than ISO strings: lexicographic
+  // string compare misorders events whose timestamps describe the same
+  // instant with different textual offsets (e.g. `Z` vs `+00:00`).
+  const leftMs = eventTimeMs(left);
+  const rightMs = eventTimeMs(right);
   return (
-    eventTime(left).localeCompare(eventTime(right))
+    leftMs - rightMs
     || (left.id ?? '').localeCompare(right.id ?? '')
     || (left.canonicalPath ?? '').localeCompare(right.canonicalPath ?? '')
   );
@@ -69,6 +74,13 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
 
 function eventTime(event: DigestChangeEvent): string {
   return event.timestamp ?? event.occurredAt ?? '';
+}
+
+function eventTimeMs(event: DigestChangeEvent): number {
+  const raw = eventTime(event);
+  if (!raw) return Number.NEGATIVE_INFINITY;
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 }
 
 function normalizeDigestPath(path: string): string {
@@ -87,13 +99,16 @@ function githubIdentifier(path: string): string {
 
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (/(open|opened|create|created|add|added|write|written)/u.test(action)) {
+  // Word boundaries (\b) prevent substring matches like "reopened" being
+  // misclassified as "opened" — a real GitHub webhook action that would
+  // otherwise produce a semantically wrong digest line.
+  if (/\b(open|opened|create|created|add|added|write|written)\b/u.test(action)) {
     return 'was opened';
   }
-  if (/(close|closed|merge|merged)/u.test(action)) {
+  if (/\b(close|closed|merge|merged)\b/u.test(action)) {
     return 'was closed';
   }
-  if (/(delete|deleted|remove|removed)/u.test(action)) {
+  if (/\b(delete|deleted|remove|removed)\b/u.test(action)) {
     return 'was deleted';
   }
   return 'was updated';

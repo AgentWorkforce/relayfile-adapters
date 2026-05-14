@@ -55,13 +55,23 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'notion' || event.canonicalPath.startsWith('notion/') || event.canonicalPath.startsWith('/notion/'))
+    && (
+      event.canonicalPath === 'notion'
+      || event.canonicalPath === '/notion'
+      || event.canonicalPath.startsWith('notion/')
+      || event.canonicalPath.startsWith('/notion/')
+    )
   );
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
+  // Compare parsed timestamps in ms rather than ISO strings: lexicographic
+  // string compare misorders events whose timestamps describe the same
+  // instant with different textual offsets (e.g. `Z` vs `+00:00`).
+  const leftMs = eventTimeMs(left);
+  const rightMs = eventTimeMs(right);
   return (
-    eventTime(left).localeCompare(eventTime(right))
+    leftMs - rightMs
     || (left.id ?? '').localeCompare(right.id ?? '')
     || (left.canonicalPath ?? '').localeCompare(right.canonicalPath ?? '')
   );
@@ -69,6 +79,13 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
 
 function eventTime(event: DigestChangeEvent): string {
   return event.timestamp ?? event.occurredAt ?? '';
+}
+
+function eventTimeMs(event: DigestChangeEvent): number {
+  const raw = eventTime(event);
+  if (!raw) return Number.NEGATIVE_INFINITY;
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 }
 
 function normalizeDigestPath(path: string): string {
@@ -87,10 +104,13 @@ function notionIdentifier(path: string): string {
 
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (/(create|created|add|added|write|written)/u.test(action)) {
+  // Word boundaries (\b) prevent substring matches like "unarchived" being
+  // misclassified as "archived" — the semantic inverse, which would
+  // report a restored page as archived.
+  if (/\b(create|created|add|added|write|written)\b/u.test(action)) {
     return 'was created';
   }
-  if (/(delete|deleted|remove|removed|archive|archived)/u.test(action)) {
+  if (/\b(delete|deleted|remove|removed|archive|archived)\b/u.test(action)) {
     return 'was archived';
   }
   return 'was updated';

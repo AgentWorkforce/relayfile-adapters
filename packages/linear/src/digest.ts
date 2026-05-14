@@ -60,8 +60,13 @@ function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent 
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
+  // Compare parsed timestamps in ms rather than ISO strings: lexicographic
+  // string compare misorders events whose timestamps describe the same
+  // instant with different textual offsets (e.g. `Z` vs `+00:00`).
+  const leftMs = eventTimeMs(left);
+  const rightMs = eventTimeMs(right);
   return (
-    eventTime(left).localeCompare(eventTime(right))
+    leftMs - rightMs
     || (left.id ?? '').localeCompare(right.id ?? '')
     || (left.canonicalPath ?? '').localeCompare(right.canonicalPath ?? '')
   );
@@ -69,6 +74,13 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
 
 function eventTime(event: DigestChangeEvent): string {
   return event.timestamp ?? event.occurredAt ?? '';
+}
+
+function eventTimeMs(event: DigestChangeEvent): number {
+  const raw = eventTime(event);
+  if (!raw) return Number.NEGATIVE_INFINITY;
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
 }
 
 function normalizeDigestPath(path: string): string {

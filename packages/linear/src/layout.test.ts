@@ -9,7 +9,7 @@ test('layoutManifest exposes Linear resources with canonical aliases and writeba
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'linear');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-title', 'by-state']);
+  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-name', 'by-title', 'by-state']);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {
@@ -22,6 +22,19 @@ test('layoutManifest exposes Linear resources with canonical aliases and writeba
       assert.ok(writeback.path.startsWith('linear/'));
       assert.doesNotMatch(writeback.path, /^\//u);
       assert.match(writeback.schemaId, /^linear\/[a-z-]+$/u);
+    }
+  }
+});
+
+test('layoutManifest top-level aliasSegments contains the union of all resource alias segments', () => {
+  const manifest = layoutManifest();
+  const declared = new Set(manifest.aliasSegments);
+  for (const resource of manifest.resources) {
+    for (const alias of resource.aliasSegments) {
+      assert.ok(
+        declared.has(alias),
+        `top-level aliasSegments missing ${alias} declared by resource ${resource.path}`,
+      );
     }
   }
 });
