@@ -7,3 +7,5 @@ Source schemas from the strongest available contract for the integration: JSON S
 New resources must use file-native writeback, not magic filenames. Declare an `idPattern` in `src/resources.ts`, ship a full-record `.schema.json` beside the resource, mark provider-managed fields with `readOnly: true`, and provide a `.create.example.json` for minimal create documents. Creates happen by writing to a non-canonical filename; patches happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`.
 
 Run `npm run test:writeback-discovery` before opening a PR that touches adapter writeback behavior or creates a new adapter.
+
+Keep tracking docs current. When adding a new adapter, adding/removing writeback resources, or changing whether a writeback schema is sourced from OpenAPI, JSON Schema, Postman, provider docs, or inline adapter code, update `docs/writeback-spec-coverage.md` in the same PR. If new tracking docs are added for integration scope, schema provenance, provider permissions, or generated discovery coverage, update those docs alongside the source change instead of leaving the state implicit in code.
