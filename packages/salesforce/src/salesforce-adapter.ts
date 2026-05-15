@@ -284,8 +284,18 @@ export class SalesforceAdapter extends IntegrationAdapter {
       throw new Error(`Salesforce ${objectType} webhook is missing data.Id`);
     }
 
-    const payload = mergeSalesforcePayload(event, objectType, objectId);
-    const action = normalizeAction(asString(event.action) ?? 'updated');
+    let action = normalizeAction(asString(event.action) ?? 'updated');
+    if (action === 'updated') {
+      const data = getRecord(event.data) ?? {};
+      const header = getRecord(data.ChangeEventHeader);
+      const changedFields = Array.isArray(header?.changedFields) ? (header.changedFields as unknown[]).map(String) : [];
+      if (changedFields.includes('IsClosed') && data.IsClosed === true) {
+        action = 'closed';
+      } else if (changedFields.includes('IsConverted') && data.IsConverted === true) {
+        action = 'converted';
+      }
+    }
+    const payload = mergeSalesforcePayload(event, objectType, objectId, action);
     const normalized: NormalizedWebhook = {
       provider: this.config.provider || SALESFORCE_PROVIDER_NAME,
       eventType: `${objectType}.${action}`,
@@ -595,12 +605,13 @@ function mergeSalesforcePayload(
   event: SalesforceWebhookPayload,
   objectType: SalesforceObjectType,
   objectId: string,
+  action: string,
 ): Record<string, unknown> {
   const data = getRecord(event.data) ?? {};
   return {
     ...data,
     _webhook: compactObject<SalesforceWebhookEnvelope>({
-      action: normalizeAction(asString(event.action) ?? 'updated'),
+      action,
       createdAt: asString(event.createdAt),
       objectId,
       objectType,

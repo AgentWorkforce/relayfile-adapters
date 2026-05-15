@@ -281,7 +281,15 @@ export class ZendeskAdapter extends IntegrationAdapter {
       throw new Error(`Zendesk ${objectType} webhook is missing object id`);
     }
 
-    const action = inferWebhookAction(event);
+    let action = inferWebhookAction(event);
+    if (action === 'updated' && objectType === 'ticket') {
+      const previous = getRecord(event.previous);
+      const currentStatus = asString(objectData.status)?.toLowerCase();
+      const previousStatus = asString(previous?.status)?.toLowerCase();
+      if (currentStatus && currentStatus !== previousStatus && (currentStatus === 'solved' || currentStatus === 'closed')) {
+        action = 'solved';
+      }
+    }
     const payload = mergeZendeskPayload(event, objectType, objectData, action);
     const normalized: NormalizedWebhook = {
       provider: this.config.provider || ZENDESK_PROVIDER_NAME,

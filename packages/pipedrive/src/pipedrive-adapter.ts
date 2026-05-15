@@ -276,7 +276,16 @@ export class PipedriveAdapter extends IntegrationAdapter {
       throw new Error(`Pipedrive ${objectType} webhook is missing current.id or data.id`);
     }
 
-    const action = canonicalAction(readActionFromWebhook(event));
+    let action = canonicalAction(readActionFromWebhook(event));
+    if (action === 'updated' && objectType === 'deal') {
+      const previous = getRecord(event.previous);
+      const currentStatus = asString(data.status)?.toLowerCase();
+      const previousStatus = asString(previous?.status)?.toLowerCase();
+      if (currentStatus && currentStatus !== previousStatus) {
+        if (currentStatus === 'won') action = 'won';
+        else if (currentStatus === 'lost') action = 'lost';
+      }
+    }
     const payload = mergePipedrivePayload(event, data, objectType, action, objectId);
     const normalized: NormalizedWebhook = {
       provider: this.config.provider || PIPEDRIVE_PROVIDER_NAME,

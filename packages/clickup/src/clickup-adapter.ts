@@ -278,8 +278,20 @@ export class ClickUpAdapter extends IntegrationAdapter {
 
     const objectType = inferWebhookObjectType(event);
     const objectId = inferWebhookObjectId(event, objectType);
-    const payload = mergeClickUpPayload(event, objectType, objectId);
     const eventType = canonicalizeEventType(event.event, objectType);
+    let action = getEventAction(eventType) ?? 'updated';
+    if (action === 'updated' && objectType === 'task') {
+      const data = getRecord(event.data);
+      const statusType = asString(getRecord(data?.status)?.type)?.toLowerCase();
+      const historyItems = Array.isArray(event.history_items) ? event.history_items as Record<string, unknown>[] : [];
+      const statusChanged = historyItems.some((item) => asString(item.field) === 'status');
+      if (statusChanged && (statusType === 'closed' || statusType === 'done')) {
+        action = 'completed';
+      } else if (data?.archived === true && historyItems.some((item) => asString(item.field) === 'archived')) {
+        action = 'archived';
+      }
+    }
+    const payload = mergeClickUpPayload(event, objectType, objectId, action);
     const normalized: NormalizedWebhook = {
       provider: this.config.provider || CLICKUP_PROVIDER_NAME,
       eventType,
@@ -572,6 +584,7 @@ function mergeClickUpPayload(
   event: ClickUpWebhookPayload,
   objectType: string,
   objectId: string,
+  action: string,
 ): Record<string, unknown> {
   const data = getRecord(event.data) ?? {};
   return {
@@ -579,7 +592,7 @@ function mergeClickUpPayload(
     id: asString(data.id) ?? objectId,
     _webhook: compactObject<ClickUpWebhookEnvelope>({
       event: asString(event.event),
-      action: getEventAction(canonicalizeEventType(event.event, objectType)),
+      action,
       historyItems: event.history_items,
       objectId,
       objectType,

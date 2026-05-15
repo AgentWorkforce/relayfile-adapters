@@ -313,9 +313,13 @@ export class AsanaAdapter extends IntegrationAdapter {
         continue;
       }
 
-      const action = normalizeAction(
+      let action = normalizeAction(
         asString(eventItem.action) ?? asString(getRecord(eventItem.change)?.action) ?? 'changed',
       );
+      const change = getRecord(eventItem.change);
+      if (action === 'changed' && objectType === 'task' && change?.field === 'completed' && change.new_value) {
+        action = 'completed';
+      }
       const payload = mergeAsanaPayload(event, eventItem, objectType, objectId, action);
       const normalized: NormalizedWebhook = {
         provider: this.config.provider || ASANA_PROVIDER_NAME,
