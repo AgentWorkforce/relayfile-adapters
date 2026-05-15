@@ -92,6 +92,33 @@ test('digest classifies S3 copy and restore actions', async () => {
   });
 });
 
+test('digest keeps canonical object keys with by-prefixed folders', async () => {
+  const ctx: DigestContext = {
+    provider: 's3',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-by-folder',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'ObjectCreated:Put',
+          canonicalPath: '/s3/my-bucket/tasks/by-state/report.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 's3',
+    bullets: [
+      {
+        text: 'object tasks/by-state/report was uploaded',
+        canonicalPath: 's3/my-bucket/tasks/by-state/report.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty S3 event window', async () => {
   const ctx: DigestContext = {
     provider: 's3',

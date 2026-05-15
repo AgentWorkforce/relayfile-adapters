@@ -74,7 +74,68 @@ function isCanonicalDigestPath(path: string): boolean {
   const leaf = segments.at(-1) ?? '';
   return leaf !== 'LAYOUT.md'
     && leaf !== '_index.json'
-    && segments.slice(0, -1).every((segment) => !segment.startsWith('by-'));
+    && !hasDigestAliasDirectory(segments);
+}
+
+const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
+  'asana',
+  'clickup',
+  'confluence',
+  'github',
+  'gitlab',
+  'jira',
+  'linear',
+  'notion',
+  'slack',
+]);
+
+const DIGEST_ALIAS_SEGMENTS = new Set([
+  'by-assignee',
+  'by-creator',
+  'by-database',
+  'by-id',
+  'by-key',
+  'by-name',
+  'by-parent',
+  'by-priority',
+  'by-ref',
+  'by-space',
+  'by-state',
+  'by-status',
+  'by-title',
+  'by-uuid',
+]);
+
+const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
+  'channels',
+  'commits',
+  'databases',
+  'deployments',
+  'issues',
+  'pages',
+  'pipelines',
+  'projects',
+  'pulls',
+  'sprints',
+  'spaces',
+  'tags',
+  'tasks',
+  'teams',
+  'users',
+]);
+
+function hasDigestAliasDirectory(segments: readonly string[]): boolean {
+  const provider = segments[0] ?? '';
+  if (!DIGEST_ALIAS_PROVIDER_SEGMENTS.has(provider)) return false;
+
+  for (let index = 1; index < segments.length - 1; index += 1) {
+    const segment = segments[index];
+    const parent = segments[index - 1];
+    if (segment && parent && DIGEST_ALIAS_SEGMENTS.has(segment) && DIGEST_ALIAS_PARENT_SEGMENTS.has(parent)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {

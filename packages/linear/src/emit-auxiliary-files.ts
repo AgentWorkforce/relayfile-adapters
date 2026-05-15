@@ -708,6 +708,7 @@ async function emitFlatResource<TRecord extends { id: string }>(
     }),
   });
   const priorReader = new PriorAliasReader(client, workspaceId);
+  const aliasReservations = new Map<string, string>();
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
@@ -720,7 +721,7 @@ async function emitFlatResource<TRecord extends { id: string }>(
     if (!id) return {};
     indexReconciler.upsert(opts.indexRow(record));
     const prior = await readFlatPrior(id, priorReader, opts);
-    const paths = await flatResourcePaths(id, record, opts, priorReader);
+    const paths = await flatResourcePaths(id, record, opts, priorReader, aliasReservations);
     const priorPaths = prior ? await flatResourcePaths(id, prior, opts, priorReader) : [];
     const stalePaths = diffPaths(priorPaths, paths);
     const content = renderContent(opts.objectType, record, opts.connectionId, false);
@@ -757,11 +758,12 @@ async function flatResourcePaths<TRecord extends { id: string }>(
   record: Record<string, unknown> | null,
   opts: FlatResourceOptions<TRecord>,
   priorReader: PriorAliasReader,
+  aliasReservations?: Map<string, string>,
 ): Promise<string[]> {
   const aliases = record && opts.aliasPaths ? opts.aliasPaths(record, id) : [];
   const resolvedAliases: string[] = [];
   for (const alias of aliases) {
-    resolvedAliases.push(await resolveFlatAliasPath(alias, id, priorReader));
+    resolvedAliases.push(await resolveFlatAliasPath(alias, id, priorReader, aliasReservations));
   }
   return [opts.canonicalPath(id), ...resolvedAliases];
 }
@@ -770,15 +772,23 @@ async function resolveFlatAliasPath(
   alias: FlatAliasPath,
   id: string,
   priorReader: PriorAliasReader,
+  aliasReservations?: Map<string, string>,
 ): Promise<string> {
   if (typeof alias === 'string') {
     return alias;
+  }
+  const reservedId = aliasReservations?.get(alias.path);
+  if (reservedId && reservedId !== id) {
+    aliasReservations?.set(alias.collisionPath, id);
+    return alias.collisionPath;
   }
   const existing = await priorReader.read<Record<string, unknown>>(alias.path);
   const existingId =
     readNonEmptyString(existing?.objectId) ??
     (existing ? readNonEmptyString(pickPayload(existing)?.id) : undefined);
-  return existingId && existingId !== id ? alias.collisionPath : alias.path;
+  const path = existingId && existingId !== id ? alias.collisionPath : alias.path;
+  aliasReservations?.set(path, id);
+  return path;
 }
 
 function projectAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {

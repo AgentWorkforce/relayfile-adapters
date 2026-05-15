@@ -180,6 +180,27 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
   });
 
+  it('disambiguates project and team alias slug collisions without readFile support', async () => {
+    const client = createClient({ noRead: true });
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [
+        { id: 'project-1', name: 'Roadmap', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'project-2', name: 'Roadmap!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+      teams: [
+        { id: 'team-1', name: 'Core', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'team-2', name: 'Core!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
+  });
+
   it('writes an empty index for an explicit empty cycle bucket', async () => {
     const client = createClient();
     const result = await emitLinearAuxiliaryFiles(client, {
