@@ -2,6 +2,11 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 import {
+  clickUpTaskByAssigneePath,
+  clickUpTaskByCreatorPath,
+  clickUpTaskByIdAliasPath,
+  clickUpTaskByPriorityPath,
+  clickUpTaskByStatePath,
   clickUpFolderPath,
   clickUpListPath,
   clickUpSpacePath,
@@ -9,6 +14,7 @@ import {
   computeClickUpPath,
   normalizeClickUpObjectType,
 } from './path-mapper.js';
+import { emitClickUpAuxiliaryFiles } from './emit-auxiliary-files.js';
 import { CLICKUP_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   ClickUpAdapterConfig,
@@ -142,48 +148,53 @@ export class ClickUpAdapter extends IntegrationAdapter {
       if (this.isDeleteEvent(normalized)) {
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path });
+          const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, undefined, true);
           return {
             filesWritten: 0,
             filesUpdated: 0,
-            filesDeleted: 1,
-            paths: [path],
-            errors: [],
+            filesDeleted: 1 + auxiliary.filesDeleted,
+            paths: [path, ...auxiliary.paths],
+            errors: auxiliary.errors,
           };
         }
 
+        const content = this.renderContent(workspaceId, normalized, true);
         const deleteResult = await this.client.writeFile({
           workspaceId,
           path,
-          content: this.renderContent(workspaceId, normalized, true),
+          content,
           contentType: JSON_CONTENT_TYPE,
           semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
         });
 
+        const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, content, false);
         const counts = inferWriteCounts(normalized, deleteResult, true);
         return {
-          filesWritten: counts.filesWritten,
+          filesWritten: counts.filesWritten + auxiliary.filesWritten,
           filesUpdated: counts.filesUpdated,
-          filesDeleted: counts.filesDeleted,
-          paths: [path],
-          errors: [],
+          filesDeleted: counts.filesDeleted + auxiliary.filesDeleted,
+          paths: [path, ...auxiliary.paths],
+          errors: auxiliary.errors,
         };
       }
 
+      const content = this.renderContent(workspaceId, normalized, false);
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, false),
+        content,
         contentType: JSON_CONTENT_TYPE,
         semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
       });
 
+      const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, content, false);
       const counts = inferWriteCounts(normalized, writeResult, false);
       return {
-        filesWritten: counts.filesWritten,
+        filesWritten: counts.filesWritten + auxiliary.filesWritten,
         filesUpdated: counts.filesUpdated,
-        filesDeleted: 0,
-        paths: [path],
-        errors: [],
+        filesDeleted: auxiliary.filesDeleted,
+        paths: [path, ...auxiliary.paths],
+        errors: auxiliary.errors,
       };
     } catch (error) {
       const fallbackPath = inferFallbackPath(event);
@@ -322,6 +333,82 @@ export class ClickUpAdapter extends IntegrationAdapter {
       payload: event.payload,
     });
   }
+
+  private async writeTaskAuxiliaryFiles(
+    workspaceId: string,
+    event: NormalizedWebhook,
+    content: string | undefined,
+    deleted: boolean,
+  ): Promise<{ filesWritten: number; filesDeleted: number; paths: string[]; errors: IngestError[] }> {
+    if (normalizeClickUpObjectType(event.objectType) !== 'task') {
+      return { filesWritten: 0, filesDeleted: 0, paths: [], errors: [] };
+    }
+    const auxiliary = await emitClickUpAuxiliaryFiles(this.client, {
+      workspaceId,
+      tasks: [{
+        objectId: event.objectId,
+        payload: event.payload as unknown as ClickUpTask,
+        ...(content ? { content } : {}),
+        deleted,
+        ...(event.connectionId ? { connectionId: event.connectionId } : {}),
+      }],
+    });
+    return {
+      filesWritten: auxiliary.written,
+      filesDeleted: auxiliary.deleted,
+      paths: auxiliaryPathsForTask(event.payload, event.objectId),
+      errors: auxiliary.errors.map((error) => ({
+        path: error.path,
+        error: error.error,
+      })),
+    };
+  }
+}
+
+function auxiliaryPathsForTask(payload: Record<string, unknown>, objectId: string): string[] {
+  const paths = [clickUpTaskByIdAliasPath(objectId)];
+  const status = clickUpTaskStatus(payload.status);
+  if (status) {
+    paths.push(clickUpTaskByStatePath(status, objectId));
+  }
+  for (const assigneeId of clickUpTaskAssigneeIds(payload.assignees)) {
+    paths.push(clickUpTaskByAssigneePath(assigneeId, objectId));
+  }
+  const creator = getRecord(payload.creator);
+  const creatorId = creator ? userId(creator as Partial<ClickUpUser>) : asString(payload.creator_id);
+  if (creatorId) {
+    paths.push(clickUpTaskByCreatorPath(creatorId, objectId));
+  }
+  const priority = clickUpTaskPriority(payload.priority);
+  if (priority) {
+    paths.push(clickUpTaskByPriorityPath(priority, objectId));
+  }
+  return paths;
+}
+
+function clickUpTaskStatus(value: unknown): string | undefined {
+  const status = getRecord(value);
+  return status
+    ? asString(status.status) ?? asString(status.name) ?? asString(status.type)
+    : asString(value);
+}
+
+function clickUpTaskPriority(value: unknown): string | undefined {
+  const priority = getRecord(value);
+  return priority
+    ? asString(priority.priority) ?? asString(priority.name)
+    : asString(value);
+}
+
+function clickUpTaskAssigneeIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  for (const item of value) {
+    const assignee = getRecord(item);
+    const id = assignee ? userId(assignee as Partial<ClickUpUser>) : undefined;
+    if (id) ids.add(id);
+  }
+  return [...ids];
 }
 
 function applyTaskSemantics(

@@ -1,3 +1,5 @@
+import { slugifyAlias } from '@relayfile/adapter-core';
+
 export const ASANA_PATH_ROOT = '/asana';
 
 export const ASANA_OBJECT_TYPES = [
@@ -72,6 +74,26 @@ export function normalizeNangoAsanaModel(model: string): AsanaPathObjectType {
 
 export function asanaTaskPath(taskId: string, name?: string): string {
   return `${ASANA_PATH_ROOT}/tasks/${titleSegmentWithId(name, taskId)}.json`;
+}
+
+export function asanaTaskByIdAliasPath(taskId: string): string {
+  return `${ASANA_PATH_ROOT}/tasks/by-id/${encodeAsanaPathSegment(taskId)}.json`;
+}
+
+export function asanaTaskByStatePath(state: string, taskId: string): string {
+  return `${ASANA_PATH_ROOT}/tasks/by-state/${encodeAsanaPathSegment(slugifyAlias(state))}/${encodeAsanaPathSegment(taskId)}.json`;
+}
+
+export function asanaTaskByAssigneePath(assigneeGid: string, taskId: string): string {
+  return `${ASANA_PATH_ROOT}/tasks/by-assignee/${encodeAsanaPathSegment(assigneeGid)}/${encodeAsanaPathSegment(taskId)}.json`;
+}
+
+export function asanaTaskByCreatorPath(creatorGid: string, taskId: string): string {
+  return `${ASANA_PATH_ROOT}/tasks/by-creator/${encodeAsanaPathSegment(creatorGid)}/${encodeAsanaPathSegment(taskId)}.json`;
+}
+
+export function asanaTaskByPriorityPath(priority: string, taskId: string): string {
+  return `${ASANA_PATH_ROOT}/tasks/by-priority/${encodeAsanaPathSegment(slugifyAlias(priority))}/${encodeAsanaPathSegment(taskId)}.json`;
 }
 
 export function asanaProjectPath(projectId: string, name?: string): string {

@@ -46,6 +46,18 @@ const categoryResourceContracts = [
     aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
+    category: 'task-management',
+    provider: 'asana',
+    resource: 'asana/tasks',
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
+  },
+  {
+    category: 'task-management',
+    provider: 'clickup',
+    resource: 'clickup/tasks',
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
+  },
+  {
     category: 'ci-deploy',
     provider: 'gitlab',
     resource: 'gitlab/projects/**/pipelines',
@@ -138,6 +150,18 @@ const executableRegressionContracts = [
     file: 'src/layout.ts',
     needles: ['by-uuid'],
     label: 'layout manifest must advertise emitted Linear by-uuid aliases',
+  },
+  {
+    provider: 'asana',
+    file: 'src/__tests__/emit-auxiliary-files.test.ts',
+    needles: ['asanaTaskByStatePath', 'asanaTaskByAssigneePath', 'asanaTaskByCreatorPath', 'asanaTaskByPriorityPath'],
+    label: 'task-management aliases must be materially emitted and reconciled',
+  },
+  {
+    provider: 'clickup',
+    file: 'src/__tests__/emit-auxiliary-files.test.ts',
+    needles: ['clickUpTaskByStatePath', 'clickUpTaskByAssigneePath', 'clickUpTaskByCreatorPath', 'clickUpTaskByPriorityPath'],
+    label: 'task-management aliases must be materially emitted and reconciled',
   },
   {
     provider: 'notion',

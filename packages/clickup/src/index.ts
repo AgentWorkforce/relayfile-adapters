@@ -10,9 +10,16 @@ export {
   type WriteFileInput,
   type WriteFileResult,
 } from './clickup-adapter.js';
+export * from './emit-auxiliary-files.js';
+export * from './layout.js';
 export {
   CLICKUP_OBJECT_TYPES,
   CLICKUP_PATH_ROOT,
+  clickUpTaskByAssigneePath,
+  clickUpTaskByCreatorPath,
+  clickUpTaskByIdAliasPath,
+  clickUpTaskByPriorityPath,
+  clickUpTaskByStatePath,
   clickUpFolderPath,
   clickUpListPath,
   clickUpSpacePath,

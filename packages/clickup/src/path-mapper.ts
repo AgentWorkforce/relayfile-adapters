@@ -1,3 +1,5 @@
+import { slugifyAlias } from '@relayfile/adapter-core';
+
 export const CLICKUP_PATH_ROOT = '/clickup';
 
 export const CLICKUP_OBJECT_TYPES = [
@@ -72,6 +74,26 @@ export function normalizeNangoClickUpModel(model: string): ClickUpPathObjectType
 
 export function clickUpTaskPath(taskId: string, title?: string): string {
   return `${CLICKUP_PATH_ROOT}/tasks/${titleSegmentWithId(title, assertNonEmptySegment(taskId, 'task id'))}.json`;
+}
+
+export function clickUpTaskByIdAliasPath(taskId: string): string {
+  return `${CLICKUP_PATH_ROOT}/tasks/by-id/${encodeClickUpPathSegment(taskId)}.json`;
+}
+
+export function clickUpTaskByStatePath(state: string, taskId: string): string {
+  return `${CLICKUP_PATH_ROOT}/tasks/by-state/${encodeClickUpPathSegment(slugifyAlias(state))}/${encodeClickUpPathSegment(taskId)}.json`;
+}
+
+export function clickUpTaskByAssigneePath(assigneeId: string, taskId: string): string {
+  return `${CLICKUP_PATH_ROOT}/tasks/by-assignee/${encodeClickUpPathSegment(assigneeId)}/${encodeClickUpPathSegment(taskId)}.json`;
+}
+
+export function clickUpTaskByCreatorPath(creatorId: string, taskId: string): string {
+  return `${CLICKUP_PATH_ROOT}/tasks/by-creator/${encodeClickUpPathSegment(creatorId)}/${encodeClickUpPathSegment(taskId)}.json`;
+}
+
+export function clickUpTaskByPriorityPath(priority: string, taskId: string): string {
+  return `${CLICKUP_PATH_ROOT}/tasks/by-priority/${encodeClickUpPathSegment(slugifyAlias(priority))}/${encodeClickUpPathSegment(taskId)}.json`;
 }
 
 export function clickUpListPath(listId: string, name?: string): string {
