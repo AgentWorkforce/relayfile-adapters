@@ -8,6 +8,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull r
 \`/github/repos/_index.json\` lists materialized repositories.
 \`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
 \`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
+Issue and pull request aliases include \`by-id/<number>.json\`, \`by-title/<slug>.json\`, and \`by-state/<state>/<number>.json\`.
 
 ## Indexes
 
@@ -33,6 +34,7 @@ Examples:
 ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
+ls /github/repos/octocat__hello-world/issues/by-state/open
 grep -R "TODO" /github/repos/octocat/hello-world/pulls
 \`\`\`
 `;

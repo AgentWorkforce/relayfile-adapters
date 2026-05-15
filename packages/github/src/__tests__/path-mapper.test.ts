@@ -6,6 +6,7 @@ import {
   encodeGitHubPathSegment,
   githubAliasRepoPrefix,
   githubByIdAliasPath,
+  githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
@@ -162,6 +163,10 @@ describe('path-mapper', () => {
       assert.equal(
         githubByIdAliasPath('octocat', 'hello-world', 'pulls', 42),
         '/github/repos/octocat__hello-world/pulls/by-id/42.json',
+      );
+      assert.equal(
+        githubByStateAliasPath('octocat', 'hello-world', 'issues', 'in progress', 7),
+        '/github/repos/octocat__hello-world/issues/by-state/in-progress/7.json',
       );
     });
   });

@@ -27,6 +27,7 @@ export {
   encodeProjectPath,
   gitLabByIdAliasPath,
   gitLabByRefAliasPath,
+  gitLabByStateAliasPath,
   gitLabByStatusAliasPath,
   gitLabByTitleAliasPath,
   gitLabFlatRecordFilename,

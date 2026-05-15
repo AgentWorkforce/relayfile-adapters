@@ -12,6 +12,7 @@ import type {
 } from '@relayfile/adapter-core';
 import {
   githubByIdAliasPath,
+  githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
@@ -135,9 +136,10 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const canonical = githubPullRequestPath('acme', 'widgets', 42, 'Add darkmode toggle');
     const byId = githubByIdAliasPath('acme', 'widgets', 'pulls', 42);
     const byTitle = githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
+    const byState = githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42);
     const indexPath = githubRepoPullsIndexPath('acme', 'widgets');
 
-    for (const p of [canonical, byId, byTitle, indexPath]) {
+    for (const p of [canonical, byId, byTitle, byState, indexPath]) {
       assert.ok(writtenPaths.includes(p), `missing expected write ${p}`);
     }
 
@@ -145,6 +147,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const canonicalBytes = client.files.get(canonical);
     assert.equal(client.files.get(byId), canonicalBytes);
     assert.equal(client.files.get(byTitle), canonicalBytes);
+    assert.equal(client.files.get(byState), canonicalBytes);
 
     // Index row scoped to this repo.
     const indexBytes = client.files.get(indexPath)!;
@@ -210,6 +213,50 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'New Title', 42)));
   });
 
+  it('reconciles a PR state transition by moving the by-state alias', async () => {
+    const priorPayload = {
+      provider: 'github',
+      objectType: 'pull_request',
+      objectId: '42',
+      payload: {
+        owner: 'acme',
+        repo: 'widgets',
+        number: 42,
+        title: 'Stateful PR',
+        state: 'open',
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [githubByIdAliasPath('acme', 'widgets', 'pulls', 42)]: JSON.stringify(priorPayload),
+      },
+    });
+
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 42,
+          title: 'Stateful PR',
+          state: 'closed',
+          updated_at: '2026-05-12T00:00:00Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(
+      client.deletes.some((d) => d.path === githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42)),
+      'expected prior by-state alias to be deleted',
+    );
+    assert.ok(
+      client.writes.some((w) => w.path === githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)),
+      'expected new by-state alias to be written',
+    );
+  });
+
   it('writes canonical meta.json + aliases for an issue with per-repo issues index', async () => {
     const client = createClient();
     await emitGitHubAuxiliaryFiles(client, {
@@ -231,6 +278,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubIssuePath('acme', 'widgets', 7, 'Bug report')));
     assert.ok(writtenPaths.includes(githubByIdAliasPath('acme', 'widgets', 'issues', 7)));
     assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)));
+    assert.ok(writtenPaths.includes(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
     // No writes leaked into the pulls index for this repo.
@@ -380,6 +428,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
     assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
     assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
 
     // No content write happened for the tombstone itself — only the index flush.
     const contentWrites = client.writes.filter(

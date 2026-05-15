@@ -67,6 +67,7 @@ import {
 } from './index-emitter.js';
 import {
   githubByIdAliasPath,
+  githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
@@ -449,18 +450,18 @@ async function planNumberedWrite(
     aliasKind,
     number,
     title,
+    state,
   });
   const priorTitle = prior?.title;
-  const stalePaths =
-    priorTitle && priorTitle !== title
-      ? numberedStalePathsFor({
-          owner: repoInfo.owner,
-          repo: repoInfo.repo,
-          aliasKind,
-          number,
-          priorTitle,
-        })
-      : [];
+  const priorState = prior?.state;
+  const stalePaths = numberedStalePathsFor({
+    owner: repoInfo.owner,
+    repo: repoInfo.repo,
+    aliasKind,
+    number,
+    priorTitle: priorTitle && priorTitle !== title ? priorTitle : undefined,
+    priorState: priorState && priorState !== state ? priorState : undefined,
+  });
 
   const writes: EmitWrite[] = newPaths.map((path) => ({
     path,
@@ -511,6 +512,9 @@ async function planNumberedDelete(
   if (priorTitle && slugifies(priorTitle)) {
     paths.push(githubByTitleAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, priorTitle, number));
   }
+  if (prior?.state) {
+    paths.push(githubByStateAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, prior.state, number));
+  }
 
   // Drop the per-repo index row.
   getReconciler(repoInfo.owner, repoInfo.repo).remove(String(number));
@@ -524,14 +528,18 @@ function numberedPathsFor(args: {
   aliasKind: 'pulls' | 'issues';
   number: string;
   title: string | undefined;
+  state: string | undefined;
 }): string[] {
-  const { owner, repo, aliasKind, number, title } = args;
+  const { owner, repo, aliasKind, number, title, state } = args;
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
   const paths: string[] = [];
   paths.push(canonicalPathFor(objectType, owner, repo, number, title));
   paths.push(githubByIdAliasPath(owner, repo, aliasKind, number));
   if (title && slugifies(title)) {
     paths.push(githubByTitleAliasPath(owner, repo, aliasKind, title, number));
+  }
+  if (state && slugifies(state)) {
+    paths.push(githubByStateAliasPath(owner, repo, aliasKind, state, number));
   }
   return paths;
 }
@@ -541,17 +549,21 @@ function numberedStalePathsFor(args: {
   repo: string;
   aliasKind: 'pulls' | 'issues';
   number: string;
-  priorTitle: string;
+  priorTitle?: string | undefined;
+  priorState?: string | undefined;
 }): string[] {
-  const { owner, repo, aliasKind, number, priorTitle } = args;
+  const { owner, repo, aliasKind, number, priorTitle, priorState } = args;
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
   const paths: string[] = [];
-  // Prior canonical meta.json — note we delete only the file, not the
-  // enclosing `<n>__<slug>/` directory. The directory may hold sub-artifacts
-  // (diff.patch, files/**, base/**) that should survive the rename.
-  paths.push(canonicalPathFor(objectType, owner, repo, number, priorTitle));
-  if (slugifies(priorTitle)) {
+  if (priorTitle) {
+    // Prior canonical meta.json — note we delete only the file, not the
+    // enclosing `<n>__<slug>/` directory. The directory may hold sub-artifacts
+    // (diff.patch, files/**, base/**) that should survive the rename.
+    paths.push(canonicalPathFor(objectType, owner, repo, number, priorTitle));
     paths.push(githubByTitleAliasPath(owner, repo, aliasKind, priorTitle, number));
+  }
+  if (priorState && slugifies(priorState)) {
+    paths.push(githubByStateAliasPath(owner, repo, aliasKind, priorState, number));
   }
   return paths;
 }

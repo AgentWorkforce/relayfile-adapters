@@ -8,7 +8,7 @@ test('layoutManifest exposes GitLab resources with canonical aliases and writeba
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'gitlab');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-ref', 'by-status', 'by-title']);
+  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-ref', 'by-state', 'by-status', 'by-title']);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {

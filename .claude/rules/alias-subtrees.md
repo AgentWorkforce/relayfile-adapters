@@ -12,6 +12,12 @@ Add an alias subtree whenever the entity has a natural human-readable lookup key
 - `by-state` / `by-status` — when the consumer cares about the lifecycle bucket (`open`, `closed`, `in-progress`, ...).
 - `by-parent` — when the entity has a single natural parent (issues -> project, pages -> space).
 
+The enforced category matrix lives in `docs/digest-layout-contract.md` and is
+checked by `npm run test:digest-contracts`. If a resource belongs to a matrix
+category such as issue-tracking, add the required alias (`by-state` for
+issue-tracking, `by-status` for CI/deploy) in the same change as the layout,
+emitter, and tests.
+
 Do NOT add an alias for a key that already matches the canonical filename one-to-one — it would be redundant.
 
 ## Path shape

@@ -23,7 +23,7 @@ Record rows always include \`id\`, \`title\`, and \`updated\`, with filter-frien
 
 ## Aliases
 
-When a canonical directory embeds a slug, a stable \`by-id/<id>.json\` alias points to the canonical record. Merge requests, issues, and commits also emit \`by-title/<slug>__<id>.json\`; pipelines and tags emit \`by-ref/<ref-slug>__<id>.json\`; pipelines and deployments emit \`by-status/<status>/<id>.json\`. Alias files are minimal pointers:
+When a canonical directory embeds a slug, a stable \`by-id/<id>.json\` alias points to the canonical record. Merge requests, issues, and commits also emit \`by-title/<slug>__<id>.json\`; merge requests and issues emit \`by-state/<state>/<id>.json\`; pipelines and tags emit \`by-ref/<ref-slug>__<id>.json\`; pipelines and deployments emit \`by-status/<status>/<id>.json\`. Alias files are minimal pointers:
 
 \`\`\`json
 { "id": "42", "canonicalPath": "/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json", "title": "Add OAuth" }
@@ -34,6 +34,7 @@ When a canonical directory embeds a slug, a stable \`by-id/<id>.json\` alias poi
 \`\`\`bash
 ls /gitlab/projects/acme/api/merge_requests
 jq '.[] | {iid, state, title}' /gitlab/projects/acme/api/merge_requests/_index.json
+ls /gitlab/projects/acme/api/issues/by-state/opened
 jq '.[] | select(.status == "failed")' /gitlab/projects/acme/api/pipelines/_index.json
 ls /gitlab/projects/acme/api/merge_requests/by-title
 \`\`\`

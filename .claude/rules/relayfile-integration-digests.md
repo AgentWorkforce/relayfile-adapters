@@ -25,6 +25,12 @@ summarizable in the activity digest.
   the upstream object was actually deleted.
 - Add tests for create/update, terminal state, delete, deterministic ordering,
   and empty windows.
+- Keep the provider layout aligned with the category matrix in
+  `docs/digest-layout-contract.md`. For example, issue-tracking resources must
+  expose `by-state` and CI/deploy resources must expose `by-status` unless the
+  matrix documents an explicit exception.
+- Run `npm run test:digest-contracts` whenever adding or materially changing an
+  adapter, digest handler, layout manifest, or category matrix entry.
 
 ## No-op handlers
 

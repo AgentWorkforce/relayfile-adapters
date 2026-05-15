@@ -16,6 +16,7 @@ export type GitLabDirectoryResourceType = 'commits' | 'issues' | 'merge_requests
 export type GitLabFlatResourceType = 'deployments' | 'tags';
 export type GitLabIndexedResourceType = GitLabDirectoryResourceType | GitLabFlatResourceType;
 export type GitLabTitledResourceType = 'commits' | 'issues' | 'merge_requests';
+export type GitLabStatefulResourceType = 'issues' | 'merge_requests';
 
 export interface GitLabPathContext {
   ref?: string | null;
@@ -141,6 +142,17 @@ export function gitLabByTitleAliasPath(
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-title/${encodeGitLabPathSegment(
     `${slug}${suffix}__${String(objectId)}`,
   )}.json`;
+}
+
+export function gitLabByStateAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  state: string,
+  objectId: number | string,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-state/${encodeGitLabPathSegment(
+    slugifyAlias(state),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
 export function gitLabByRefAliasPath(

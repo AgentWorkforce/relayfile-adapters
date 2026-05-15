@@ -332,5 +332,11 @@ usable digest contract. When adding or materially changing an adapter:
   terminal state, delete, deterministic sorting, and empty-window behavior.
 - If an adapter intentionally does not participate in digests, document why in
   the package README or PR and keep the no-op handler covered by a test.
+- Keep digest behavior and layout aliases aligned with the category matrix in
+  `docs/digest-layout-contract.md`. Issue-tracking resources must expose
+  `by-state` unless the matrix documents an explicit exception; status-driven
+  build/deploy resources must expose `by-status`.
+- Run `npm run test:digest-contracts` after adding or changing an adapter,
+  digest handler, layout manifest, or category matrix entry.
 
 Full rule: `.claude/rules/relayfile-integration-digests.md`.

@@ -9,7 +9,7 @@ test('layoutManifest exposes GitHub resources with canonical aliases and writeba
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'github');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-name', 'by-title']);
+  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-name', 'by-state', 'by-title']);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {

@@ -61,6 +61,7 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-id/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-title/add-oauth__42.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-state/opened/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-ref/main__9.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
@@ -70,6 +71,7 @@ describe('emitGitLabAuxiliaryFiles', () => {
       id: '42',
       canonicalPath: '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
       title: 'Add OAuth',
+      state: 'opened',
     });
 
     const index = JSON.parse(client.writes.get('/gitlab/projects/acme/api/merge_requests/_index.json') ?? '[]');
@@ -82,5 +84,38 @@ describe('emitGitLabAuxiliaryFiles', () => {
         state: 'opened',
       },
     ]);
+  });
+
+  it('moves issue by-state aliases on state transitions', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
+      title: 'Fix bug',
+      state: 'opened',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/issues/by-state/opened/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
+      title: 'Fix bug',
+      state: 'opened',
+    }));
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          projectPath: 'acme/api',
+          iid: 7,
+          title: 'Fix bug',
+          state: 'closed',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-state/opened/7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-state/closed/7.json'));
   });
 });

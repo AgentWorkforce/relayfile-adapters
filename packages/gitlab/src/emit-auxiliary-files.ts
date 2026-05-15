@@ -22,6 +22,7 @@ import {
   computeMetadataPath,
   gitLabByIdAliasPath,
   gitLabByRefAliasPath,
+  gitLabByStateAliasPath,
   gitLabByStatusAliasPath,
   gitLabByTitleAliasPath,
   gitLabProjectResourceIndexPath,
@@ -195,17 +196,24 @@ async function planTitledDirectoryRecord(
 
   const id = String(objectId);
   const title = readNonEmptyString(record.title) ?? id;
+  const state = readNonEmptyString(record.state);
   const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
   const byIdPath = gitLabByIdAliasPath(projectPath, objectType, id);
-  const prior = await priorReader.read<{ title?: string }>(byIdPath, (parsed) => ({
+  const prior = await priorReader.read<{ title?: string; state?: string }>(byIdPath, (parsed) => ({
     title: readNonEmptyString(parsed.title),
+    state: readNonEmptyString(parsed.state),
   }));
-  const deletes = prior?.title && prior.title !== title
-    ? [
-        { path: computeMetadataPath(projectPath, objectType, id, prior.title) },
-        { path: gitLabByTitleAliasPath(projectPath, objectType, prior.title, id) },
-      ]
-    : [];
+  const deletes = [
+    ...(prior?.title && prior.title !== title
+      ? [
+          { path: computeMetadataPath(projectPath, objectType, id, prior.title) },
+          { path: gitLabByTitleAliasPath(projectPath, objectType, prior.title, id) },
+        ]
+      : []),
+    ...(prior?.state && prior.state !== state
+      ? [{ path: gitLabByStateAliasPath(projectPath, objectType, prior.state, id) }]
+      : []),
+  ];
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, objectType).upsert({
@@ -213,16 +221,21 @@ async function planTitledDirectoryRecord(
     title,
     updated: readUpdatedAt(record),
     iid: Number(id),
-    state: readNonEmptyString(record.state),
+    state,
   });
+
+  const writes: EmitWrite[] = [
+    canonicalWrite(canonicalPath, objectType, record, connectionId),
+    aliasWrite(byIdPath, id, canonicalPath, { title, state }),
+    aliasWrite(gitLabByTitleAliasPath(projectPath, objectType, title, id), id, canonicalPath, { title, state }),
+  ];
+  if (state) {
+    writes.push(aliasWrite(gitLabByStateAliasPath(projectPath, objectType, state, id), id, canonicalPath, { title, state }));
+  }
 
   return {
     deletes,
-    writes: [
-      canonicalWrite(canonicalPath, objectType, record, connectionId),
-      aliasWrite(byIdPath, id, canonicalPath, { title }),
-      aliasWrite(gitLabByTitleAliasPath(projectPath, objectType, title, id), id, canonicalPath, { title }),
-    ],
+    writes,
   };
 }
 

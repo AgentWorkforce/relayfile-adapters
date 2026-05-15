@@ -216,6 +216,18 @@ export function githubByIdAliasPath(
   return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-id/${encodeGitHubPathSegment(String(number))}.json`;
 }
 
+export function githubByStateAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  state: string,
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-state/${encodeGitHubPathSegment(
+    slugifyAlias(state),
+  )}/${encodeGitHubPathSegment(String(number))}.json`;
+}
+
 const OBJECT_TYPE_ALIASES: Record<string, string> = {
   pr: 'pull_request',
   pulls: 'pull_request',
