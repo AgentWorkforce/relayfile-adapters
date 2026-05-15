@@ -12,6 +12,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: unknown;
 }
 
 export interface DigestContext {
@@ -44,7 +45,7 @@ export const digest: DigestHandler = async (ctx) => {
     .map((event) => {
       const canonicalPath = normalizeDigestPath(digestEventPath(event));
       return {
-        text: `${googleDriveIdentifier(canonicalPath)} ${pastTense(event)}`,
+        text: `${googleDriveIdentifier(canonicalPath, event)} ${pastTense(event)}`,
         canonicalPath,
       };
     });
@@ -158,14 +159,30 @@ function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, '');
 }
 
-function googleDriveIdentifier(path: string): string {
+function googleDriveIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
-  if (segments[1] === 'files' && segments.length === 3) {
+  if (segments[1] === 'files' && segments.length === 3 && isGoogleDriveWrapper(event)) {
     return `file ${(segments[2] ?? path).replace(/\.json$/u, '')}`;
   }
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `file ${file}`;
+}
+
+function isGoogleDriveWrapper(event: DigestChangeEvent): boolean {
+  const content = event.content;
+  return isRecord(content)
+    && typeof content.id === 'string'
+    && (
+      typeof content.name === 'string'
+      || typeof content.mimeType === 'string'
+      || Array.isArray(content.parents)
+      || typeof content.webViewLink === 'string'
+    );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function pastTense(event: DigestChangeEvent): string {

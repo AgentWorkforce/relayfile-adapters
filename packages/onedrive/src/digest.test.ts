@@ -176,6 +176,7 @@ test('digest strips OneDrive artificial record suffixes', async () => {
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'item.updated',
           canonicalPath: 'onedrive/acct_one/items/item-od-1.json',
+          content: { id: 'item-od-1', name: 'Budget.xlsx', webUrl: 'https://example.test/budget' },
         },
       ];
     },
@@ -187,6 +188,33 @@ test('digest strips OneDrive artificial record suffixes', async () => {
       {
         text: 'item item-od-1 was modified',
         canonicalPath: 'onedrive/acct_one/items/item-od-1.json',
+      },
+    ],
+  });
+});
+
+test('digest preserves .json when items is a real OneDrive folder name', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-collision',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'onedrive/acct_one/items/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item items/settings.json was modified',
+        canonicalPath: 'onedrive/acct_one/items/settings.json',
       },
     ],
   });

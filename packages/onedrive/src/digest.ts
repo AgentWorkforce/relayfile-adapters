@@ -12,6 +12,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: unknown;
 }
 
 export interface DigestContext {
@@ -44,7 +45,7 @@ export const digest: DigestHandler = async (ctx) => {
     .map((event) => {
       const canonicalPath = normalizeDigestPath(digestEventPath(event));
       return {
-        text: `${onedriveIdentifier(canonicalPath)} ${pastTense(event)}`,
+        text: `${onedriveIdentifier(canonicalPath, event)} ${pastTense(event)}`,
         canonicalPath,
       };
     });
@@ -163,14 +164,30 @@ function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, '');
 }
 
-function onedriveIdentifier(path: string): string {
+function onedriveIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
-  if (segments[2] === 'items' && segments.length === 4) {
+  if (segments[2] === 'items' && segments.length === 4 && isOneDriveWrapper(event)) {
     return `item ${(segments[3] ?? path).replace(/\.json$/u, '')}`;
   }
   // Skip provider prefix and account to get the item path
   const item = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;
+}
+
+function isOneDriveWrapper(event: DigestChangeEvent): boolean {
+  const content = event.content;
+  return isRecord(content)
+    && typeof content.id === 'string'
+    && (
+      typeof content.name === 'string'
+      || typeof content.webUrl === 'string'
+      || isRecord(content.file)
+      || isRecord(content.folder)
+    );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function pastTense(event: DigestChangeEvent): string {

@@ -132,6 +132,7 @@ test('digest strips SharePoint artificial record suffixes', async () => {
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'item.updated',
           canonicalPath: 'sharepoint/site-a/drive-a/items/item-sp-1.json',
+          content: { id: 'item-sp-1', name: 'Plan.docx', webUrl: 'https://example.test/plan' },
         },
       ];
     },
@@ -143,6 +144,33 @@ test('digest strips SharePoint artificial record suffixes', async () => {
       {
         text: 'item item-sp-1 was modified',
         canonicalPath: 'sharepoint/site-a/drive-a/items/item-sp-1.json',
+      },
+    ],
+  });
+});
+
+test('digest preserves .json when items is a real SharePoint folder name', async () => {
+  const ctx: DigestContext = {
+    provider: 'sharepoint',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-collision',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'sharepoint/site-a/drive-a/items/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'sharepoint',
+    bullets: [
+      {
+        text: 'item items/settings.json was modified',
+        canonicalPath: 'sharepoint/site-a/drive-a/items/settings.json',
       },
     ],
   });

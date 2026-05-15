@@ -132,6 +132,7 @@ test('digest strips Google Drive artificial record suffixes', async () => {
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'file.updated',
           canonicalPath: 'google-drive/files/file_123.json',
+          content: { id: 'file_123', name: 'Project plan', mimeType: 'application/pdf' },
         },
       ];
     },
@@ -143,6 +144,33 @@ test('digest strips Google Drive artificial record suffixes', async () => {
       {
         text: 'file file_123 was modified',
         canonicalPath: 'google-drive/files/file_123.json',
+      },
+    ],
+  });
+});
+
+test('digest preserves .json when files is a real Google Drive account id', async () => {
+  const ctx: DigestContext = {
+    provider: 'google-drive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-collision',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'file.updated',
+          canonicalPath: 'google-drive/files/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'google-drive',
+    bullets: [
+      {
+        text: 'file settings.json was modified',
+        canonicalPath: 'google-drive/files/settings.json',
       },
     ],
   });

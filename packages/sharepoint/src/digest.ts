@@ -12,6 +12,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: unknown;
 }
 
 export interface DigestContext {
@@ -44,7 +45,7 @@ export const digest: DigestHandler = async (ctx) => {
     .map((event) => {
       const canonicalPath = normalizeDigestPath(digestEventPath(event));
       return {
-        text: `${sharepointIdentifier(canonicalPath)} ${pastTense(event)}`,
+        text: `${sharepointIdentifier(canonicalPath, event)} ${pastTense(event)}`,
         canonicalPath,
       };
     });
@@ -158,14 +159,30 @@ function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, '');
 }
 
-function sharepointIdentifier(path: string): string {
+function sharepointIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
-  if (segments[3] === 'items' && segments.length === 5) {
+  if (segments[3] === 'items' && segments.length === 5 && isSharePointWrapper(event)) {
     return `item ${(segments[4] ?? path).replace(/\.json$/u, '')}`;
   }
   // Skip provider prefix, site, drive to get the item path
   const item = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;
+}
+
+function isSharePointWrapper(event: DigestChangeEvent): boolean {
+  const content = event.content;
+  return isRecord(content)
+    && typeof content.id === 'string'
+    && (
+      typeof content.name === 'string'
+      || typeof content.webUrl === 'string'
+      || isRecord(content.file)
+      || isRecord(content.folder)
+    );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function pastTense(event: DigestChangeEvent): string {
