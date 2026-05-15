@@ -165,6 +165,9 @@ function normalizeDigestPath(path: string): string {
 
 function onedriveIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  if (segments[2] === 'items' && segments.length === 4) {
+    return `item ${(segments[3] ?? path).replace(/\.json$/u, '')}`;
+  }
   // Skip provider prefix and account to get the item path
   const item = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;

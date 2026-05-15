@@ -153,17 +153,10 @@ const GITLAB_ALIAS_RESOURCE_SEGMENTS = new Set([
 function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
   if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
 
-  const resourceIndex = gitLabResourceSegmentIndex(segments);
-  if (resourceIndex < 0) return false;
-
-  const resource = segments[resourceIndex];
-  const alias = segments[resourceIndex + 1];
-  return Boolean(
-    resource
-    && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(resource)
-    && alias
-    && DIGEST_ALIAS_SEGMENTS.has(alias),
-  );
+  for (let index = 2; index < segments.length - 1; index += 1) {
+    if (isGitLabAliasAt(segments, index)) return true;
+  }
+  return false;
 }
 
 type GitLabResourceSegment = 'commits' | 'deployments' | 'files' | 'issues' | 'merge_requests' | 'pipelines' | 'snippets' | 'tags';
@@ -182,6 +175,24 @@ function gitLabResourceSegment(segments: readonly string[]): GitLabResourceSegme
   const index = gitLabResourceSegmentIndex(segments);
   if (index >= 0) return segments[index] as GitLabResourceSegment;
   return undefined;
+}
+
+function isGitLabAliasAt(segments: readonly string[], resourceIndex: number): boolean {
+  const resource = segments[resourceIndex];
+  const alias = segments[resourceIndex + 1];
+  if (!resource || !GITLAB_ALIAS_RESOURCE_SEGMENTS.has(resource) || !alias) {
+    return false;
+  }
+
+  if (alias === 'by-state' || alias === 'by-assignee' || alias === 'by-creator' || alias === 'by-priority' || alias === 'by-status') {
+    return segments.length === resourceIndex + 4;
+  }
+
+  if (alias === 'by-id' || alias === 'by-title' || alias === 'by-ref') {
+    return segments.length === resourceIndex + 3;
+  }
+
+  return false;
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
@@ -238,8 +249,8 @@ function gitLabRecordId(resource: GitLabResourceSegment | undefined, basename: s
   const separatorIndex = basename.indexOf('__');
   if (separatorIndex <= 0) return basename;
 
-  if (resource === 'deployments' || resource === 'tags') {
-    return basename.slice(separatorIndex + 2);
+  if (resource === 'deployments' || resource === 'files' || resource === 'tags') {
+    return resource === 'files' ? basename : basename.slice(separatorIndex + 2);
   }
   return basename.slice(0, separatorIndex);
 }

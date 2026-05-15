@@ -25,6 +25,7 @@ function accumulate(result: SyncResult, objectType: string, operations: IngestOp
 
   result.filesWritten += operations.filter((operation) => operation.mode === 'write').length;
   result.filesUpdated += operations.filter((operation) => operation.mode === 'update').length;
+  result.filesDeleted += operations.filter((operation) => operation.mode === 'delete').length;
   result.paths.push(...operations.map((operation) => operation.path));
   result.operations.push(...operations);
   if (!result.syncedObjectTypes.includes(objectType)) {

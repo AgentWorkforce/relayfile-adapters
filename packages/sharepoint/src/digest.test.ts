@@ -120,3 +120,30 @@ test('digest keeps real .json suffixes in SharePoint item names', async () => {
     ],
   });
 });
+
+test('digest strips SharePoint artificial record suffixes', async () => {
+  const ctx: DigestContext = {
+    provider: 'sharepoint',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-wrapper',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'sharepoint/site-a/drive-a/items/item-sp-1.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'sharepoint',
+    bullets: [
+      {
+        text: 'item item-sp-1 was modified',
+        canonicalPath: 'sharepoint/site-a/drive-a/items/item-sp-1.json',
+      },
+    ],
+  });
+});

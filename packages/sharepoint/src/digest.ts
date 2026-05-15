@@ -160,6 +160,9 @@ function normalizeDigestPath(path: string): string {
 
 function sharepointIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  if (segments[3] === 'items' && segments.length === 5) {
+    return `item ${(segments[4] ?? path).replace(/\.json$/u, '')}`;
+  }
   // Skip provider prefix, site, drive to get the item path
   const item = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;

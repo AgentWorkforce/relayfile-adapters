@@ -276,6 +276,58 @@ test('digest keeps canonical GitLab resources that have alias-shaped project nam
   });
 });
 
+test('digest ignores GitLab aliases whose alias values look like resource names', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-assignee',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/acme/api/issues/by-assignee/files/7.json',
+        },
+        {
+          id: 'evt-creator',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/acme/api/merge_requests/by-creator/snippets/8.json',
+        },
+      ];
+    },
+  };
+
+  assert.equal(await digest(ctx), null);
+});
+
+test('digest keeps double-underscore GitLab file identifiers intact', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-file',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/acme/api/files/config%2Ffoo__bar.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'file config%2Ffoo__bar was updated',
+        canonicalPath: 'gitlab/projects/acme/api/files/config%2Ffoo__bar.json',
+      },
+    ],
+  });
+});
+
 test('digest classifies GitLab deployment lifecycle states with deployment identifiers', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

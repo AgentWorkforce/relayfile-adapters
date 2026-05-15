@@ -120,3 +120,30 @@ test('digest keeps real .json suffixes in Google Drive file names', async () => 
     ],
   });
 });
+
+test('digest strips Google Drive artificial record suffixes', async () => {
+  const ctx: DigestContext = {
+    provider: 'google-drive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-wrapper',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'file.updated',
+          canonicalPath: 'google-drive/files/file_123.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'google-drive',
+    bullets: [
+      {
+        text: 'file file_123 was modified',
+        canonicalPath: 'google-drive/files/file_123.json',
+      },
+    ],
+  });
+});

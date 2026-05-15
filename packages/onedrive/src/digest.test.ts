@@ -164,3 +164,30 @@ test('digest keeps real .json suffixes in OneDrive item names', async () => {
     ],
   });
 });
+
+test('digest strips OneDrive artificial record suffixes', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-wrapper',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'onedrive/acct_one/items/item-od-1.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item item-od-1 was modified',
+        canonicalPath: 'onedrive/acct_one/items/item-od-1.json',
+      },
+    ],
+  });
+});

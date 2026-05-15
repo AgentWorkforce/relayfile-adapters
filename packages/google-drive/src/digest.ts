@@ -160,6 +160,9 @@ function normalizeDigestPath(path: string): string {
 
 function googleDriveIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  if (segments[1] === 'files' && segments.length === 3) {
+    return `file ${(segments[2] ?? path).replace(/\.json$/u, '')}`;
+  }
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `file ${file}`;

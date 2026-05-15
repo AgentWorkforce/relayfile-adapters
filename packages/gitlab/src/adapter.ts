@@ -67,7 +67,7 @@ function fromOperations(operations: IngestOperation[]): IngestResult {
   return {
     filesWritten: operations.filter((operation) => operation.mode === 'write').length,
     filesUpdated: operations.filter((operation) => operation.mode === 'update').length,
-    filesDeleted: 0,
+    filesDeleted: operations.filter((operation) => operation.mode === 'delete').length,
     paths: operations.map((operation) => operation.path),
     errors: [],
     operations,
@@ -323,13 +323,23 @@ export class GitLabAdapter extends IntegrationAdapter {
 
   async ingestTagPush(_normalized: WebhookInput, payload: GitLabWebhookPayload): Promise<IngestResult> {
     const tagPayload = payload as GitLabTagPushWebhook;
+    const deleted = isDeletedTagPush(tagPayload);
+    const path = computeMetadataPath(tagPayload.project.path_with_namespace, 'tags', tagPayload.ref, tagPayload.ref);
     return fromOperations([
       {
-        path: computeMetadataPath(tagPayload.project.path_with_namespace, 'tags', tagPayload.ref, tagPayload.ref),
-        mode: 'write',
-        content: JSON.stringify(tagPayload, null, 2),
-        contentType: 'application/json',
+        path,
+        mode: deleted ? 'delete' : 'write',
+        ...(deleted
+          ? {}
+          : {
+              content: JSON.stringify(tagPayload, null, 2),
+              contentType: 'application/json' as const,
+            }),
       },
     ]);
   }
+}
+
+function isDeletedTagPush(payload: GitLabTagPushWebhook): boolean {
+  return payload.checkout_sha === null || /^0+$/u.test(payload.after);
 }
