@@ -137,3 +137,30 @@ test('digest returns null for an empty OneDrive event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest keeps real .json suffixes in OneDrive item names', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-json',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'onedrive/user/config/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item config/settings.json was modified',
+        canonicalPath: 'onedrive/user/config/settings.json',
+      },
+    ],
+  });
+});

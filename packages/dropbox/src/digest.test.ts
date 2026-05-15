@@ -110,3 +110,30 @@ test('digest returns null for an empty Dropbox event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest keeps real .json suffixes in Dropbox file names', async () => {
+  const ctx: DigestContext = {
+    provider: 'dropbox',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-json',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'file.updated',
+          canonicalPath: 'dropbox/user/config/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'dropbox',
+    bullets: [
+      {
+        text: 'file config/settings.json was modified',
+        canonicalPath: 'dropbox/user/config/settings.json',
+      },
+    ],
+  });
+});

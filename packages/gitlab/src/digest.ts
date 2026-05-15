@@ -130,6 +130,17 @@ function hasDigestAliasDirectory(segments: readonly string[]): boolean {
   return false;
 }
 
+const GITLAB_RESOURCE_SEGMENTS = new Set([
+  'commits',
+  'deployments',
+  'files',
+  'issues',
+  'merge_requests',
+  'pipelines',
+  'snippets',
+  'tags',
+]);
+
 const GITLAB_ALIAS_RESOURCE_SEGMENTS = new Set([
   'commits',
   'deployments',
@@ -142,25 +153,34 @@ const GITLAB_ALIAS_RESOURCE_SEGMENTS = new Set([
 function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
   if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
 
-  for (let index = segments.length - 2; index >= 2; index -= 1) {
-    const resource = segments[index];
-    const alias = segments[index + 1];
-    if (resource && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(resource)) {
-      return Boolean(alias && DIGEST_ALIAS_SEGMENTS.has(alias));
-    }
-  }
-  return false;
+  const resourceIndex = gitLabResourceSegmentIndex(segments);
+  if (resourceIndex < 0) return false;
+
+  const resource = segments[resourceIndex];
+  const alias = segments[resourceIndex + 1];
+  return Boolean(
+    resource
+    && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(resource)
+    && alias
+    && DIGEST_ALIAS_SEGMENTS.has(alias),
+  );
 }
 
-type GitLabResourceSegment = 'commits' | 'deployments' | 'issues' | 'merge_requests' | 'pipelines' | 'tags';
+type GitLabResourceSegment = 'commits' | 'deployments' | 'files' | 'issues' | 'merge_requests' | 'pipelines' | 'snippets' | 'tags';
 
-function gitLabResourceSegment(segments: readonly string[]): GitLabResourceSegment | undefined {
+function gitLabResourceSegmentIndex(segments: readonly string[]): number {
   for (let index = segments.length - 2; index >= 2; index -= 1) {
     const segment = segments[index];
-    if (segment && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(segment)) {
-      return segment as GitLabResourceSegment;
+    if (segment && GITLAB_RESOURCE_SEGMENTS.has(segment)) {
+      return index;
     }
   }
+  return -1;
+}
+
+function gitLabResourceSegment(segments: readonly string[]): GitLabResourceSegment | undefined {
+  const index = gitLabResourceSegmentIndex(segments);
+  if (index >= 0) return segments[index] as GitLabResourceSegment;
   return undefined;
 }
 
@@ -208,6 +228,8 @@ function gitLabIdentifier(path: string): string {
   if (resource === 'pipelines') return `pipeline #${id}`;
   if (resource === 'commits') return `commit ${id.slice(0, 12)}`;
   if (resource === 'deployments') return `deployment #${id}`;
+  if (resource === 'files') return `file ${id}`;
+  if (resource === 'snippets') return `snippet ${id}`;
   if (resource === 'tags') return `tag ${id}`;
   return id;
 }

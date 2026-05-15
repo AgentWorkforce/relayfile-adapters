@@ -162,7 +162,7 @@ function googleDriveIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
-  return `file ${file.replace(/\.json$/u, '')}`;
+  return `file ${file}`;
 }
 
 function pastTense(event: DigestChangeEvent): string {

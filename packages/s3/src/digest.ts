@@ -162,7 +162,7 @@ function s3Identifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   // Skip provider prefix and bucket to get the object key
   const key = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
-  return `object ${key.replace(/\.json$/u, '')}`;
+  return `object ${key}`;
 }
 
 function pastTense(event: DigestChangeEvent): string {

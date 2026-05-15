@@ -348,4 +348,26 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/legacy/9.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
   });
+
+  it('deletes GitLab tag canonical and by-ref alias paths on tombstones', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/tags/v1-0__v1.0.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      tags: [
+        {
+          projectPath: 'acme/api',
+          ref: 'v1.0',
+          _deleted: true,
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/v1-0__v1.0.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json'));
+  });
 });

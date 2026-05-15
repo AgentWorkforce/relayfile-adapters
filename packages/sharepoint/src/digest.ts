@@ -162,7 +162,7 @@ function sharepointIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   // Skip provider prefix, site, drive to get the item path
   const item = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
-  return `item ${item.replace(/\.json$/u, '')}`;
+  return `item ${item}`;
 }
 
 function pastTense(event: DigestChangeEvent): string {

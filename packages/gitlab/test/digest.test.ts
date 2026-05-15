@@ -239,6 +239,43 @@ test('digest identifies GitLab resources from the canonical resource segment, no
   });
 });
 
+test('digest keeps canonical GitLab resources that have alias-shaped project namespace segments', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/org/issues/by-title/snippets/abc123.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/org/pipelines/by-ref/files/docs%2Fsetup.md.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'snippet abc123 was updated',
+        canonicalPath: 'gitlab/projects/org/issues/by-title/snippets/abc123.json',
+      },
+      {
+        text: 'file docs%2Fsetup.md was updated',
+        canonicalPath: 'gitlab/projects/org/pipelines/by-ref/files/docs%2Fsetup.md.json',
+      },
+    ],
+  });
+});
+
 test('digest classifies GitLab deployment lifecycle states with deployment identifiers', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

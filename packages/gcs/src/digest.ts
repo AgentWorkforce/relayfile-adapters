@@ -162,7 +162,7 @@ function gcsIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   // Skip provider prefix and bucket to get the object name
   const obj = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
-  return `object ${obj.replace(/\.json$/u, '')}`;
+  return `object ${obj}`;
 }
 
 function pastTense(event: DigestChangeEvent): string {

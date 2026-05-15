@@ -77,7 +77,7 @@ test('digest classifies S3 copy and restore actions', async () => {
     provider: 's3',
     bullets: [
       {
-        text: 'object backup/data was copied',
+        text: 'object backup/data.json was copied',
         canonicalPath: 's3/my-bucket/backup/data.json',
       },
       {
@@ -112,7 +112,7 @@ test('digest keeps canonical object keys with by-prefixed folders', async () => 
     provider: 's3',
     bullets: [
       {
-        text: 'object tasks/by-state/report was uploaded',
+        text: 'object tasks/by-state/report.json was uploaded',
         canonicalPath: 's3/my-bucket/tasks/by-state/report.json',
       },
     ],

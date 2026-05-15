@@ -582,6 +582,13 @@ function planTagRecord(
   const id = record.ref;
   const canonicalPath = computeMetadataPath(projectPath, 'tags', id, id);
 
+  if (record._deleted === true) {
+    getReconciler(projectPath, 'tags').remove(id);
+    return {
+      deletes: tagPathsFor({ projectPath, id }).map((path) => ({ path })),
+    };
+  }
+
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, 'tags').upsert({
     id,
@@ -596,6 +603,14 @@ function planTagRecord(
       aliasWrite(gitLabByRefAliasPath(projectPath, 'tags', id, id), id, canonicalPath, { ref: id }),
     ],
   };
+}
+
+function tagPathsFor(args: { projectPath: string; id: string }): string[] {
+  const { projectPath, id } = args;
+  return [
+    computeMetadataPath(projectPath, 'tags', id, id),
+    gitLabByRefAliasPath(projectPath, 'tags', id, id),
+  ];
 }
 
 function canonicalWrite(

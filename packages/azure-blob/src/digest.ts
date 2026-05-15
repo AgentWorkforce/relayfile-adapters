@@ -171,7 +171,7 @@ function azureBlobIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   // Skip provider prefix, account, container to get the blob name
   const blob = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
-  return `blob ${blob.replace(/\.json$/u, '')}`;
+  return `blob ${blob}`;
 }
 
 function pastTense(event: DigestChangeEvent): string {
