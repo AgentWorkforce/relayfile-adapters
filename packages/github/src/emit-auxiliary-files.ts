@@ -436,6 +436,12 @@ interface PriorNumberedState {
   repo?: string | undefined;
 }
 
+interface NumberedDeleteRecovery {
+  owner: string;
+  repo: string;
+  prior?: PriorNumberedState | undefined;
+}
+
 async function planNumberedWrite(
   record: GitHubPullRequestEmitRecord | GitHubIssueEmitRecord,
   objectType: 'pull_request' | 'issue',
@@ -521,21 +527,27 @@ async function planNumberedDelete(
     return {};
   }
 
-  let repoInfo = extractRepoInfo(tombstone);
-  if (!repoInfo) {
-    repoInfo = await findRepoInfoForNumberedDelete(client, workspaceId, aliasKind, number);
-    if (!repoInfo) {
+  let recovery: NumberedDeleteRecovery | null = null;
+  const explicitRepoInfo = extractRepoInfo(tombstone);
+  if (explicitRepoInfo) {
+    recovery = explicitRepoInfo;
+  } else {
+    recovery = await findRepoInfoForNumberedDelete(client, workspaceId, aliasKind, number);
+    if (!recovery) {
       return {};
     }
   }
 
-  const idAliasPath = githubByIdAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, number);
-  const prior = await priorReader.read<PriorNumberedState>(idAliasPath, extractPriorNumberedState);
+  const idAliasPath = githubByIdAliasPath(recovery.owner, recovery.repo, aliasKind, number);
+  const prior =
+    await priorReader.read<PriorNumberedState>(idAliasPath, extractPriorNumberedState)
+    ?? recovery.prior
+    ?? await findNumberedIndexPrior(client, workspaceId, aliasKind, number, recovery);
 
   const priorTitle = prior?.title;
   const priorPaths = numberedPathsFor({
-    owner: repoInfo.owner,
-    repo: repoInfo.repo,
+    owner: recovery.owner,
+    repo: recovery.repo,
     aliasKind,
     number,
     title: priorTitle,
@@ -548,10 +560,10 @@ async function planNumberedDelete(
 
   const paths = priorPaths.length > 0
     ? priorPaths
-    : [canonicalPathFor(objectType, repoInfo.owner, repoInfo.repo, number, priorTitle), idAliasPath];
+    : [canonicalPathFor(objectType, recovery.owner, recovery.repo, number, priorTitle), idAliasPath];
 
   // Drop the per-repo index row.
-  getReconciler(repoInfo.owner, repoInfo.repo).remove(String(number));
+  getReconciler(recovery.owner, recovery.repo).remove(String(number));
 
   return { deletes: paths.map((path) => ({ path })) };
 }
@@ -561,13 +573,13 @@ async function findRepoInfoForNumberedDelete(
   workspaceId: string,
   aliasKind: 'pulls' | 'issues',
   number: string,
-): Promise<{ owner: string; repo: string } | null> {
+): Promise<NumberedDeleteRecovery | null> {
   if (!client.readFile) {
     return null;
   }
 
   const repos = await readJsonArray(client, workspaceId, githubReposIndexPath());
-  const matches: Array<{ owner: string; repo: string }> = [];
+  const matches: NumberedDeleteRecovery[] = [];
   for (const row of repos) {
     const repoInfo = extractRepoInfo(row) ?? repoInfoFromIndexId(readNonEmptyString(row.id));
     if (!repoInfo) continue;
@@ -575,12 +587,34 @@ async function findRepoInfoForNumberedDelete(
       ? githubRepoPullsIndexPath(repoInfo.owner, repoInfo.repo)
       : githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
     const rows = await readJsonArray(client, workspaceId, indexPath);
-    if (rows.some((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number)) {
-      matches.push(repoInfo);
+    const match = rows.find((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number);
+    if (match) {
+      matches.push({
+        ...repoInfo,
+        prior: priorNumberedStateFromIndexRow(match, repoInfo),
+      });
     }
   }
 
   return matches.length === 1 ? matches[0] : null;
+}
+
+async function findNumberedIndexPrior(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aliasKind: 'pulls' | 'issues',
+  number: string,
+  repoInfo: { owner: string; repo: string },
+): Promise<PriorNumberedState | null> {
+  if (!client.readFile) {
+    return null;
+  }
+  const indexPath = aliasKind === 'pulls'
+    ? githubRepoPullsIndexPath(repoInfo.owner, repoInfo.repo)
+    : githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
+  const rows = await readJsonArray(client, workspaceId, indexPath);
+  const match = rows.find((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number);
+  return match ? priorNumberedStateFromIndexRow(match, repoInfo) : null;
 }
 
 async function readJsonArray(
@@ -604,6 +638,21 @@ function repoInfoFromIndexId(value: string | undefined): { owner: string; repo: 
   if (!value) return null;
   const [owner, repo] = value.split('/', 2);
   return owner && repo ? { owner, repo } : null;
+}
+
+function priorNumberedStateFromIndexRow(
+  row: Record<string, unknown>,
+  repoInfo: { owner: string; repo: string },
+): PriorNumberedState {
+  return {
+    title: readNonEmptyString(row.title),
+    state: readNonEmptyString(row.state),
+    assigneeKeys: readStringArray(row.assigneeKeys),
+    creatorKey: readNonEmptyString(row.creatorKey),
+    priority: readNonEmptyString(row.priority),
+    owner: repoInfo.owner,
+    repo: repoInfo.repo,
+  };
 }
 
 function numberedPathsFor(args: {
@@ -666,6 +715,9 @@ function buildRecordIndexRow(
     updated: readUpdatedAt(record),
     number: Number(number),
     state: state ?? '',
+    ...withOptionalArray('assigneeKeys', readGitHubAssigneeKeys(record)),
+    ...withOptionalString('creatorKey', readGitHubCreatorKey(record)),
+    ...withOptionalString('priority', readPriority(record)),
   };
 }
 
@@ -871,6 +923,26 @@ function readPriority(record: Record<string, unknown>): string | undefined {
     if (priority) return priority;
   }
   return undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const values = uniqueStrings(
+    value
+      .map((entry) => readNonEmptyString(entry))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  return values.length > 0 ? values : undefined;
+}
+
+function withOptionalString(key: 'creatorKey' | 'priority', value: string | undefined): Partial<GitHubRecordIndexRow> {
+  return value ? { [key]: value } : {};
+}
+
+function withOptionalArray(key: 'assigneeKeys', value: string[]): Partial<GitHubRecordIndexRow> {
+  return value.length > 0 ? { [key]: value } : {};
 }
 
 function parsePriorityLabel(label: string | undefined): string | undefined {

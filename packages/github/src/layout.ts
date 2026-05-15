@@ -13,14 +13,14 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   filenameConvention: '<number>__<slug>/meta.json',
   // Top-level aliasSegments is the union of every resource's alias segments
   // so consumers that inspect only the manifest root can discover all
-  // lookup keys. `by-name` belongs here because `github/repos` exposes it.
-  aliasSegments: ['by-assignee', 'by-creator', 'by-id', 'by-name', 'by-priority', 'by-state', 'by-title'],
+  // lookup keys.
+  aliasSegments: ['by-assignee', 'by-creator', 'by-id', 'by-priority', 'by-state', 'by-title'],
   resources: [
     {
       path: 'github/repos',
       title: 'Repositories',
       materialization: 'lazy',
-      aliasSegments: ['by-name'],
+      aliasSegments: [],
       writebackResources: [],
     },
     {

@@ -127,6 +127,12 @@ const executableRegressionContracts = [
     label: 'digest tests must cover path-only Relayfile events',
   },
   {
+    provider: 'github',
+    file: 'src/__tests__/emit-auxiliary-files.test.ts',
+    needles: ['index-only bare PR tombstone', 'githubByAssigneeAliasPath', 'githubByPriorityAliasPath'],
+    label: 'bare tombstone recovery must delete aliases even when the by-id alias is missing',
+  },
+  {
     provider: 'linear',
     file: 'src/layout.ts',
     needles: ['by-uuid'],
@@ -238,6 +244,8 @@ for (const contract of categoryResourceContracts) {
   }
 }
 
+verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases();
+
 for (const contract of executableRegressionContracts) {
   const testPath = join(packagesDir, contract.provider, contract.file);
   if (!existsSync(testPath)) {
@@ -314,6 +322,23 @@ function digestAcceptsExactRoot(digestSource, root) {
     || digestSource.includes(`digestEventPath(event) === "/${root}"`)
     || digestSource.includes(`digestEventPath(event) === '/${root}'`)
   );
+}
+
+function verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases() {
+  const layoutPath = join(packagesDir, 'github', 'src', 'layout.ts');
+  const emitterPath = join(packagesDir, 'github', 'src', 'emit-auxiliary-files.ts');
+  if (!existsSync(layoutPath) || !existsSync(emitterPath)) {
+    return;
+  }
+  const layoutSource = readFileSync(layoutPath, 'utf8');
+  const emitterSource = readFileSync(emitterPath, 'utf8');
+  const repoResourceAdvertisesByName =
+    /path:\s*['"]github\/repos['"][\s\S]*?aliasSegments:\s*\[[^\]]*['"]by-name['"]/u.test(layoutSource);
+  const repoEmitterWritesByName =
+    /githubRepo(?:sitory)?ByName|repos\/by-name|by-name/u.test(emitterSource);
+  if (repoResourceAdvertisesByName && !repoEmitterWritesByName) {
+    failures.push('github: layout advertises github/repos by-name but repository emitter does not materialize a by-name alias');
+  }
 }
 
 function digestAcceptsRootChildren(digestSource, root) {

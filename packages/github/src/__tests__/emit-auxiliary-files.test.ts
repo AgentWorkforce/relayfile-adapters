@@ -513,6 +513,45 @@ describe('emitGitHubAuxiliaryFiles', () => {
     );
   });
 
+  it('index-only bare PR tombstone removes canonical and category aliases when by-id alias is missing', async () => {
+    const priorIndex = [
+      {
+        id: '42',
+        title: 'Doomed PR',
+        updated: '2026-05-12T00:00:00Z',
+        number: 42,
+        state: 'closed',
+        assigneeKeys: ['mona'],
+        creatorKey: 'hubot',
+        priority: 'high',
+      },
+      { id: '99', title: 'Surviving PR', updated: '2026-05-11T00:00:00Z', number: 99, state: 'open' },
+    ];
+
+    const client = createClient({
+      initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
+        [githubRepoPullsIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [{ id: '42', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
+    assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
+    assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
+    assert.ok(deletedPaths.has(githubByAssigneeAliasPath('acme', 'widgets', 'pulls', 'mona', 42)));
+    assert.ok(deletedPaths.has(githubByCreatorAliasPath('acme', 'widgets', 'pulls', 'hubot', 42)));
+    assert.ok(deletedPaths.has(githubByPriorityAliasPath('acme', 'widgets', 'pulls', 'high', 42)));
+  });
+
   it('delete tombstone for an issue drops its per-repo issues index row', async () => {
     const priorPayload = {
       payload: { owner: 'acme', repo: 'widgets', number: 11, title: 'Old issue', state: 'open' },
