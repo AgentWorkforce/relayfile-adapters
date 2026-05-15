@@ -564,26 +564,55 @@ function inferSalesforceLifecycleAction(record: SalesforceRecord): string | unde
   const objectType = extractSalesforceObjectType(record).toLowerCase();
   const data = getWebhookData(record);
   if (!data) return undefined;
+  const changedFields = getChangedFields(data);
 
-  if (objectType === 'lead' && (data.IsConverted === true || data.isConverted === true)) {
+  if (
+    objectType === 'lead' &&
+    fieldChanged(changedFields, 'IsConverted') &&
+    (data.IsConverted === true || data.isConverted === true)
+  ) {
     return 'converted';
   }
 
   if (objectType === 'case') {
     const status = readOptionalString(data.Status) ?? readOptionalString(data.status);
-    if (data.IsClosed === true || data.isClosed === true || isSalesforceClosedValue(status)) {
+    if (
+      (fieldChanged(changedFields, 'IsClosed') && (data.IsClosed === true || data.isClosed === true)) ||
+      (fieldChanged(changedFields, 'Status') && isSalesforceClosedValue(status))
+    ) {
       return 'closed';
     }
   }
 
   if (objectType === 'opportunity') {
     const stage = readOptionalString(data.StageName) ?? readOptionalString(data.stageName);
-    if (data.IsClosed === true || data.isClosed === true || isSalesforceClosedValue(stage)) {
+    if (
+      (fieldChanged(changedFields, 'IsClosed') && (data.IsClosed === true || data.isClosed === true)) ||
+      (fieldChanged(changedFields, 'StageName') && isSalesforceClosedValue(stage))
+    ) {
       return 'closed';
     }
   }
 
   return undefined;
+}
+
+function getChangedFields(data: SalesforceRecord): Set<string> {
+  const header = getRecord(data.ChangeEventHeader) ?? getRecord(data.changeEventHeader);
+  const raw = header?.changedFields;
+  if (!Array.isArray(raw)) {
+    return new Set();
+  }
+  return new Set(
+    raw
+      .map((field) => readOptionalString(field))
+      .filter((field): field is string => Boolean(field)),
+  );
+}
+
+function fieldChanged(changedFields: Set<string>, field: string): boolean {
+  const lowerFirst = field ? field.charAt(0).toLowerCase() + field.slice(1) : field;
+  return changedFields.has(field) || changedFields.has(lowerFirst);
 }
 
 function isSalesforceClosedValue(value: string | undefined): boolean {

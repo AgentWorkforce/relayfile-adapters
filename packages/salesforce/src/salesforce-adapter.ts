@@ -124,12 +124,20 @@ export class SalesforceAdapter extends IntegrationAdapter {
   }
 
   override supportedEvents(): string[] {
-    return SUPPORTED_EVENTS.flatMap((objectType) => [
-      `${objectType}.created`,
-      `${objectType}.updated`,
-      `${objectType}.deleted`,
-      `${objectType}.upserted`,
-    ]);
+    return SUPPORTED_EVENTS.flatMap((objectType) => {
+      const events = [
+        `${objectType}.created`,
+        `${objectType}.updated`,
+        `${objectType}.deleted`,
+        `${objectType}.upserted`,
+      ];
+      if (objectType === 'Case') {
+        events.push(`${objectType}.closed`);
+      } else if (objectType === 'Lead') {
+        events.push(`${objectType}.converted`);
+      }
+      return events;
+    });
   }
 
   override async ingestWebhook(

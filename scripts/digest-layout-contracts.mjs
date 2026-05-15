@@ -6,6 +6,7 @@ const root = new URL('..', import.meta.url).pathname;
 const packagesDir = join(root, 'packages');
 
 const nonProviderPackages = new Set(['core', 'webhook-server']);
+const appendOnlyLifecycleProviders = new Set(['segment']);
 
 const categoryResourceContracts = [
   {
@@ -215,12 +216,17 @@ for (const provider of providerPackages()) {
     /create|created|update|updated|upsert|upserted|upload|uploaded|insert|inserted|set|sent|received/i,
     'create/update classification',
   );
-  assertTestMentions(
-    provider,
-    testSource,
-    /delete|deleted|remove|removed|closed|merged|archiv|completed|canceled|cancelled|resolved|solved|trashed|locked|failed|succeeded|refunded|voided|expired|truncate|upserted/i,
-    'provider lifecycle classification',
-  );
+  if (appendOnlyLifecycleProviders.has(provider)) {
+    assertTestMentions(provider, digestSource, /append-only|immutable/i, 'documented append-only lifecycle exception');
+    assertTestMentions(provider, testSource, /upsert|upserted/i, 'append-only upsert classification');
+  } else {
+    assertTestMentions(
+      provider,
+      testSource,
+      /delete|deleted|remove|removed|closed|merged|archiv|completed|canceled|cancelled|resolved|solved|trashed|locked|failed|succeeded|refunded|voided|expired|truncate/i,
+      'provider lifecycle classification',
+    );
+  }
 }
 
 for (const contract of categoryResourceContracts) {

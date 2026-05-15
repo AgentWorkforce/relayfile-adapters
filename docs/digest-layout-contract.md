@@ -27,6 +27,12 @@ No-op digest handlers are not a shipping pattern. A provider that intentionally
 does not appear in digests must document the exception and keep that exclusion
 covered by a test.
 
+Append-only providers are a narrow exception to the delete-or-terminal portion
+of lifecycle coverage. Segment is currently the only enforced exception:
+records are immutable once written, so its digest contract must explicitly
+classify append/upsert activity and document the append-only behavior in
+`src/digest.ts`.
+
 ## Category Matrix
 
 These category rules are enforced by `scripts/digest-layout-contracts.mjs`.

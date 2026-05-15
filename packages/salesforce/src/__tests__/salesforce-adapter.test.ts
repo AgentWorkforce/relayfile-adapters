@@ -78,10 +78,12 @@ test('SalesforceAdapter exposes provider metadata and supported events', () => {
     'Lead.updated',
     'Lead.deleted',
     'Lead.upserted',
+    'Lead.converted',
     'Case.created',
     'Case.updated',
     'Case.deleted',
     'Case.upserted',
+    'Case.closed',
   ]);
 });
 

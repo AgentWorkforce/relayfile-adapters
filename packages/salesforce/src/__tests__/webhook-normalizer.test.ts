@@ -63,6 +63,7 @@ test('normalizeSalesforceWebhook preserves closed and converted lifecycle action
       Id: '500A',
       Status: 'Closed',
       Subject: 'Billing question',
+      ChangeEventHeader: { changedFields: ['Status'] },
     },
   });
   assert.equal(closedCase.eventType, 'Case.closed');
@@ -76,11 +77,38 @@ test('normalizeSalesforceWebhook preserves closed and converted lifecycle action
       Id: '00QA',
       IsConverted: true,
       Name: 'Grace Hopper',
+      ChangeEventHeader: { changedFields: ['IsConverted'] },
     },
   });
   assert.equal(convertedLead.eventType, 'Lead.converted');
   const convertedWebhook = convertedLead.payload._webhook as Record<string, unknown>;
   assert.equal(convertedWebhook.action, 'converted');
+});
+
+test('normalizeSalesforceWebhook does not re-emit lifecycle actions for unchanged terminal records', () => {
+  const closedCase = normalizeSalesforceWebhook({
+    action: 'updated',
+    objectType: 'Case',
+    data: {
+      Id: '500A',
+      Status: 'Closed',
+      Subject: 'Billing question',
+      ChangeEventHeader: { changedFields: ['Subject'] },
+    },
+  });
+  assert.equal(closedCase.eventType, 'Case.updated');
+
+  const convertedLead = normalizeSalesforceWebhook({
+    action: 'updated',
+    objectType: 'Lead',
+    data: {
+      Id: '00QA',
+      IsConverted: true,
+      Name: 'Grace Hopper',
+      ChangeEventHeader: { changedFields: ['Name'] },
+    },
+  });
+  assert.equal(convertedLead.eventType, 'Lead.updated');
 });
 
 test('validateSalesforceWebhookSecret rejects a header with the wrong secret', () => {
