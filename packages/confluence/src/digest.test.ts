@@ -123,3 +123,42 @@ test('digest classifies Confluence trash, archive, and remove actions distinctly
     ],
   });
 });
+
+test('digest ignores Confluence aliases without dropping canonical alias-shaped space keys', async () => {
+  const ctx: DigestContext = {
+    provider: 'confluence',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-alias-page',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'confluence/pages/by-title/release-plan.json',
+        },
+        {
+          id: 'evt-alias-space',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'space.created',
+          canonicalPath: 'confluence/spaces/by-title/engineering.json',
+        },
+        {
+          id: 'evt-canonical-page',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'confluence/spaces/by-title/pages/123__release-plan.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'confluence',
+    bullets: [
+      {
+        text: 'page 123 was updated',
+        canonicalPath: 'confluence/spaces/by-title/pages/123__release-plan.json',
+      },
+    ],
+  });
+});

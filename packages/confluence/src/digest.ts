@@ -123,6 +123,7 @@ const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
 function hasDigestAliasDirectory(segments: readonly string[]): boolean {
   const provider = segments[0] ?? '';
   if (!DIGEST_ALIAS_PROVIDER_SEGMENTS.has(provider)) return false;
+  if (provider === 'confluence') return hasConfluenceAliasDirectory(segments);
 
   for (let index = 1; index < segments.length - 1; index += 1) {
     const segment = segments[index];
@@ -131,6 +132,40 @@ function hasDigestAliasDirectory(segments: readonly string[]): boolean {
       return true;
     }
   }
+  return false;
+}
+
+const CONFLUENCE_PAGE_ALIAS_SEGMENTS = new Set([
+  'by-id',
+  'by-parent',
+  'by-space',
+  'by-state',
+  'by-title',
+]);
+
+const CONFLUENCE_SPACE_ALIAS_SEGMENTS = new Set([
+  'by-id',
+  'by-key',
+  'by-title',
+]);
+
+function hasConfluenceAliasDirectory(segments: readonly string[]): boolean {
+  if (segments[0] !== 'confluence') return false;
+
+  if (segments[1] === 'pages') {
+    const alias = segments[2];
+    return Boolean(alias && CONFLUENCE_PAGE_ALIAS_SEGMENTS.has(alias));
+  }
+
+  if (segments[1] === 'spaces') {
+    const alias = segments[2];
+    return Boolean(
+      alias
+      && CONFLUENCE_SPACE_ALIAS_SEGMENTS.has(alias)
+      && segments[3] !== 'pages',
+    );
+  }
+
   return false;
 }
 

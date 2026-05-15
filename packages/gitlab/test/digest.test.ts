@@ -202,6 +202,90 @@ test('digest ignores GitLab merge request alias paths without dropping canonical
   });
 });
 
+test('digest identifies GitLab resources from the canonical resource segment, not project path names', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'opened',
+          canonicalPath: 'gitlab/projects/org/merge_requests/service/issues/42__add-login/meta.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'pipeline.failed',
+          canonicalPath: 'gitlab/projects/org/issues/by-title/service/pipelines/1001__main/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'issue #42 was opened',
+        canonicalPath: 'gitlab/projects/org/merge_requests/service/issues/42__add-login/meta.json',
+      },
+      {
+        text: 'pipeline #1001 failed',
+        canonicalPath: 'gitlab/projects/org/issues/by-title/service/pipelines/1001__main/meta.json',
+      },
+    ],
+  });
+});
+
+test('digest classifies GitLab deployment lifecycle states with deployment identifiers', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'deployment.failed',
+          canonicalPath: 'gitlab/projects/acme/api/deployments/14.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'deployment.success',
+          canonicalPath: 'gitlab/projects/acme/api/deployments/production__15.json',
+        },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'deployment.canceled',
+          canonicalPath: 'gitlab/projects/acme/api/deployments/staging__16.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'deployment #14 failed',
+        canonicalPath: 'gitlab/projects/acme/api/deployments/14.json',
+      },
+      {
+        text: 'deployment #15 succeeded',
+        canonicalPath: 'gitlab/projects/acme/api/deployments/production__15.json',
+      },
+      {
+        text: 'deployment #16 was canceled',
+        canonicalPath: 'gitlab/projects/acme/api/deployments/staging__16.json',
+      },
+    ],
+  });
+});
+
 test('digest classifies deleted GitLab records', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

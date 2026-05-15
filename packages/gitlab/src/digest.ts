@@ -152,6 +152,18 @@ function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
   return false;
 }
 
+type GitLabResourceSegment = 'commits' | 'deployments' | 'issues' | 'merge_requests' | 'pipelines' | 'tags';
+
+function gitLabResourceSegment(segments: readonly string[]): GitLabResourceSegment | undefined {
+  for (let index = segments.length - 2; index >= 2; index -= 1) {
+    const segment = segments[index];
+    if (segment && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(segment)) {
+      return segment as GitLabResourceSegment;
+    }
+  }
+  return undefined;
+}
+
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
   const leftMs = eventTimeMs(left);
   const rightMs = eventTimeMs(right);
@@ -183,19 +195,31 @@ function normalizeDigestPath(path: string): string {
 
 function gitLabIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
+  const resource = gitLabResourceSegment(segments);
   const terminal = segments.at(-1);
   const segment = terminal === 'meta.json' || terminal === 'metadata.json'
     ? segments.at(-2) ?? path
     : terminal ?? path;
   const basename = segment.replace(/\.[^.]+$/u, '');
-  const separatorIndex = basename.indexOf('__');
-  const id = separatorIndex > 0 ? basename.slice(0, separatorIndex) : basename;
+  const id = gitLabRecordId(resource, basename);
 
-  if (path.includes('/merge_requests/')) return `MR !${id}`;
-  if (path.includes('/issues/')) return `issue #${id}`;
-  if (path.includes('/pipelines/')) return `pipeline #${id}`;
-  if (path.includes('/commits/')) return `commit ${id.slice(0, 12)}`;
+  if (resource === 'merge_requests') return `MR !${id}`;
+  if (resource === 'issues') return `issue #${id}`;
+  if (resource === 'pipelines') return `pipeline #${id}`;
+  if (resource === 'commits') return `commit ${id.slice(0, 12)}`;
+  if (resource === 'deployments') return `deployment #${id}`;
+  if (resource === 'tags') return `tag ${id}`;
   return id;
+}
+
+function gitLabRecordId(resource: GitLabResourceSegment | undefined, basename: string): string {
+  const separatorIndex = basename.indexOf('__');
+  if (separatorIndex <= 0) return basename;
+
+  if (resource === 'deployments' || resource === 'tags') {
+    return basename.slice(separatorIndex + 2);
+  }
+  return basename.slice(0, separatorIndex);
 }
 
 function pastTense(event: DigestChangeEvent): string {

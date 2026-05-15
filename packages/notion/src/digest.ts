@@ -123,6 +123,7 @@ const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
 function hasDigestAliasDirectory(segments: readonly string[]): boolean {
   const provider = segments[0] ?? '';
   if (!DIGEST_ALIAS_PROVIDER_SEGMENTS.has(provider)) return false;
+  if (provider === 'notion') return hasNotionAliasDirectory(segments);
 
   for (let index = 1; index < segments.length - 1; index += 1) {
     const segment = segments[index];
@@ -131,6 +132,60 @@ function hasDigestAliasDirectory(segments: readonly string[]): boolean {
       return true;
     }
   }
+  return false;
+}
+
+const NOTION_DATABASE_ALIAS_SEGMENTS = new Set([
+  'by-id',
+  'by-title',
+]);
+
+const NOTION_PAGE_ALIAS_SEGMENTS = new Set([
+  'by-database',
+  'by-id',
+  'by-parent',
+  'by-title',
+]);
+
+const NOTION_USER_ALIAS_SEGMENTS = new Set([
+  'by-id',
+  'by-name',
+]);
+
+const NOTION_PAGE_CONTENT_LEAVES = new Set([
+  'blocks',
+  'comments.json',
+  'content.md',
+  'page.md',
+]);
+
+function hasNotionAliasDirectory(segments: readonly string[]): boolean {
+  if (segments[0] !== 'notion') return false;
+
+  if (segments[1] === 'databases') {
+    const alias = segments[2];
+    return Boolean(
+      alias
+      && NOTION_DATABASE_ALIAS_SEGMENTS.has(alias)
+      && segments[3] !== 'metadata.json'
+      && segments[3] !== 'pages',
+    );
+  }
+
+  if (segments[1] === 'pages') {
+    const alias = segments[2];
+    return Boolean(
+      alias
+      && NOTION_PAGE_ALIAS_SEGMENTS.has(alias)
+      && !NOTION_PAGE_CONTENT_LEAVES.has(segments[3] ?? ''),
+    );
+  }
+
+  if (segments[1] === 'users') {
+    const alias = segments[2];
+    return Boolean(alias && NOTION_USER_ALIAS_SEGMENTS.has(alias));
+  }
+
   return false;
 }
 
