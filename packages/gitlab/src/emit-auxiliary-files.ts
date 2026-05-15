@@ -215,17 +215,28 @@ async function planTitledDirectoryRecord(
     creatorKey: readNonEmptyString(parsed.creatorKey),
     priority: readNonEmptyString(parsed.priority),
   }));
-  const title = readNonEmptyString(record.title) ?? prior?.title ?? id;
-  const state = readNonEmptyString(record.state) ?? prior?.state;
+  const isDelete = record._deleted === true;
+  const title = isDelete
+    ? prior?.title ?? readNonEmptyString(record.title) ?? id
+    : readNonEmptyString(record.title) ?? prior?.title ?? id;
+  const state = isDelete
+    ? prior?.state ?? readNonEmptyString(record.state)
+    : readNonEmptyString(record.state) ?? prior?.state;
   const recordAssigneeKeys = Array.isArray(record.assignees)
     ? readGitLabAssigneeKeys(record)
     : undefined;
-  const assigneeKeys = recordAssigneeKeys ?? prior?.assigneeKeys ?? [];
-  const creatorKey = readGitLabCreatorKey(record) ?? prior?.creatorKey;
-  const priority = readPriority(record) ?? prior?.priority;
+  const assigneeKeys = isDelete
+    ? prior?.assigneeKeys ?? recordAssigneeKeys ?? []
+    : recordAssigneeKeys ?? prior?.assigneeKeys ?? [];
+  const creatorKey = isDelete
+    ? prior?.creatorKey ?? readGitLabCreatorKey(record)
+    : readGitLabCreatorKey(record) ?? prior?.creatorKey;
+  const priority = isDelete
+    ? prior?.priority ?? readPriority(record)
+    : readPriority(record) ?? prior?.priority;
   const canonicalPath = prior?.canonicalPath ?? computeMetadataPath(projectPath, objectType, id, title);
-  if (record._deleted === true) {
-    const paths = titledDirectoryPathsFor({
+  if (isDelete) {
+    const paths = new Set(titledDirectoryPathsFor({
       projectPath,
       objectType,
       id,
@@ -234,12 +245,24 @@ async function planTitledDirectoryRecord(
       assigneeKeys,
       creatorKey,
       priority,
-    });
-    if (prior?.canonicalPath && !paths.includes(prior.canonicalPath)) {
-      paths.push(prior.canonicalPath);
+    }));
+    for (const currentPath of titledDirectoryPathsFor({
+      projectPath,
+      objectType,
+      id,
+      title: readNonEmptyString(record.title) ?? title,
+      state: readNonEmptyString(record.state),
+      assigneeKeys: recordAssigneeKeys,
+      creatorKey: readGitLabCreatorKey(record),
+      priority: readPriority(record),
+    })) {
+      paths.add(currentPath);
+    }
+    if (prior?.canonicalPath) {
+      paths.add(prior.canonicalPath);
     }
     getReconciler(projectPath, objectType).remove(id);
-    return { deletes: paths.map((path) => ({ path })) };
+    return { deletes: [...paths].map((path) => ({ path })) };
   }
   const newPaths = titledDirectoryPathsFor({
     projectPath,

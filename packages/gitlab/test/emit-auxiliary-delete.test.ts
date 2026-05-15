@@ -56,6 +56,9 @@ test('GitLab issue tombstones delete canonical and alias files using prior by-id
         {
           iid: '17',
           project_path: 'acme/api',
+          title: 'Renamed before delete',
+          state: 'closed',
+          assignees: [],
           _deleted: true,
         },
       ],
@@ -69,6 +72,8 @@ test('GitLab issue tombstones delete canonical and alias files using prior by-id
   assert.ok(deletes.includes('/gitlab/projects/acme/api/issues/by-assignee/assignee-1/17.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/issues/by-creator/creator-1/17.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/issues/by-priority/high/17.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/issues/17__renamed-before-delete/meta.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/issues/by-state/closed/17.json'));
 
   const indexWrite = writes.find((write) => write.path === '/gitlab/projects/acme/api/issues/_index.json');
   assert.ok(indexWrite, 'expected issue index rewrite');
