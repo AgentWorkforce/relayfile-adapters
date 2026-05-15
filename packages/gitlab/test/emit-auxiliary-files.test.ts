@@ -37,7 +37,7 @@ describe('emitGitLabAuxiliaryFiles', () => {
           state: 'opened',
           assignees: [{ username: 'ada' }],
           author: { username: 'linus' },
-          labels: [{ title: 'priority::high' }],
+          labels: [{ title: 'P1' }],
           updated_at: '2026-05-12T08:00:00.000Z',
         },
       ],
@@ -67,7 +67,7 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-state/opened/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-assignee/ada/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-creator/linus/42.json'));
-    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-priority/high/42.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-priority/p1/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-ref/main__9.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
@@ -80,7 +80,7 @@ describe('emitGitLabAuxiliaryFiles', () => {
       state: 'opened',
       assigneeKeys: ['ada'],
       creatorKey: 'linus',
-      priority: 'high',
+      priority: 'P1',
     });
 
     const index = JSON.parse(client.writes.get('/gitlab/projects/acme/api/merge_requests/_index.json') ?? '[]');
@@ -126,5 +126,45 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.deepEqual(result.errors, []);
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-state/opened/7.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-state/closed/7.json'));
+  });
+
+  it('moves issue assignee, creator, and priority aliases on metadata changes', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: '/gitlab/projects/acme/api/issues/7__fix-bug/meta.json',
+      title: 'Fix bug',
+      state: 'opened',
+      assigneeKeys: ['ada'],
+      creatorKey: 'linus',
+      priority: 'P1',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/issues/by-assignee/ada/7.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/issues/by-creator/linus/7.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/issues/by-priority/p1/7.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          projectPath: 'acme/api',
+          iid: 7,
+          title: 'Fix bug',
+          state: 'opened',
+          assignees: [{ username: 'grace' }],
+          author: { username: 'maintainer' },
+          labels: [{ title: 'priority:high' }],
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-assignee/ada/7.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-creator/linus/7.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-priority/p1/7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-assignee/grace/7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-creator/maintainer/7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-priority/high/7.json'));
   });
 });

@@ -287,6 +287,53 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(linearIssueByStatePath('Done', 'AGE-8')));
   });
 
+  it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'issue',
+      objectId: 'issue-123',
+      payload: {
+        id: 'issue-123',
+        identifier: 'AGE-8',
+        title: 'Release Plan',
+        state: { name: 'Todo' },
+        assignee: { id: 'user-a' },
+        creator: { id: 'user-c' },
+        priority: 1,
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
+      },
+    });
+
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-123',
+          identifier: 'AGE-8',
+          title: 'Release Plan',
+          state: { id: 's', name: 'Todo' },
+          assignee: { id: 'user-b' },
+          creator: { id: 'user-d' },
+          priority: 4,
+        },
+      ],
+    });
+
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(deletedPaths.includes(linearIssueByAssigneePath('user-a', 'AGE-8')));
+    assert.ok(deletedPaths.includes(linearIssueByCreatorPath('user-c', 'AGE-8')));
+    assert.ok(deletedPaths.includes(linearIssueByPriorityPath(1, 'AGE-8')));
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(linearIssueByAssigneePath('user-b', 'AGE-8')));
+    assert.ok(writtenPaths.includes(linearIssueByCreatorPath('user-d', 'AGE-8')));
+    assert.ok(writtenPaths.includes(linearIssueByPriorityPath(4, 'AGE-8')));
+  });
+
   it('writes canonical user + index row', async () => {
     const client = createClient();
     await emitLinearAuxiliaryFiles(client, {

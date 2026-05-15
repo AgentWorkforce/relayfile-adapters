@@ -822,8 +822,11 @@ function readPriority(record: Record<string, unknown>): string | undefined {
 function parsePriorityLabel(label: string | undefined): string | undefined {
   if (!label) return undefined;
   const trimmed = label.trim();
-  const match = /^(?:priority|prio|p)[\s:_/-]*(.+)$/iu.exec(trimmed);
-  return readNonEmptyString(match?.[1]) ?? (/^p[0-5]$/iu.test(trimmed) ? trimmed : undefined);
+  if (/^p[0-5](?:$|[\s:_/-].*)/iu.test(trimmed)) {
+    return trimmed;
+  }
+  const match = /^(?:priority|prio|p)[\s:_/-]+(.+)$/iu.exec(trimmed);
+  return readNonEmptyString(match?.[1]);
 }
 
 function uniqueStrings(values: string[]): string[] {

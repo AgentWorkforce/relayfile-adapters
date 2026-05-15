@@ -260,6 +260,55 @@ describe('emitGitHubAuxiliaryFiles', () => {
     );
   });
 
+  it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {
+    const priorPayload = {
+      provider: 'github',
+      objectType: 'issue',
+      objectId: '7',
+      payload: {
+        owner: 'acme',
+        repo: 'widgets',
+        number: 7,
+        title: 'Metadata issue',
+        state: 'open',
+        assignees: [{ login: 'octocat' }],
+        user: { login: 'monalisa' },
+        labels: [{ name: 'P1' }],
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify(priorPayload),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 7,
+          title: 'Metadata issue',
+          state: 'open',
+          assignees: [{ login: 'hubot' }],
+          user: { login: 'maintainer' },
+          labels: [{ name: 'priority:high' }],
+        },
+      ],
+    });
+
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(deletedPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
+    assert.ok(deletedPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
+    assert.ok(deletedPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'P1', 7)));
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'hubot', 7)));
+    assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'maintainer', 7)));
+    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'high', 7)));
+  });
+
   it('writes canonical meta.json + aliases for an issue with per-repo issues index', async () => {
     const client = createClient();
     await emitGitHubAuxiliaryFiles(client, {
@@ -273,7 +322,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
           state: 'open',
           assignees: [{ login: 'octocat' }],
           user: { login: 'monalisa' },
-          labels: [{ name: 'priority:high' }],
+          labels: [{ name: 'P0 Critical' }],
           updated_at: '2026-05-12T00:00:00Z',
         },
       ],
@@ -287,7 +336,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)));
     assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
     assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
-    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'high', 7)));
+    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'P0 Critical', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
     // No writes leaked into the pulls index for this repo.
