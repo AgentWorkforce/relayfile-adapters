@@ -88,7 +88,7 @@ test('GitLab commit tombstones delete canonical and title aliases using prior by
       '/gitlab/projects/acme/api/commits/by-id/abc123.json',
       {
         id: 'abc123',
-        canonicalPath: '/gitlab/projects/acme/api/commits/abc123__ship-fix/meta.json',
+        canonicalPath: '/gitlab/projects/acme/api/commits/legacy/abc123.json',
         title: 'Ship fix',
       },
     ],
@@ -136,6 +136,7 @@ test('GitLab commit tombstones delete canonical and title aliases using prior by
   );
 
   assert.equal(result.errors.length, 0);
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/legacy/abc123.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/abc123__ship-fix/meta.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-id/abc123.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-title/ship-fix__abc123.json'));

@@ -128,6 +128,38 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-state/closed/7.json'));
   });
 
+  it('moves issue canonical and by-title aliases on title changes', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: '/gitlab/projects/acme/api/issues/7__old-title/meta.json',
+      title: 'Old title',
+      state: 'opened',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/issues/7__old-title/meta.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/issues/by-title/old-title__7.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          projectPath: 'acme/api',
+          iid: 7,
+          title: 'New title',
+          state: 'opened',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/7__old-title/meta.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-title/old-title__7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/7__new-title/meta.json'));
+    const byTitle = JSON.parse(client.writes.get('/gitlab/projects/acme/api/issues/by-title/new-title__7.json') ?? '{}');
+    assert.equal(byTitle.canonicalPath, '/gitlab/projects/acme/api/issues/7__new-title/meta.json');
+  });
+
   it('moves issue assignee, creator, and priority aliases on metadata changes', async () => {
     const client = new MemoryClient();
     client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
@@ -209,5 +241,35 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/deployments/by-status/running/14.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/deployments/by-status/success/14.json'));
+  });
+
+  it('preserves pipeline ref aliases on status-only updates', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-id/9.json', JSON.stringify({
+      id: '9',
+      canonicalPath: '/gitlab/projects/acme/api/pipelines/9__main/meta.json',
+      ref: 'main',
+      status: 'running',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-ref/main__9.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-status/running/9.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pipelines: [
+        {
+          projectPath: 'acme/api',
+          id: 9,
+          status: 'failed',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-ref/main__9.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/running/9.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
   });
 });

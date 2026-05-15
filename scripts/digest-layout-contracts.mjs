@@ -97,6 +97,12 @@ const executableRegressionContracts = [
     label: 'layout-advertised by-title aliases must be emitted and reconciled',
   },
   {
+    provider: 'jira',
+    file: 'src/layout.ts',
+    needles: ['by-key'],
+    label: 'layout manifest must advertise emitted Jira by-key aliases',
+  },
+  {
     provider: 'gitlab',
     file: 'test/emit-auxiliary-files.test.ts',
     needles: ['moves pipeline and deployment by-status aliases on status transitions', 'by-status/running', 'by-status/failed'],

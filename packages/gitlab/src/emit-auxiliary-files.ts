@@ -234,7 +234,7 @@ async function planTitledDirectoryRecord(
   const priority = isDelete
     ? prior?.priority ?? readPriority(record)
     : readPriority(record) ?? prior?.priority;
-  const canonicalPath = prior?.canonicalPath ?? computeMetadataPath(projectPath, objectType, id, title);
+  const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
   if (isDelete) {
     const paths = new Set(titledDirectoryPathsFor({
       projectPath,
@@ -372,7 +372,10 @@ async function planPipelineRecord(
     canonicalPath: readNonEmptyString(parsed.canonicalPath),
   }));
   const isDelete = record._deleted === true;
-  const ref = readNonEmptyString(record.ref);
+  const recordRef = readNonEmptyString(record.ref);
+  const ref = isDelete
+    ? prior?.ref ?? recordRef
+    : recordRef ?? prior?.ref;
   const status = readNonEmptyString(record.status) ?? prior?.status;
   const canonicalPath = computeMetadataPath(projectPath, 'pipelines', id, ref);
 
@@ -445,23 +448,28 @@ async function planCommitRecord(
   const title = readNonEmptyString(record.title) ?? id.slice(0, 12);
   const canonicalPath = computeMetadataPath(projectPath, 'commits', id, title);
   const byIdPath = gitLabByIdAliasPath(projectPath, 'commits', id);
-  const prior = await priorReader.read<{ title?: string }>(byIdPath, (parsed) => ({
+  const prior = await priorReader.read<{ title?: string; canonicalPath?: string }>(byIdPath, (parsed) => ({
     title: readNonEmptyString(parsed.title),
+    canonicalPath: readNonEmptyString(parsed.canonicalPath),
   }));
   if (record._deleted === true) {
     const paths = new Set(commitPathsFor({ projectPath, id, title: prior?.title ?? title }));
     for (const currentPath of commitPathsFor({ projectPath, id, title: readNonEmptyString(record.title) })) {
       paths.add(currentPath);
     }
+    if (prior?.canonicalPath) {
+      paths.add(prior.canonicalPath);
+    }
     getReconciler(projectPath, 'commits').remove(id);
     return { deletes: [...paths].map((path) => ({ path })) };
   }
-  const deletes = prior?.title && prior.title !== title
-    ? [
-        { path: computeMetadataPath(projectPath, 'commits', id, prior.title) },
-        { path: gitLabByTitleAliasPath(projectPath, 'commits', prior.title, id) },
-      ]
+  const stalePaths = prior?.title && prior.title !== title
+    ? commitPathsFor({ projectPath, id, title: prior.title })
     : [];
+  if (prior?.canonicalPath && prior.canonicalPath !== canonicalPath) {
+    stalePaths.push(prior.canonicalPath);
+  }
+  const deletes = diffPaths(stalePaths, commitPathsFor({ projectPath, id, title })).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, 'commits').upsert({
