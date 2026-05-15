@@ -113,16 +113,13 @@ for (const provider of providerPackages()) {
   }
   const pathMapperPath = join(packageRoot, 'src', 'path-mapper.ts');
   if (existsSync(pathMapperPath)) {
-    const actualRoot = relayfileRoot(readFileSync(pathMapperPath, 'utf8'));
-    if (actualRoot) {
+    for (const actualRoot of relayfileRoots(readFileSync(pathMapperPath, 'utf8'))) {
       const root = actualRoot.replace(/^\/+/u, '');
-      if (
-        !digestSource.includes(`event.canonicalPath === '${root}'`)
-        && !digestSource.includes(`event.canonicalPath === '/${root}'`)
-        && !digestSource.includes(`canonicalPath === '${root}'`)
-        && !digestSource.includes(`canonicalPath === '/${root}'`)
-      ) {
+      if (!digestAcceptsExactRoot(digestSource, root)) {
         failures.push(`${provider}: digest canonical-path filter must accept actual Relayfile root ${actualRoot}`);
+      }
+      if (!digestAcceptsRootChildren(digestSource, root)) {
+        failures.push(`${provider}: digest canonical-path filter must accept children under actual Relayfile root ${actualRoot}`);
       }
     }
   }
@@ -212,8 +209,34 @@ function assertTestMentions(provider, source, pattern, label) {
   }
 }
 
-function relayfileRoot(pathMapperSource) {
-  return pathMapperSource.match(/RELAYFILE_ROOT\s*=\s*['"]([^'"]+)['"]/u)?.[1] ?? null;
+function relayfileRoots(pathMapperSource) {
+  const roots = new Set();
+  for (const match of pathMapperSource.matchAll(/(?:export\s+)?const\s+[A-Z0-9_]*(?:ROOT|PATH_ROOT|RELAYFILE_ROOT|DEFAULT_ROOT)\s*=\s*['"](\/[a-z0-9-]+)['"]/gu)) {
+    roots.add(match[1]);
+  }
+  return [...roots].sort();
+}
+
+function digestAcceptsExactRoot(digestSource, root) {
+  return (
+    digestSource.includes(`event.canonicalPath === '${root}'`)
+    || digestSource.includes(`event.canonicalPath === "${root}"`)
+    || digestSource.includes(`event.canonicalPath === "/${root}"`)
+    || digestSource.includes(`event.canonicalPath === '/${root}'`)
+    || digestSource.includes(`canonicalPath === '${root}'`)
+    || digestSource.includes(`canonicalPath === "${root}"`)
+    || digestSource.includes(`canonicalPath === "/${root}"`)
+    || digestSource.includes(`canonicalPath === '/${root}'`)
+  );
+}
+
+function digestAcceptsRootChildren(digestSource, root) {
+  return (
+    digestSource.includes(`startsWith('${root}/')`)
+    || digestSource.includes(`startsWith("${root}/")`)
+    || digestSource.includes(`startsWith('/${root}/')`)
+    || digestSource.includes(`startsWith("/${root}/")`)
+  );
 }
 
 function aliasesForResource(layoutSource, resourcePath) {

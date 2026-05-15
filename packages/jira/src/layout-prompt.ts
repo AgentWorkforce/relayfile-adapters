@@ -56,7 +56,7 @@ ls /jira/issues/by-assignee
 ls /jira/issues/by-priority
 jq '.[0]' /jira/issues/_index.json
 jq '.[] | select(.state == "In Progress") | {key, title}' /jira/issues/_index.json
-jq '.canonicalPath' /jira/issues/by-key/ENG-42.json
+jq '{key, title, state}' /jira/issues/by-key/ENG-42.json
 grep -R "regression" /jira/issues
 \`\`\`
 `;

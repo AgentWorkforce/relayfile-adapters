@@ -15,7 +15,7 @@ It must be green before the PR opens. Do not bypass git hooks; if the pre-commit
 ## What each helper needs covered
 
 - **Path-mapper helpers** — round-trip tests: compose with the helper, parse the result back to its inputs, assert equality. Cover at least one ASCII-clean case, one case with characters that the slugifier collapses, and one case with an empty / missing slug input.
-- **Alias subtrees** — collision test: emit two entities whose slugs collide, assert that both alias paths are distinct and deterministic (re-emitting produces the same paths), and that each alias file points at a different `canonicalPath`.
+- **Alias subtrees** — collision test: emit two entities whose slugs collide, assert that both alias paths are distinct and deterministic (re-emitting produces the same paths), and assert the resource's alias strategy. Minimal pointer aliases must point at different `canonicalPath` values; materialized canonical mirrors must match the canonical provider envelope/body for each entity.
 - **`LAYOUT.md` emitter** — non-empty content test asserting:
   - `file.path === '/<provider>/LAYOUT.md'`.
   - `file.contentType === 'text/markdown; charset=utf-8'`.

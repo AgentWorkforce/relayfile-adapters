@@ -206,20 +206,41 @@ async function planTitledDirectoryRecord(
   if (!projectPath) return {};
 
   const id = String(objectId);
-  const title = readNonEmptyString(record.title) ?? id;
-  const state = readNonEmptyString(record.state);
-  const assigneeKeys = readGitLabAssigneeKeys(record);
-  const creatorKey = readGitLabCreatorKey(record);
-  const priority = readPriority(record);
-  const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
   const byIdPath = gitLabByIdAliasPath(projectPath, objectType, id);
   const prior = await priorReader.read<PriorTitledDirectoryRecord>(byIdPath, (parsed) => ({
+    canonicalPath: readNonEmptyString(parsed.canonicalPath),
     title: readNonEmptyString(parsed.title),
     state: readNonEmptyString(parsed.state),
     assigneeKeys: readStringArray(parsed.assigneeKeys),
     creatorKey: readNonEmptyString(parsed.creatorKey),
     priority: readNonEmptyString(parsed.priority),
   }));
+  const title = readNonEmptyString(record.title) ?? prior?.title ?? id;
+  const state = readNonEmptyString(record.state) ?? prior?.state;
+  const recordAssigneeKeys = Array.isArray(record.assignees)
+    ? readGitLabAssigneeKeys(record)
+    : undefined;
+  const assigneeKeys = recordAssigneeKeys ?? prior?.assigneeKeys ?? [];
+  const creatorKey = readGitLabCreatorKey(record) ?? prior?.creatorKey;
+  const priority = readPriority(record) ?? prior?.priority;
+  const canonicalPath = prior?.canonicalPath ?? computeMetadataPath(projectPath, objectType, id, title);
+  if (record._deleted === true) {
+    const paths = titledDirectoryPathsFor({
+      projectPath,
+      objectType,
+      id,
+      title,
+      state,
+      assigneeKeys,
+      creatorKey,
+      priority,
+    });
+    if (prior?.canonicalPath && !paths.includes(prior.canonicalPath)) {
+      paths.push(prior.canonicalPath);
+    }
+    getReconciler(projectPath, objectType).remove(id);
+    return { deletes: paths.map((path) => ({ path })) };
+  }
   const newPaths = titledDirectoryPathsFor({
     projectPath,
     objectType,
@@ -278,6 +299,7 @@ async function planTitledDirectoryRecord(
 }
 
 interface PriorTitledDirectoryRecord {
+  canonicalPath?: string | undefined;
   title?: string | undefined;
   state?: string | undefined;
   assigneeKeys?: string[] | undefined;
