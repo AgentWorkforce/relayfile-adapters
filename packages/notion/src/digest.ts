@@ -38,11 +38,11 @@ export type DigestHandler = (ctx: DigestContext) => Promise<DigestSection | null
 export const digest: DigestHandler = async (ctx) => {
   const events = await ctx.changeEvents({ providers: [ctx.provider] });
   const bullets = events
-    .filter(hasCanonicalPath)
+    .filter(hasDigestPath)
     .slice()
     .sort(compareEvents)
     .map((event) => {
-      const canonicalPath = normalizeDigestPath(event.canonicalPath);
+      const canonicalPath = normalizeDigestPath(digestEventPath(event));
       return {
         text: `${notionIdentifier(canonicalPath)} ${pastTense(event)}`,
         canonicalPath,
@@ -52,14 +52,14 @@ export const digest: DigestHandler = async (ctx) => {
   return bullets.length === 0 ? null : { provider: ctx.provider, bullets };
 };
 
-function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
+function hasDigestPath(event: DigestChangeEvent): boolean {
   return (
-    typeof event.canonicalPath === 'string'
+    typeof digestEventPath(event) === 'string'
     && (
-      event.canonicalPath === 'notion'
-      || event.canonicalPath === '/notion'
-      || event.canonicalPath.startsWith('notion/')
-      || event.canonicalPath.startsWith('/notion/')
+      digestEventPath(event) === 'notion'
+      || digestEventPath(event) === '/notion'
+      || digestEventPath(event).startsWith('notion/')
+      || digestEventPath(event).startsWith('/notion/')
     )
   );
 }
@@ -73,7 +73,7 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   return (
     leftMs - rightMs
     || (left.id ?? '').localeCompare(right.id ?? '')
-    || (left.canonicalPath ?? '').localeCompare(right.canonicalPath ?? '')
+    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
   );
 }
 
@@ -86,6 +86,10 @@ function eventTimeMs(event: DigestChangeEvent): number {
   if (!raw) return Number.NEGATIVE_INFINITY;
   const ms = Date.parse(raw);
   return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+}
+
+function digestEventPath(event: DigestChangeEvent): string {
+  return event.canonicalPath ?? event.path ?? '';
 }
 
 function normalizeDigestPath(path: string): string {

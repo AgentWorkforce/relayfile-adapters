@@ -3,13 +3,21 @@ import test from 'node:test';
 
 import { layoutManifest } from './layout.js';
 
-const CANONICAL_ALIAS_SEGMENTS = new Set(['by-id', 'by-name', 'by-state', 'by-title']);
+const CANONICAL_ALIAS_SEGMENTS = new Set([
+  'by-id',
+  'by-key',
+  'by-name',
+  'by-parent',
+  'by-space',
+  'by-state',
+  'by-title',
+]);
 
 test('layoutManifest exposes Confluence resources with canonical aliases and writeback schema pointers', () => {
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'confluence');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-title', 'by-state']);
+  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-key', 'by-parent', 'by-space', 'by-state', 'by-title']);
 
   for (const resource of manifest.resources) {
     assert.ok(resource.path.startsWith('confluence/'));

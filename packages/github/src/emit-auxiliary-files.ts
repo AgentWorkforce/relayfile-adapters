@@ -292,6 +292,8 @@ export async function emitGitHubAuxiliaryFiles(
     const fan = await runEmitBatch(client, workspaceId, pullRequests, async (record) => {
       if (isDeleteRecord(record)) {
         return planNumberedDelete(
+          client,
+          workspaceId,
           record,
           'pulls',
           priorReader,
@@ -315,6 +317,8 @@ export async function emitGitHubAuxiliaryFiles(
     const fan = await runEmitBatch(client, workspaceId, issues, async (record) => {
       if (isDeleteRecord(record)) {
         return planNumberedDelete(
+          client,
+          workspaceId,
           record,
           'issues',
           priorReader,
@@ -505,6 +509,8 @@ async function planNumberedWrite(
 }
 
 async function planNumberedDelete(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
   tombstone: ScopedDeleteTombstone,
   aliasKind: 'pulls' | 'issues',
   priorReader: PriorAliasReader,
@@ -515,14 +521,12 @@ async function planNumberedDelete(
     return {};
   }
 
-  // Prefer explicit owner/repo on the tombstone; otherwise recover from a
-  // prior by-id alias if we can find one. Without owner/repo we can't even
-  // form the by-id alias path to read — so try a few likely sources.
   let repoInfo = extractRepoInfo(tombstone);
-
-  // If repo context is missing, we cannot route the delete — bail.
   if (!repoInfo) {
-    return {};
+    repoInfo = await findRepoInfoForNumberedDelete(client, workspaceId, aliasKind, number);
+    if (!repoInfo) {
+      return {};
+    }
   }
 
   const idAliasPath = githubByIdAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, number);
@@ -550,6 +554,56 @@ async function planNumberedDelete(
   getReconciler(repoInfo.owner, repoInfo.repo).remove(String(number));
 
   return { deletes: paths.map((path) => ({ path })) };
+}
+
+async function findRepoInfoForNumberedDelete(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aliasKind: 'pulls' | 'issues',
+  number: string,
+): Promise<{ owner: string; repo: string } | null> {
+  if (!client.readFile) {
+    return null;
+  }
+
+  const repos = await readJsonArray(client, workspaceId, githubReposIndexPath());
+  const matches: Array<{ owner: string; repo: string }> = [];
+  for (const row of repos) {
+    const repoInfo = extractRepoInfo(row) ?? repoInfoFromIndexId(readNonEmptyString(row.id));
+    if (!repoInfo) continue;
+    const indexPath = aliasKind === 'pulls'
+      ? githubRepoPullsIndexPath(repoInfo.owner, repoInfo.repo)
+      : githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
+    const rows = await readJsonArray(client, workspaceId, indexPath);
+    if (rows.some((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number)) {
+      matches.push(repoInfo);
+    }
+  }
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+async function readJsonArray(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<Record<string, unknown>[]> {
+  try {
+    const raw = await client.readFile?.({ workspaceId, path });
+    if (!raw || typeof raw.content !== 'string') {
+      return [];
+    }
+    const parsed = JSON.parse(raw.content) as unknown;
+    return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
+  } catch {
+    return [];
+  }
+}
+
+function repoInfoFromIndexId(value: string | undefined): { owner: string; repo: string } | null {
+  if (!value) return null;
+  const [owner, repo] = value.split('/', 2);
+  return owner && repo ? { owner, repo } : null;
 }
 
 function numberedPathsFor(args: {

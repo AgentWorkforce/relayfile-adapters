@@ -3,13 +3,13 @@ import test from 'node:test';
 
 import { layoutManifest } from './layout.js';
 
-const CANONICAL_ALIAS_SEGMENTS = new Set(['by-id', 'by-name', 'by-state', 'by-title']);
+const CANONICAL_ALIAS_SEGMENTS = new Set(['by-database', 'by-id', 'by-name', 'by-parent', 'by-state', 'by-title']);
 
 test('layoutManifest exposes Notion resources with canonical aliases and writeback schema pointers', () => {
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'notion');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-title', 'by-name']);
+  assert.deepEqual(manifest.aliasSegments, ['by-database', 'by-id', 'by-name', 'by-parent', 'by-title']);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {

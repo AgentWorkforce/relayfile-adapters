@@ -127,6 +127,33 @@ test('digest classifies deleted events', async () => {
   });
 });
 
+test('digest accepts path-only Relayfile change events', async () => {
+  const ctx: DigestContext = {
+    provider: 'github',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-path-1',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'closed',
+          path: '/github/repos/acme/api/issues/46__path-only/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'github',
+    bullets: [
+      {
+        text: '#46 was closed',
+        canonicalPath: 'github/repos/acme/api/issues/46__path-only/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty GitHub event window', async () => {
   const ctx: DigestContext = {
     provider: 'github',

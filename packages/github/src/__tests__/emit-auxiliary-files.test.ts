@@ -467,6 +467,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     const client = createClient({
       initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
         [githubByIdAliasPath('acme', 'widgets', 'pulls', 42)]: JSON.stringify(priorPayload),
         [githubRepoPullsIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
       },
@@ -475,8 +478,8 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const result = await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
       pullRequests: [
-        // ScopedDeleteTombstone — id + _deleted + owner/repo context.
-        { id: '42', _deleted: true, owner: 'acme', repo: 'widgets' },
+        // Bare tombstone — repo context is recovered from the repo + pulls indexes.
+        { id: '42', _deleted: true },
       ],
     });
 
@@ -520,6 +523,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
     ];
     const client = createClient({
       initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
         [githubByIdAliasPath('acme', 'widgets', 'issues', 11)]: JSON.stringify(priorPayload),
         [githubRepoIssuesIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
       },
@@ -527,7 +533,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
-      issues: [{ id: '11', _deleted: true, owner: 'acme', repo: 'widgets' }],
+      issues: [{ id: '11', _deleted: true }],
     });
 
     const indexWrite = client.writes.find(

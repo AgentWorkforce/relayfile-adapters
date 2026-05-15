@@ -11,6 +11,7 @@ const CANONICAL_ALIAS_SEGMENTS = new Set([
   'by-priority',
   'by-state',
   'by-title',
+  'by-uuid',
 ]);
 
 test('layoutManifest exposes Linear resources with canonical aliases and writeback schema pointers', () => {
@@ -25,6 +26,7 @@ test('layoutManifest exposes Linear resources with canonical aliases and writeba
     'by-priority',
     'by-title',
     'by-state',
+    'by-uuid',
   ]);
   assert.ok(manifest.resources.length > 0);
 

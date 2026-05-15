@@ -120,6 +120,30 @@ const executableRegressionContracts = [
     needles: ['classifies canceled issue status transitions as completed events', 'Cancelled'],
     label: 'canceled terminal webhook states must normalize to completed events',
   },
+  {
+    provider: 'github',
+    file: 'src/digest.test.ts',
+    needles: ['path-only Relayfile change events', "path: '/github/repos/acme/api/issues/46__path-only/meta.json'"],
+    label: 'digest tests must cover path-only Relayfile events',
+  },
+  {
+    provider: 'linear',
+    file: 'src/layout.ts',
+    needles: ['by-uuid'],
+    label: 'layout manifest must advertise emitted Linear by-uuid aliases',
+  },
+  {
+    provider: 'notion',
+    file: 'src/layout.ts',
+    needles: ['by-database', 'by-parent'],
+    label: 'layout manifest must advertise emitted Notion relationship aliases',
+  },
+  {
+    provider: 'confluence',
+    file: 'src/layout.ts',
+    needles: ['by-space', 'by-parent', 'by-key'],
+    label: 'layout manifest must advertise emitted Confluence relationship aliases',
+  },
 ];
 
 const failures = [];
@@ -143,10 +167,14 @@ for (const provider of providerPackages()) {
   if (!/ctx\.changeEvents\s*\(\s*\{\s*providers\s*:\s*\[\s*ctx\.provider\s*\]\s*\}\s*\)/u.test(digestSource)) {
     failures.push(`${provider}: digest must scope ctx.changeEvents to ctx.provider`);
   }
+  if (!digestSource.includes('event.path') || !digestSource.includes('digestEventPath')) {
+    failures.push(`${provider}: digest must accept path-only Relayfile change events, not only canonicalPath`);
+  }
   if (
     digestSource.includes(`startsWith('/${provider}/')`)
     && !digestSource.includes(`event.canonicalPath === '/${provider}'`)
     && !digestSource.includes(`canonicalPath === '/${provider}'`)
+    && !digestSource.includes(`digestEventPath(event) === '/${provider}'`)
   ) {
     failures.push(`${provider}: digest canonical-path filter must accept exact /${provider}`);
   }
@@ -281,6 +309,10 @@ function digestAcceptsExactRoot(digestSource, root) {
     || digestSource.includes(`canonicalPath === "${root}"`)
     || digestSource.includes(`canonicalPath === "/${root}"`)
     || digestSource.includes(`canonicalPath === '/${root}'`)
+    || digestSource.includes(`digestEventPath(event) === '${root}'`)
+    || digestSource.includes(`digestEventPath(event) === "${root}"`)
+    || digestSource.includes(`digestEventPath(event) === "/${root}"`)
+    || digestSource.includes(`digestEventPath(event) === '/${root}'`)
   );
 }
 
