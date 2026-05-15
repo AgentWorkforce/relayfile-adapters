@@ -355,6 +355,16 @@ export function linearByTitleAliasPath(scope: string, title: string, id: string,
   return `${scope}/by-title/${encodeLinearPathSegment(filename)}.json`;
 }
 
+export function linearByNameAliasPath(scope: string, name: string, id: string, colliding = false): string {
+  const slug = slugifyAlias(name);
+  if (!slug) {
+    throw new Error('Linear alias name must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+  return `${scope}/by-name/${encodeLinearPathSegment(filename)}.json`;
+}
+
 export function linearByIdAliasPath(scope: string, identifier: string): string {
   return `${scope}/by-id/${encodeLinearPathSegment(identifier)}.json`;
 }

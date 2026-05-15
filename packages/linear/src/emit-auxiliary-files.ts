@@ -69,6 +69,7 @@ import { buildLinearRootIndexFile } from './index-emitter.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
   linearCommentPath,
@@ -120,6 +121,8 @@ import type {
 const LINEAR_PROVIDER_NAME = 'linear';
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 const ISSUES_SCOPE = `${LINEAR_PATH_ROOT}/issues`;
+const PROJECTS_SCOPE = `${LINEAR_PATH_ROOT}/projects`;
+const TEAMS_SCOPE = `${LINEAR_PATH_ROOT}/teams`;
 
 /**
  * Records accepted by `emitLinearAuxiliaryFiles`. Each entry is either a
@@ -600,6 +603,8 @@ async function emitTeams(
     indexRow: (record) => linearTeamIndexRow(record),
     objectType: 'team',
     connectionId,
+    aliasAnchorPath: (id) => linearByIdAliasPath(TEAMS_SCOPE, id),
+    aliasPaths: teamAliasPaths,
   });
 }
 
@@ -615,6 +620,8 @@ async function emitProjects(
     indexRow: (record) => linearProjectIndexRow(record),
     objectType: 'project',
     connectionId,
+    aliasAnchorPath: (id) => linearByIdAliasPath(PROJECTS_SCOPE, id),
+    aliasPaths: projectAliasPaths,
   });
 }
 
@@ -669,6 +676,8 @@ interface FlatResourceOptions<TRecord extends { id: string }> {
   indexRow: (record: TRecord) => LinearBaseIndexRow;
   objectType: string;
   connectionId: string | undefined;
+  aliasAnchorPath?: (id: string) => string;
+  aliasPaths?: (record: Record<string, unknown>, id: string) => string[];
 }
 
 async function emitFlatResource<TRecord extends { id: string }>(
@@ -691,23 +700,30 @@ async function emitFlatResource<TRecord extends { id: string }>(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
+  const priorReader = new PriorAliasReader(client, workspaceId);
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
       indexReconciler.remove(record.id);
-      return { deletes: [{ path: opts.canonicalPath(record.id) }] };
+      const prior = await readFlatPrior(record.id, priorReader, opts);
+      const paths = flatResourcePaths(record.id, prior, opts);
+      return { deletes: paths.map((path) => ({ path })) };
     }
     const id = readNonEmptyString(record.id);
     if (!id) return {};
     indexReconciler.upsert(opts.indexRow(record));
+    const prior = await readFlatPrior(id, priorReader, opts);
+    const paths = flatResourcePaths(id, record, opts);
+    const priorPaths = prior ? flatResourcePaths(id, prior, opts) : [];
+    const stalePaths = diffPaths(priorPaths, paths);
+    const content = renderContent(opts.objectType, record, opts.connectionId, false);
     return {
-      writes: [
-        {
-          path: opts.canonicalPath(id),
-          content: renderContent(opts.objectType, record, opts.connectionId, false),
-          contentType: JSON_CONTENT_TYPE,
-        },
-      ],
+      writes: paths.map((path) => ({
+        path,
+        content,
+        contentType: JSON_CONTENT_TYPE,
+      })),
+      deletes: stalePaths.map((path) => ({ path })),
     };
   });
 
@@ -715,6 +731,47 @@ async function emitFlatResource<TRecord extends { id: string }>(
   fanOut.written += indexResult.written;
   fanOut.errors.push(...indexResult.errors);
   return fanOut;
+}
+
+async function readFlatPrior<TRecord extends { id: string }>(
+  id: string,
+  priorReader: PriorAliasReader,
+  opts: FlatResourceOptions<TRecord>,
+): Promise<Record<string, unknown> | null> {
+  if (!opts.aliasAnchorPath || !opts.aliasPaths) return null;
+  return priorReader.read<Record<string, unknown>>(
+    opts.aliasAnchorPath(id),
+    (parsed) => pickPayload(parsed),
+  );
+}
+
+function flatResourcePaths<TRecord extends { id: string }>(
+  id: string,
+  record: Record<string, unknown> | null,
+  opts: FlatResourceOptions<TRecord>,
+): string[] {
+  return [
+    opts.canonicalPath(id),
+    ...(record && opts.aliasPaths ? opts.aliasPaths(record, id) : []),
+  ];
+}
+
+function projectAliasPaths(record: Record<string, unknown>, id: string): string[] {
+  const paths = [linearByIdAliasPath(PROJECTS_SCOPE, id)];
+  const name = readNonEmptyString(record.name);
+  if (name && slugifies(name)) {
+    paths.push(linearByTitleAliasPath(PROJECTS_SCOPE, name, id));
+  }
+  return paths;
+}
+
+function teamAliasPaths(record: Record<string, unknown>, id: string): string[] {
+  const paths = [linearByIdAliasPath(TEAMS_SCOPE, id)];
+  const name = readNonEmptyString(record.name) ?? readNonEmptyString(record.key);
+  if (name && slugifies(name)) {
+    paths.push(linearByNameAliasPath(TEAMS_SCOPE, name, id));
+  }
+  return paths;
 }
 
 // -- shared helpers ---------------------------------------------------------

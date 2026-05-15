@@ -13,6 +13,7 @@ import { emitLinearAuxiliaryFiles } from '../emit-auxiliary-files.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
   linearCyclesIndexPath,
@@ -119,6 +120,43 @@ describe('emitLinearAuxiliaryFiles', () => {
       client.writes.some((w) => w.path === linearRootIndexPath()),
       'expected /linear/_index.json root index write',
     );
+  });
+
+  it('materializes advertised project and team aliases and reconciles renames', async () => {
+    const client = createClient({
+      initialFiles: {
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-1')]: JSON.stringify({
+          provider: 'linear',
+          objectType: 'project',
+          objectId: 'project-1',
+          payload: { id: 'project-1', name: 'Old Project' },
+        }),
+        [linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')]: '{}',
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')]: JSON.stringify({
+          provider: 'linear',
+          objectType: 'team',
+          objectId: 'team-1',
+          payload: { id: 'team-1', name: 'Old Team' },
+        }),
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')]: '{}',
+      },
+    });
+
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{ id: 'project-1', name: 'New Project', updatedAt: '2026-05-12T00:00:00Z' }],
+      teams: [{ id: 'team-1', name: 'New Team', key: 'CORE', updatedAt: '2026-05-12T00:00:00Z' }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearProjectPath('project-1')));
+    assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-1')));
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'New Project', 'project-1')));
+    assert.ok(!client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')));
+    assert.ok(client.files.has(linearTeamPath('team-1')));
+    assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'New Team', 'team-1')));
+    assert.ok(!client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')));
   });
 
   it('writes an empty index for an explicit empty cycle bucket', async () => {

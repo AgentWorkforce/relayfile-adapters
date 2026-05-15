@@ -55,8 +55,17 @@ export const digest: DigestHandler = async (ctx) => {
 function hasDigestPath(event: DigestChangeEvent): boolean {
   return (
     typeof digestEventPath(event) === 'string'
+    && isCanonicalDigestPath(digestEventPath(event))
     && (digestEventPath(event) === 'sharepoint' || digestEventPath(event) === '/sharepoint' || digestEventPath(event).startsWith('sharepoint/') || digestEventPath(event).startsWith('/sharepoint/'))
   );
+}
+
+function isCanonicalDigestPath(path: string): boolean {
+  const segments = normalizeDigestPath(path).split('/').filter(Boolean);
+  const leaf = segments.at(-1) ?? '';
+  return leaf !== 'LAYOUT.md'
+    && leaf !== '_index.json'
+    && segments.every((segment) => !segment.startsWith('by-'));
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {

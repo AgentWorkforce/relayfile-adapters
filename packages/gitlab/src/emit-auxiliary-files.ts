@@ -399,6 +399,9 @@ async function planPipelineRecord(
   const priorPaths = prior
     ? pipelinePathsFor({ projectPath, id, ref: prior.ref, status: prior.status })
     : [];
+  if (prior?.canonicalPath && prior.canonicalPath !== canonicalPath) {
+    priorPaths.push(prior.canonicalPath);
+  }
   const deletes = diffPaths(priorPaths, newPaths).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));

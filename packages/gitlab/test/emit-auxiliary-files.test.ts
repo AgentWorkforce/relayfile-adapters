@@ -320,4 +320,32 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/running/9.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
   });
+
+  it('deletes legacy pipeline canonical paths recorded in the by-id alias', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-id/9.json', JSON.stringify({
+      id: '9',
+      canonicalPath: '/gitlab/projects/acme/api/pipelines/legacy/9.json',
+      ref: 'main',
+      status: 'running',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/pipelines/legacy/9.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pipelines: [
+        {
+          projectPath: 'acme/api',
+          id: 9,
+          ref: 'main',
+          status: 'failed',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/legacy/9.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
+  });
 });

@@ -101,6 +101,54 @@ test('digest renders non-terminal changes as updated', async () => {
   });
 });
 
+test('digest ignores alias, index, and layout writes', async () => {
+  const ctx: DigestContext = {
+    provider: 'asana',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-canonical',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'changed',
+          path: '/asana/tasks/rename-title__333.json',
+        },
+        {
+          id: 'evt-by-id',
+          timestamp: '2026-05-12T08:00:01.000Z',
+          action: 'changed',
+          path: '/asana/tasks/by-id/333.json',
+        },
+        {
+          id: 'evt-by-state',
+          timestamp: '2026-05-12T08:00:02.000Z',
+          action: 'changed',
+          path: '/asana/tasks/by-state/open/333.json',
+        },
+        {
+          id: 'evt-index',
+          timestamp: '2026-05-12T08:00:03.000Z',
+          action: 'changed',
+          path: '/asana/tasks/_index.json',
+        },
+        {
+          id: 'evt-layout',
+          timestamp: '2026-05-12T08:00:04.000Z',
+          action: 'changed',
+          path: '/asana/LAYOUT.md',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'asana',
+    bullets: [
+      { text: 'task rename-title was updated', canonicalPath: 'asana/tasks/rename-title__333.json' },
+    ],
+  });
+});
+
 test('digest returns null for an empty Asana event window', async () => {
   const ctx: DigestContext = {
     provider: 'asana',
