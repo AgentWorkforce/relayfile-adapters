@@ -120,3 +120,25 @@ test('digest classifies Slack channel updates and meta paths', async () => {
     ],
   });
 });
+
+test('digest accepts the exact /slack root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 'slack',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/slack',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'slack',
+    bullets: [{ text: 'slack was updated', canonicalPath: 'slack' }],
+  });
+});

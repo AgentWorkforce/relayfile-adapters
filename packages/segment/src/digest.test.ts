@@ -131,3 +131,25 @@ test('digest returns null for an empty Segment event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest accepts the exact /segment root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 'segment',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/segment',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'segment',
+    bullets: [{ text: 'segment was updated', canonicalPath: 'segment' }],
+  });
+});

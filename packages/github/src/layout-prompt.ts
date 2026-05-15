@@ -34,9 +34,9 @@ Examples:
 ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
-ls /github/repos/octocat__hello-world/issues/by-state/open
-ls /github/repos/octocat__hello-world/issues/by-assignee/octocat
-ls /github/repos/octocat__hello-world/issues/by-priority/high
+ls /github/repos/octocat/hello-world/issues/by-state/open
+ls /github/repos/octocat/hello-world/issues/by-assignee/octocat
+ls /github/repos/octocat/hello-world/issues/by-priority/high
 grep -R "TODO" /github/repos/octocat/hello-world/pulls
 \`\`\`
 `;

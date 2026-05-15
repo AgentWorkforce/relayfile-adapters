@@ -55,7 +55,7 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'sendgrid' || event.canonicalPath.startsWith('sendgrid/') || event.canonicalPath.startsWith('/sendgrid/'))
+    && (event.canonicalPath === 'sendgrid' || event.canonicalPath === '/sendgrid' || event.canonicalPath.startsWith('sendgrid/') || event.canonicalPath.startsWith('/sendgrid/'))
   );
 }
 

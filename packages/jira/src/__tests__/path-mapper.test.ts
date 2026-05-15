@@ -79,15 +79,37 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       );
     });
 
-    it('composes by-creator and by-priority paths under their own grouped subtrees', () => {
+  });
+
+  describe('jiraIssueByCreatorAliasPath', () => {
+    it('composes a stable path under issues/by-creator/<accountId>/<issueId>', () => {
       assert.equal(
         jiraIssueByCreatorAliasPath('acct-creator', '10001'),
         `${JIRA_PATH_ROOT}/issues/by-creator/acct-creator/10001.json`,
       );
+    });
+
+    it('round-trips the issue id from the leaf segment', () => {
+      const issueId = '10001';
+      const path = jiraIssueByCreatorAliasPath('acct-creator', issueId);
+      const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
+    });
+  });
+
+  describe('jiraIssueByPriorityPath', () => {
+    it('composes a stable path under issues/by-priority/<priority>/<issueId>', () => {
       assert.equal(
         jiraIssueByPriorityPath('Highest Priority', '10001'),
         `${JIRA_PATH_ROOT}/issues/by-priority/highest-priority/10001.json`,
       );
+    });
+
+    it('round-trips the issue id from the leaf segment', () => {
+      const issueId = '10001';
+      const path = jiraIssueByPriorityPath('Highest Priority', issueId);
+      const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
     });
   });
 

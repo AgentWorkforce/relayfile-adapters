@@ -298,17 +298,13 @@ async function planIssueWrite(
   // (no PII) and is required to compute stale `by-assignee/...` paths
   // when the issue is reassigned. Hoist it onto `fields.assigneeAccountId`
   // so `extractPriorIssueState` can read it back on the next emit.
-  if (assigneeAccountId) {
+  if (assigneeAccountId || creatorAccountId || priorityName) {
     const safeFields = isRecord(safe.fields)
       ? safe.fields
       : ({} as Record<string, unknown>);
-    safeFields.assigneeAccountId = assigneeAccountId;
-    safe.fields = safeFields;
-  }
-  if (creatorAccountId || priorityName) {
-    const safeFields = isRecord(safe.fields)
-      ? safe.fields
-      : ({} as Record<string, unknown>);
+    if (assigneeAccountId) {
+      safeFields.assigneeAccountId = assigneeAccountId;
+    }
     if (creatorAccountId) {
       safeFields.creatorAccountId = creatorAccountId;
     }

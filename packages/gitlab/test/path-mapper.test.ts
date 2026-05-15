@@ -78,6 +78,25 @@ describe('path mapper', () => {
     );
   });
 
+  it('rejects empty stateful alias values', () => {
+    assert.throws(
+      () => gitLabByStateAliasPath('acme/api', 'issues', '   ', 7),
+      /state must be a non-empty string/u,
+    );
+    assert.throws(
+      () => gitLabByAssigneeAliasPath('acme/api', 'issues', '', 7),
+      /assignee must be a non-empty string/u,
+    );
+    assert.throws(
+      () => gitLabByCreatorAliasPath('acme/api', 'merge_requests', '', 42),
+      /creator must be a non-empty string/u,
+    );
+    assert.throws(
+      () => gitLabByPriorityAliasPath('acme/api', 'issues', '', 7),
+      /priority must be a non-empty string/u,
+    );
+  });
+
   it('parses paths with subgroup project names', () => {
     assert.deepStrictEqual(
       parseGitLabPath('/gitlab/projects/acme/platform/api/merge_requests/42__add-oauth/discussions/abc.json'),

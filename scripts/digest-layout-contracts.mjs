@@ -101,7 +101,7 @@ for (const provider of providerPackages()) {
   }
 
   const digestSource = readFileSync(digestPath, 'utf8');
-  if (!digestSource.includes('ctx.changeEvents({ providers: [ctx.provider] })')) {
+  if (!/ctx\.changeEvents\s*\(\s*\{\s*providers\s*:\s*\[\s*ctx\.provider\s*\]\s*\}\s*\)/u.test(digestSource)) {
     failures.push(`${provider}: digest must scope ctx.changeEvents to ctx.provider`);
   }
 
@@ -193,9 +193,11 @@ function assertTestMentions(provider, source, pattern, label) {
 function aliasesForResource(layoutSource, resourcePath) {
   const resourceIndex = layoutSource.indexOf(`path: '${resourcePath}'`);
   if (resourceIndex < 0) return null;
+  const nextResourceIndex = layoutSource.indexOf('path:', resourceIndex + 1);
+  const resourceEnd = nextResourceIndex < 0 ? layoutSource.length : nextResourceIndex;
   const aliasIndex = layoutSource.indexOf('aliasSegments:', resourceIndex);
-  if (aliasIndex < 0) return null;
-  const aliasMatch = layoutSource.slice(aliasIndex).match(/aliasSegments:\s*\[([^\]]*)\]/u);
+  if (aliasIndex < 0 || aliasIndex >= resourceEnd) return null;
+  const aliasMatch = layoutSource.slice(aliasIndex, resourceEnd).match(/aliasSegments:\s*\[([^\]]*)\]/u);
   if (!aliasMatch) return null;
   return Array.from(aliasMatch[1].matchAll(/'([^']+)'/gu), (match) => match[1]);
 }

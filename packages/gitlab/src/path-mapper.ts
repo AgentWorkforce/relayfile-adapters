@@ -60,6 +60,14 @@ export function encodeGitLabPathSegment(value: string): string {
   return encodeURIComponent(value);
 }
 
+function assertNonEmptySegment(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return trimmed;
+}
+
 export function encodeProjectPath(projectPath: string): string {
   return projectPath
     .split('/')
@@ -150,8 +158,9 @@ export function gitLabByStateAliasPath(
   state: string,
   objectId: number | string,
 ): string {
+  const normalizedState = assertNonEmptySegment(state, 'state');
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-state/${encodeGitLabPathSegment(
-    slugifyAlias(state),
+    slugifyAlias(normalizedState),
   )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
@@ -161,8 +170,9 @@ export function gitLabByAssigneeAliasPath(
   assignee: string,
   objectId: number | string,
 ): string {
+  const normalizedAssignee = assertNonEmptySegment(assignee, 'assignee');
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-assignee/${encodeGitLabPathSegment(
-    slugifyAlias(assignee),
+    slugifyAlias(normalizedAssignee),
   )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
@@ -172,8 +182,9 @@ export function gitLabByCreatorAliasPath(
   creator: string,
   objectId: number | string,
 ): string {
+  const normalizedCreator = assertNonEmptySegment(creator, 'creator');
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-creator/${encodeGitLabPathSegment(
-    slugifyAlias(creator),
+    slugifyAlias(normalizedCreator),
   )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
@@ -183,8 +194,9 @@ export function gitLabByPriorityAliasPath(
   priority: string,
   objectId: number | string,
 ): string {
+  const normalizedPriority = assertNonEmptySegment(priority, 'priority');
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-priority/${encodeGitLabPathSegment(
-    slugifyAlias(priority),
+    slugifyAlias(normalizedPriority),
   )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 

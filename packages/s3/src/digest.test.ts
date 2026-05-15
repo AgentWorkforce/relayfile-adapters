@@ -103,3 +103,25 @@ test('digest returns null for an empty S3 event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest accepts the exact /s3 root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 's3',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/s3',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 's3',
+    bullets: [{ text: 'object s3 was modified', canonicalPath: 's3' }],
+  });
+});

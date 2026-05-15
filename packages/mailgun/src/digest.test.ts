@@ -113,3 +113,25 @@ test('digest treats undelivered as updated not as delivered (word boundary)', as
   const result = await digest(ctx);
   assert.equal(result?.bullets[0]?.text, 'message msg-003 was updated');
 });
+
+test('digest accepts the exact /mailgun root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 'mailgun',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/mailgun',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'mailgun',
+    bullets: [{ text: 'mailgun was updated', canonicalPath: 'mailgun' }],
+  });
+});
