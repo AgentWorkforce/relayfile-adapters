@@ -11,8 +11,10 @@ import type { EmitReadInput, EmitReadResult } from '@relayfile/adapter-core';
 import {
   jiraCommentPath,
   jiraIssueByAssigneeAliasPath,
+  jiraIssueByCreatorAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
+  jiraIssueByPriorityPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraIssuesIndexPath,
@@ -419,6 +421,8 @@ describe('emitJiraAuxiliaryFiles', () => {
         summary: 'Routing bug',
         status: { name: 'To Do' },
         assignee: { accountId: 'acct-aaaa', displayName: 'Alice' },
+        creator: { accountId: 'acct-creator', displayName: 'Creator' },
+        priority: { name: 'High' },
       },
     };
     await emitJiraAuxiliaryFiles(client, {
@@ -430,6 +434,14 @@ describe('emitJiraAuxiliaryFiles', () => {
       writtenPaths.includes(jiraIssueByAssigneeAliasPath('acct-aaaa', '20001')),
       'expected by-assignee/acct-aaaa/20001.json on first emit',
     );
+    assert.ok(
+      writtenPaths.includes(jiraIssueByCreatorAliasPath('acct-creator', '20001')),
+      'expected by-creator/acct-creator/20001.json on first emit',
+    );
+    assert.ok(
+      writtenPaths.includes(jiraIssueByPriorityPath('High', '20001')),
+      'expected by-priority/high/20001.json on first emit',
+    );
 
     // Second emit: same issue reassigned to user B; the old by-assignee
     // alias must be deleted via by-id reconciliation.
@@ -437,7 +449,11 @@ describe('emitJiraAuxiliaryFiles', () => {
     client.deletes.length = 0;
     const issueB = {
       ...issueA,
-      fields: { ...issueA.fields, assignee: { accountId: 'acct-bbbb', displayName: 'Bob' } },
+      fields: {
+        ...issueA.fields,
+        assignee: { accountId: 'acct-bbbb', displayName: 'Bob' },
+        priority: { name: 'Highest' },
+      },
     };
     await emitJiraAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -448,10 +464,22 @@ describe('emitJiraAuxiliaryFiles', () => {
       deletedPaths.includes(jiraIssueByAssigneeAliasPath('acct-aaaa', '20001')),
       'expected stale by-assignee alias to be deleted on reassign',
     );
+    assert.ok(
+      deletedPaths.includes(jiraIssueByPriorityPath('High', '20001')),
+      'expected stale by-priority alias to be deleted on priority change',
+    );
     const writtenPaths2 = client.writes.map((w) => w.path);
     assert.ok(
       writtenPaths2.includes(jiraIssueByAssigneeAliasPath('acct-bbbb', '20001')),
       'expected new by-assignee alias on reassign',
+    );
+    assert.ok(
+      writtenPaths2.includes(jiraIssueByCreatorAliasPath('acct-creator', '20001')),
+      'expected by-creator alias to remain current after reassign',
+    );
+    assert.ok(
+      writtenPaths2.includes(jiraIssueByPriorityPath('Highest', '20001')),
+      'expected new by-priority alias on priority change',
     );
   });
 

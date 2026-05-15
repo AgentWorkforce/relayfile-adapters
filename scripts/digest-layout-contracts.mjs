@@ -12,37 +12,37 @@ const categoryResourceContracts = [
     category: 'issue-tracking',
     provider: 'github',
     resource: 'github/repos/*/*/issues',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'issue-tracking',
     provider: 'github',
     resource: 'github/repos/*/*/pulls',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'issue-tracking',
     provider: 'gitlab',
     resource: 'gitlab/projects/**/issues',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'issue-tracking',
     provider: 'gitlab',
     resource: 'gitlab/projects/**/merge_requests',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'issue-tracking',
     provider: 'jira',
     resource: 'jira/issues',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'issue-tracking',
     provider: 'linear',
     resource: 'linear/issues',
-    aliases: ['by-state'],
+    aliases: ['by-state', 'by-assignee', 'by-creator', 'by-priority'],
   },
   {
     category: 'ci-deploy',
@@ -75,11 +75,11 @@ const requiredDocs = [
   },
   {
     file: '.claude/rules/alias-subtrees.md',
-    needles: ['by-state', 'category matrix'],
+    needles: ['by-state', 'by-assignee', 'by-creator', 'by-priority', 'category matrix'],
   },
   {
     file: 'docs/digest-layout-contract.md',
-    needles: ['issue-tracking', 'by-state', 'test:digest-contracts'],
+    needles: ['issue-tracking', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'test:digest-contracts'],
   },
 ];
 

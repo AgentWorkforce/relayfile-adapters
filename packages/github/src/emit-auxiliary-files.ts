@@ -23,8 +23,10 @@
  *    commit-level artifacts). On rename we delete the prior `meta.json` only,
  *    NOT the enclosing directory — the directory is shared with those
  *    sub-artifacts and must outlive the rename.
- * 4. Aliases live under `/github/repos/<owner>__<repo>/{pulls|issues}/by-{id,title}/...`
- *    per the helpers in `path-mapper.ts`. Only pulls + issues have aliases —
+ * 4. Aliases live under `/github/repos/<owner>__<repo>/{pulls|issues}/by-*`
+ *    per the helpers in `path-mapper.ts`. Issue-family aliases include id,
+ *    title, state, assignee, creator, and priority when those fields are
+ *    present. Only pulls + issues have aliases —
  *    reviews, review_comments, check_runs, commits are flat per-repo paths
  *    with no by-* views and no per-repo index entry (matches cloud's
  *    `writeGitHubAuxiliaryFiles`, which only iterates the three indexed
@@ -66,7 +68,10 @@ import {
   type GitHubRepoIndexRow,
 } from './index-emitter.js';
 import {
+  githubByAssigneeAliasPath,
+  githubByCreatorAliasPath,
   githubByIdAliasPath,
+  githubByPriorityAliasPath,
   githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
@@ -107,6 +112,10 @@ export interface GitHubPullRequestEmitRecord extends GitHubRepoContext {
   number: number | string;
   title?: string;
   state?: string;
+  assignees?: unknown[];
+  user?: unknown;
+  labels?: unknown[];
+  priority?: string;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -115,6 +124,10 @@ export interface GitHubIssueEmitRecord extends GitHubRepoContext {
   number: number | string;
   title?: string;
   state?: string;
+  assignees?: unknown[];
+  user?: unknown;
+  labels?: unknown[];
+  priority?: string;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -410,6 +423,9 @@ function stringifyError(error: unknown): string {
 interface PriorNumberedState {
   title?: string | undefined;
   state?: string | undefined;
+  assigneeKeys?: string[] | undefined;
+  creatorKey?: string | undefined;
+  priority?: string | undefined;
   /** owner/repo recovered from the prior payload — needed for delete
    *  tombstones that don't carry repo context. */
   owner?: string | undefined;
@@ -435,6 +451,9 @@ async function planNumberedWrite(
 
   const title = readNonEmptyString(record.title);
   const state = readNonEmptyString(record.state);
+  const assigneeKeys = readGitHubAssigneeKeys(record);
+  const creatorKey = readGitHubCreatorKey(record);
+  const priority = readPriority(record);
 
   const content = renderContent(objectType, record, connectionId, false);
 
@@ -451,17 +470,25 @@ async function planNumberedWrite(
     number,
     title,
     state,
+    assigneeKeys,
+    creatorKey,
+    priority,
   });
   const priorTitle = prior?.title;
-  const priorState = prior?.state;
-  const stalePaths = numberedStalePathsFor({
-    owner: repoInfo.owner,
-    repo: repoInfo.repo,
-    aliasKind,
-    number,
-    priorTitle: priorTitle && priorTitle !== title ? priorTitle : undefined,
-    priorState: priorState && priorState !== state ? priorState : undefined,
-  });
+  const priorPaths = prior
+    ? numberedPathsFor({
+        owner: repoInfo.owner,
+        repo: repoInfo.repo,
+        aliasKind,
+        number,
+        title: priorTitle,
+        state: prior.state,
+        assigneeKeys: prior.assigneeKeys,
+        creatorKey: prior.creatorKey,
+        priority: prior.priority,
+      })
+    : [];
+  const stalePaths = diffPaths(priorPaths, newPaths);
 
   const writes: EmitWrite[] = newPaths.map((path) => ({
     path,
@@ -502,19 +529,22 @@ async function planNumberedDelete(
   const prior = await priorReader.read<PriorNumberedState>(idAliasPath, extractPriorNumberedState);
 
   const priorTitle = prior?.title;
+  const priorPaths = numberedPathsFor({
+    owner: repoInfo.owner,
+    repo: repoInfo.repo,
+    aliasKind,
+    number,
+    title: priorTitle,
+    state: prior?.state,
+    assigneeKeys: prior?.assigneeKeys,
+    creatorKey: prior?.creatorKey,
+    priority: prior?.priority,
+  });
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
 
-  const paths: string[] = [];
-  // Canonical meta.json — under the title-derived directory if we know it,
-  // otherwise the bare number directory.
-  paths.push(canonicalPathFor(objectType, repoInfo.owner, repoInfo.repo, number, priorTitle));
-  paths.push(idAliasPath);
-  if (priorTitle && slugifies(priorTitle)) {
-    paths.push(githubByTitleAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, priorTitle, number));
-  }
-  if (prior?.state) {
-    paths.push(githubByStateAliasPath(repoInfo.owner, repoInfo.repo, aliasKind, prior.state, number));
-  }
+  const paths = priorPaths.length > 0
+    ? priorPaths
+    : [canonicalPathFor(objectType, repoInfo.owner, repoInfo.repo, number, priorTitle), idAliasPath];
 
   // Drop the per-repo index row.
   getReconciler(repoInfo.owner, repoInfo.repo).remove(String(number));
@@ -529,8 +559,11 @@ function numberedPathsFor(args: {
   number: string;
   title: string | undefined;
   state: string | undefined;
+  assigneeKeys?: string[] | undefined;
+  creatorKey?: string | undefined;
+  priority?: string | undefined;
 }): string[] {
-  const { owner, repo, aliasKind, number, title, state } = args;
+  const { owner, repo, aliasKind, number, title, state, assigneeKeys, creatorKey, priority } = args;
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
   const paths: string[] = [];
   paths.push(canonicalPathFor(objectType, owner, repo, number, title));
@@ -541,29 +574,16 @@ function numberedPathsFor(args: {
   if (state && slugifies(state)) {
     paths.push(githubByStateAliasPath(owner, repo, aliasKind, state, number));
   }
-  return paths;
-}
-
-function numberedStalePathsFor(args: {
-  owner: string;
-  repo: string;
-  aliasKind: 'pulls' | 'issues';
-  number: string;
-  priorTitle?: string | undefined;
-  priorState?: string | undefined;
-}): string[] {
-  const { owner, repo, aliasKind, number, priorTitle, priorState } = args;
-  const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
-  const paths: string[] = [];
-  if (priorTitle) {
-    // Prior canonical meta.json — note we delete only the file, not the
-    // enclosing `<n>__<slug>/` directory. The directory may hold sub-artifacts
-    // (diff.patch, files/**, base/**) that should survive the rename.
-    paths.push(canonicalPathFor(objectType, owner, repo, number, priorTitle));
-    paths.push(githubByTitleAliasPath(owner, repo, aliasKind, priorTitle, number));
+  for (const assignee of assigneeKeys ?? []) {
+    if (slugifies(assignee)) {
+      paths.push(githubByAssigneeAliasPath(owner, repo, aliasKind, assignee, number));
+    }
   }
-  if (priorState && slugifies(priorState)) {
-    paths.push(githubByStateAliasPath(owner, repo, aliasKind, priorState, number));
+  if (creatorKey && slugifies(creatorKey)) {
+    paths.push(githubByCreatorAliasPath(owner, repo, aliasKind, creatorKey, number));
+  }
+  if (priority && slugifies(priority)) {
+    paths.push(githubByPriorityAliasPath(owner, repo, aliasKind, priority, number));
   }
   return paths;
 }
@@ -763,9 +783,56 @@ function extractPriorNumberedState(parsed: Record<string, unknown>): PriorNumber
   return {
     title: readNonEmptyString(payload.title) ?? readNonEmptyString(payload.name),
     state: readNonEmptyString(payload.state),
+    assigneeKeys: readGitHubAssigneeKeys(payload),
+    creatorKey: readGitHubCreatorKey(payload),
+    priority: readPriority(payload),
     owner: readNonEmptyString(payload.owner),
     repo: readNonEmptyString(payload.repo),
   };
+}
+
+function readGitHubAssigneeKeys(record: Record<string, unknown>): string[] {
+  const assignees = Array.isArray(record.assignees) ? record.assignees : [];
+  return uniqueStrings(assignees.map((entry) => readUserKey(entry)).filter((entry): entry is string => Boolean(entry)));
+}
+
+function readGitHubCreatorKey(record: Record<string, unknown>): string | undefined {
+  return readUserKey(record.user) ?? readNonEmptyString(record.user);
+}
+
+function readUserKey(value: unknown): string | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return readNonEmptyString(value.login) ?? readNumericId(value.id);
+}
+
+function readPriority(record: Record<string, unknown>): string | undefined {
+  const explicit = readNonEmptyString(record.priority);
+  if (explicit) return explicit;
+  const labels = Array.isArray(record.labels) ? record.labels : [];
+  for (const label of labels) {
+    const name = readNonEmptyString(label) ?? readNonEmptyString(isRecord(label) ? label.name : undefined);
+    const priority = parsePriorityLabel(name);
+    if (priority) return priority;
+  }
+  return undefined;
+}
+
+function parsePriorityLabel(label: string | undefined): string | undefined {
+  if (!label) return undefined;
+  const trimmed = label.trim();
+  const match = /^(?:priority|prio|p)[\s:_/-]*(.+)$/iu.exec(trimmed);
+  return readNonEmptyString(match?.[1]) ?? (/^p[0-5]$/iu.test(trimmed) ? trimmed : undefined);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function diffPaths(prior: readonly string[], next: readonly string[]): string[] {
+  const nextSet = new Set(next);
+  return prior.filter((path) => !nextSet.has(path));
 }
 
 function pickPayload(parsed: Record<string, unknown>): Record<string, unknown> | null {

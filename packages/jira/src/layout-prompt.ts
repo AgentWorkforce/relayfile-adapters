@@ -33,6 +33,8 @@ Issues are addressable through parallel paths that all resolve to the same canon
 - By key: \`/jira/issues/by-key/<TEAM-123>.json\` — Jira's natural human-readable key.
 - By state: \`/jira/issues/by-state/<status>/<id>.json\` — \`to-do\`, \`in-progress\`, \`done\`, etc.
 - By assignee: \`/jira/issues/by-assignee/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the current assignee. Unassigned issues are not emitted under this prefix.
+- By creator: \`/jira/issues/by-creator/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the issue creator.
+- By priority: \`/jira/issues/by-priority/<priority>/<issueId>.json\` — grouped by the slugged Jira priority name.
 
 Projects and sprints carry a stable reconciliation anchor keyed on the immutable id, so renames leave the alias resolving to the latest payload:
 
@@ -50,6 +52,8 @@ Examples:
 \`\`\`bash
 ls /jira/issues
 ls /jira/issues/by-state
+ls /jira/issues/by-assignee
+ls /jira/issues/by-priority
 jq '.[0]' /jira/issues/_index.json
 jq '.[] | select(.state == "In Progress") | {key, title}' /jira/issues/_index.json
 jq '.canonicalPath' /jira/issues/by-key/ENG-42.json

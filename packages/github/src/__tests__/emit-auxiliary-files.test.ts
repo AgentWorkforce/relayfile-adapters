@@ -11,7 +11,10 @@ import type {
   EmitWriteResult,
 } from '@relayfile/adapter-core';
 import {
+  githubByAssigneeAliasPath,
+  githubByCreatorAliasPath,
   githubByIdAliasPath,
+  githubByPriorityAliasPath,
   githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
@@ -268,6 +271,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
           number: 7,
           title: 'Bug report',
           state: 'open',
+          assignees: [{ login: 'octocat' }],
+          user: { login: 'monalisa' },
+          labels: [{ name: 'priority:high' }],
           updated_at: '2026-05-12T00:00:00Z',
         },
       ],
@@ -279,6 +285,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByIdAliasPath('acme', 'widgets', 'issues', 7)));
     assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)));
     assert.ok(writtenPaths.includes(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)));
+    assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
+    assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
+    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'high', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
     // No writes leaked into the pulls index for this repo.

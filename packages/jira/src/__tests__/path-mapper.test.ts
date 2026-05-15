@@ -5,8 +5,10 @@ import {
   JIRA_PATH_ROOT,
   extractJiraIdFromPathSegment,
   jiraIssueByAssigneeAliasPath,
+  jiraIssueByCreatorAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
+  jiraIssueByPriorityPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraProjectByIdAliasPath,
@@ -58,8 +60,10 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       const byId = jiraIssueByIdAliasPath(issueId);
       const byKey = jiraIssueByKeyAliasPath('ENG-42');
       const byState = jiraIssueByStatePath('In Progress', issueId);
-      const all = new Set([byAssignee, byId, byKey, byState]);
-      assert.equal(all.size, 4, 'each alias subtree must produce a unique path');
+      const byCreator = jiraIssueByCreatorAliasPath(accountId, issueId);
+      const byPriority = jiraIssueByPriorityPath('High Priority', issueId);
+      const all = new Set([byAssignee, byId, byKey, byState, byCreator, byPriority]);
+      assert.equal(all.size, 6, 'each alias subtree must produce a unique path');
     });
 
     it('url-encodes accountId and issueId segments', () => {
@@ -72,6 +76,17 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       assert.ok(
         path.endsWith('/100%2F01.json'),
         `expected issueId segment to be URI-encoded, got: ${path}`,
+      );
+    });
+
+    it('composes by-creator and by-priority paths under their own grouped subtrees', () => {
+      assert.equal(
+        jiraIssueByCreatorAliasPath('acct-creator', '10001'),
+        `${JIRA_PATH_ROOT}/issues/by-creator/acct-creator/10001.json`,
+      );
+      assert.equal(
+        jiraIssueByPriorityPath('Highest Priority', '10001'),
+        `${JIRA_PATH_ROOT}/issues/by-priority/highest-priority/10001.json`,
       );
     });
   });
@@ -127,6 +142,10 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
   it('rejects empty segments via the shared assertion', () => {
     assert.throws(() => jiraIssueByAssigneeAliasPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByAssigneeAliasPath('acct-abc', ''), /non-empty/u);
+    assert.throws(() => jiraIssueByCreatorAliasPath('', '10001'), /non-empty/u);
+    assert.throws(() => jiraIssueByCreatorAliasPath('acct-abc', ''), /non-empty/u);
+    assert.throws(() => jiraIssueByPriorityPath('', '10001'), /non-empty/u);
+    assert.throws(() => jiraIssueByPriorityPath('high', ''), /non-empty/u);
     assert.throws(() => jiraProjectByIdAliasPath(''), /non-empty/u);
     assert.throws(() => jiraSprintByIdAliasPath(''), /non-empty/u);
   });

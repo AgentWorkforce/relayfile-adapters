@@ -35,6 +35,9 @@ describe('emitGitLabAuxiliaryFiles', () => {
           iid: 42,
           title: 'Add OAuth',
           state: 'opened',
+          assignees: [{ username: 'ada' }],
+          author: { username: 'linus' },
+          labels: [{ title: 'priority::high' }],
           updated_at: '2026-05-12T08:00:00.000Z',
         },
       ],
@@ -62,6 +65,9 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-id/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-title/add-oauth__42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-state/opened/42.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-assignee/ada/42.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-creator/linus/42.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/merge_requests/by-priority/high/42.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-ref/main__9.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
@@ -72,6 +78,9 @@ describe('emitGitLabAuxiliaryFiles', () => {
       canonicalPath: '/gitlab/projects/acme/api/merge_requests/42__add-oauth/meta.json',
       title: 'Add OAuth',
       state: 'opened',
+      assigneeKeys: ['ada'],
+      creatorKey: 'linus',
+      priority: 'high',
     });
 
     const index = JSON.parse(client.writes.get('/gitlab/projects/acme/api/merge_requests/_index.json') ?? '[]');

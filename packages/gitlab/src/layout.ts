@@ -11,7 +11,7 @@ export type {
 export const layoutManifest: CoreLayoutManifestProvider = () => ({
   provider: 'gitlab',
   filenameConvention: '<id>__<slug>/meta.json',
-  aliasSegments: ['by-id', 'by-ref', 'by-state', 'by-status', 'by-title'],
+  aliasSegments: ['by-assignee', 'by-creator', 'by-id', 'by-priority', 'by-ref', 'by-state', 'by-status', 'by-title'],
   resources: [
     {
       path: 'gitlab/projects',
@@ -24,7 +24,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       path: 'gitlab/projects/**/merge_requests',
       title: 'Merge requests',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title', 'by-state'],
+      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
       writebackResources: [
         { path: 'gitlab/projects/**/merge_requests', schemaId: 'gitlab/merge-request' },
         { path: 'gitlab/projects/**/merge_requests/discussions', schemaId: 'gitlab/merge-request-discussion' },
@@ -34,7 +34,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       path: 'gitlab/projects/**/issues',
       title: 'Issues',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title', 'by-state'],
+      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
       writebackResources: [
         { path: 'gitlab/projects/**/issues', schemaId: 'gitlab/issue' },
         { path: 'gitlab/projects/**/issues/comments', schemaId: 'gitlab/issue-comment' },

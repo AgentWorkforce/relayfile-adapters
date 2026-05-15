@@ -14,10 +14,10 @@
  * record-writer historically left as a follow-up:
  *
  *   1. For every issue record, write the by-id alias unconditionally (the
- *      stable reconciliation anchor) plus by-key (when a key is present)
- *      and by-state (when the status name is present). The canonical
- *      `/jira/issues/<slug>__<id>.json` path is written too — bytes are
- *      identical at every alias path.
+ *      stable reconciliation anchor), plus by-key, by-state, by-assignee,
+ *      by-creator, and by-priority when the corresponding provider fields
+ *      are present. The canonical `/jira/issues/<slug>__<id>.json` path is
+ *      written too — bytes are identical at every alias path.
  *   2. For every issue rename / status transition / key change, read the
  *      prior by-id alias to recover the previous summary / status / key,
  *      recompute the prior alias set, and delete every alias that no
@@ -55,8 +55,10 @@ import { sanitizeJiraRecordForStorage } from './jira-adapter.js';
 import {
   jiraCommentPath,
   jiraIssueByAssigneeAliasPath,
+  jiraIssueByCreatorAliasPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
+  jiraIssueByPriorityPath,
   jiraIssueByStatePath,
   jiraIssuePath,
   jiraIssuesIndexPath,
@@ -277,12 +279,18 @@ async function planIssueWrite(
   const fields = isRecord(issue.fields) ? issue.fields : {};
   const statusObject = isRecord(fields.status) ? fields.status : {};
   const assigneeObject = isRecord(fields.assignee) ? fields.assignee : {};
+  const creatorObject = isRecord(fields.creator) ? fields.creator : {};
+  const priorityObject = isRecord(fields.priority) ? fields.priority : {};
   const summary = readNonEmptyString((fields as { summary?: unknown }).summary);
   const status = readNonEmptyString((statusObject as { name?: unknown }).name);
   const key = readNonEmptyString((issue as { key?: unknown }).key);
   const assigneeAccountId = readNonEmptyString(
     (assigneeObject as { accountId?: unknown }).accountId,
   );
+  const creatorAccountId = readNonEmptyString(
+    (creatorObject as { accountId?: unknown }).accountId,
+  );
+  const priorityName = readNonEmptyString((priorityObject as { name?: unknown }).name);
 
   const safe = sanitizeJiraRecordForStorage(issue as unknown as Record<string, unknown>);
   // `sanitizeJiraRecordForStorage` strips the entire `fields.assignee` user
@@ -297,9 +305,21 @@ async function planIssueWrite(
     safeFields.assigneeAccountId = assigneeAccountId;
     safe.fields = safeFields;
   }
+  if (creatorAccountId || priorityName) {
+    const safeFields = isRecord(safe.fields)
+      ? safe.fields
+      : ({} as Record<string, unknown>);
+    if (creatorAccountId) {
+      safeFields.creatorAccountId = creatorAccountId;
+    }
+    if (priorityName) {
+      safeFields.priorityName = priorityName;
+    }
+    safe.fields = safeFields;
+  }
   const content = renderObjectContent(safe, 'issue', id, connectionId, false);
 
-  const newPaths = issuePathsFor({ id, summary, status, key, assigneeAccountId });
+  const newPaths = issuePathsFor({ id, summary, status, key, assigneeAccountId, creatorAccountId, priorityName });
 
   // Reconciliation: read prior by-id to recover summary/status/key and
   // diff against the new alias set. by-id is the stable anchor and is
@@ -349,10 +369,12 @@ interface PriorIssueState {
   status?: string | undefined;
   key?: string | undefined;
   assigneeAccountId?: string | undefined;
+  creatorAccountId?: string | undefined;
+  priorityName?: string | undefined;
 }
 
 function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
-  const { id, summary, status, key, assigneeAccountId } = args;
+  const { id, summary, status, key, assigneeAccountId, creatorAccountId, priorityName } = args;
   const paths: string[] = [];
   // Canonical: `<slug>__<id>.json` — uses the issue summary for the slug,
   // falling back to the key when summary is missing (matches the existing
@@ -368,6 +390,12 @@ function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
   }
   if (assigneeAccountId) {
     paths.push(jiraIssueByAssigneeAliasPath(assigneeAccountId, id));
+  }
+  if (creatorAccountId) {
+    paths.push(jiraIssueByCreatorAliasPath(creatorAccountId, id));
+  }
+  if (priorityName) {
+    paths.push(jiraIssueByPriorityPath(priorityName, id));
   }
   return paths;
 }
@@ -386,6 +414,12 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     // `accountId` to `fields.assigneeAccountId` for reconciliation reads.
     assigneeAccountId: readNonEmptyString(
       (fields as { assigneeAccountId?: unknown }).assigneeAccountId,
+    ),
+    creatorAccountId: readNonEmptyString(
+      (fields as { creatorAccountId?: unknown }).creatorAccountId,
+    ),
+    priorityName: readNonEmptyString(
+      (fields as { priorityName?: unknown }).priorityName,
     ),
   };
 }

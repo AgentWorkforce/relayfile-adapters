@@ -33,14 +33,14 @@ These category rules are enforced by `scripts/digest-layout-contracts.mjs`.
 
 | Category | Providers/resources | Required lookup | Rationale |
 | --- | --- | --- | --- |
-| issue-tracking | GitHub issues and pull requests, GitLab issues and merge requests, Jira issues, Linear issues | `by-state/<state>/<id>.json` | Agents often ask for open, closed, merged, completed, or canceled work without already knowing an id. |
+| issue-tracking | GitHub issues and pull requests, GitLab issues and merge requests, Jira issues, Linear issues | `by-state/<state>/<id>.json`, `by-assignee/<assignee>/<id>.json`, `by-creator/<creator>/<id>.json`, `by-priority/<priority>/<id>.json` | Agents often ask for open, closed, merged, completed, canceled, assigned, created-by, or priority-scoped work without already knowing an id. |
 | ci-deploy | GitLab pipelines and deployments | `by-status/<status>/<id>.json` | Status is the primary lifecycle bucket for build and deploy resources. |
 | knowledge | Confluence pages | `by-state/<state>/<id>.json` | Pages can be current, archived, trashed, restored, or deleted and must remain discoverable by lifecycle bucket. |
 
 Resources outside this matrix still need digest coverage. They only need a
-`by-state` or `by-status` alias when the resource exposes a durable lifecycle
-bucket that agents naturally browse by. Add the resource to the matrix when that
-is true; do not rely on prose alone.
+`by-state`, `by-status`, `by-assignee`, `by-creator`, or `by-priority` alias
+when the resource exposes a durable bucket that agents naturally browse by. Add
+the resource to the matrix when that is true; do not rely on prose alone.
 
 ## Review Checklist
 

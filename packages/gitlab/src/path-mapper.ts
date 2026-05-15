@@ -155,6 +155,39 @@ export function gitLabByStateAliasPath(
   )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
+export function gitLabByAssigneeAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  assignee: string,
+  objectId: number | string,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-assignee/${encodeGitLabPathSegment(
+    slugifyAlias(assignee),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
+export function gitLabByCreatorAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  creator: string,
+  objectId: number | string,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-creator/${encodeGitLabPathSegment(
+    slugifyAlias(creator),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
+export function gitLabByPriorityAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  priority: string,
+  objectId: number | string,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-priority/${encodeGitLabPathSegment(
+    slugifyAlias(priority),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
 export function gitLabByRefAliasPath(
   projectPath: string,
   objectType: 'pipelines' | 'tags',

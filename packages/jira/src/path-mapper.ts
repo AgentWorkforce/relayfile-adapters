@@ -194,6 +194,15 @@ export function jiraIssueByAssigneeAliasPath(accountId: string, issueId: string)
   return `${JIRA_PATH_ROOT}/issues/by-assignee/${encodeJiraPathSegment(accountId)}/${encodeJiraPathSegment(issueId)}.json`;
 }
 
+export function jiraIssueByCreatorAliasPath(accountId: string, issueId: string): string {
+  return `${JIRA_PATH_ROOT}/issues/by-creator/${encodeJiraPathSegment(accountId)}/${encodeJiraPathSegment(issueId)}.json`;
+}
+
+export function jiraIssueByPriorityPath(priorityName: string, issueId: string): string {
+  const slug = slugifyAlias(assertNonEmptySegment(priorityName, 'priority name'));
+  return `${JIRA_PATH_ROOT}/issues/by-priority/${encodeJiraPathSegment(slug)}/${encodeJiraPathSegment(issueId)}.json`;
+}
+
 // -- Project alias paths ---------------------------------------------------
 
 /**

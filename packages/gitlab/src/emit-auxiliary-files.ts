@@ -20,7 +20,10 @@ import {
 import { gitLabLayoutPromptFile } from './layout-prompt.js';
 import {
   computeMetadataPath,
+  gitLabByAssigneeAliasPath,
+  gitLabByCreatorAliasPath,
   gitLabByIdAliasPath,
+  gitLabByPriorityAliasPath,
   gitLabByRefAliasPath,
   gitLabByStateAliasPath,
   gitLabByStatusAliasPath,
@@ -44,6 +47,10 @@ export interface GitLabMergeRequestEmitRecord extends GitLabRecordContext {
   iid: number | string;
   title?: string;
   state?: string;
+  assignees?: unknown[];
+  author?: unknown;
+  labels?: unknown[];
+  priority?: string;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -52,6 +59,10 @@ export interface GitLabIssueEmitRecord extends GitLabRecordContext {
   iid: number | string;
   title?: string;
   state?: string;
+  assignees?: unknown[];
+  author?: unknown;
+  labels?: unknown[];
+  priority?: string;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -197,23 +208,41 @@ async function planTitledDirectoryRecord(
   const id = String(objectId);
   const title = readNonEmptyString(record.title) ?? id;
   const state = readNonEmptyString(record.state);
+  const assigneeKeys = readGitLabAssigneeKeys(record);
+  const creatorKey = readGitLabCreatorKey(record);
+  const priority = readPriority(record);
   const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
   const byIdPath = gitLabByIdAliasPath(projectPath, objectType, id);
-  const prior = await priorReader.read<{ title?: string; state?: string }>(byIdPath, (parsed) => ({
+  const prior = await priorReader.read<PriorTitledDirectoryRecord>(byIdPath, (parsed) => ({
     title: readNonEmptyString(parsed.title),
     state: readNonEmptyString(parsed.state),
+    assigneeKeys: readStringArray(parsed.assigneeKeys),
+    creatorKey: readNonEmptyString(parsed.creatorKey),
+    priority: readNonEmptyString(parsed.priority),
   }));
-  const deletes = [
-    ...(prior?.title && prior.title !== title
-      ? [
-          { path: computeMetadataPath(projectPath, objectType, id, prior.title) },
-          { path: gitLabByTitleAliasPath(projectPath, objectType, prior.title, id) },
-        ]
-      : []),
-    ...(prior?.state && prior.state !== state
-      ? [{ path: gitLabByStateAliasPath(projectPath, objectType, prior.state, id) }]
-      : []),
-  ];
+  const newPaths = titledDirectoryPathsFor({
+    projectPath,
+    objectType,
+    id,
+    title,
+    state,
+    assigneeKeys,
+    creatorKey,
+    priority,
+  });
+  const priorPaths = prior
+    ? titledDirectoryPathsFor({
+        projectPath,
+        objectType,
+        id,
+        title: prior.title ?? id,
+        state: prior.state,
+        assigneeKeys: prior.assigneeKeys,
+        creatorKey: prior.creatorKey,
+        priority: prior.priority,
+      })
+    : [];
+  const deletes = diffPaths(priorPaths, newPaths).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, objectType).upsert({
@@ -226,17 +255,59 @@ async function planTitledDirectoryRecord(
 
   const writes: EmitWrite[] = [
     canonicalWrite(canonicalPath, objectType, record, connectionId),
-    aliasWrite(byIdPath, id, canonicalPath, { title, state }),
-    aliasWrite(gitLabByTitleAliasPath(projectPath, objectType, title, id), id, canonicalPath, { title, state }),
+    aliasWrite(byIdPath, id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }),
+    aliasWrite(gitLabByTitleAliasPath(projectPath, objectType, title, id), id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }),
   ];
   if (state) {
-    writes.push(aliasWrite(gitLabByStateAliasPath(projectPath, objectType, state, id), id, canonicalPath, { title, state }));
+    writes.push(aliasWrite(gitLabByStateAliasPath(projectPath, objectType, state, id), id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }));
+  }
+  for (const assignee of assigneeKeys) {
+    writes.push(aliasWrite(gitLabByAssigneeAliasPath(projectPath, objectType, assignee, id), id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }));
+  }
+  if (creatorKey) {
+    writes.push(aliasWrite(gitLabByCreatorAliasPath(projectPath, objectType, creatorKey, id), id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }));
+  }
+  if (priority) {
+    writes.push(aliasWrite(gitLabByPriorityAliasPath(projectPath, objectType, priority, id), id, canonicalPath, { title, state, assigneeKeys, creatorKey, priority }));
   }
 
   return {
     deletes,
     writes,
   };
+}
+
+interface PriorTitledDirectoryRecord {
+  title?: string | undefined;
+  state?: string | undefined;
+  assigneeKeys?: string[] | undefined;
+  creatorKey?: string | undefined;
+  priority?: string | undefined;
+}
+
+function titledDirectoryPathsFor(args: {
+  projectPath: string;
+  objectType: 'merge_requests' | 'issues';
+  id: string;
+  title: string;
+  state?: string | undefined;
+  assigneeKeys?: string[] | undefined;
+  creatorKey?: string | undefined;
+  priority?: string | undefined;
+}): string[] {
+  const { projectPath, objectType, id, title, state, assigneeKeys, creatorKey, priority } = args;
+  const paths = [
+    computeMetadataPath(projectPath, objectType, id, title),
+    gitLabByIdAliasPath(projectPath, objectType, id),
+    gitLabByTitleAliasPath(projectPath, objectType, title, id),
+  ];
+  if (state) paths.push(gitLabByStateAliasPath(projectPath, objectType, state, id));
+  for (const assignee of assigneeKeys ?? []) {
+    paths.push(gitLabByAssigneeAliasPath(projectPath, objectType, assignee, id));
+  }
+  if (creatorKey) paths.push(gitLabByCreatorAliasPath(projectPath, objectType, creatorKey, id));
+  if (priority) paths.push(gitLabByPriorityAliasPath(projectPath, objectType, priority, id));
+  return paths;
 }
 
 function planPipelineRecord(
@@ -425,7 +496,63 @@ function readUpdatedAt(record: Record<string, unknown>): string {
 }
 
 function readNonEmptyString(value: unknown): string | undefined {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : undefined;
+  }
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return uniqueStrings(value.map((entry) => readNonEmptyString(entry)).filter((entry): entry is string => Boolean(entry)));
+}
+
+function readGitLabAssigneeKeys(record: GitLabMergeRequestEmitRecord | GitLabIssueEmitRecord): string[] {
+  const assignees = Array.isArray(record.assignees) ? record.assignees : [];
+  return uniqueStrings(assignees.map((entry) => readUserKey(entry)).filter((entry): entry is string => Boolean(entry)));
+}
+
+function readGitLabCreatorKey(record: GitLabMergeRequestEmitRecord | GitLabIssueEmitRecord): string | undefined {
+  return readUserKey(record.author);
+}
+
+function readUserKey(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  return readNonEmptyString(value.username) ?? readNonEmptyString(value.id);
+}
+
+function readPriority(record: GitLabMergeRequestEmitRecord | GitLabIssueEmitRecord): string | undefined {
+  const explicit = readNonEmptyString(record.priority);
+  if (explicit) return explicit;
+  const labels = Array.isArray(record.labels) ? record.labels : [];
+  for (const label of labels) {
+    const name = readNonEmptyString(label)
+      ?? readNonEmptyString(isRecord(label) ? label.title : undefined)
+      ?? readNonEmptyString(isRecord(label) ? label.name : undefined);
+    const priority = parsePriorityLabel(name);
+    if (priority) return priority;
+  }
+  return undefined;
+}
+
+function parsePriorityLabel(label: string | undefined): string | undefined {
+  if (!label) return undefined;
+  const trimmed = label.trim();
+  const match = /^(?:priority|prio|p)[\s:_/-]*(.+)$/iu.exec(trimmed);
+  return readNonEmptyString(match?.[1]) ?? (/^p[0-5]$/iu.test(trimmed) ? trimmed : undefined);
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function diffPaths(prior: readonly string[], next: readonly string[]): string[] {
+  const nextSet = new Set(next);
+  return prior.filter((path) => !nextSet.has(path));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function stripUndefined(record: Record<string, unknown>): Record<string, unknown> {

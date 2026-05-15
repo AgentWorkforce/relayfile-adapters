@@ -334,8 +334,9 @@ usable digest contract. When adding or materially changing an adapter:
   the package README or PR and keep the no-op handler covered by a test.
 - Keep digest behavior and layout aliases aligned with the category matrix in
   `docs/digest-layout-contract.md`. Issue-tracking resources must expose
-  `by-state` unless the matrix documents an explicit exception; status-driven
-  build/deploy resources must expose `by-status`.
+  `by-state`, `by-assignee`, `by-creator`, and `by-priority` unless the matrix
+  documents an explicit exception; status-driven build/deploy resources must
+  expose `by-status`.
 - Run `npm run test:digest-contracts` after adding or changing an adapter,
   digest handler, layout manifest, or category matrix entry.
 

@@ -11,6 +11,9 @@ import {
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  gitLabByAssigneeAliasPath,
+  gitLabByCreatorAliasPath,
+  gitLabByPriorityAliasPath,
   gitLabByStateAliasPath,
   parseGitLabPath,
 } from '../src/path-mapper.js';
@@ -60,6 +63,18 @@ describe('path mapper', () => {
     assert.strictEqual(
       gitLabByStateAliasPath('acme/api', 'issues', 'in progress', 7),
       '/gitlab/projects/acme/api/issues/by-state/in-progress/7.json',
+    );
+    assert.strictEqual(
+      gitLabByAssigneeAliasPath('acme/api', 'issues', 'Ada Lovelace', 7),
+      '/gitlab/projects/acme/api/issues/by-assignee/ada-lovelace/7.json',
+    );
+    assert.strictEqual(
+      gitLabByCreatorAliasPath('acme/api', 'merge_requests', 'linus', 42),
+      '/gitlab/projects/acme/api/merge_requests/by-creator/linus/42.json',
+    );
+    assert.strictEqual(
+      gitLabByPriorityAliasPath('acme/api', 'issues', 'priority::high', 7),
+      '/gitlab/projects/acme/api/issues/by-priority/priority-high/7.json',
     );
   });
 

@@ -3,13 +3,29 @@ import test from 'node:test';
 
 import { layoutManifest } from './layout.js';
 
-const CANONICAL_ALIAS_SEGMENTS = new Set(['by-id', 'by-name', 'by-state', 'by-title']);
+const CANONICAL_ALIAS_SEGMENTS = new Set([
+  'by-assignee',
+  'by-creator',
+  'by-id',
+  'by-name',
+  'by-priority',
+  'by-state',
+  'by-title',
+]);
 
 test('layoutManifest exposes GitHub resources with canonical aliases and writeback schema pointers', () => {
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'github');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-name', 'by-state', 'by-title']);
+  assert.deepEqual(manifest.aliasSegments, [
+    'by-assignee',
+    'by-creator',
+    'by-id',
+    'by-name',
+    'by-priority',
+    'by-state',
+    'by-title',
+  ]);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {

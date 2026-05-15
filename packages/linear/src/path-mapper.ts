@@ -254,6 +254,40 @@ export function linearIssueByStatePath(stateName: string, identifier: string): s
   return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
 }
 
+export function linearIssueByAssigneePath(assigneeId: string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-assignee/${encodeLinearPathSegment(assigneeId)}/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function linearIssueByCreatorPath(creatorId: string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-creator/${encodeLinearPathSegment(creatorId)}/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function linearIssueByPriorityPath(priority: number | string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-priority/${encodeLinearPathSegment(
+    linearPrioritySlug(priority),
+  )}/${encodeLinearPathSegment(identifier)}.json`;
+}
+
+export function linearPrioritySlug(priority: number | string): string {
+  if (typeof priority === 'number') {
+    switch (priority) {
+      case 0:
+        return 'no-priority';
+      case 1:
+        return 'urgent';
+      case 2:
+        return 'high';
+      case 3:
+        return 'medium';
+      case 4:
+        return 'low';
+      default:
+        return encodeLinearPathSegment(String(priority));
+    }
+  }
+  return slugifyAlias(priority);
+}
+
 export function linearCommentPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
   return `${LINEAR_PATH_ROOT}/comments/${nameWithId(humanReadable, commentId, opts)}.json`;
 }

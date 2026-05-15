@@ -10,13 +10,16 @@ Add an alias subtree whenever the entity has a natural human-readable lookup key
 - `by-title` / `by-name` — for entities whose human-readable label changes independently of the ID.
 - `by-key` — for entities with a provider-issued short key (e.g. Jira `ENG-42`, Linear identifier `ENG-42`).
 - `by-state` / `by-status` — when the consumer cares about the lifecycle bucket (`open`, `closed`, `in-progress`, ...).
+- `by-assignee` — when work items have a current owner/assignee.
+- `by-creator` — when work items track the user who opened or created them.
+- `by-priority` — when work items expose a native priority or a conventional priority label.
 - `by-parent` — when the entity has a single natural parent (issues -> project, pages -> space).
 
 The enforced category matrix lives in `docs/digest-layout-contract.md` and is
 checked by `npm run test:digest-contracts`. If a resource belongs to a matrix
-category such as issue-tracking, add the required alias (`by-state` for
-issue-tracking, `by-status` for CI/deploy) in the same change as the layout,
-emitter, and tests.
+category such as issue-tracking, add the required aliases (`by-state`,
+`by-assignee`, `by-creator`, and `by-priority` for issue-tracking, `by-status`
+for CI/deploy) in the same change as the layout, emitter, and tests.
 
 Do NOT add an alias for a key that already matches the canonical filename one-to-one — it would be redundant.
 
@@ -27,9 +30,13 @@ Do NOT add an alias for a key that already matches the canonical filename one-to
 ```
 
 For `by-state`, group records under a state subdirectory:
+For `by-assignee`, `by-creator`, and `by-priority`, use the same grouped shape.
 
 ```text
 /<provider>/<resource>/by-state/<state>/<id>.json
+/<provider>/<resource>/by-assignee/<assignee>/<id>.json
+/<provider>/<resource>/by-creator/<creator>/<id>.json
+/<provider>/<resource>/by-priority/<priority>/<id>.json
 ```
 
 ## Collision handling
