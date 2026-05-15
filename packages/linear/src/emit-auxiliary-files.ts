@@ -677,8 +677,15 @@ interface FlatResourceOptions<TRecord extends { id: string }> {
   objectType: string;
   connectionId: string | undefined;
   aliasAnchorPath?: (id: string) => string;
-  aliasPaths?: (record: Record<string, unknown>, id: string) => string[];
+  aliasPaths?: (record: Record<string, unknown>, id: string) => FlatAliasPath[];
 }
+
+type FlatAliasPath =
+  | string
+  | {
+      path: string;
+      collisionPath: string;
+    };
 
 async function emitFlatResource<TRecord extends { id: string }>(
   client: AuxiliaryEmitterClient,
@@ -706,15 +713,15 @@ async function emitFlatResource<TRecord extends { id: string }>(
     if (isDeleteRecord(record)) {
       indexReconciler.remove(record.id);
       const prior = await readFlatPrior(record.id, priorReader, opts);
-      const paths = flatResourcePaths(record.id, prior, opts);
+      const paths = await flatResourcePaths(record.id, prior, opts, priorReader);
       return { deletes: paths.map((path) => ({ path })) };
     }
     const id = readNonEmptyString(record.id);
     if (!id) return {};
     indexReconciler.upsert(opts.indexRow(record));
     const prior = await readFlatPrior(id, priorReader, opts);
-    const paths = flatResourcePaths(id, record, opts);
-    const priorPaths = prior ? flatResourcePaths(id, prior, opts) : [];
+    const paths = await flatResourcePaths(id, record, opts, priorReader);
+    const priorPaths = prior ? await flatResourcePaths(id, prior, opts, priorReader) : [];
     const stalePaths = diffPaths(priorPaths, paths);
     const content = renderContent(opts.objectType, record, opts.connectionId, false);
     return {
@@ -745,31 +752,55 @@ async function readFlatPrior<TRecord extends { id: string }>(
   );
 }
 
-function flatResourcePaths<TRecord extends { id: string }>(
+async function flatResourcePaths<TRecord extends { id: string }>(
   id: string,
   record: Record<string, unknown> | null,
   opts: FlatResourceOptions<TRecord>,
-): string[] {
-  return [
-    opts.canonicalPath(id),
-    ...(record && opts.aliasPaths ? opts.aliasPaths(record, id) : []),
-  ];
+  priorReader: PriorAliasReader,
+): Promise<string[]> {
+  const aliases = record && opts.aliasPaths ? opts.aliasPaths(record, id) : [];
+  const resolvedAliases: string[] = [];
+  for (const alias of aliases) {
+    resolvedAliases.push(await resolveFlatAliasPath(alias, id, priorReader));
+  }
+  return [opts.canonicalPath(id), ...resolvedAliases];
 }
 
-function projectAliasPaths(record: Record<string, unknown>, id: string): string[] {
-  const paths = [linearByIdAliasPath(PROJECTS_SCOPE, id)];
+async function resolveFlatAliasPath(
+  alias: FlatAliasPath,
+  id: string,
+  priorReader: PriorAliasReader,
+): Promise<string> {
+  if (typeof alias === 'string') {
+    return alias;
+  }
+  const existing = await priorReader.read<Record<string, unknown>>(alias.path);
+  const existingId =
+    readNonEmptyString(existing?.objectId) ??
+    (existing ? readNonEmptyString(pickPayload(existing)?.id) : undefined);
+  return existingId && existingId !== id ? alias.collisionPath : alias.path;
+}
+
+function projectAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
+  const paths: FlatAliasPath[] = [linearByIdAliasPath(PROJECTS_SCOPE, id)];
   const name = readNonEmptyString(record.name);
   if (name && slugifies(name)) {
-    paths.push(linearByTitleAliasPath(PROJECTS_SCOPE, name, id));
+    paths.push({
+      path: linearByTitleAliasPath(PROJECTS_SCOPE, name, id),
+      collisionPath: linearByTitleAliasPath(PROJECTS_SCOPE, name, id, true),
+    });
   }
   return paths;
 }
 
-function teamAliasPaths(record: Record<string, unknown>, id: string): string[] {
-  const paths = [linearByIdAliasPath(TEAMS_SCOPE, id)];
+function teamAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
+  const paths: FlatAliasPath[] = [linearByIdAliasPath(TEAMS_SCOPE, id)];
   const name = readNonEmptyString(record.name) ?? readNonEmptyString(record.key);
   if (name && slugifies(name)) {
-    paths.push(linearByNameAliasPath(TEAMS_SCOPE, name, id));
+    paths.push({
+      path: linearByNameAliasPath(TEAMS_SCOPE, name, id),
+      collisionPath: linearByNameAliasPath(TEAMS_SCOPE, name, id, true),
+    });
   }
   return paths;
 }

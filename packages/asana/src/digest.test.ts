@@ -149,6 +149,30 @@ test('digest ignores alias, index, and layout writes', async () => {
   });
 });
 
+test('digest keeps canonical filenames whose slug starts with by-', async () => {
+  const ctx: DigestContext = {
+    provider: 'asana',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-canonical-by-slug',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'changed',
+          path: '/asana/tasks/by-design__333.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'asana',
+    bullets: [
+      { text: 'task by-design was updated', canonicalPath: 'asana/tasks/by-design__333.json' },
+    ],
+  });
+});
+
 test('digest returns null for an empty Asana event window', async () => {
   const ctx: DigestContext = {
     provider: 'asana',

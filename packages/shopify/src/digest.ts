@@ -65,7 +65,7 @@ function isCanonicalDigestPath(path: string): boolean {
   const leaf = segments.at(-1) ?? '';
   return leaf !== 'LAYOUT.md'
     && leaf !== '_index.json'
-    && segments.every((segment) => !segment.startsWith('by-'));
+    && segments.slice(0, -1).every((segment) => !segment.startsWith('by-'));
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
