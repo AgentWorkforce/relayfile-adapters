@@ -45,13 +45,21 @@ Always use `aliasCollisionSuffix` from `packages/core/src/alias-slug.ts` (an 8-c
 
 ## Alias file content
 
-Each alias file is a minimal pointer, not a full copy of the record:
+Alias files may use either of these shapes, but the choice must be consistent
+within a resource and covered by tests:
+
+- Minimal pointer:
 
 ```json
 { "id": "<id>", "canonicalPath": "/<provider>/<resource>/<slug>__<id>.json", "title": "<optional>" }
 ```
 
-Readers follow `canonicalPath` to get the full record. This keeps the cost of adding alias views low and means the canonical record is the single source of truth.
+- Materialized canonical mirror: the same provider envelope as the canonical
+  record, written to the alias path for direct reads.
+
+For minimal pointers, readers follow `canonicalPath` to get the full record. For
+materialized mirrors, readers can use the alias body directly. Do not mix pointer
+and mirror files under the same resource subtree.
 
 ## Read pattern
 

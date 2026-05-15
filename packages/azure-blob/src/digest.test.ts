@@ -14,13 +14,13 @@ test('digest returns deterministic Azure Blob bullets sorted by event time and i
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'deleted',
-          canonicalPath: 'azure-blob/acct/container/logs/app.log',
+          canonicalPath: 'azure/acct/container/logs/app.log',
         },
         {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'BlobCreated',
-          canonicalPath: '/azure-blob/acct/container/data/report.csv',
+          canonicalPath: '/azure/acct/container/data/report.csv',
         },
       ];
     },
@@ -35,11 +35,11 @@ test('digest returns deterministic Azure Blob bullets sorted by event time and i
     bullets: [
       {
         text: 'blob data/report.csv was uploaded',
-        canonicalPath: 'azure-blob/acct/container/data/report.csv',
+        canonicalPath: 'azure/acct/container/data/report.csv',
       },
       {
         text: 'blob logs/app.log was deleted',
-        canonicalPath: 'azure-blob/acct/container/logs/app.log',
+        canonicalPath: 'azure/acct/container/logs/app.log',
       },
     ],
   });
@@ -55,7 +55,7 @@ test('digest classifies Azure Blob archive tier changes', async () => {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'BlobTiered',
-          canonicalPath: 'azure-blob/acct/container/old-data.bin',
+          canonicalPath: 'azure/acct/container/old-data.bin',
         },
       ];
     },
@@ -66,7 +66,7 @@ test('digest classifies Azure Blob archive tier changes', async () => {
     bullets: [
       {
         text: 'blob old-data.bin was archived',
-        canonicalPath: 'azure-blob/acct/container/old-data.bin',
+        canonicalPath: 'azure/acct/container/old-data.bin',
       },
     ],
   });
@@ -82,7 +82,7 @@ test('digest classifies Azure Blob updates as modified', async () => {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'BlobUpdated',
-          canonicalPath: 'azure-blob/acct/container/data/report.csv',
+          canonicalPath: 'azure/acct/container/data/report.csv',
         },
       ];
     },
@@ -93,7 +93,7 @@ test('digest classifies Azure Blob updates as modified', async () => {
     bullets: [
       {
         text: 'blob data/report.csv was modified',
-        canonicalPath: 'azure-blob/acct/container/data/report.csv',
+        canonicalPath: 'azure/acct/container/data/report.csv',
       },
     ],
   });
@@ -109,4 +109,26 @@ test('digest returns null for an empty Azure Blob event window', async () => {
   };
 
   assert.equal(await digest(ctx), null);
+});
+
+test('digest accepts the actual /azure root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobUpdated',
+          canonicalPath: '/azure',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [{ text: 'blob azure was modified', canonicalPath: 'azure' }],
+  });
 });

@@ -55,7 +55,16 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'azure-blob' || event.canonicalPath === '/azure-blob' || event.canonicalPath.startsWith('azure-blob/') || event.canonicalPath.startsWith('/azure-blob/'))
+    && (
+      event.canonicalPath === 'azure'
+      || event.canonicalPath === '/azure'
+      || event.canonicalPath.startsWith('azure/')
+      || event.canonicalPath.startsWith('/azure/')
+      || event.canonicalPath === 'azure-blob'
+      || event.canonicalPath === '/azure-blob'
+      || event.canonicalPath.startsWith('azure-blob/')
+      || event.canonicalPath.startsWith('/azure-blob/')
+    )
   );
 }
 

@@ -41,7 +41,7 @@ Projects and sprints carry a stable reconciliation anchor keyed on the immutable
 - \`/jira/projects/by-id/<id>.json\` — durable lookup for projects.
 - \`/jira/sprints/by-id/<id>.json\` — durable lookup for sprints.
 
-Each alias file is a minimal pointer of the form \`{ id, canonicalPath, title? }\`; readers follow \`canonicalPath\` for the full record. Collisions on a \`by-key\`/\`by-title\` slug get a deterministic 8-character hash suffix (never first-writer-wins).
+Issue, project, and sprint aliases materialize the same provider envelope as the canonical record so reads through an alias return the full current payload. Collisions on a \`by-key\`/\`by-title\` slug get a deterministic 8-character hash suffix (never first-writer-wins).
 
 ## JSONL And Querying
 

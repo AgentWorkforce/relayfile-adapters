@@ -67,7 +67,7 @@ const categoryResourceContracts = [
 const requiredDocs = [
   {
     file: 'AGENTS.md',
-    needles: ['Relayfile Integration Digest Contract', 'test:digest-contracts', 'category matrix'],
+    needles: ['Relayfile Integration Digest Contract', 'test:digest-contracts', 'category matrix', 'materialized canonical mirror'],
   },
   {
     file: '.claude/rules/relayfile-integration-digests.md',
@@ -75,7 +75,7 @@ const requiredDocs = [
   },
   {
     file: '.claude/rules/alias-subtrees.md',
-    needles: ['by-state', 'by-assignee', 'by-creator', 'by-priority', 'category matrix'],
+    needles: ['by-state', 'by-assignee', 'by-creator', 'by-priority', 'category matrix', 'Materialized canonical mirror'],
   },
   {
     file: 'docs/digest-layout-contract.md',
@@ -110,6 +110,21 @@ for (const provider of providerPackages()) {
     && !digestSource.includes(`canonicalPath === '/${provider}'`)
   ) {
     failures.push(`${provider}: digest canonical-path filter must accept exact /${provider}`);
+  }
+  const pathMapperPath = join(packageRoot, 'src', 'path-mapper.ts');
+  if (existsSync(pathMapperPath)) {
+    const actualRoot = relayfileRoot(readFileSync(pathMapperPath, 'utf8'));
+    if (actualRoot) {
+      const root = actualRoot.replace(/^\/+/u, '');
+      if (
+        !digestSource.includes(`event.canonicalPath === '${root}'`)
+        && !digestSource.includes(`event.canonicalPath === '/${root}'`)
+        && !digestSource.includes(`canonicalPath === '${root}'`)
+        && !digestSource.includes(`canonicalPath === '/${root}'`)
+      ) {
+        failures.push(`${provider}: digest canonical-path filter must accept actual Relayfile root ${actualRoot}`);
+      }
+    }
   }
 
   if (!existsSync(indexPath) || !readFileSync(indexPath, 'utf8').includes("from './digest.js'")) {
@@ -195,6 +210,10 @@ function assertTestMentions(provider, source, pattern, label) {
   if (!pattern.test(source)) {
     failures.push(`${provider}: digest test must cover ${label}`);
   }
+}
+
+function relayfileRoot(pathMapperSource) {
+  return pathMapperSource.match(/RELAYFILE_ROOT\s*=\s*['"]([^'"]+)['"]/u)?.[1] ?? null;
 }
 
 function aliasesForResource(layoutSource, resourcePath) {
