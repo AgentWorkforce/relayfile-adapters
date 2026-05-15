@@ -1,4 +1,5 @@
 // Public barrel for runtime helpers, normalizers, and exported types.
+export * from './digest.js';
 export * from './mailgun-adapter.js';
 export * from './path-mapper.js';
 export * from './webhook-normalizer.js';

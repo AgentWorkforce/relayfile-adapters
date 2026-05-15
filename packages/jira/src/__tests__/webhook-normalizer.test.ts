@@ -67,6 +67,46 @@ describe('normalizeJiraWebhook', () => {
     assert.equal(normalized.objectId, '10001');
   });
 
+  it('classifies terminal issue status transitions as completed events', () => {
+    const normalized = normalizeJiraWebhook(
+      {
+        webhookEvent: 'jira:issue_updated',
+        issue: {
+          id: '10001',
+          key: 'ENG-42',
+          fields: {
+            status: { name: 'Done', statusCategory: { key: 'done' } },
+            summary: 'Ship the digest',
+          },
+        },
+        changelog: {
+          histories: [
+            {
+              items: [
+                { field: 'status', fromString: 'In Progress', toString: 'Done' },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        config: { sharedSecret: SHARED_SECRET },
+        headers: {
+          authorization: `JWT ${signJwt()}`,
+          'x-relay-connection-id': 'conn-1',
+        },
+        method: METHOD,
+        nowSeconds: NOW,
+        path: PATH,
+        query: QUERY,
+      },
+    );
+
+    assert.equal(normalized.eventType, 'issue.completed');
+    assert.equal(normalized.objectType, 'issue');
+    assert.equal(normalized.objectId, '10001');
+  });
+
   it('rejects a tampered-body signature', () => {
     const token = signJwt();
     const tampered = `${token.slice(0, -1)}x`;

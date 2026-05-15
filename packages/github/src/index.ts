@@ -118,7 +118,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       objectId,
     };
 
-    const action = typeof payload.action === 'string' ? payload.action : undefined;
+    const action = normalizeLifecycleAction(objectType, payload);
     if (action) {
       properties.action = action;
     }
@@ -149,7 +149,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async closePullRequest(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult('pull_request.closed', 'pull_request', payload, 'update');
+    return this.createIngestResult(
+      isMergedPullRequestPayload(payload) ? 'pull_request.merged' : 'pull_request.closed',
+      'pull_request',
+      payload,
+      'update',
+    );
   }
 
   async ingestReview(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -346,6 +351,18 @@ function readNestedValue(payload: Record<string, unknown>, ...path: string[]): u
   }
 
   return current;
+}
+
+function normalizeLifecycleAction(objectType: string, payload: Record<string, unknown>): string | undefined {
+  const action = typeof payload.action === 'string' ? payload.action : undefined;
+  if (objectType === 'pull_request' && action === 'closed' && isMergedPullRequestPayload(payload)) {
+    return 'merged';
+  }
+  return action;
+}
+
+function isMergedPullRequestPayload(payload: Record<string, unknown>): boolean {
+  return readNestedValue(payload, 'pull_request', 'merged') === true;
 }
 
 export * from './config.js';

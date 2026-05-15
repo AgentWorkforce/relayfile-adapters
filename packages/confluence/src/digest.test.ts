@@ -56,3 +56,50 @@ test('digest returns null for an empty Confluence event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest classifies Confluence trash, archive, and remove actions distinctly', async () => {
+  const ctx: DigestContext = {
+    provider: 'confluence',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'page.trashed',
+          canonicalPath: 'confluence/pages/123__release-plan.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'page.archived',
+          canonicalPath: 'confluence/pages/124__old-plan.json',
+        },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'page.remove',
+          canonicalPath: 'confluence/pages/125__deleted-plan.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'confluence',
+    bullets: [
+      {
+        text: 'page 123 was trashed',
+        canonicalPath: 'confluence/pages/123__release-plan.json',
+      },
+      {
+        text: 'page 124 was archived',
+        canonicalPath: 'confluence/pages/124__old-plan.json',
+      },
+      {
+        text: 'page 125 was deleted',
+        canonicalPath: 'confluence/pages/125__deleted-plan.json',
+      },
+    ],
+  });
+});

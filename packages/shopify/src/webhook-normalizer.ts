@@ -619,9 +619,13 @@ function normalizeAction(action: string): string {
     case 'fulfill':
     case 'fulfilled':
       return 'fulfill';
+    case 'cancel':
     case 'cancelled':
-    case 'edited':
+    case 'canceled':
+      return 'cancel';
     case 'paid':
+      return 'paid';
+    case 'edited':
     case 'partially_fulfilled':
     case 'update':
     case 'updated':

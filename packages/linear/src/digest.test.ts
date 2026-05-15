@@ -56,3 +56,30 @@ test('digest returns null for an empty Linear event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest classifies completed Linear issues as closed terminal updates', async () => {
+  const ctx: DigestContext = {
+    provider: 'linear',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'issue.completed',
+          canonicalPath: 'linear/issues/AGE-42__finish-digest.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'linear',
+    bullets: [
+      {
+        text: 'AGE-42 was closed',
+        canonicalPath: 'linear/issues/AGE-42__finish-digest.json',
+      },
+    ],
+  });
+});

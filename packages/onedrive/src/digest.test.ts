@@ -1,0 +1,85 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { digest, type DigestContext } from './digest.js';
+
+test('digest returns deterministic OneDrive bullets sorted by event time and id', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents(filter) {
+      assert.deepEqual(filter, { providers: ['onedrive'] });
+      return [
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'deleted',
+          canonicalPath: 'onedrive/me/Documents/old-draft.docx',
+        },
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'created',
+          canonicalPath: '/onedrive/me/Documents/budget.xlsx',
+        },
+      ];
+    },
+  };
+
+  const first = await digest(ctx);
+  const second = await digest(ctx);
+
+  assert.deepEqual(first, second);
+  assert.deepEqual(first, {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item Documents/budget.xlsx was created',
+        canonicalPath: 'onedrive/me/Documents/budget.xlsx',
+      },
+      {
+        text: 'item Documents/old-draft.docx was deleted',
+        canonicalPath: 'onedrive/me/Documents/old-draft.docx',
+      },
+    ],
+  });
+});
+
+test('digest classifies OneDrive move actions', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'moved',
+          canonicalPath: 'onedrive/me/Archive/report.pdf',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item Archive/report.pdf was moved',
+        canonicalPath: 'onedrive/me/Archive/report.pdf',
+      },
+    ],
+  });
+});
+
+test('digest returns null for an empty OneDrive event window', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [];
+    },
+  };
+
+  assert.equal(await digest(ctx), null);
+});

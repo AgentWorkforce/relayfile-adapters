@@ -186,6 +186,40 @@ test('event ingestion contains malformed paths and does not overcount void write
   assert.equal(result.errors.length, 1);
 });
 
+test('event ingestion preserves cancelled events as readable terminal records', async () => {
+  const writes: WriteFileInput[] = [];
+  const deletes: Array<{ path: string; workspaceId: string }> = [];
+  const client: RelayFileClientLike = {
+    async writeFile(input) {
+      writes.push(input);
+      return { updated: true };
+    },
+    async deleteFile(input) {
+      deletes.push(input);
+    },
+  };
+
+  const result = await ingestGoogleCalendarEvents(client, 'ws_1', [
+    {
+      id: 'evt_cancelled',
+      calendarId: 'primary',
+      status: 'cancelled',
+      summary: 'Canceled sync',
+      updated: '2026-05-12T09:00:00.000Z',
+    },
+  ]);
+
+  assert.equal(result.filesUpdated, 1);
+  assert.equal(result.filesDeleted, 0);
+  assert.equal(deletes.length, 0);
+  assert.equal(writes[0]?.path, '/google-calendar/calendars/primary/events/evt_cancelled.json');
+  assert.equal(writes[0]?.semantics?.properties?.['google_calendar.status'], 'cancelled');
+  const content = JSON.parse(writes[0]?.content ?? '{}') as {
+    payload?: { status?: string };
+  };
+  assert.equal(content.payload?.status, 'cancelled');
+});
+
 test('sync resets expired Google Calendar sync tokens and retries full window', async () => {
   const requests: ProxyRequest[] = [];
   const provider: ConnectionProvider = {

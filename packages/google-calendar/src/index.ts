@@ -1,3 +1,4 @@
+export * from './digest.js';
 export * from './google-calendar-adapter.js';
 export * from './path-mapper.js';
 export * from './resources.js';

@@ -46,7 +46,7 @@ test('normalizeConfluenceWebhook canonicalizes Atlassian webhookEvent and extrac
   });
 });
 
-test('normalizeConfluenceWebhook handles trashed events as remove and accepts dot-notation eventType', () => {
+test('normalizeConfluenceWebhook preserves trash/archive/remove actions distinctly', () => {
   const removed = normalizeConfluenceWebhook(
     {
       webhookEvent: 'page_trashed',
@@ -54,7 +54,25 @@ test('normalizeConfluenceWebhook handles trashed events as remove and accepts do
     },
     {},
   );
-  assert.equal(removed.eventType, 'page.remove');
+  assert.equal(removed.eventType, 'page.trashed');
+
+  const archived = normalizeConfluenceWebhook(
+    {
+      webhookEvent: 'page_archived',
+      page: { id: '98766', title: 'Old Plan' },
+    },
+    {},
+  );
+  assert.equal(archived.eventType, 'page.archived');
+
+  const deleted = normalizeConfluenceWebhook(
+    {
+      webhookEvent: 'page_removed',
+      page: { id: '98767', title: 'Deleted Plan' },
+    },
+    {},
+  );
+  assert.equal(deleted.eventType, 'page.remove');
 
   const explicit = normalizeConfluenceWebhook(
     {
@@ -107,17 +125,19 @@ test('validateConfluenceWebhookTimestamp enforces freshness', () => {
 });
 
 // Atlassian Connect sends events with a `confluence:` prefix. Make sure
-// restored and archived land on the same canonical eventType as the
-// un-prefixed variants — without these aliases the fallback splits the
-// underscore name into `confluence:page.restored` and downstream filters
-// on `page.update` miss the event entirely.
-test('normalizeConfluenceWebhook resolves prefixed page_restored / page_archived to page.update', () => {
-  for (const event of ['confluence:page_restored', 'confluence:page_archived']) {
+// restored and archived retain distinct canonical actions — without these
+// aliases the fallback splits the underscore name into `confluence:page.restored`.
+test('normalizeConfluenceWebhook resolves prefixed page_restored / page_archived distinctly', () => {
+  const cases = new Map([
+    ['confluence:page_restored', 'page.restored'],
+    ['confluence:page_archived', 'page.archived'],
+  ]);
+  for (const [event, eventType] of cases) {
     const normalized = normalizeConfluenceWebhook(
       { ...pagePayload, webhookEvent: event },
       { [CONFLUENCE_DELIVERY_HEADER]: `delivery_${event}` },
     );
-    assert.equal(normalized.eventType, 'page.update', `${event} should map to page.update`);
+    assert.equal(normalized.eventType, eventType, `${event} should retain its lifecycle action`);
     assert.equal(normalized.objectType, 'page');
   }
 });

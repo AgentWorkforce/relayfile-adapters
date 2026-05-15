@@ -48,4 +48,5 @@ export {
   validateCalendlyWebhookSignature,
 } from './webhook-normalizer.js';
 export * from './summary.js';
+export * from './digest.js';
 export type * from './types.js';

@@ -10,6 +10,7 @@ export const INTERCOM_WEBHOOK_ACTIONS = [
   'deleted',
   'closed',
   'reopened',
+  'archived',
   'assigned',
 ] as const;
 

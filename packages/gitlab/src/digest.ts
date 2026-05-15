@@ -112,6 +112,9 @@ function pastTense(event: DigestChangeEvent): string {
   if (/\b(success|succeeded)\b/u.test(action)) {
     return 'succeeded';
   }
+  if (/\b(cancel|canceled|cancelled)\b/u.test(action)) {
+    return 'was canceled';
+  }
   if (/\b(close|closed)\b/u.test(action)) {
     return 'was closed';
   }

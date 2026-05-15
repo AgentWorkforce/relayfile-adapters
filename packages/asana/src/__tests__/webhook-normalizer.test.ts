@@ -85,6 +85,30 @@ test('accepts known-good HMAC signature and normalizes Asana webhook payload', (
   });
 });
 
+test('normalizer preserves completed task lifecycle changes for digest actions', () => {
+  const normalized = normalizeAsanaWebhook({
+    events: [
+      {
+        action: 'changed',
+        change: {
+          action: 'changed',
+          field: 'completed',
+          new_value: true,
+        },
+        resource: {
+          gid: '12001',
+          name: 'Ship Asana adapter',
+          resource_type: 'task',
+        },
+      },
+    ],
+  });
+
+  assert.equal(normalized.eventType, 'task.completed');
+  const webhook = normalized.payload._webhook as Record<string, unknown>;
+  assert.equal(webhook.action, 'completed');
+});
+
 test('rejects tampered body with invalid-signature result and throwing helper', () => {
   const rawPayload = JSON.stringify(payload);
   const tamperedPayload = JSON.stringify({

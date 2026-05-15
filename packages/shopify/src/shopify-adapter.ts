@@ -126,6 +126,9 @@ export class ShopifyAdapter extends IntegrationAdapter {
       `${objectType}.create`,
       `${objectType}.update`,
       `${objectType}.delete`,
+      `${objectType}.cancel`,
+      `${objectType}.paid`,
+      `${objectType}.fulfill`,
     ]);
   }
 
@@ -846,8 +849,13 @@ function normalizeAction(action: string): string {
     case 'fulfilled':
     case 'fulfill':
       return 'fulfill';
-    case 'edited':
+    case 'cancel':
+    case 'cancelled':
+    case 'canceled':
+      return 'cancel';
     case 'paid':
+      return 'paid';
+    case 'edited':
     case 'partially_fulfilled':
     case 'updated':
     case 'update':

@@ -294,7 +294,7 @@ export class CalendlyAdapter extends IntegrationAdapter {
 
   private isDeleteEvent(event: NormalizedWebhook): boolean {
     const action = getWebhookAction(event.payload) ?? getEventAction(event.eventType);
-    return action === 'canceled' || action === 'deleted';
+    return action === 'deleted';
   }
 
   private renderContent(workspaceId: string, event: NormalizedWebhook, deleted: boolean): string {

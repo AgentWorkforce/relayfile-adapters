@@ -1,5 +1,6 @@
 export * from './adapter.js';
 export * from './bridge.js';
+export * from './digest.js';
 export * from './config.js';
 export * from './fetch-content.js';
 export * from './path-mapper.js';

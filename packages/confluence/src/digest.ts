@@ -110,6 +110,9 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'archive|archived')) {
     return 'was archived';
   }
+  if (hasActionVerb(action, 'trash|trashed')) {
+    return 'was trashed';
+  }
   if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
     return 'was deleted';
   }

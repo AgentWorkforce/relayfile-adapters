@@ -16,6 +16,7 @@ export {
 export * from './path-mapper.js';
 export * from './queries.js';
 export * from './summary.js';
+export * from './digest.js';
 export * from './webhook-normalizer.js';
 export * from './writeback.js';
 export type * from './types.js';

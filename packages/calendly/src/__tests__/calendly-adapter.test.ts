@@ -176,7 +176,7 @@ test('ingestWebhook writes event_type payloads with description semantics', asyn
   assert.deepEqual(client.writes[0]?.semantics?.comments, ['Technical screen with the platform team.']);
 });
 
-test('ingestWebhook deletes canceled scheduled events when deleteFile is available', async () => {
+test('ingestWebhook preserves canceled scheduled events as updates, not deletes', async () => {
   const client = createClient();
   const adapter = createAdapter(client);
 
@@ -189,6 +189,29 @@ test('ingestWebhook deletes canceled scheduled events when deleteFile is availab
       cancellation: {
         reason: 'Customer rescheduled',
       },
+    },
+  });
+
+  assert.equal(result.filesWritten, 1);
+  assert.equal(result.filesDeleted, 0);
+  assert.equal(client.deleted.length, 0);
+  assert.equal(client.writes.length, 1);
+  assert.equal(client.writes[0]?.path, '/calendly/scheduled-events/event_123.json');
+  const content = JSON.parse(client.writes[0]?.content ?? '{}');
+  assert.equal(content.deleted, false);
+  assert.equal(content.payload.status, 'canceled');
+});
+
+test('ingestWebhook deletes scheduled events only for deleted actions', async () => {
+  const client = createClient();
+  const adapter = createAdapter(client);
+
+  const result = await adapter.ingestWebhook('ws_123', {
+    event: 'scheduled_event.deleted',
+    payload: {
+      uri: 'https://api.calendly.com/scheduled_events/event_123',
+      name: 'Deleted call',
+      status: 'canceled',
     },
   });
 

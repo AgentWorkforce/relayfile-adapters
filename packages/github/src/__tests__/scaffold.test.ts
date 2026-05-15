@@ -201,4 +201,18 @@ describe('GitHubAdapter scaffold', () => {
       assert.strictEqual(typeof name, 'string');
     }
   });
+
+  it('computes merged pull request lifecycle semantics from real closed webhook payloads', () => {
+    const adapter = createAdapter();
+    const semantics = adapter.computeSemantics('pull_request', '42', {
+      ...REPO_PAYLOAD,
+      action: 'closed',
+      pull_request: {
+        number: 42,
+        merged: true,
+      },
+    });
+
+    assert.equal(semantics.properties?.action, 'merged');
+  });
 });

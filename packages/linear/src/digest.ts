@@ -102,7 +102,7 @@ function pastTense(event: DigestChangeEvent): string {
   if (/(delete|deleted|remove|removed)/u.test(action)) {
     return 'was deleted';
   }
-  if (/(close|closed|resolve|resolved|cancel|canceled)/u.test(action)) {
+  if (/(close|closed|resolve|resolved|complete|completed|done|cancel|canceled)/u.test(action)) {
     return 'was closed';
   }
   return 'was updated';

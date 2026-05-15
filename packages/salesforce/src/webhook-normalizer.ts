@@ -271,15 +271,20 @@ export function extractSalesforceAction(payload: unknown): string {
   const record = parseSalesforceWebhookPayload(payload);
   const metadata = getRecord(record.metadata);
   const webhook = getRecord(record._webhook);
-  const action =
+  const action = normalizeAction(
     readOptionalString(record.action) ??
     readOptionalString(record.eventAction) ??
     readOptionalString(record.event_action) ??
     readOptionalString(metadata?.action) ??
     readOptionalString(webhook?.action) ??
-    'updated';
+    'updated',
+  );
 
-  return normalizeAction(action);
+  if (action === 'updated' || action === 'upserted') {
+    return inferSalesforceLifecycleAction(record) ?? action;
+  }
+
+  return action;
 }
 
 /**
@@ -542,11 +547,48 @@ function normalizeAction(action: string): string {
     case 'upsert':
     case 'upserted':
       return 'upserted';
+    case 'close':
+    case 'closed':
+      return 'closed';
+    case 'convert':
+    case 'converted':
+      return 'converted';
     case 'update':
     case 'updated':
     default:
       return normalized || 'updated';
   }
+}
+
+function inferSalesforceLifecycleAction(record: SalesforceRecord): string | undefined {
+  const objectType = extractSalesforceObjectType(record).toLowerCase();
+  const data = getWebhookData(record);
+  if (!data) return undefined;
+
+  if (objectType === 'lead' && (data.IsConverted === true || data.isConverted === true)) {
+    return 'converted';
+  }
+
+  if (objectType === 'case') {
+    const status = readOptionalString(data.Status) ?? readOptionalString(data.status);
+    if (data.IsClosed === true || data.isClosed === true || isSalesforceClosedValue(status)) {
+      return 'closed';
+    }
+  }
+
+  if (objectType === 'opportunity') {
+    const stage = readOptionalString(data.StageName) ?? readOptionalString(data.stageName);
+    if (data.IsClosed === true || data.isClosed === true || isSalesforceClosedValue(stage)) {
+      return 'closed';
+    }
+  }
+
+  return undefined;
+}
+
+function isSalesforceClosedValue(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  return normalized === 'closed' || normalized === 'closed won' || normalized === 'closed lost' || normalized === 'converted';
 }
 
 function normalizeHeaders(headers: SalesforceWebhookHeaders): Record<string, string> {

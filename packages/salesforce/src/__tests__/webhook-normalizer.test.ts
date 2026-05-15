@@ -55,6 +55,34 @@ test('normalizeSalesforceWebhook accepts the literal shared secret in X-SFDC-Web
   assert.match(SALESFORCE_MTLS_DEPLOYMENT_NOTE, /mTLS/);
 });
 
+test('normalizeSalesforceWebhook preserves closed and converted lifecycle actions', () => {
+  const closedCase = normalizeSalesforceWebhook({
+    action: 'updated',
+    objectType: 'Case',
+    data: {
+      Id: '500A',
+      Status: 'Closed',
+      Subject: 'Billing question',
+    },
+  });
+  assert.equal(closedCase.eventType, 'Case.closed');
+  const closedWebhook = closedCase.payload._webhook as Record<string, unknown>;
+  assert.equal(closedWebhook.action, 'closed');
+
+  const convertedLead = normalizeSalesforceWebhook({
+    action: 'updated',
+    objectType: 'Lead',
+    data: {
+      Id: '00QA',
+      IsConverted: true,
+      Name: 'Grace Hopper',
+    },
+  });
+  assert.equal(convertedLead.eventType, 'Lead.converted');
+  const convertedWebhook = convertedLead.payload._webhook as Record<string, unknown>;
+  assert.equal(convertedWebhook.action, 'converted');
+});
+
 test('validateSalesforceWebhookSecret rejects a header with the wrong secret', () => {
   const rawPayload = JSON.stringify(accountPayload);
   const secret = 'salesforce-webhook-secret';
