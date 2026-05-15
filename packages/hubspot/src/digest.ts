@@ -111,6 +111,21 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'merge|merged')) {
     return 'was merged';
   }
+  if (hasActionVerb(action, 'archive|archived')) {
+    return 'was archived';
+  }
+  if (hasActionVerb(action, 'close|closed')) {
+    return 'was closed';
+  }
+  if (hasActionVerb(action, 'complete|completed|done')) {
+    return 'was completed';
+  }
+  if (hasActionVerb(action, 'cancel|canceled|cancelled')) {
+    return 'was canceled';
+  }
+  if (hasActionVerb(action, 'resolve|resolved')) {
+    return 'was resolved';
+  }
   return 'was updated';
 }
 

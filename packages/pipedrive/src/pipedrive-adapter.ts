@@ -121,11 +121,14 @@ export class PipedriveAdapter extends IntegrationAdapter {
   }
 
   override supportedEvents(): string[] {
-    return SUPPORTED_EVENTS.flatMap((objectType) => [
-      `${objectType}.created`,
-      `${objectType}.updated`,
-      `${objectType}.deleted`,
-    ]);
+    return SUPPORTED_EVENTS.flatMap((objectType) => {
+      const events = [
+        `${objectType}.created`,
+        `${objectType}.updated`,
+        `${objectType}.deleted`,
+      ];
+      return objectType === 'deal' ? [...events, 'deal.won', 'deal.lost'] : events;
+    });
   }
 
   override async ingestWebhook(

@@ -17,6 +17,12 @@ test('digest returns deterministic Intercom bullets sorted by event time and id'
           canonicalPath: '/intercom/conversations/conv-456.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/intercom/companies/co-999.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'created',
@@ -40,6 +46,10 @@ test('digest returns deterministic Intercom bullets sorted by event time and id'
       {
         text: 'conversation conv-456 was closed',
         canonicalPath: 'intercom/conversations/conv-456.json',
+      },
+      {
+        text: 'company co-999 was updated',
+        canonicalPath: 'intercom/companies/co-999.json',
       },
     ],
   });
@@ -69,6 +79,24 @@ test('digest classifies terminal states distinctly', async () => {
           action: 'deleted',
           canonicalPath: '/intercom/companies/co-gone.json',
         },
+        {
+          id: 'evt-4',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'resolved',
+          canonicalPath: '/intercom/conversations/conv-done.json',
+        },
+        {
+          id: 'evt-5',
+          timestamp: '2026-05-12T12:00:00.000Z',
+          action: 'canceled',
+          canonicalPath: '/intercom/conversations/conv-cancel.json',
+        },
+        {
+          id: 'evt-6',
+          timestamp: '2026-05-12T13:00:00.000Z',
+          action: 'merged',
+          canonicalPath: '/intercom/contacts/contact-merge.json',
+        },
       ];
     },
   };
@@ -80,6 +108,9 @@ test('digest classifies terminal states distinctly', async () => {
       { text: 'conversation conv-old was archived', canonicalPath: 'intercom/conversations/conv-old.json' },
       { text: 'conversation conv-reopen was reopened', canonicalPath: 'intercom/conversations/conv-reopen.json' },
       { text: 'company co-gone was deleted', canonicalPath: 'intercom/companies/co-gone.json' },
+      { text: 'conversation conv-done was resolved', canonicalPath: 'intercom/conversations/conv-done.json' },
+      { text: 'conversation conv-cancel was canceled', canonicalPath: 'intercom/conversations/conv-cancel.json' },
+      { text: 'contact contact-merge was merged', canonicalPath: 'intercom/contacts/contact-merge.json' },
     ],
   });
 });

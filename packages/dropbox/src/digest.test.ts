@@ -72,6 +72,33 @@ test('digest classifies Dropbox move actions', async () => {
   });
 });
 
+test('digest classifies Dropbox updates as modified', async () => {
+  const ctx: DigestContext = {
+    provider: 'dropbox',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'file.updated',
+          canonicalPath: 'dropbox/user/Documents/notes.txt',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'dropbox',
+    bullets: [
+      {
+        text: 'file Documents/notes.txt was modified',
+        canonicalPath: 'dropbox/user/Documents/notes.txt',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Dropbox event window', async () => {
   const ctx: DigestContext = {
     provider: 'dropbox',

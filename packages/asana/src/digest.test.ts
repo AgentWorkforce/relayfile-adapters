@@ -77,6 +77,30 @@ test('digest classifies terminal states distinctly', async () => {
   });
 });
 
+test('digest renders non-terminal changes as updated', async () => {
+  const ctx: DigestContext = {
+    provider: 'asana',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'changed',
+          canonicalPath: '/asana/tasks/rename-title__333.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'asana',
+    bullets: [
+      { text: 'task rename-title was updated', canonicalPath: 'asana/tasks/rename-title__333.json' },
+    ],
+  });
+});
+
 test('digest returns null for an empty Asana event window', async () => {
   const ctx: DigestContext = {
     provider: 'asana',

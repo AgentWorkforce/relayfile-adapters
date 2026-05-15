@@ -86,9 +86,10 @@ function normalizeDigestPath(path: string): string {
 
 function slackIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
-  const segment = segments.at(-1) === 'message.json' || segments.at(-1) === 'profile.json'
+  const tail = segments.at(-1);
+  const segment = tail === 'message.json' || tail === 'profile.json' || tail === 'meta.json'
     ? segments.at(-2) ?? path
-    : segments.at(-1) ?? path;
+    : tail ?? path;
   const basename = segment.replace(/\.[^.]+$/u, '');
   const separatorIndex = basename.lastIndexOf('__');
   const id = separatorIndex > 0 ? basename.slice(0, separatorIndex) : basename;

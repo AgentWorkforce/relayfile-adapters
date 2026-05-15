@@ -107,6 +107,9 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'create|created|add|added|write|written')) {
     return 'was created';
   }
+  if (hasActionVerb(action, 'restore|restored|unarchive|unarchived')) {
+    return 'was restored';
+  }
   if (hasActionVerb(action, 'archive|archived')) {
     return 'was archived';
   }

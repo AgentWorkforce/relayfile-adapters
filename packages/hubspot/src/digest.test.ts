@@ -63,6 +63,18 @@ test('digest classifies terminal states distinctly', async () => {
           action: 'merged',
           canonicalPath: '/hubspot/contacts/dup__301.json',
         },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'ticket.resolved',
+          canonicalPath: '/hubspot/tickets/support-case__401.json',
+        },
+        {
+          id: 'evt-4',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'deal.canceled',
+          canonicalPath: '/hubspot/deals/churn-risk__501.json',
+        },
       ];
     },
   };
@@ -73,6 +85,8 @@ test('digest classifies terminal states distinctly', async () => {
     bullets: [
       { text: 'company old-co was deleted', canonicalPath: 'hubspot/companies/old-co__201.json' },
       { text: 'contact dup was merged', canonicalPath: 'hubspot/contacts/dup__301.json' },
+      { text: 'ticket support-case was resolved', canonicalPath: 'hubspot/tickets/support-case__401.json' },
+      { text: 'deal churn-risk was canceled', canonicalPath: 'hubspot/deals/churn-risk__501.json' },
     ],
   });
 });

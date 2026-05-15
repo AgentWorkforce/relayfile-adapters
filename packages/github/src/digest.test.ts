@@ -100,6 +100,33 @@ test('digest classifies merged pull requests distinctly from closed issues', asy
   });
 });
 
+test('digest classifies deleted events', async () => {
+  const ctx: DigestContext = {
+    provider: 'github',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-del-1',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'deleted',
+          canonicalPath: 'github/repos/acme/api/issues/45__cleanup/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'github',
+    bullets: [
+      {
+        text: '#45 was deleted',
+        canonicalPath: 'github/repos/acme/api/issues/45__cleanup/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty GitHub event window', async () => {
   const ctx: DigestContext = {
     provider: 'github',

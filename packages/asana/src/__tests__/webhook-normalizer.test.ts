@@ -109,6 +109,26 @@ test('normalizer preserves completed task lifecycle changes for digest actions',
   assert.equal(webhook.action, 'completed');
 });
 
+test('normalizer does not infer completed from steady-state completed flags', () => {
+  const normalized = normalizeAsanaWebhook({
+    events: [
+      {
+        action: 'changed',
+        resource: {
+          gid: '12001',
+          name: 'Already done task',
+          resource_type: 'task',
+          completed: true,
+        },
+      },
+    ],
+  });
+
+  assert.equal(normalized.eventType, 'task.changed');
+  const webhook = normalized.payload._webhook as Record<string, unknown>;
+  assert.equal(webhook.action, 'changed');
+});
+
 test('rejects tampered body with invalid-signature result and throwing helper', () => {
   const rawPayload = JSON.stringify(payload);
   const tamperedPayload = JSON.stringify({

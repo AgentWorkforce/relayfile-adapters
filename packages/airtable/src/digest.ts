@@ -107,6 +107,24 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
     return 'was deleted';
   }
+  if (hasActionVerb(action, 'archive|archived')) {
+    return 'was archived';
+  }
+  if (hasActionVerb(action, 'unarchive|unarchived|restore|restored')) {
+    return 'was unarchived';
+  }
+  if (hasActionVerb(action, 'complete|completed|done')) {
+    return 'was completed';
+  }
+  if (hasActionVerb(action, 'cancel|canceled|cancelled')) {
+    return 'was canceled';
+  }
+  if (hasActionVerb(action, 'resolve|resolved')) {
+    return 'was resolved';
+  }
+  if (hasActionVerb(action, 'merge|merged')) {
+    return 'was merged';
+  }
   return 'was updated';
 }
 

@@ -107,12 +107,13 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
     return 'was deleted';
   }
-  if (hasActionVerb(action, 'close|closed|complete|completed|resolve|resolved|done')) {
+  if (hasActionVerb(action, 'close|closed|complete|completed|resolve|resolved|done|cancel|canceled|cancelled')) {
     return 'was completed';
   }
   return 'was updated';
 }
 
 function hasActionVerb(action: string, verbs: string): boolean {
+  // Safe: all call sites pass static verb lists with simple alternation.
   return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
 }

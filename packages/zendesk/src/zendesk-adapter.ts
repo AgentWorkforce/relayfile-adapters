@@ -286,7 +286,15 @@ export class ZendeskAdapter extends IntegrationAdapter {
       const previous = getRecord(event.previous);
       const currentStatus = asString(objectData.status)?.toLowerCase();
       const previousStatus = asString(previous?.status)?.toLowerCase();
-      if (currentStatus && currentStatus !== previousStatus && (currentStatus === 'solved' || currentStatus === 'closed')) {
+      const hasPreviousStatus = previous !== undefined
+        && Object.prototype.hasOwnProperty.call(previous, 'status');
+      if (
+        currentStatus
+        && hasPreviousStatus
+        && previousStatus
+        && currentStatus !== previousStatus
+        && (currentStatus === 'solved' || currentStatus === 'closed')
+      ) {
         action = 'solved';
       }
     }

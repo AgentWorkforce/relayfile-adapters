@@ -82,6 +82,33 @@ test('digest classifies Box lock and copy actions', async () => {
   });
 });
 
+test('digest classifies Box updates as modified', async () => {
+  const ctx: DigestContext = {
+    provider: 'box',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'ITEM_UPDATE',
+          canonicalPath: 'box/acct/files/name__f123.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'box',
+    bullets: [
+      {
+        text: 'file name was modified',
+        canonicalPath: 'box/acct/files/name__f123.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Box event window', async () => {
   const ctx: DigestContext = {
     provider: 'box',

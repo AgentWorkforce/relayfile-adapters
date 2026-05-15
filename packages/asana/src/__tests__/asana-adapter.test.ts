@@ -55,6 +55,7 @@ test('AsanaAdapter exposes provider name and supported Asana webhook events', ()
   assert.deepEqual(adapter.supportedEvents(), [
     'task.added',
     'task.changed',
+    'task.completed',
     'task.deleted',
     'task.removed',
     'project.added',

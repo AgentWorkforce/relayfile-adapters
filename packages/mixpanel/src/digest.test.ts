@@ -110,6 +110,33 @@ test('digest identifies cohorts by resource path', async () => {
   });
 });
 
+test('digest accepts the leading-slash Mixpanel root path', async () => {
+  const ctx: DigestContext = {
+    provider: 'mixpanel',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/mixpanel',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'mixpanel',
+    bullets: [
+      {
+        text: 'mixpanel was updated',
+        canonicalPath: 'mixpanel',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Mixpanel event window', async () => {
   const ctx: DigestContext = {
     provider: 'mixpanel',

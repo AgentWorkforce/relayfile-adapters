@@ -96,7 +96,10 @@ function pastTense(event: DigestChangeEvent): string {
   if (hasActionVerb(action, 'create|created|put|upload|uploaded|write|written')) {
     return 'was uploaded';
   }
-  if (hasActionVerb(action, 'copy|copied|restore|restored')) {
+  if (hasActionVerb(action, 'objectrestore|restore|restored')) {
+    return 'was restored';
+  }
+  if (hasActionVerb(action, 'copy|copied')) {
     return 'was copied';
   }
   if (hasActionVerb(action, 'delete|deleted|remove|removed')) {

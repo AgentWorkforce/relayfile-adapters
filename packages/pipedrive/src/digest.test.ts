@@ -77,6 +77,30 @@ test('digest classifies terminal states distinctly', async () => {
   });
 });
 
+test('digest maps updated actions to updated wording', async () => {
+  const ctx: DigestContext = {
+    provider: 'pipedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'pipedrive/deals/renewal__11.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'pipedrive',
+    bullets: [
+      { text: 'deal renewal was updated', canonicalPath: 'pipedrive/deals/renewal__11.json' },
+    ],
+  });
+});
+
 test('digest returns null for an empty Pipedrive event window', async () => {
   const ctx: DigestContext = {
     provider: 'pipedrive',

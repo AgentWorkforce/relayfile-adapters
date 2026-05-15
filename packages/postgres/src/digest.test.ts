@@ -72,6 +72,33 @@ test('digest classifies Postgres truncate as terminal state', async () => {
   });
 });
 
+test('digest classifies Postgres update actions as updated', async () => {
+  const ctx: DigestContext = {
+    provider: 'postgres',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'UPDATE',
+          canonicalPath: 'postgres/mydb/public/users/42.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'postgres',
+    bullets: [
+      {
+        text: 'row users/42 was updated',
+        canonicalPath: 'postgres/mydb/public/users/42.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Postgres event window', async () => {
   const ctx: DigestContext = {
     provider: 'postgres',

@@ -17,6 +17,12 @@ test('digest returns deterministic Airtable bullets sorted by event time and id'
           canonicalPath: '/airtable/bases/appXYZ/tables/tblABC/records/rec456__invoice.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/airtable/bases/appXYZ/tables/tblABC/records/rec789__status.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'created',
@@ -40,6 +46,57 @@ test('digest returns deterministic Airtable bullets sorted by event time and id'
       {
         text: 'record rec456 was deleted',
         canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec456__invoice.json',
+      },
+      {
+        text: 'record rec789 was updated',
+        canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec789__status.json',
+      },
+    ],
+  });
+});
+
+test('digest classifies Airtable terminal lifecycle actions explicitly', async () => {
+  const ctx: DigestContext = {
+    provider: 'airtable',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'archived',
+          canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec999__old.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'canceled',
+          canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec998__void.json',
+        },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'resolved',
+          canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec997__ticket.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'airtable',
+    bullets: [
+      {
+        text: 'record rec999 was archived',
+        canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec999__old.json',
+      },
+      {
+        text: 'record rec998 was canceled',
+        canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec998__void.json',
+      },
+      {
+        text: 'record rec997 was resolved',
+        canonicalPath: 'airtable/bases/appXYZ/tables/tblABC/records/rec997__ticket.json',
       },
     ],
   });

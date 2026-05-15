@@ -77,6 +77,33 @@ test('digest classifies terminal states distinctly', async () => {
   });
 });
 
+test('digest classifies Salesforce updates as updated', async () => {
+  const ctx: DigestContext = {
+    provider: 'salesforce',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/salesforce/contacts/john-doe__003XYZ.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'salesforce',
+    bullets: [
+      {
+        text: 'contact john-doe was updated',
+        canonicalPath: 'salesforce/contacts/john-doe__003XYZ.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Salesforce event window', async () => {
   const ctx: DigestContext = {
     provider: 'salesforce',

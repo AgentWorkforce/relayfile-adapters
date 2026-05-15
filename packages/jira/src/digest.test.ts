@@ -17,6 +17,24 @@ test('digest returns deterministic Jira bullets sorted by event time and id', as
           canonicalPath: '/jira/issues/ENG-42__release-plan.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'jira:issue_updated',
+          canonicalPath: '/jira/issues/ENG-43__follow-up.json',
+        },
+        {
+          id: 'evt-4',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'deleted',
+          canonicalPath: '/jira/issues/ENG-44__obsolete.json',
+        },
+        {
+          id: 'evt-5',
+          timestamp: '2026-05-12T12:00:00.000Z',
+          action: 'canceled',
+          canonicalPath: '/jira/issues/ENG-45__cancelled.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'jira:issue_created',
@@ -40,6 +58,18 @@ test('digest returns deterministic Jira bullets sorted by event time and id', as
       {
         text: 'issue ENG-42 was completed',
         canonicalPath: 'jira/issues/ENG-42__release-plan.json',
+      },
+      {
+        text: 'issue ENG-43 was updated',
+        canonicalPath: 'jira/issues/ENG-43__follow-up.json',
+      },
+      {
+        text: 'issue ENG-44 was deleted',
+        canonicalPath: 'jira/issues/ENG-44__obsolete.json',
+      },
+      {
+        text: 'issue ENG-45 was completed',
+        canonicalPath: 'jira/issues/ENG-45__cancelled.json',
       },
     ],
   });

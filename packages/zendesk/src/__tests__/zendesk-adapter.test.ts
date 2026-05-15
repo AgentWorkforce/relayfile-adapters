@@ -139,6 +139,25 @@ test('ingestWebhook writes organization callbacks with domain metadata', async (
   assert.equal(captures[0]?.semantics?.properties?.['zendesk.domain_count'], '2');
 });
 
+test('ingestWebhook only infers solved when previous ticket status is explicit', async () => {
+  const captures: WriteFileInput[] = [];
+  const adapter = createAdapter(captures);
+
+  const result = await adapter.ingestWebhook('workspace_123', {
+    action: 'updated',
+    type: 'ticket',
+    ticket: {
+      id: 124,
+      subject: 'Already solved',
+      status: 'solved',
+    },
+  });
+
+  assert.equal(result.filesUpdated, 1);
+  assert.equal(captures[0]?.path, '/zendesk/tickets/124.json');
+  assert.equal(captures[0]?.semantics?.properties?.['zendesk.webhook.action'], 'updated');
+});
+
 test('computeSemantics extracts ticket fields, comments, tags, and relations deterministically', () => {
   const adapter = createAdapter();
 

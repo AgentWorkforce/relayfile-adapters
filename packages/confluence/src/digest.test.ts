@@ -17,6 +17,12 @@ test('digest returns deterministic Confluence bullets sorted by event time and i
           canonicalPath: '/confluence/pages/123__release-plan.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'confluence/pages/124__follow-up.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'created',
@@ -40,6 +46,10 @@ test('digest returns deterministic Confluence bullets sorted by event time and i
       {
         text: 'page 123 was archived',
         canonicalPath: 'confluence/pages/123__release-plan.json',
+      },
+      {
+        text: 'page 124 was updated',
+        canonicalPath: 'confluence/pages/124__follow-up.json',
       },
     ],
   });
@@ -81,6 +91,12 @@ test('digest classifies Confluence trash, archive, and remove actions distinctly
           action: 'page.remove',
           canonicalPath: 'confluence/pages/125__deleted-plan.json',
         },
+        {
+          id: 'evt-4',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'page.restored',
+          canonicalPath: 'confluence/pages/126__restored-plan.json',
+        },
       ];
     },
   };
@@ -99,6 +115,10 @@ test('digest classifies Confluence trash, archive, and remove actions distinctly
       {
         text: 'page 125 was deleted',
         canonicalPath: 'confluence/pages/125__deleted-plan.json',
+      },
+      {
+        text: 'page 126 was restored',
+        canonicalPath: 'confluence/pages/126__restored-plan.json',
       },
     ],
   });

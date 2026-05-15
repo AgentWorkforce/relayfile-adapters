@@ -131,3 +131,30 @@ test('digest classifies canceled GitLab pipeline lifecycle states', async () => 
     ],
   });
 });
+
+test('digest classifies deleted GitLab records', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'deleted',
+          canonicalPath: 'gitlab/projects/acme/api/issues/99__cleanup/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'issue #99 was deleted',
+        canonicalPath: 'gitlab/projects/acme/api/issues/99__cleanup/meta.json',
+      },
+    ],
+  });
+});

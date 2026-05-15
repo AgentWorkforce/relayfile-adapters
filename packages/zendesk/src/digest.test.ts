@@ -17,6 +17,12 @@ test('digest returns deterministic Zendesk bullets sorted by event time and id',
           canonicalPath: '/zendesk/tickets/4567.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/zendesk/tickets/7890.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'created',
@@ -40,6 +46,10 @@ test('digest returns deterministic Zendesk bullets sorted by event time and id',
       {
         text: 'ticket 4567 was solved',
         canonicalPath: 'zendesk/tickets/4567.json',
+      },
+      {
+        text: 'ticket 7890 was updated',
+        canonicalPath: 'zendesk/tickets/7890.json',
       },
     ],
   });

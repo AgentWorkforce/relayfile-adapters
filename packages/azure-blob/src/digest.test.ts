@@ -72,6 +72,33 @@ test('digest classifies Azure Blob archive tier changes', async () => {
   });
 });
 
+test('digest classifies Azure Blob updates as modified', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobUpdated',
+          canonicalPath: 'azure-blob/acct/container/data/report.csv',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [
+      {
+        text: 'blob data/report.csv was modified',
+        canonicalPath: 'azure-blob/acct/container/data/report.csv',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Azure Blob event window', async () => {
   const ctx: DigestContext = {
     provider: 'azure-blob',

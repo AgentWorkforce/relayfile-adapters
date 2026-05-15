@@ -126,6 +126,7 @@ export class AsanaAdapter extends IntegrationAdapter {
     return SUPPORTED_EVENTS.flatMap((objectType) => [
       `${objectType}.added`,
       `${objectType}.changed`,
+      ...(objectType === 'task' ? [`${objectType}.completed`] : []),
       `${objectType}.deleted`,
       `${objectType}.removed`,
     ]);
@@ -317,7 +318,7 @@ export class AsanaAdapter extends IntegrationAdapter {
         asString(eventItem.action) ?? asString(getRecord(eventItem.change)?.action) ?? 'changed',
       );
       const change = getRecord(eventItem.change);
-      if (action === 'changed' && objectType === 'task' && change?.field === 'completed' && change.new_value) {
+      if (action === 'changed' && objectType === 'task' && change?.field === 'completed' && change.new_value === true) {
         action = 'completed';
       }
       const payload = mergeAsanaPayload(event, eventItem, objectType, objectId, action);

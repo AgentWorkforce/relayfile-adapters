@@ -115,5 +115,6 @@ function pastTense(event: DigestChangeEvent): string {
 }
 
 function hasActionVerb(action: string, verbs: string): boolean {
+  // Safe: all call sites pass static verb lists with simple alternation.
   return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
 }

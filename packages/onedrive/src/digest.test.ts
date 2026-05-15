@@ -72,6 +72,60 @@ test('digest classifies OneDrive move actions', async () => {
   });
 });
 
+test('digest maps non-terminal OneDrive actions to modified wording', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'onedrive/me/Documents/notes.txt',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item Documents/notes.txt was modified',
+        canonicalPath: 'onedrive/me/Documents/notes.txt',
+      },
+    ],
+  });
+});
+
+test('digest accepts the leading-slash OneDrive root path', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/onedrive',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item onedrive was modified',
+        canonicalPath: 'onedrive',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty OneDrive event window', async () => {
   const ctx: DigestContext = {
     provider: 'onedrive',

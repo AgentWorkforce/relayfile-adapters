@@ -17,6 +17,12 @@ test('digest returns deterministic Calendly bullets sorted by event time and id'
           canonicalPath: '/calendly/scheduled-events/abc-123.json',
         },
         {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'invitee.updated',
+          canonicalPath: 'calendly/invitees/inv-789.json',
+        },
+        {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'invitee.created',
@@ -40,6 +46,10 @@ test('digest returns deterministic Calendly bullets sorted by event time and id'
       {
         text: 'event abc-123 was canceled',
         canonicalPath: 'calendly/scheduled-events/abc-123.json',
+      },
+      {
+        text: 'invitee inv-789 was updated',
+        canonicalPath: 'calendly/invitees/inv-789.json',
       },
     ],
   });

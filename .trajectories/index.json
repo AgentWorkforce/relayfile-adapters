@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-12T01:36:53.866Z",
+  "lastUpdated": "2026-05-15T11:58:11.340Z",
   "trajectories": {
     "traj_q7vhb9378uqk": {
       "title": "Wire Jira privacy-safe adapter storage",
@@ -334,6 +334,55 @@
       "startedAt": "2026-05-12T01:29:12.191Z",
       "completedAt": "2026-05-12T01:36:53.740Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_16jy5n5ejwmn.json"
+    },
+    "traj_26dxjcy6eeao": {
+      "title": "Implement Tier-2 buildSummary adapters for Salesforce, HubSpot, Stripe, Zendesk, and Asana",
+      "status": "completed",
+      "startedAt": "2026-05-12T07:43:30.336Z",
+      "completedAt": "2026-05-12T07:51:21.689Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_26dxjcy6eeao.json"
+    },
+    "traj_653cvqi7c650": {
+      "title": "Address PR 67 feedback",
+      "status": "abandoned",
+      "startedAt": "2026-05-12T10:04:48.218Z",
+      "completedAt": "2026-05-12T10:19:47.488Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_653cvqi7c650.json"
+    },
+    "traj_aad65ivnpfxj": {
+      "title": "Address PR 68 feedback",
+      "status": "completed",
+      "startedAt": "2026-05-12T10:24:14.001Z",
+      "completedAt": "2026-05-15T10:22:52.332Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_aad65ivnpfxj.json"
+    },
+    "traj_d8xc6lop46pt": {
+      "title": "Track G: Tier-3 buildSummary (9 providers)",
+      "status": "completed",
+      "startedAt": "2026-05-12T08:09:19.612Z",
+      "completedAt": "2026-05-12T08:28:28.057Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_d8xc6lop46pt.json"
+    },
+    "traj_et4ghsuda3uz": {
+      "title": "Finish relayfile adapter lifecycle digest sweep",
+      "status": "completed",
+      "startedAt": "2026-05-15T10:36:32.907Z",
+      "completedAt": "2026-05-15T10:37:12.092Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_et4ghsuda3uz.json"
+    },
+    "traj_vy46it87lscw": {
+      "title": "Implement Tier-2 buildSummary adapters for Salesforce, HubSpot, Stripe, Zendesk, and Asana",
+      "status": "completed",
+      "startedAt": "2026-05-12T06:28:57.987Z",
+      "completedAt": "2026-05-12T06:37:06.442Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_vy46it87lscw.json"
+    },
+    "traj_gp710tis5d5b": {
+      "title": "Address relayfile-adapters PR 97 review comments",
+      "status": "completed",
+      "startedAt": "2026-05-15T11:47:53.245Z",
+      "completedAt": "2026-05-15T11:58:11.229Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_gp710tis5d5b.json"
     }
   }
 }

@@ -57,6 +57,18 @@ test('digest classifies S3 copy and restore actions', async () => {
           action: 'ObjectCreated:Copy',
           canonicalPath: 's3/my-bucket/backup/data.json',
         },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'ObjectRestore:Completed',
+          canonicalPath: 's3/my-bucket/archive/report.csv',
+        },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'ObjectTagsUpdated',
+          canonicalPath: 's3/my-bucket/data/report.csv',
+        },
       ];
     },
   };
@@ -67,6 +79,14 @@ test('digest classifies S3 copy and restore actions', async () => {
       {
         text: 'object backup/data was copied',
         canonicalPath: 's3/my-bucket/backup/data.json',
+      },
+      {
+        text: 'object archive/report.csv was restored',
+        canonicalPath: 's3/my-bucket/archive/report.csv',
+      },
+      {
+        text: 'object data/report.csv was modified',
+        canonicalPath: 's3/my-bucket/data/report.csv',
       },
     ],
   });

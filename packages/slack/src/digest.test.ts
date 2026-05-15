@@ -93,3 +93,30 @@ test('digest classifies Slack channel archive and unarchive state changes', asyn
     ],
   });
 });
+
+test('digest classifies Slack channel updates and meta paths', async () => {
+  const ctx: DigestContext = {
+    provider: 'slack',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'channel.changed',
+          canonicalPath: 'slack/channels/C321__ops/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'slack',
+    bullets: [
+      {
+        text: 'channel C321 was updated',
+        canonicalPath: 'slack/channels/C321__ops/meta.json',
+      },
+    ],
+  });
+});

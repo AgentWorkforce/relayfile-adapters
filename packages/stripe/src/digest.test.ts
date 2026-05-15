@@ -149,6 +149,43 @@ test('digest classifies finalized and paid invoice states', async () => {
   });
 });
 
+test('digest classifies Stripe updated and deleted customer events', async () => {
+  const ctx: DigestContext = {
+    provider: 'stripe',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'customer.updated',
+          canonicalPath: 'stripe/customers/cus_xyz789.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'customer.deleted',
+          canonicalPath: 'stripe/customers/cus_xyz789.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'stripe',
+    bullets: [
+      {
+        text: 'customer cus_xyz789 was updated',
+        canonicalPath: 'stripe/customers/cus_xyz789.json',
+      },
+      {
+        text: 'customer cus_xyz789 was deleted',
+        canonicalPath: 'stripe/customers/cus_xyz789.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Stripe event window', async () => {
   const ctx: DigestContext = {
     provider: 'stripe',

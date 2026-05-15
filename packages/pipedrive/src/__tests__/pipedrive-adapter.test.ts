@@ -91,6 +91,8 @@ test('PipedriveAdapter exposes provider name and supported webhook events', () =
     'deal.created',
     'deal.updated',
     'deal.deleted',
+    'deal.won',
+    'deal.lost',
     'person.created',
     'person.updated',
     'person.deleted',

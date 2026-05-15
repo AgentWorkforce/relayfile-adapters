@@ -82,6 +82,33 @@ test('digest classifies Redis delete and expiry as terminal states', async () =>
   });
 });
 
+test('digest classifies non-terminal Redis mutations as updated', async () => {
+  const ctx: DigestContext = {
+    provider: 'redis',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'rename',
+          canonicalPath: 'redis/0/cache:user:42',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'redis',
+    bullets: [
+      {
+        text: 'key cache:user:42 was updated',
+        canonicalPath: 'redis/0/cache:user:42',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty Redis event window', async () => {
   const ctx: DigestContext = {
     provider: 'redis',

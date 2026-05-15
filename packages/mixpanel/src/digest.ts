@@ -55,7 +55,12 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'mixpanel' || event.canonicalPath.startsWith('mixpanel/') || event.canonicalPath.startsWith('/mixpanel/'))
+    && (
+      event.canonicalPath === 'mixpanel'
+      || event.canonicalPath === '/mixpanel'
+      || event.canonicalPath.startsWith('mixpanel/')
+      || event.canonicalPath.startsWith('/mixpanel/')
+    )
   );
 }
 

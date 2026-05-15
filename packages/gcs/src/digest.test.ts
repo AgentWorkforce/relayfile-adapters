@@ -72,6 +72,33 @@ test('digest classifies GCS archive actions', async () => {
   });
 });
 
+test('digest classifies GCS metadata updates as modified', async () => {
+  const ctx: DigestContext = {
+    provider: 'gcs',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'OBJECT_METADATA_UPDATE',
+          canonicalPath: 'gcs/my-bucket/data/report.csv',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gcs',
+    bullets: [
+      {
+        text: 'object data/report.csv was modified',
+        canonicalPath: 'gcs/my-bucket/data/report.csv',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty GCS event window', async () => {
   const ctx: DigestContext = {
     provider: 'gcs',
