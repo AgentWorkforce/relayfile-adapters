@@ -55,7 +55,7 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'shopify' || event.canonicalPath.startsWith('shopify/') || event.canonicalPath.startsWith('/shopify/'))
+    && (event.canonicalPath === 'shopify' || event.canonicalPath === '/shopify' || event.canonicalPath.startsWith('shopify/') || event.canonicalPath.startsWith('/shopify/'))
   );
 }
 

@@ -57,6 +57,7 @@ function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent 
     typeof event.canonicalPath === 'string'
     && (
       event.canonicalPath === 'confluence'
+      || event.canonicalPath === '/confluence'
       || event.canonicalPath.startsWith('confluence/')
       || event.canonicalPath.startsWith('/confluence/')
     )

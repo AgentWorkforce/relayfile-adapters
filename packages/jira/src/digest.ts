@@ -55,7 +55,7 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'jira' || event.canonicalPath.startsWith('jira/') || event.canonicalPath.startsWith('/jira/'))
+    && (event.canonicalPath === 'jira' || event.canonicalPath === '/jira' || event.canonicalPath.startsWith('jira/') || event.canonicalPath.startsWith('/jira/'))
   );
 }
 

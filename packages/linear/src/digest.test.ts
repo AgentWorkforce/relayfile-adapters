@@ -57,7 +57,7 @@ test('digest returns null for an empty Linear event window', async () => {
   assert.equal(await digest(ctx), null);
 });
 
-test('digest classifies completed Linear issues as closed terminal updates', async () => {
+test('digest classifies Linear issue completion and cancellation distinctly', async () => {
   const ctx: DigestContext = {
     provider: 'linear',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
@@ -69,6 +69,12 @@ test('digest classifies completed Linear issues as closed terminal updates', asy
           action: 'issue.completed',
           canonicalPath: 'linear/issues/AGE-42__finish-digest.json',
         },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'issue.canceled',
+          canonicalPath: 'linear/issues/AGE-43__cancel-digest.json',
+        },
       ];
     },
   };
@@ -77,8 +83,39 @@ test('digest classifies completed Linear issues as closed terminal updates', asy
     provider: 'linear',
     bullets: [
       {
-        text: 'AGE-42 was closed',
+        text: 'AGE-42 was completed',
         canonicalPath: 'linear/issues/AGE-42__finish-digest.json',
+      },
+      {
+        text: 'AGE-43 was canceled',
+        canonicalPath: 'linear/issues/AGE-43__cancel-digest.json',
+      },
+    ],
+  });
+});
+
+test('digest treats uncanceled Linear wording as updated, not canceled', async () => {
+  const ctx: DigestContext = {
+    provider: 'linear',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'issue.uncanceled',
+          canonicalPath: 'linear/issues/AGE-44__resume-work.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'linear',
+    bullets: [
+      {
+        text: 'AGE-44 was updated',
+        canonicalPath: 'linear/issues/AGE-44__resume-work.json',
       },
     ],
   });

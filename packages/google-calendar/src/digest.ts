@@ -56,6 +56,7 @@ function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent 
   return (
     typeof event.canonicalPath === 'string'
     && (event.canonicalPath === 'google-calendar'
+      || event.canonicalPath === '/google-calendar'
       || event.canonicalPath.startsWith('google-calendar/')
       || event.canonicalPath.startsWith('/google-calendar/'))
   );

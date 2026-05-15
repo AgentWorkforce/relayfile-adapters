@@ -55,7 +55,7 @@ export const digest: DigestHandler = async (ctx) => {
 function hasCanonicalPath(event: DigestChangeEvent): event is DigestChangeEvent & { canonicalPath: string } {
   return (
     typeof event.canonicalPath === 'string'
-    && (event.canonicalPath === 'linear' || event.canonicalPath.startsWith('linear/') || event.canonicalPath.startsWith('/linear/'))
+    && (event.canonicalPath === 'linear' || event.canonicalPath === '/linear' || event.canonicalPath.startsWith('linear/') || event.canonicalPath.startsWith('/linear/'))
   );
 }
 
@@ -96,14 +96,24 @@ function linearIdentifier(path: string): string {
 
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (/(create|created|open|opened|add|added|write|written)/u.test(action)) {
+  if (hasActionVerb(action, 'create|created|open|opened|add|added|write|written')) {
     return 'was created';
   }
-  if (/(delete|deleted|remove|removed)/u.test(action)) {
+  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
     return 'was deleted';
   }
-  if (/(close|closed|resolve|resolved|complete|completed|done|cancel|canceled)/u.test(action)) {
+  if (hasActionVerb(action, 'cancel|canceled|cancelled')) {
+    return 'was canceled';
+  }
+  if (hasActionVerb(action, 'complete|completed|done')) {
+    return 'was completed';
+  }
+  if (hasActionVerb(action, 'close|closed|resolve|resolved')) {
     return 'was closed';
   }
   return 'was updated';
+}
+
+function hasActionVerb(action: string, verbs: string): boolean {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
 }

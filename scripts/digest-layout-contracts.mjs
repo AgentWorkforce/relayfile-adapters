@@ -104,6 +104,13 @@ for (const provider of providerPackages()) {
   if (!/ctx\.changeEvents\s*\(\s*\{\s*providers\s*:\s*\[\s*ctx\.provider\s*\]\s*\}\s*\)/u.test(digestSource)) {
     failures.push(`${provider}: digest must scope ctx.changeEvents to ctx.provider`);
   }
+  if (
+    digestSource.includes(`startsWith('/${provider}/')`)
+    && !digestSource.includes(`event.canonicalPath === '/${provider}'`)
+    && !digestSource.includes(`canonicalPath === '/${provider}'`)
+  ) {
+    failures.push(`${provider}: digest canonical-path filter must accept exact /${provider}`);
+  }
 
   if (!existsSync(indexPath) || !readFileSync(indexPath, 'utf8').includes("from './digest.js'")) {
     failures.push(`${provider}: package barrel must export src/digest.ts`);
