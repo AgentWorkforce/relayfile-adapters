@@ -160,6 +160,34 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.equal(byTitle.canonicalPath, '/gitlab/projects/acme/api/issues/7__new-title/meta.json');
   });
 
+  it('deletes legacy issue canonical paths recorded in the by-id alias', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: '/gitlab/projects/acme/api/issues/legacy/7.json',
+      title: 'Fix bug',
+      state: 'opened',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/issues/legacy/7.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          projectPath: 'acme/api',
+          iid: 7,
+          title: 'Fix bug',
+          state: 'opened',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/legacy/7.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/7__fix-bug/meta.json'));
+  });
+
   it('moves issue assignee, creator, and priority aliases on metadata changes', async () => {
     const client = new MemoryClient();
     client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
@@ -198,6 +226,26 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-assignee/grace/7.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-creator/maintainer/7.json'));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/by-priority/high/7.json'));
+
+    await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          projectPath: 'acme/api',
+          iid: 7,
+          title: 'Fix bug',
+          state: 'opened',
+          assignees: [{ username: 'grace' }],
+          author: { username: 'maintainer' },
+          labels: [{ title: 'maintenance' }],
+          updated_at: '2026-05-12T10:00:00.000Z',
+        },
+      ],
+    });
+
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-priority/high/7.json'));
+    const byId = JSON.parse(client.writes.get('/gitlab/projects/acme/api/issues/by-id/7.json') ?? '{}');
+    assert.equal(byId.priority, undefined);
   });
 
   it('moves pipeline and deployment by-status aliases on status transitions', async () => {

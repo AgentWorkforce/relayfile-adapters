@@ -231,9 +231,11 @@ async function planTitledDirectoryRecord(
   const creatorKey = isDelete
     ? prior?.creatorKey ?? readGitLabCreatorKey(record)
     : readGitLabCreatorKey(record) ?? prior?.creatorKey;
+  const recordPriority = readPriority(record);
+  const hasPrioritySignal = record.priority !== undefined || Array.isArray(record.labels);
   const priority = isDelete
-    ? prior?.priority ?? readPriority(record)
-    : readPriority(record) ?? prior?.priority;
+    ? prior?.priority ?? recordPriority
+    : hasPrioritySignal ? recordPriority : prior?.priority;
   const canonicalPath = computeMetadataPath(projectPath, objectType, id, title);
   if (isDelete) {
     const paths = new Set(titledDirectoryPathsFor({
@@ -286,7 +288,11 @@ async function planTitledDirectoryRecord(
         priority: prior.priority,
       })
     : [];
-  const deletes = diffPaths(priorPaths, newPaths).map((path) => ({ path }));
+  const stalePaths = diffPaths(priorPaths, newPaths);
+  if (prior?.canonicalPath && prior.canonicalPath !== canonicalPath) {
+    stalePaths.push(prior.canonicalPath);
+  }
+  const deletes = diffPaths(stalePaths, newPaths).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, objectType).upsert({
