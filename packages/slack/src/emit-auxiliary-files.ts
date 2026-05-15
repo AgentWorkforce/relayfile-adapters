@@ -383,8 +383,11 @@ function planChannelWrite(
   const id = readNonEmptyString(channel.id);
   if (!id) return {};
 
-  const name = readNonEmptyString(channel.name);
-  const content = renderContent('channel', id, channel, connectionId, false);
+  const name = readNonEmptyString(channel.name) ?? priorNameById.get(id);
+  const payload = name && !readNonEmptyString(channel.name)
+    ? { ...channel, name }
+    : channel;
+  const content = renderContent('channel', id, payload, connectionId, false);
 
   const writes: EmitWrite[] = [];
   const deletes: EmitDelete[] = [];

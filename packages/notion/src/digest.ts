@@ -104,14 +104,18 @@ function notionIdentifier(path: string): string {
 
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  // Word boundaries (\b) prevent substring matches like "unarchived" being
-  // misclassified as "archived" — the semantic inverse, which would
-  // report a restored page as archived.
-  if (/\b(create|created|add|added|write|written)\b/u.test(action)) {
+  if (hasActionVerb(action, 'create|created|add|added|write|written')) {
     return 'was created';
   }
-  if (/\b(delete|deleted|remove|removed|archive|archived)\b/u.test(action)) {
+  if (hasActionVerb(action, 'archive|archived')) {
     return 'was archived';
   }
+  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
+    return 'was deleted';
+  }
   return 'was updated';
+}
+
+function hasActionVerb(action: string, verbs: string): boolean {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
 }

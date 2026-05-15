@@ -315,3 +315,22 @@ Your trajectory helps others understand:
 
 Future agents can query past trajectories to learn from your decisions.
 <!-- prpm:snippet:end @agent-workforce/trail-snippet@1.1.2 -->
+
+# Relayfile Integration Digest Contract
+
+Every adapter that exposes provider records to Relayfile must also expose a
+usable digest contract. When adding or materially changing an adapter:
+
+- Add or update `src/digest.ts` and export it from the package barrel.
+- Classify lifecycle actions explicitly. Terminal states such as `closed`,
+  `merged`, `archived`, `completed`, `canceled`, and `resolved` must not fall
+  through to a generic "updated" line unless the provider has no terminal
+  concept.
+- Do not model terminal lifecycle states as deletion in adapter webhook
+  handling. Only actual upstream deletes should produce delete semantics.
+- Add digest tests beside the adapter tests. Cover at least create/update,
+  terminal state, delete, deterministic sorting, and empty-window behavior.
+- If an adapter intentionally does not participate in digests, document why in
+  the package README or PR and keep the no-op handler covered by a test.
+
+Full rule: `.claude/rules/relayfile-integration-digests.md`.

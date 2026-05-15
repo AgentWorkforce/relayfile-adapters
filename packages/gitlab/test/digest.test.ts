@@ -77,3 +77,30 @@ test('digest classifies reopened as updated and returns null for empty windows',
     null,
   );
 });
+
+test('digest classifies merged merge requests distinctly from closed issues', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'merged',
+          canonicalPath: 'gitlab/projects/acme/api/merge_requests/42__ship-it/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'MR !42 was merged',
+        canonicalPath: 'gitlab/projects/acme/api/merge_requests/42__ship-it/meta.json',
+      },
+    ],
+  });
+});

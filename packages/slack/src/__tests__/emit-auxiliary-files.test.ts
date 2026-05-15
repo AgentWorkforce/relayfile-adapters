@@ -200,6 +200,33 @@ describe('emitSlackAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(slackByNameChannelAliasPath('new-name', 'C001')));
   });
 
+  it('preserves prior channel name for sparse lifecycle updates', async () => {
+    const priorIndex = [
+      { id: 'C001', title: 'general', updated: '2026-05-11T00:00:00Z' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [slackChannelsIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    const result = await emitSlackAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      channels: [{ id: 'C001', is_archived: true, updated: '2026-05-12T00:00:00Z' }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(!deletedPaths.includes(channelMetadataPath('C001', 'general')));
+    assert.ok(!deletedPaths.includes(slackByNameChannelAliasPath('general', 'C001')));
+
+    const written = client.writes.find((w) => w.path === channelMetadataPath('C001', 'general'));
+    assert.ok(written, 'expected sparse lifecycle update to keep the named canonical path');
+    const payload = JSON.parse(written.content) as { payload?: { name?: string; is_archived?: boolean } };
+    assert.equal(payload.payload?.name, 'general');
+    assert.equal(payload.payload?.is_archived, true);
+  });
+
   it('reconciles user rename via the prior handle on the existing index row', async () => {
     const priorIndex = [
       { id: 'U001', title: 'Sam Smith', name: 'sam', is_bot: false, updated: '2026-05-11T00:00:00Z' },

@@ -106,7 +106,13 @@ function pastTense(event: DigestChangeEvent): string {
   if (/\b(open|opened|create|created|add|added|write|written)\b/u.test(action)) {
     return 'was opened';
   }
-  if (/\b(close|closed|merge|merged|success|succeeded)\b/u.test(action)) {
+  if (/\b(merge|merged)\b/u.test(action)) {
+    return 'was merged';
+  }
+  if (/\b(success|succeeded)\b/u.test(action)) {
+    return 'succeeded';
+  }
+  if (/\b(close|closed)\b/u.test(action)) {
     return 'was closed';
   }
   if (/\b(delete|deleted|remove|removed)\b/u.test(action)) {
