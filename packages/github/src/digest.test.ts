@@ -154,6 +154,39 @@ test('digest accepts path-only Relayfile change events', async () => {
   });
 });
 
+test('digest ignores GitHub alias paths without dropping canonical repos with alias-looking names', async () => {
+  const ctx: DigestContext = {
+    provider: 'github',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-alias',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'opened',
+          canonicalPath: 'github/repos/acme__api/issues/by-title/add-login.json',
+        },
+        {
+          id: 'evt-canonical',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'opened',
+          canonicalPath: 'github/repos/issues/by-title/issues/42__add-login/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'github',
+    bullets: [
+      {
+        text: '#42 was opened',
+        canonicalPath: 'github/repos/issues/by-title/issues/42__add-login/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest returns null for an empty GitHub event window', async () => {
   const ctx: DigestContext = {
     provider: 'github',

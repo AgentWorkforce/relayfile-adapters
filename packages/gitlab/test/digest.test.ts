@@ -132,6 +132,76 @@ test('digest classifies canceled GitLab pipeline lifecycle states', async () => 
   });
 });
 
+test('digest classifies failed and skipped GitLab pipeline lifecycle states', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'pipeline.failed',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/meta.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'pipeline.skipped',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1002__docs/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'pipeline #1001 failed',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/meta.json',
+      },
+      {
+        text: 'pipeline #1002 was skipped',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1002__docs/meta.json',
+      },
+    ],
+  });
+});
+
+test('digest ignores GitLab merge request alias paths without dropping canonical project paths', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-alias',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'opened',
+          canonicalPath: 'gitlab/projects/acme/api/merge_requests/by-title/add-oauth__42.json',
+        },
+        {
+          id: 'evt-canonical',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'opened',
+          canonicalPath: 'gitlab/projects/org/issues/by-title/api/merge_requests/42__add-oauth/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'MR !42 was opened',
+        canonicalPath: 'gitlab/projects/org/issues/by-title/api/merge_requests/42__add-oauth/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest classifies deleted GitLab records', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

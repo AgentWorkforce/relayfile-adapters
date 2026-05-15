@@ -118,6 +118,7 @@ const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
 function hasDigestAliasDirectory(segments: readonly string[]): boolean {
   const provider = segments[0] ?? '';
   if (!DIGEST_ALIAS_PROVIDER_SEGMENTS.has(provider)) return false;
+  if (provider === 'github') return hasGitHubAliasDirectory(segments);
 
   for (let index = 1; index < segments.length - 1; index += 1) {
     const segment = segments[index];
@@ -127,6 +128,20 @@ function hasDigestAliasDirectory(segments: readonly string[]): boolean {
     }
   }
   return false;
+}
+
+const GITHUB_ALIAS_RESOURCE_SEGMENTS = new Set(['issues', 'pulls']);
+
+function hasGitHubAliasDirectory(segments: readonly string[]): boolean {
+  if (segments[0] !== 'github' || segments[1] !== 'repos') return false;
+  const resource = segments[3];
+  const alias = segments[4];
+  return Boolean(
+    resource
+    && alias
+    && GITHUB_ALIAS_RESOURCE_SEGMENTS.has(resource)
+    && DIGEST_ALIAS_SEGMENTS.has(alias),
+  );
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {

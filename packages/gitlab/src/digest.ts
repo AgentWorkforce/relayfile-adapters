@@ -118,12 +118,35 @@ const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
 function hasDigestAliasDirectory(segments: readonly string[]): boolean {
   const provider = segments[0] ?? '';
   if (!DIGEST_ALIAS_PROVIDER_SEGMENTS.has(provider)) return false;
+  if (provider === 'gitlab') return hasGitLabAliasDirectory(segments);
 
   for (let index = 1; index < segments.length - 1; index += 1) {
     const segment = segments[index];
     const parent = segments[index - 1];
     if (segment && parent && DIGEST_ALIAS_SEGMENTS.has(segment) && DIGEST_ALIAS_PARENT_SEGMENTS.has(parent)) {
       return true;
+    }
+  }
+  return false;
+}
+
+const GITLAB_ALIAS_RESOURCE_SEGMENTS = new Set([
+  'commits',
+  'deployments',
+  'issues',
+  'merge_requests',
+  'pipelines',
+  'tags',
+]);
+
+function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
+  if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
+
+  for (let index = segments.length - 2; index >= 2; index -= 1) {
+    const resource = segments[index];
+    const alias = segments[index + 1];
+    if (resource && GITLAB_ALIAS_RESOURCE_SEGMENTS.has(resource)) {
+      return Boolean(alias && DIGEST_ALIAS_SEGMENTS.has(alias));
     }
   }
   return false;
@@ -185,6 +208,12 @@ function pastTense(event: DigestChangeEvent): string {
   }
   if (/\b(success|succeeded)\b/u.test(action)) {
     return 'succeeded';
+  }
+  if (/\b(fail|failed)\b/u.test(action)) {
+    return 'failed';
+  }
+  if (/\b(skip|skipped)\b/u.test(action)) {
+    return 'was skipped';
   }
   if (/\b(cancel|canceled|cancelled)\b/u.test(action)) {
     return 'was canceled';
