@@ -14,10 +14,11 @@
  * record-writer historically left as a follow-up:
  *
  *   1. For every issue record, write the by-id alias unconditionally (the
- *      stable reconciliation anchor), plus by-key, by-state, by-assignee,
- *      by-creator, and by-priority when the corresponding provider fields
- *      are present. The canonical `/jira/issues/<slug>__<id>.json` path is
- *      written too — bytes are identical at every alias path.
+ *      stable reconciliation anchor), plus by-title, by-key, by-state,
+ *      by-assignee, by-creator, and by-priority when the corresponding
+ *      provider fields are present. The canonical
+ *      `/jira/issues/<slug>__<id>.json` path is written too — bytes are
+ *      identical at every alias path.
  *   2. For every issue rename / status transition / key change, read the
  *      prior by-id alias to recover the previous summary / status / key,
  *      recompute the prior alias set, and delete every alias that no
@@ -60,13 +61,16 @@ import {
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
   jiraIssueByStatePath,
+  jiraIssueByTitleAliasPath,
   jiraIssuePath,
   jiraIssuesIndexPath,
   jiraProjectByIdAliasPath,
+  jiraProjectByTitleAliasPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
   jiraRootIndexPath,
   jiraSprintByIdAliasPath,
+  jiraSprintByTitleAliasPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from './path-mapper.js';
@@ -378,6 +382,9 @@ function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
   paths.push(jiraIssuePath(id, summary));
   // by-id anchor
   paths.push(jiraIssueByIdAliasPath(id));
+  if (summary) {
+    paths.push(jiraIssueByTitleAliasPath(summary, id));
+  }
   if (key) {
     paths.push(jiraIssueByKeyAliasPath(key));
   }
@@ -465,7 +472,11 @@ interface PriorProjectState {
 
 function projectPathsFor(args: { id: string } & PriorProjectState): string[] {
   const { id, name } = args;
-  return [jiraProjectPath(id, name), jiraProjectByIdAliasPath(id)];
+  const paths = [jiraProjectPath(id, name), jiraProjectByIdAliasPath(id)];
+  if (name) {
+    paths.push(jiraProjectByTitleAliasPath(name, id));
+  }
+  return paths;
 }
 
 function extractPriorProjectState(parsed: Record<string, unknown>): PriorProjectState | null {
@@ -573,7 +584,11 @@ interface PriorSprintState {
 
 function sprintPathsFor(args: { id: string } & PriorSprintState): string[] {
   const { id, name } = args;
-  return [jiraSprintPath(id, name), jiraSprintByIdAliasPath(id)];
+  const paths = [jiraSprintPath(id, name), jiraSprintByIdAliasPath(id)];
+  if (name) {
+    paths.push(jiraSprintByTitleAliasPath(name, id));
+  }
+  return paths;
 }
 
 function extractPriorSprintState(parsed: Record<string, unknown>): PriorSprintState | null {

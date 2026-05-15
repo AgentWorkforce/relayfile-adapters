@@ -10,10 +10,13 @@ import {
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
   jiraIssueByStatePath,
+  jiraIssueByTitleAliasPath,
   jiraIssuePath,
   jiraProjectByIdAliasPath,
+  jiraProjectByTitleAliasPath,
   jiraProjectPath,
   jiraSprintByIdAliasPath,
+  jiraSprintByTitleAliasPath,
   jiraSprintPath,
 } from '../path-mapper.js';
 
@@ -60,10 +63,11 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       const byId = jiraIssueByIdAliasPath(issueId);
       const byKey = jiraIssueByKeyAliasPath('ENG-42');
       const byState = jiraIssueByStatePath('In Progress', issueId);
+      const byTitle = jiraIssueByTitleAliasPath('Fix login redirect', issueId);
       const byCreator = jiraIssueByCreatorAliasPath(accountId, issueId);
       const byPriority = jiraIssueByPriorityPath('High Priority', issueId);
-      const all = new Set([byAssignee, byId, byKey, byState, byCreator, byPriority]);
-      assert.equal(all.size, 6, 'each alias subtree must produce a unique path');
+      const all = new Set([byAssignee, byId, byKey, byState, byTitle, byCreator, byPriority]);
+      assert.equal(all.size, 7, 'each alias subtree must produce a unique path');
     });
 
     it('url-encodes accountId and issueId segments', () => {
@@ -134,6 +138,35 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     });
   });
 
+  describe('by-title aliases', () => {
+    it('composes stable title aliases with an id suffix for issues, projects, and sprints', () => {
+      assert.equal(
+        jiraIssueByTitleAliasPath('Fix Login Redirect', '10001'),
+        `${JIRA_PATH_ROOT}/issues/by-title/fix-login-redirect__10001.json`,
+      );
+      assert.equal(
+        jiraProjectByTitleAliasPath('Engineering Platform', '99'),
+        `${JIRA_PATH_ROOT}/projects/by-title/engineering-platform__99.json`,
+      );
+      assert.equal(
+        jiraSprintByTitleAliasPath('Sprint 7', '7'),
+        `${JIRA_PATH_ROOT}/sprints/by-title/sprint-7__7.json`,
+      );
+    });
+
+    it('round-trips the immutable id from by-title leaves', () => {
+      const cases = [
+        { path: jiraIssueByTitleAliasPath('Fix Login Redirect', '10001'), id: '10001' },
+        { path: jiraProjectByTitleAliasPath('Engineering Platform', '99'), id: '99' },
+        { path: jiraSprintByTitleAliasPath('Sprint 7', '7'), id: '7' },
+      ];
+      for (const { path, id } of cases) {
+        const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+        assert.equal(extractJiraIdFromPathSegment(leaf), id);
+      }
+    });
+  });
+
   describe('jiraSprintByIdAliasPath', () => {
     it('composes a stable path under sprints/by-id/<id>', () => {
       assert.equal(jiraSprintByIdAliasPath('7'), `${JIRA_PATH_ROOT}/sprints/by-id/7.json`);
@@ -168,7 +201,13 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     assert.throws(() => jiraIssueByCreatorAliasPath('acct-abc', ''), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('high', ''), /non-empty/u);
+    assert.throws(() => jiraIssueByTitleAliasPath('', '10001'), /non-empty/u);
+    assert.throws(() => jiraIssueByTitleAliasPath('title', ''), /non-empty/u);
     assert.throws(() => jiraProjectByIdAliasPath(''), /non-empty/u);
+    assert.throws(() => jiraProjectByTitleAliasPath('', '99'), /non-empty/u);
+    assert.throws(() => jiraProjectByTitleAliasPath('project', ''), /non-empty/u);
     assert.throws(() => jiraSprintByIdAliasPath(''), /non-empty/u);
+    assert.throws(() => jiraSprintByTitleAliasPath('', '7'), /non-empty/u);
+    assert.throws(() => jiraSprintByTitleAliasPath('sprint', ''), /non-empty/u);
   });
 });

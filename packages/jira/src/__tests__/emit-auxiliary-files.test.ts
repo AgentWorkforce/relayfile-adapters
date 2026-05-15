@@ -16,13 +16,16 @@ import {
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
   jiraIssueByStatePath,
+  jiraIssueByTitleAliasPath,
   jiraIssuePath,
   jiraIssuesIndexPath,
   jiraProjectByIdAliasPath,
+  jiraProjectByTitleAliasPath,
   jiraProjectPath,
   jiraProjectsIndexPath,
   jiraRootIndexPath,
   jiraSprintByIdAliasPath,
+  jiraSprintByTitleAliasPath,
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from '../path-mapper.js';
@@ -156,7 +159,7 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.deepEqual(JSON.parse(client.files.get(jiraSprintsIndexPath())!), []);
   });
 
-  it('writes canonical + by-id + by-key + by-state for an issue plus an index row', async () => {
+  it('writes canonical + by-id + by-title + by-key + by-state for an issue plus an index row', async () => {
     const client = createClient();
     const issue = makeIssue({
       id: '10001',
@@ -172,13 +175,14 @@ describe('emitJiraAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // 4 file writes (canonical + by-id + by-key + by-state) + 1 issues index + 1 root index.
-    assert.equal(result.written, 6);
+    // 5 file writes (canonical + by-id + by-title + by-key + by-state) + 1 issues index + 1 root index.
+    assert.equal(result.written, 7);
     assert.deepEqual(result.errors, []);
 
     const expectedFilePaths = [
       jiraIssuePath('10001', 'Release Plan'),
       jiraIssueByIdAliasPath('10001'),
+      jiraIssueByTitleAliasPath('Release Plan', '10001'),
       jiraIssueByKeyAliasPath('KAN-42'),
       jiraIssueByStatePath('In Progress', '10001'),
     ];
@@ -258,6 +262,10 @@ describe('emitJiraAuxiliaryFiles', () => {
       deletedPaths.includes(jiraIssuePath('10001', 'Old Summary')),
       `expected prior canonical in deletes, got: ${deletedPaths.join(', ')}`,
     );
+    assert.ok(
+      deletedPaths.includes(jiraIssueByTitleAliasPath('Old Summary', '10001')),
+      `expected prior by-title alias in deletes, got: ${deletedPaths.join(', ')}`,
+    );
     // by-key didn't change → not in deletes.
     assert.ok(!deletedPaths.includes(jiraIssueByKeyAliasPath('KAN-42')));
     // by-id is the anchor → never in deletes.
@@ -265,6 +273,7 @@ describe('emitJiraAuxiliaryFiles', () => {
 
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraIssuePath('10001', 'New Summary')));
+    assert.ok(writtenPaths.includes(jiraIssueByTitleAliasPath('New Summary', '10001')));
     assert.ok(writtenPaths.includes(jiraIssueByKeyAliasPath('KAN-42')));
     assert.deepEqual(result.errors, []);
   });
@@ -316,11 +325,16 @@ describe('emitJiraAuxiliaryFiles', () => {
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraProjectPath('99', 'Kanban Project')));
     assert.ok(writtenPaths.includes(jiraProjectByIdAliasPath('99')));
+    assert.ok(writtenPaths.includes(jiraProjectByTitleAliasPath('Kanban Project', '99')));
     assert.ok(writtenPaths.includes(jiraProjectsIndexPath()));
 
     // Canonical and by-id bytes are identical.
     assert.equal(
       client.files.get(jiraProjectByIdAliasPath('99')),
+      client.files.get(jiraProjectPath('99', 'Kanban Project')),
+    );
+    assert.equal(
+      client.files.get(jiraProjectByTitleAliasPath('Kanban Project', '99')),
       client.files.get(jiraProjectPath('99', 'Kanban Project')),
     );
 
@@ -357,12 +371,17 @@ describe('emitJiraAuxiliaryFiles', () => {
       deletedPaths.includes(jiraProjectPath('99', 'Old Name')),
       'expected old canonical path to be deleted on rename',
     );
+    assert.ok(
+      deletedPaths.includes(jiraProjectByTitleAliasPath('Old Name', '99')),
+      'expected old by-title path to be deleted on rename',
+    );
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraProjectPath('99', 'New Name')));
     assert.ok(writtenPaths.includes(jiraProjectByIdAliasPath('99')));
+    assert.ok(writtenPaths.includes(jiraProjectByTitleAliasPath('New Name', '99')));
   });
 
-  it('writes canonical + by-id + index row for a sprint record', async () => {
+  it('writes canonical + by-id + by-title + index row for a sprint record', async () => {
     const client = createClient();
     await emitJiraAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -371,10 +390,15 @@ describe('emitJiraAuxiliaryFiles', () => {
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(jiraSprintPath('7', 'Sprint 7')));
     assert.ok(writtenPaths.includes(jiraSprintByIdAliasPath('7')));
+    assert.ok(writtenPaths.includes(jiraSprintByTitleAliasPath('Sprint 7', '7')));
     assert.ok(writtenPaths.includes(jiraSprintsIndexPath()));
 
     assert.equal(
       client.files.get(jiraSprintByIdAliasPath('7')),
+      client.files.get(jiraSprintPath('7', 'Sprint 7')),
+    );
+    assert.equal(
+      client.files.get(jiraSprintByTitleAliasPath('Sprint 7', '7')),
       client.files.get(jiraSprintPath('7', 'Sprint 7')),
     );
 
@@ -408,6 +432,10 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.ok(
       deletedPaths.includes(jiraSprintPath('7', 'Sprint 7 — Old')),
       'expected old canonical path to be deleted on rename',
+    );
+    assert.ok(
+      deletedPaths.includes(jiraSprintByTitleAliasPath('Sprint 7 — Old', '7')),
+      'expected old by-title path to be deleted on rename',
     );
   });
 

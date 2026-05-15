@@ -1,3 +1,5 @@
+import { extractJiraIdFromPathSegment } from './path-mapper.js';
+
 export interface DigestWindow {
   readonly from: string;
   readonly to: string;
@@ -90,8 +92,7 @@ function jiraIdentifier(path: string): string {
     ? segments.at(-2) ?? path
     : segments.at(-1) ?? path;
   const basename = segment.replace(/\.[^.]+$/u, '');
-  const separatorIndex = basename.lastIndexOf('__');
-  const id = separatorIndex > 0 ? basename.slice(0, separatorIndex) : basename;
+  const id = extractJiraIdFromPathSegment(basename);
 
   if (path.includes('/issues/')) return `issue ${id}`;
   if (path.includes('/projects/')) return `project ${id}`;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { digest, type DigestContext } from './digest.js';
+import { jiraIssuePath } from './path-mapper.js';
 
 test('digest returns deterministic Jira bullets sorted by event time and id', async () => {
   const ctx: DigestContext = {
@@ -14,31 +15,31 @@ test('digest returns deterministic Jira bullets sorted by event time and id', as
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'done',
-          canonicalPath: '/jira/issues/ENG-42__release-plan.json',
+          canonicalPath: jiraIssuePath('ENG-42', 'Release Plan'),
         },
         {
           id: 'evt-3',
           timestamp: '2026-05-12T10:00:00.000Z',
           action: 'jira:issue_updated',
-          canonicalPath: '/jira/issues/ENG-43__follow-up.json',
+          canonicalPath: jiraIssuePath('ENG-43', 'Follow Up'),
         },
         {
           id: 'evt-4',
           timestamp: '2026-05-12T11:00:00.000Z',
           action: 'deleted',
-          canonicalPath: '/jira/issues/ENG-44__obsolete.json',
+          canonicalPath: jiraIssuePath('ENG-44', 'Obsolete'),
         },
         {
           id: 'evt-5',
           timestamp: '2026-05-12T12:00:00.000Z',
           action: 'canceled',
-          canonicalPath: '/jira/issues/ENG-45__cancelled.json',
+          canonicalPath: jiraIssuePath('ENG-45', 'Cancelled'),
         },
         {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'jira:issue_created',
-          canonicalPath: 'jira/issues/ENG-41__triage-login.json',
+          canonicalPath: jiraIssuePath('ENG-41', 'Triage Login').replace(/^\//u, ''),
         },
       ];
     },
@@ -53,23 +54,23 @@ test('digest returns deterministic Jira bullets sorted by event time and id', as
     bullets: [
       {
         text: 'issue ENG-41 was created',
-        canonicalPath: 'jira/issues/ENG-41__triage-login.json',
+        canonicalPath: 'jira/issues/triage-login__ENG-41.json',
       },
       {
         text: 'issue ENG-42 was completed',
-        canonicalPath: 'jira/issues/ENG-42__release-plan.json',
+        canonicalPath: 'jira/issues/release-plan__ENG-42.json',
       },
       {
         text: 'issue ENG-43 was updated',
-        canonicalPath: 'jira/issues/ENG-43__follow-up.json',
+        canonicalPath: 'jira/issues/follow-up__ENG-43.json',
       },
       {
         text: 'issue ENG-44 was deleted',
-        canonicalPath: 'jira/issues/ENG-44__obsolete.json',
+        canonicalPath: 'jira/issues/obsolete__ENG-44.json',
       },
       {
         text: 'issue ENG-45 was completed',
-        canonicalPath: 'jira/issues/ENG-45__cancelled.json',
+        canonicalPath: 'jira/issues/cancelled__ENG-45.json',
       },
     ],
   });

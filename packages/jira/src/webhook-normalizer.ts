@@ -429,6 +429,7 @@ function normalizeJiraAction(value: string | undefined): string {
     || normalized.includes('complete')
     || normalized.includes('resolve')
     || normalized.includes('closed')
+    || normalized.includes('cancel')
   ) {
     return 'completed';
   }
@@ -474,6 +475,8 @@ function isJiraTerminalValue(value: string | undefined): boolean {
     || normalized === 'closed'
     || normalized === 'complete'
     || normalized === 'completed'
+    || normalized === 'cancelled'
+    || normalized === 'canceled'
     || normalized === 'done category'
   );
 }

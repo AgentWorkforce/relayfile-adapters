@@ -79,3 +79,70 @@ test('GitLab issue tombstones delete canonical and alias files using prior by-id
   assert.ok(indexWrite, 'expected issue index rewrite');
   assert.deepEqual(JSON.parse(indexWrite.content), []);
 });
+
+test('GitLab commit tombstones delete canonical and title aliases using prior by-id context', async () => {
+  const writes: Array<{ path: string; content: string }> = [];
+  const deletes: string[] = [];
+  const seed = new Map<string, unknown>([
+    [
+      '/gitlab/projects/acme/api/commits/by-id/abc123.json',
+      {
+        id: 'abc123',
+        canonicalPath: '/gitlab/projects/acme/api/commits/abc123__ship-fix/meta.json',
+        title: 'Ship fix',
+      },
+    ],
+    [
+      '/gitlab/projects/acme/api/commits/_index.json',
+      [
+        {
+          id: 'abc123',
+          title: 'Ship fix',
+          updated: '2026-05-15T10:00:00.000Z',
+          sha: 'abc123',
+        },
+      ],
+    ],
+  ]);
+
+  const result = await emitGitLabAuxiliaryFiles(
+    {
+      async writeFile(input) {
+        writes.push({ path: input.path, content: input.content });
+      },
+      async deleteFile(input) {
+        deletes.push(input.path);
+      },
+      async readFile(input) {
+        if (seed.has(input.path)) {
+          return { content: JSON.stringify(seed.get(input.path)) };
+        }
+        const error = new Error('not found') as Error & { status: number };
+        error.status = 404;
+        throw error;
+      },
+    },
+    {
+      workspaceId: 'ws_test',
+      commits: [
+        {
+          sha: 'abc123',
+          project_path: 'acme/api',
+          title: 'Renamed before delete',
+          _deleted: true,
+        },
+      ],
+    },
+  );
+
+  assert.equal(result.errors.length, 0);
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/abc123__ship-fix/meta.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-id/abc123.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-title/ship-fix__abc123.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/abc123__renamed-before-delete/meta.json'));
+  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-title/renamed-before-delete__abc123.json'));
+
+  const indexWrite = writes.find((write) => write.path === '/gitlab/projects/acme/api/commits/_index.json');
+  assert.ok(indexWrite, 'expected commit index rewrite');
+  assert.deepEqual(JSON.parse(indexWrite.content), []);
+});

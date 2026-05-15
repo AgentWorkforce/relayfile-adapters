@@ -83,6 +83,39 @@ const requiredDocs = [
   },
 ];
 
+const executableRegressionContracts = [
+  {
+    provider: 'jira',
+    file: 'src/digest.test.ts',
+    needles: ['jiraIssuePath(', 'release-plan__ENG-42'],
+    label: 'digest tests must use the real <slug>__<id> path mapper output',
+  },
+  {
+    provider: 'jira',
+    file: 'src/__tests__/emit-auxiliary-files.test.ts',
+    needles: ['jiraIssueByTitleAliasPath', 'jiraProjectByTitleAliasPath', 'jiraSprintByTitleAliasPath'],
+    label: 'layout-advertised by-title aliases must be emitted and reconciled',
+  },
+  {
+    provider: 'gitlab',
+    file: 'test/emit-auxiliary-files.test.ts',
+    needles: ['moves pipeline and deployment by-status aliases on status transitions', 'by-status/running', 'by-status/failed'],
+    label: 'ci/deploy by-status aliases must reconcile on transitions',
+  },
+  {
+    provider: 'gitlab',
+    file: 'test/emit-auxiliary-delete.test.ts',
+    needles: ['GitLab commit tombstones delete canonical and title aliases', 'by-title/ship-fix__abc123'],
+    label: 'commit tombstones must delete canonical and alias files',
+  },
+  {
+    provider: 'jira',
+    file: 'src/__tests__/webhook-normalizer.test.ts',
+    needles: ['classifies canceled issue status transitions as completed events', 'Cancelled'],
+    label: 'canceled terminal webhook states must normalize to completed events',
+  },
+];
+
 const failures = [];
 
 for (const provider of providerPackages()) {
@@ -171,6 +204,20 @@ for (const contract of categoryResourceContracts) {
   }
 }
 
+for (const contract of executableRegressionContracts) {
+  const testPath = join(packagesDir, contract.provider, contract.file);
+  if (!existsSync(testPath)) {
+    failures.push(`${contract.provider}: missing executable regression contract ${contract.file}`);
+    continue;
+  }
+  const source = readFileSync(testPath, 'utf8');
+  for (const needle of contract.needles) {
+    if (!source.includes(needle)) {
+      failures.push(`${contract.provider}: ${contract.label} (missing "${needle}" in ${contract.file})`);
+    }
+  }
+}
+
 for (const doc of requiredDocs) {
   const docPath = join(root, doc.file);
   if (!existsSync(docPath)) {
@@ -195,6 +242,7 @@ if (failures.length > 0) {
 
 console.log(`Verified digest contracts for ${providerPackages().length} provider packages.`);
 console.log(`Verified ${categoryResourceContracts.length} category resource contracts.`);
+console.log(`Verified ${executableRegressionContracts.length} executable regression contracts.`);
 
 function providerPackages() {
   return readdirSync(packagesDir)

@@ -169,6 +169,14 @@ export function jiraIssueByKeyAliasPath(key: string): string {
   return `${JIRA_PATH_ROOT}/issues/by-key/${encodeJiraPathSegment(key)}.json`;
 }
 
+export function jiraIssueByTitleAliasPath(summary: string, issueId: string): string {
+  const normalizedSummary = assertNonEmptySegment(summary, 'issue summary');
+  const normalizedIssueId = assertNonEmptySegment(issueId, 'issue id');
+  return `${JIRA_PATH_ROOT}/issues/by-title/${encodeJiraPathSegment(
+    `${slugifyAlias(normalizedSummary)}__${normalizedIssueId}`,
+  )}.json`;
+}
+
 /**
  * `by-state/<status>/<id>.json` — grouped by status name slug (`to-do`,
  * `in-progress`, `done`). The leaf is the issue id (not the key), matching
@@ -217,6 +225,14 @@ export function jiraProjectByIdAliasPath(id: string): string {
   return `${JIRA_PATH_ROOT}/projects/by-id/${encodeJiraPathSegment(id)}.json`;
 }
 
+export function jiraProjectByTitleAliasPath(name: string, id: string): string {
+  const normalizedName = assertNonEmptySegment(name, 'project name');
+  const normalizedId = assertNonEmptySegment(id, 'project id');
+  return `${JIRA_PATH_ROOT}/projects/by-title/${encodeJiraPathSegment(
+    `${slugifyAlias(normalizedName)}__${normalizedId}`,
+  )}.json`;
+}
+
 // -- Sprint alias paths ----------------------------------------------------
 
 /**
@@ -224,6 +240,14 @@ export function jiraProjectByIdAliasPath(id: string): string {
  */
 export function jiraSprintByIdAliasPath(id: string): string {
   return `${JIRA_PATH_ROOT}/sprints/by-id/${encodeJiraPathSegment(id)}.json`;
+}
+
+export function jiraSprintByTitleAliasPath(name: string, id: string): string {
+  const normalizedName = assertNonEmptySegment(name, 'sprint name');
+  const normalizedId = assertNonEmptySegment(id, 'sprint id');
+  return `${JIRA_PATH_ROOT}/sprints/by-title/${encodeJiraPathSegment(
+    `${slugifyAlias(normalizedName)}__${normalizedId}`,
+  )}.json`;
 }
 
 export function extractJiraIdFromPathSegment(segment: string): string {

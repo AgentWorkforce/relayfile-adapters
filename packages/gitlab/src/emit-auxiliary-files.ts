@@ -148,13 +148,13 @@ export async function emitGitLabAuxiliaryFiles(
     planTitledDirectoryRecord(record, 'issues', record.iid, priorReader, projects, getRecordReconciler, input.connectionId),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, input.pipelines ?? [], async (record) =>
-    planPipelineRecord(record, projects, getRecordReconciler, input.connectionId),
+    planPipelineRecord(record, priorReader, projects, getRecordReconciler, input.connectionId),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, input.commits ?? [], async (record) =>
     planCommitRecord(record, priorReader, projects, getRecordReconciler, input.connectionId),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, input.deployments ?? [], async (record) =>
-    planDeploymentRecord(record, projects, getRecordReconciler, input.connectionId),
+    planDeploymentRecord(record, priorReader, projects, getRecordReconciler, input.connectionId),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, input.tags ?? [], async (record) =>
     planTagRecord(record, projects, getRecordReconciler, input.connectionId),
@@ -355,18 +355,42 @@ function titledDirectoryPathsFor(args: {
   return paths;
 }
 
-function planPipelineRecord(
+async function planPipelineRecord(
   record: GitLabPipelineEmitRecord,
+  priorReader: PriorAliasReader,
   projects: IndexFileReconciler<GitLabProjectIndexRow>,
   getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const projectPath = extractProjectPath(record);
   if (!projectPath) return {};
   const id = String(record.id);
+  const byIdPath = gitLabByIdAliasPath(projectPath, 'pipelines', id);
+  const prior = await priorReader.read<PriorPipelineRecord>(byIdPath, (parsed) => ({
+    ref: readNonEmptyString(parsed.ref),
+    status: readNonEmptyString(parsed.status),
+    canonicalPath: readNonEmptyString(parsed.canonicalPath),
+  }));
+  const isDelete = record._deleted === true;
   const ref = readNonEmptyString(record.ref);
-  const status = readNonEmptyString(record.status);
+  const status = readNonEmptyString(record.status) ?? prior?.status;
   const canonicalPath = computeMetadataPath(projectPath, 'pipelines', id, ref);
+
+  if (isDelete) {
+    const paths = new Set(pipelinePathsFor({ projectPath, id, ref: prior?.ref ?? ref, status }));
+    for (const currentPath of pipelinePathsFor({ projectPath, id, ref, status: readNonEmptyString(record.status) })) {
+      paths.add(currentPath);
+    }
+    if (prior?.canonicalPath) paths.add(prior.canonicalPath);
+    getReconciler(projectPath, 'pipelines').remove(id);
+    return { deletes: [...paths].map((path) => ({ path })) };
+  }
+
+  const newPaths = pipelinePathsFor({ projectPath, id, ref, status });
+  const priorPaths = prior
+    ? pipelinePathsFor({ projectPath, id, ref: prior.ref, status: prior.status })
+    : [];
+  const deletes = diffPaths(priorPaths, newPaths).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, 'pipelines').upsert({
@@ -379,11 +403,33 @@ function planPipelineRecord(
 
   const writes: EmitWrite[] = [
     canonicalWrite(canonicalPath, 'pipeline', record, connectionId),
-    aliasWrite(gitLabByIdAliasPath(projectPath, 'pipelines', id), id, canonicalPath, { ref, status }),
+    aliasWrite(byIdPath, id, canonicalPath, { ref, status }),
   ];
   if (ref) writes.push(aliasWrite(gitLabByRefAliasPath(projectPath, 'pipelines', ref, id), id, canonicalPath, { ref, status }));
   if (status) writes.push(aliasWrite(gitLabByStatusAliasPath(projectPath, 'pipelines', status, id), id, canonicalPath, { ref, status }));
-  return { writes };
+  return { writes, deletes };
+}
+
+interface PriorPipelineRecord {
+  canonicalPath?: string | undefined;
+  ref?: string | undefined;
+  status?: string | undefined;
+}
+
+function pipelinePathsFor(args: {
+  projectPath: string;
+  id: string;
+  ref?: string | undefined;
+  status?: string | undefined;
+}): string[] {
+  const { projectPath, id, ref, status } = args;
+  const paths = [
+    computeMetadataPath(projectPath, 'pipelines', id, ref),
+    gitLabByIdAliasPath(projectPath, 'pipelines', id),
+  ];
+  if (ref) paths.push(gitLabByRefAliasPath(projectPath, 'pipelines', ref, id));
+  if (status) paths.push(gitLabByStatusAliasPath(projectPath, 'pipelines', status, id));
+  return paths;
 }
 
 async function planCommitRecord(
@@ -402,6 +448,14 @@ async function planCommitRecord(
   const prior = await priorReader.read<{ title?: string }>(byIdPath, (parsed) => ({
     title: readNonEmptyString(parsed.title),
   }));
+  if (record._deleted === true) {
+    const paths = new Set(commitPathsFor({ projectPath, id, title: prior?.title ?? title }));
+    for (const currentPath of commitPathsFor({ projectPath, id, title: readNonEmptyString(record.title) })) {
+      paths.add(currentPath);
+    }
+    getReconciler(projectPath, 'commits').remove(id);
+    return { deletes: [...paths].map((path) => ({ path })) };
+  }
   const deletes = prior?.title && prior.title !== title
     ? [
         { path: computeMetadataPath(projectPath, 'commits', id, prior.title) },
@@ -427,17 +481,50 @@ async function planCommitRecord(
   };
 }
 
-function planDeploymentRecord(
+function commitPathsFor(args: {
+  projectPath: string;
+  id: string;
+  title?: string | undefined;
+}): string[] {
+  const { projectPath, id, title } = args;
+  return [
+    computeMetadataPath(projectPath, 'commits', id, title),
+    gitLabByIdAliasPath(projectPath, 'commits', id),
+    gitLabByTitleAliasPath(projectPath, 'commits', title ?? id, id),
+  ];
+}
+
+async function planDeploymentRecord(
   record: GitLabDeploymentEmitRecord,
+  priorReader: PriorAliasReader,
   projects: IndexFileReconciler<GitLabProjectIndexRow>,
   getReconciler: (projectPath: string, objectType: GitLabIndexedResourceType) => IndexFileReconciler<GitLabRecordIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
+): Promise<EmitPlan> {
   const projectPath = extractProjectPath(record);
   if (!projectPath) return {};
   const id = String(record.id);
-  const status = readNonEmptyString(record.status);
   const canonicalPath = computeMetadataPath(projectPath, 'deployments', id);
+  const prior = await priorReader.read<PriorDeploymentRecord>(canonicalPath, (parsed) => ({
+    status: readNonEmptyString(parsed.status),
+  }));
+  const isDelete = record._deleted === true;
+  const status = readNonEmptyString(record.status) ?? prior?.status;
+
+  if (isDelete) {
+    const paths = new Set(deploymentPathsFor({ projectPath, id, status }));
+    for (const currentPath of deploymentPathsFor({ projectPath, id, status: readNonEmptyString(record.status) })) {
+      paths.add(currentPath);
+    }
+    getReconciler(projectPath, 'deployments').remove(id);
+    return { deletes: [...paths].map((path) => ({ path })) };
+  }
+
+  const newPaths = deploymentPathsFor({ projectPath, id, status });
+  const priorPaths = prior
+    ? deploymentPathsFor({ projectPath, id, status: prior.status })
+    : [];
+  const deletes = diffPaths(priorPaths, newPaths).map((path) => ({ path }));
 
   upsertProject(projects, projectPath, readUpdatedAt(record));
   getReconciler(projectPath, 'deployments').upsert({
@@ -449,7 +536,22 @@ function planDeploymentRecord(
 
   const writes: EmitWrite[] = [canonicalWrite(canonicalPath, 'deployment', record, connectionId)];
   if (status) writes.push(aliasWrite(gitLabByStatusAliasPath(projectPath, 'deployments', status, id), id, canonicalPath, { status }));
-  return { writes };
+  return { writes, deletes };
+}
+
+interface PriorDeploymentRecord {
+  status?: string | undefined;
+}
+
+function deploymentPathsFor(args: {
+  projectPath: string;
+  id: string;
+  status?: string | undefined;
+}): string[] {
+  const { projectPath, id, status } = args;
+  const paths = [computeMetadataPath(projectPath, 'deployments', id)];
+  if (status) paths.push(gitLabByStatusAliasPath(projectPath, 'deployments', status, id));
+  return paths;
 }
 
 function planTagRecord(
