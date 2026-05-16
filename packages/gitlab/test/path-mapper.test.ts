@@ -128,6 +128,54 @@ describe('path mapper', () => {
     });
   });
 
+  it('parses resource-named project path segments from the right resource boundary', () => {
+    const projectPath = 'org/tags/pipelines/by-ref/api';
+    const tagPath = computeMetadataPath(projectPath, 'tags', 'release/foo__bar');
+    assert.strictEqual(tagPath, '/gitlab/projects/org/tags/pipelines/by-ref/api/tags/release-foo-bar__release%2Ffoo__bar.json');
+    assert.deepStrictEqual(parseGitLabPath(tagPath), {
+      path: tagPath,
+      projectPath,
+      objectType: 'tags',
+      objectId: 'release/foo__bar',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+    assert.strictEqual(
+      computeGitLabPath('tags', `${projectPath}/tags/release/foo__bar`),
+      tagPath,
+    );
+
+    const pipelinePath = computeMetadataPath(projectPath, 'pipelines', 99, 'main');
+    assert.deepStrictEqual(parseGitLabPath(pipelinePath), {
+      path: pipelinePath,
+      projectPath,
+      objectType: 'pipelines',
+      objectId: '99',
+      subResource: 'meta.json',
+      subResourceId: undefined,
+    });
+
+    const jobPath = computePipelineJobPath(projectPath, 99, 100, 'main');
+    assert.deepStrictEqual(parseGitLabPath(jobPath), {
+      path: jobPath,
+      projectPath,
+      objectType: 'pipelines',
+      objectId: '99',
+      subResource: 'jobs',
+      subResourceId: '100',
+    });
+
+    const deploymentPath = computeMetadataPath(projectPath, 'deployments', 7);
+    assert.deepStrictEqual(parseGitLabPath(deploymentPath), {
+      path: deploymentPath,
+      projectPath,
+      objectType: 'deployments',
+      objectId: '7',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+  });
+
   it('computes paths from composite object ids', () => {
     assert.strictEqual(
       computeGitLabPath('merge_requests', 'acme/api/merge_requests/42', { title: 'Add OAuth' }),

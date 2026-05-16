@@ -2,6 +2,7 @@ import type { WebhookInput } from '@relayfile/sdk';
 
 import {
   computeCommitCommentPath,
+  encodeProjectPath,
   computeGitLabPath,
   computeIssueCommentPath,
   computeMergeRequestDiscussionPath,
@@ -21,10 +22,10 @@ function pathToObjectId(path: string): string {
       .replace(/\.json$/, '');
   }
   const segments = path.split('/').filter(Boolean);
-  const objectIndex = segments.findIndex((segment) => segment === parsed.objectType);
-  const objectPath = segments
-    .slice(objectIndex + 1)
-    .join('/')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const prefix = `/gitlab/projects/${encodeProjectPath(parsed.projectPath)}/${parsed.objectType}/`;
+  const objectPath = normalizedPath
+    .slice(prefix.length)
     .replace(/\/(?:meta|metadata)\.json$/, '')
     .replace(/\.json$/, '');
   return `${parsed.projectPath}/${parsed.objectType}/${objectPath}`;

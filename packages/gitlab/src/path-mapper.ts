@@ -120,7 +120,7 @@ export function gitLabFlatRecordFilename(
   title?: string | null,
 ): string {
   const id = String(objectId).trim().replace(/\.json$/, '');
-  if (!title && id.includes('__')) {
+  if (!title && isComposedFlatRecordFilename(id)) {
     return `${id}.json`;
   }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);
@@ -128,6 +128,20 @@ export function gitLabFlatRecordFilename(
     return `${encodeGitLabPathSegment(id)}.json`;
   }
   return `${encodeGitLabPathSegment(slug)}__${encodeGitLabPathSegment(id)}.json`;
+}
+
+function isComposedFlatRecordFilename(value: string): boolean {
+  const separatorIndex = value.indexOf('__');
+  if (separatorIndex <= 0) {
+    return false;
+  }
+  const slug = value.slice(0, separatorIndex);
+  const encodedId = value.slice(separatorIndex + 2);
+  try {
+    return slug === slugifyAlias(decodeURIComponent(encodedId));
+  } catch {
+    return false;
+  }
 }
 
 export function gitLabByIdAliasPath(
@@ -320,7 +334,7 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
     return null;
   }
 
-  const objectIndex = segments.findIndex((segment, index) => index > 1 && RESOURCE_SEGMENTS.has(segment as GitLabResourceType));
+  const objectIndex = gitLabResourceSegmentIndex(segments);
   if (objectIndex === -1 || objectIndex >= segments.length - 1) {
     return null;
   }
@@ -342,6 +356,16 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
     subResource,
     subResourceId,
   };
+}
+
+function gitLabResourceSegmentIndex(segments: readonly string[]): number {
+  for (let index = segments.length - 2; index > 1; index -= 1) {
+    const segment = segments[index];
+    if (segment && RESOURCE_SEGMENTS.has(segment as GitLabResourceType)) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 export function computeGitLabPath(
@@ -411,7 +435,7 @@ export function computeGitLabPath(
   }
 
   const marker = `/${objectType}/`;
-  const markerIndex = objectId.indexOf(marker);
+  const markerIndex = objectId.lastIndexOf(marker);
   if (markerIndex === -1) {
     return computeCanonicalPath('gitlab', objectType, objectId);
   }
