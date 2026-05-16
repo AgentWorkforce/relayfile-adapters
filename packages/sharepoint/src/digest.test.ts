@@ -142,8 +142,36 @@ test('digest strips SharePoint artificial record suffixes', async () => {
     provider: 'sharepoint',
     bullets: [
       {
-        text: 'item item-sp-1 was modified',
+        text: 'item Plan.docx was modified',
         canonicalPath: 'sharepoint/site-a/drive-a/items/item-sp-1.json',
+      },
+    ],
+  });
+});
+
+test('digest strips SharePoint wrapper suffixes for encoded ids', async () => {
+  const ctx: DigestContext = {
+    provider: 'sharepoint',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-wrapper-encoded',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'sharepoint/site-a/drive-a/items/item%20123.json',
+          content: { id: 'item 123', name: 'Plan.docx', webUrl: 'https://example.test/plan' },
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'sharepoint',
+    bullets: [
+      {
+        text: 'item Plan.docx was modified',
+        canonicalPath: 'sharepoint/site-a/drive-a/items/item%20123.json',
       },
     ],
   });
@@ -160,7 +188,7 @@ test('digest preserves .json when items is a real SharePoint folder name', async
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'item.updated',
           canonicalPath: 'sharepoint/site-a/drive-a/items/settings.json',
-          content: { id: 'provider-item-id', name: 'settings.json', webUrl: 'https://example.test/settings' },
+          content: { id: 'settings', name: 'settings.json', webUrl: 'https://example.test/settings' },
         },
       ];
     },

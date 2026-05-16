@@ -162,29 +162,48 @@ function normalizeDigestPath(path: string): string {
 function googleDriveIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[2] ?? path;
-  if (segments[1] === 'files' && segments.length === 3 && isGoogleDriveWrapper(event, leaf)) {
-    return `file ${leaf.replace(/\.json$/u, '')}`;
+  const wrapperName = segments[1] === 'files' && segments.length === 3
+    ? googleDriveWrapperName(event, leaf)
+    : null;
+  if (wrapperName) {
+    return `file ${wrapperName}`;
   }
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `file ${file}`;
 }
 
-function isGoogleDriveWrapper(event: DigestChangeEvent, leaf: string): boolean {
+function googleDriveWrapperName(event: DigestChangeEvent, leaf: string): string | null {
   const content = event.content;
-  const id = leaf.replace(/\.json$/u, '');
-  return isRecord(content)
+  const id = decodePathLeafId(leaf);
+  if (!(
+    isRecord(content)
     && content.id === id
     && (
       typeof content.name === 'string'
       || typeof content.mimeType === 'string'
       || Array.isArray(content.parents)
       || typeof content.webViewLink === 'string'
-    );
+    )
+  )) {
+    return null;
+  }
+  const name = typeof content.name === 'string' ? content.name.trim() : '';
+  if (!name || name === id || name === `${id}.json`) return null;
+  return name;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function decodePathLeafId(leaf: string): string {
+  const raw = leaf.replace(/\.json$/u, '');
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 function pastTense(event: DigestChangeEvent): string {

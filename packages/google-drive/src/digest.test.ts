@@ -142,8 +142,36 @@ test('digest strips Google Drive artificial record suffixes', async () => {
     provider: 'google-drive',
     bullets: [
       {
-        text: 'file file_123 was modified',
+        text: 'file Project plan was modified',
         canonicalPath: 'google-drive/files/file_123.json',
+      },
+    ],
+  });
+});
+
+test('digest strips Google Drive wrapper suffixes for encoded ids', async () => {
+  const ctx: DigestContext = {
+    provider: 'google-drive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-wrapper-encoded',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'file.updated',
+          canonicalPath: 'google-drive/files/file%20123.json',
+          content: { id: 'file 123', name: 'Project plan', mimeType: 'application/pdf' },
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'google-drive',
+    bullets: [
+      {
+        text: 'file Project plan was modified',
+        canonicalPath: 'google-drive/files/file%20123.json',
       },
     ],
   });
@@ -160,7 +188,7 @@ test('digest preserves .json when files is a real Google Drive account id', asyn
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'file.updated',
           canonicalPath: 'google-drive/files/settings.json',
-          content: { id: 'provider-file-id', name: 'settings.json', mimeType: 'application/json' },
+          content: { id: 'settings', name: 'settings.json', mimeType: 'application/json' },
         },
       ];
     },

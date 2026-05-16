@@ -167,29 +167,48 @@ function normalizeDigestPath(path: string): string {
 function onedriveIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[3] ?? path;
-  if (segments[2] === 'items' && segments.length === 4 && isOneDriveWrapper(event, leaf)) {
-    return `item ${leaf.replace(/\.json$/u, '')}`;
+  const wrapperName = segments[2] === 'items' && segments.length === 4
+    ? oneDriveWrapperName(event, leaf)
+    : null;
+  if (wrapperName) {
+    return `item ${wrapperName}`;
   }
   // Skip provider prefix and account to get the item path
   const item = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;
 }
 
-function isOneDriveWrapper(event: DigestChangeEvent, leaf: string): boolean {
+function oneDriveWrapperName(event: DigestChangeEvent, leaf: string): string | null {
   const content = event.content;
-  const id = leaf.replace(/\.json$/u, '');
-  return isRecord(content)
+  const id = decodePathLeafId(leaf);
+  if (!(
+    isRecord(content)
     && content.id === id
     && (
       typeof content.name === 'string'
       || typeof content.webUrl === 'string'
       || isRecord(content.file)
       || isRecord(content.folder)
-    );
+    )
+  )) {
+    return null;
+  }
+  const name = typeof content.name === 'string' ? content.name.trim() : '';
+  if (!name || name === id || name === `${id}.json`) return null;
+  return name;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function decodePathLeafId(leaf: string): string {
+  const raw = leaf.replace(/\.json$/u, '');
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 function pastTense(event: DigestChangeEvent): string {
