@@ -500,6 +500,14 @@ function gitLabObjectIdResourceMarkerIndex(
       return gitRefIndex;
     }
 
+    const composedFilenameIndex = indices.find((index) => {
+      const tail = objectId.slice(index + marker.length);
+      return !tail.includes('/') && isComposedFlatRecordFilename(tail);
+    });
+    if (composedFilenameIndex !== undefined) {
+      return composedFilenameIndex;
+    }
+
     const firstProjectScopedIndex = indices.find(
       (index) => gitLabObjectIdProjectSegmentCount(objectId, index) >= 2,
     );
