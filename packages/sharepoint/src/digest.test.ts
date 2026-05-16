@@ -160,6 +160,7 @@ test('digest preserves .json when items is a real SharePoint folder name', async
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'item.updated',
           canonicalPath: 'sharepoint/site-a/drive-a/items/settings.json',
+          content: { id: 'provider-item-id', name: 'settings.json', webUrl: 'https://example.test/settings' },
         },
       ];
     },

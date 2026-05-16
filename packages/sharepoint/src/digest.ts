@@ -161,18 +161,20 @@ function normalizeDigestPath(path: string): string {
 
 function sharepointIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
-  if (segments[3] === 'items' && segments.length === 5 && isSharePointWrapper(event)) {
-    return `item ${(segments[4] ?? path).replace(/\.json$/u, '')}`;
+  const leaf = segments[4] ?? path;
+  if (segments[3] === 'items' && segments.length === 5 && isSharePointWrapper(event, leaf)) {
+    return `item ${leaf.replace(/\.json$/u, '')}`;
   }
   // Skip provider prefix, site, drive to get the item path
   const item = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;
 }
 
-function isSharePointWrapper(event: DigestChangeEvent): boolean {
+function isSharePointWrapper(event: DigestChangeEvent, leaf: string): boolean {
   const content = event.content;
+  const id = leaf.replace(/\.json$/u, '');
   return isRecord(content)
-    && typeof content.id === 'string'
+    && content.id === id
     && (
       typeof content.name === 'string'
       || typeof content.webUrl === 'string'

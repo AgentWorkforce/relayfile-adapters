@@ -160,6 +160,7 @@ test('digest preserves .json when files is a real Google Drive account id', asyn
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'file.updated',
           canonicalPath: 'google-drive/files/settings.json',
+          content: { id: 'provider-file-id', name: 'settings.json', mimeType: 'application/json' },
         },
       ];
     },

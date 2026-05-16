@@ -161,18 +161,20 @@ function normalizeDigestPath(path: string): string {
 
 function googleDriveIdentifier(path: string, event: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
-  if (segments[1] === 'files' && segments.length === 3 && isGoogleDriveWrapper(event)) {
-    return `file ${(segments[2] ?? path).replace(/\.json$/u, '')}`;
+  const leaf = segments[2] ?? path;
+  if (segments[1] === 'files' && segments.length === 3 && isGoogleDriveWrapper(event, leaf)) {
+    return `file ${leaf.replace(/\.json$/u, '')}`;
   }
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `file ${file}`;
 }
 
-function isGoogleDriveWrapper(event: DigestChangeEvent): boolean {
+function isGoogleDriveWrapper(event: DigestChangeEvent, leaf: string): boolean {
   const content = event.content;
+  const id = leaf.replace(/\.json$/u, '');
   return isRecord(content)
-    && typeof content.id === 'string'
+    && content.id === id
     && (
       typeof content.name === 'string'
       || typeof content.mimeType === 'string'

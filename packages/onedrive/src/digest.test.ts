@@ -204,6 +204,7 @@ test('digest preserves .json when items is a real OneDrive folder name', async (
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'item.updated',
           canonicalPath: 'onedrive/acct_one/items/settings.json',
+          content: { id: 'provider-item-id', name: 'settings.json', webUrl: 'https://example.test/settings' },
         },
       ];
     },
