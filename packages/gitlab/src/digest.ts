@@ -1,3 +1,5 @@
+import { gitLabFlatRecordFilename } from './path-mapper.js';
+
 export interface DigestWindow {
   readonly from: string;
   readonly to: string;
@@ -67,7 +69,8 @@ function isCanonicalDigestPath(path: string): boolean {
     && leaf !== '_index.json'
     && !hasDigestAliasDirectory(segments)
     && !isGitLabLegacyTagCleanupPath(segments)
-    && !isGitLabFullRefTagCleanupPath(segments);
+    && !isGitLabFullRefTagCleanupPath(segments)
+    && !isGitLabLegacyFlatTagCleanupPath(segments);
 }
 
 const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
@@ -176,6 +179,19 @@ function isGitLabFullRefTagCleanupPath(segments: readonly string[]): boolean {
   }
   const basename = (segments.at(-1) ?? '').replace(/\.[^.]+$/u, '');
   return gitLabRecordId('tags', basename).startsWith('refs/tags/');
+}
+
+function isGitLabLegacyFlatTagCleanupPath(segments: readonly string[]): boolean {
+  if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
+  const resourceIndex = gitLabResourceSegmentIndex(segments);
+  if (segments[resourceIndex] !== 'tags' || segments.length !== resourceIndex + 2) {
+    return false;
+  }
+  const leaf = segments.at(-1) ?? '';
+  const basename = leaf.replace(/\.[^.]+$/u, '');
+  if (!basename.includes('__')) return false;
+  const tagId = gitLabRecordId('tags', basename);
+  return leaf !== gitLabFlatRecordFilename(tagId, tagId);
 }
 
 type GitLabResourceSegment =
