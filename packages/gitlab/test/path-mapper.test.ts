@@ -115,6 +115,19 @@ describe('path mapper', () => {
     );
   });
 
+  it('round-trips complex GitLab tag refs with slashes and double underscores', () => {
+    const path = computeMetadataPath('acme/api', 'tags', 'release/foo__bar', 'release/foo__bar');
+    assert.strictEqual(path, '/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json');
+    assert.deepStrictEqual(parseGitLabPath(path), {
+      path,
+      projectPath: 'acme/api',
+      objectType: 'tags',
+      objectId: 'release/foo__bar',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+  });
+
   it('computes paths from composite object ids', () => {
     assert.strictEqual(
       computeGitLabPath('merge_requests', 'acme/api/merge_requests/42', { title: 'Add OAuth' }),

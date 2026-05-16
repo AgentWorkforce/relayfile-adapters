@@ -466,7 +466,8 @@ function decodeDirectoryObjectId(segment: string): string {
 }
 
 function decodeFlatObjectId(segment: string): string {
-  const basename = decodeURIComponent(segment.replace(/\.json$/, ''));
-  const separatorIndex = basename.lastIndexOf('__');
-  return separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
+  const basename = segment.replace(/\.json$/, '');
+  const separatorIndex = basename.indexOf('__');
+  const id = separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
+  return decodeURIComponent(id);
 }
