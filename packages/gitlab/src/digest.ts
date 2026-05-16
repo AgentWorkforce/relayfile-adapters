@@ -135,6 +135,7 @@ const GITLAB_RESOURCE_SEGMENTS = new Set([
   'deployments',
   'files',
   'issues',
+  'jobs',
   'merge_requests',
   'pipelines',
   'snippets',
@@ -159,7 +160,16 @@ function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
   return false;
 }
 
-type GitLabResourceSegment = 'commits' | 'deployments' | 'files' | 'issues' | 'merge_requests' | 'pipelines' | 'snippets' | 'tags';
+type GitLabResourceSegment =
+  | 'commits'
+  | 'deployments'
+  | 'files'
+  | 'issues'
+  | 'jobs'
+  | 'merge_requests'
+  | 'pipelines'
+  | 'snippets'
+  | 'tags';
 
 function gitLabResourceSegmentIndex(segments: readonly string[]): number {
   for (let index = segments.length - 2; index >= 2; index -= 1) {
@@ -237,6 +247,7 @@ function gitLabIdentifier(path: string): string {
   if (resource === 'merge_requests') return `MR !${id}`;
   if (resource === 'issues') return `issue #${id}`;
   if (resource === 'pipelines') return `pipeline #${id}`;
+  if (resource === 'jobs') return `job #${id}`;
   if (resource === 'commits') return `commit ${id.slice(0, 12)}`;
   if (resource === 'deployments') return `deployment #${id}`;
   if (resource === 'files') return `file ${id}`;

@@ -169,6 +169,43 @@ test('digest classifies failed and skipped GitLab pipeline lifecycle states', as
   });
 });
 
+test('digest classifies GitLab pipeline jobs as jobs, not parent pipelines', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'job.failed',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'job.success',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/78.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'job #77 failed',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+      },
+      {
+        text: 'job #78 succeeded',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/78.json',
+      },
+    ],
+  });
+});
+
 test('digest ignores GitLab merge request alias paths without dropping canonical project paths', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',
