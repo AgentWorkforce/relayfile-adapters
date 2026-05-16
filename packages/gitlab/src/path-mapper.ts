@@ -130,6 +130,10 @@ export function gitLabFlatRecordFilename(
   return `${encodeGitLabPathSegment(slug)}__${encodeGitLabPathSegment(id)}.json`;
 }
 
+export function normalizeGitLabTagRef(ref: string): string {
+  return ref.replace(/^refs\/tags\//u, '');
+}
+
 function isComposedFlatRecordFilename(value: string): boolean {
   const separatorIndex = value.indexOf('__');
   if (separatorIndex <= 0) {
@@ -441,7 +445,11 @@ export function computeGitLabPath(
 
   const marker = `/${objectType}/`;
   const projectPath = objectId.slice(0, markerIndex);
-  const resourceId = objectId.slice(markerIndex + marker.length);
+  const markerTail = objectId.slice(markerIndex + marker.length);
+  const tagRef = objectType === 'tags' ? refPathContext(context) : undefined;
+  const resourceId = objectType === 'tags' && tagRef && tagMarkerTailMatchesRef(markerTail, tagRef)
+    ? tagRef
+    : markerTail;
 
   switch (objectType) {
     case 'merge_requests':
@@ -480,7 +488,7 @@ function gitLabObjectIdResourceMarkerIndex(
   if (objectType === 'tags') {
     const ref = refPathContext(context);
     if (ref) {
-      const exactRefIndex = indices.find((index) => objectId.slice(index + marker.length) === ref);
+      const exactRefIndex = indices.find((index) => tagMarkerTailMatchesRef(objectId.slice(index + marker.length), ref));
       if (exactRefIndex !== undefined) {
         return exactRefIndex;
       }
@@ -508,6 +516,13 @@ function gitLabObjectIdProjectSegmentCount(objectId: string, markerIndex: number
     .slice(0, markerIndex)
     .split('/')
     .filter(Boolean).length;
+}
+
+function tagMarkerTailMatchesRef(tail: string, ref: string): boolean {
+  if (tail === ref) {
+    return true;
+  }
+  return !tail.includes('/') && decodeFlatObjectId(tail) === ref;
 }
 
 function decodeParentResourceSegment(segment: string): string {

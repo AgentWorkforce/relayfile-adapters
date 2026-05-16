@@ -9,6 +9,7 @@ import {
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  normalizeGitLabTagRef,
   parseGitLabPath,
 } from '../path-mapper.js';
 import type { GitLabSupportedEvent, GitLabWebhookPayload } from '../types.js';
@@ -171,7 +172,8 @@ export function normalizeWebhook(
       };
     }
     case 'tag_push': {
-      const path = computeMetadataPath(projectPath, 'tags', payload.ref, payload.ref);
+      const ref = normalizeGitLabTagRef(payload.ref);
+      const path = computeMetadataPath(projectPath, 'tags', ref, ref);
       return {
         provider: 'gitlab',
         objectType: 'tags',
@@ -179,7 +181,7 @@ export function normalizeWebhook(
         eventType,
         payload: payload as unknown as Record<string, unknown>,
         relations: [`gitlab:project:${projectPath}`],
-        metadata: { projectPath, ref: payload.ref },
+        metadata: { projectPath, ref },
       };
     }
   }
@@ -187,5 +189,8 @@ export function normalizeWebhook(
 
 export function computePathFromWebhook(payload: GitLabWebhookPayload, eventType: GitLabSupportedEvent): string {
   const normalized = normalizeWebhook(payload, eventType);
+  if (normalized.objectType === 'tags' && typeof normalized.metadata?.projectPath === 'string' && typeof normalized.metadata?.ref === 'string') {
+    return computeMetadataPath(normalized.metadata.projectPath, 'tags', normalized.metadata.ref, normalized.metadata.ref);
+  }
   return computeGitLabPath(normalized.objectType, normalized.objectId);
 }

@@ -138,7 +138,7 @@ describe('GitLabAdapter e2e ingestion', () => {
       before: 'deadbeef',
       after: '0000000000000000000000000000000000000000',
       checkout_sha: null,
-      ref: 'v1.0',
+      ref: 'refs/tags/v1.0',
       commits: [],
       project: {
         id: 1,

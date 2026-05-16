@@ -219,7 +219,7 @@ describe('normalizeWebhook', () => {
           ref: 'refs/tags/v1.0.0',
         } as GitLabTagPushWebhook,
         'tag_push',
-      ).objectId.includes('tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0'),
+      ).objectId.includes('tags/v1-0-0__v1.0.0'),
     );
   });
 
@@ -246,6 +246,19 @@ describe('normalizeWebhook', () => {
     assert.strictEqual(
       computePathFromWebhook(tagPayload, 'tag_push'),
       '/gitlab/projects/org/tags/pipelines/by-ref/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+    );
+
+    const namespaceWithTagsPayload = {
+      ...tagPayload,
+      project: {
+        ...resourceNamedProject,
+        path_with_namespace: 'org/foo/tags/bar',
+      },
+      ref: 'refs/tags/v1.0.0',
+    } as GitLabTagPushWebhook;
+    assert.strictEqual(
+      computePathFromWebhook(namespaceWithTagsPayload, 'tag_push'),
+      '/gitlab/projects/org/foo/tags/bar/tags/v1-0-0__v1.0.0.json',
     );
   });
 });

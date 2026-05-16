@@ -13,6 +13,7 @@ import {
   computePipelineJobPath,
   computeSnippetCommentPath,
   gitLabByRefAliasPath,
+  normalizeGitLabTagRef,
   type GitLabPathContext,
 } from './path-mapper.js';
 import { ingestPipeline } from './pipeline/ingestion.js';
@@ -326,7 +327,8 @@ export class GitLabAdapter extends IntegrationAdapter {
     const tagPayload = payload as GitLabTagPushWebhook;
     const deleted = isDeletedTagPush(tagPayload);
     const projectPath = tagPayload.project.path_with_namespace;
-    const path = computeMetadataPath(projectPath, 'tags', tagPayload.ref, tagPayload.ref);
+    const ref = normalizeGitLabTagRef(tagPayload.ref);
+    const path = computeMetadataPath(projectPath, 'tags', ref, ref);
     const operations: IngestOperation[] = [
       {
         path,
@@ -342,7 +344,7 @@ export class GitLabAdapter extends IntegrationAdapter {
 
     if (deleted) {
       operations.push({
-        path: gitLabByRefAliasPath(projectPath, 'tags', tagPayload.ref, tagPayload.ref),
+        path: gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
         mode: 'delete',
       });
     }
