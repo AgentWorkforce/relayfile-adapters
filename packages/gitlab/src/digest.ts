@@ -261,9 +261,17 @@ function gitLabRecordId(resource: GitLabResourceSegment | undefined, basename: s
   if (separatorIndex <= 0) return basename;
 
   if (resource === 'deployments' || resource === 'files' || resource === 'tags') {
-    return resource === 'files' ? basename : basename.slice(separatorIndex + 2);
+    return resource === 'files' ? basename : decodeGitLabDigestId(basename.slice(separatorIndex + 2));
   }
   return basename.slice(0, separatorIndex);
+}
+
+function decodeGitLabDigestId(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function pastTense(event: DigestChangeEvent): string {

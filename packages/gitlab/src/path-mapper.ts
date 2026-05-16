@@ -120,7 +120,7 @@ export function gitLabFlatRecordFilename(
   title?: string | null,
 ): string {
   const id = String(objectId).trim().replace(/\.json$/, '');
-  if (id.includes('__')) {
+  if (!title && id.includes('__')) {
     return `${id}.json`;
   }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);

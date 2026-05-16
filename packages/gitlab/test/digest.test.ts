@@ -206,6 +206,33 @@ test('digest classifies GitLab pipeline jobs as jobs, not parent pipelines', asy
   });
 });
 
+test('digest preserves complex GitLab tag refs with slashes and double underscores', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'tag_push',
+          canonicalPath: 'gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'tag release/foo__bar was updated',
+        canonicalPath: 'gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+      },
+    ],
+  });
+});
+
 test('digest ignores GitLab merge request alias paths without dropping canonical project paths', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

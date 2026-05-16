@@ -61,6 +61,10 @@ describe('path mapper', () => {
       '/gitlab/projects/acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0.json',
     );
     assert.strictEqual(
+      computeMetadataPath('acme/api', 'tags', 'release/foo__bar', 'release/foo__bar'),
+      '/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+    );
+    assert.strictEqual(
       gitLabByStateAliasPath('acme/api', 'issues', 'in progress', 7),
       '/gitlab/projects/acme/api/issues/by-state/in-progress/7.json',
     );
