@@ -624,11 +624,10 @@ function tagPathsFor(args: { projectPath: string; id: string }): string[] {
 function extractTagRef(record: GitLabTagEmitRecord): string | null {
   const raw = firstString(record.ref, record.name, record.id);
   if (!raw) return null;
-  const normalized = normalizeGitLabTagRef(raw);
-  if (!record.ref && !record.name && normalized.includes(':')) {
-    return normalized.slice(normalized.indexOf(':') + 1);
-  }
-  return normalized;
+  const tagRef = !record.ref && !record.name && raw.includes(':')
+    ? raw.slice(raw.indexOf(':') + 1)
+    : raw;
+  return normalizeGitLabTagRef(tagRef);
 }
 
 function firstString(...values: readonly unknown[]): string | null {
