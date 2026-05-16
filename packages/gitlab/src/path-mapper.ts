@@ -491,9 +491,23 @@ function gitLabObjectIdResourceMarkerIndex(
     if (gitRefIndex !== undefined) {
       return gitRefIndex;
     }
+
+    const firstProjectScopedIndex = indices.find(
+      (index) => gitLabObjectIdProjectSegmentCount(objectId, index) >= 2,
+    );
+    if (firstProjectScopedIndex !== undefined) {
+      return firstProjectScopedIndex;
+    }
   }
 
   return indices[indices.length - 1] ?? -1;
+}
+
+function gitLabObjectIdProjectSegmentCount(objectId: string, markerIndex: number): number {
+  return objectId
+    .slice(0, markerIndex)
+    .split('/')
+    .filter(Boolean).length;
 }
 
 function decodeParentResourceSegment(segment: string): string {
