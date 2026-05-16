@@ -225,6 +225,14 @@ describe('path mapper', () => {
       computeGitLabPath('tags', 'acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0'),
       '/gitlab/projects/acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0.json',
     );
+    assert.strictEqual(
+      computeGitLabPath('tags', 'acme/api/tags/refs/tags/v1.0.0'),
+      '/gitlab/projects/acme/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0.json',
+    );
+    assert.strictEqual(
+      computeGitLabPath('tags', 'org/tags/api/tags/refs/tags/v1.0.0'),
+      '/gitlab/projects/org/tags/api/tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0.json',
+    );
   });
 
   it('parses legacy metadata paths for reader-side back-compat', () => {

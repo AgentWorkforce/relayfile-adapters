@@ -434,12 +434,12 @@ export function computeGitLabPath(
     return computeCanonicalPath('gitlab', objectType, objectId);
   }
 
-  const marker = `/${objectType}/`;
-  const markerIndex = objectId.lastIndexOf(marker);
+  const markerIndex = gitLabObjectIdResourceMarkerIndex(objectType, objectId, context);
   if (markerIndex === -1) {
     return computeCanonicalPath('gitlab', objectType, objectId);
   }
 
+  const marker = `/${objectType}/`;
   const projectPath = objectId.slice(0, markerIndex);
   const resourceId = objectId.slice(markerIndex + marker.length);
 
@@ -459,6 +459,41 @@ export function computeGitLabPath(
     default:
       return computeCanonicalPath('gitlab', objectType, objectId);
   }
+}
+
+function gitLabObjectIdResourceMarkerIndex(
+  objectType: string,
+  objectId: string,
+  context: GitLabPathContext,
+): number {
+  const marker = `/${objectType}/`;
+  const indices: number[] = [];
+  let offset = objectId.indexOf(marker);
+  while (offset !== -1) {
+    indices.push(offset);
+    offset = objectId.indexOf(marker, offset + marker.length);
+  }
+  if (indices.length === 0) {
+    return -1;
+  }
+
+  if (objectType === 'tags') {
+    const ref = refPathContext(context);
+    if (ref) {
+      const exactRefIndex = indices.find((index) => objectId.slice(index + marker.length) === ref);
+      if (exactRefIndex !== undefined) {
+        return exactRefIndex;
+      }
+    }
+
+    const gitRefPrefix = 'refs/tags/';
+    const gitRefIndex = indices.find((index) => objectId.slice(index + marker.length).startsWith(gitRefPrefix));
+    if (gitRefIndex !== undefined) {
+      return gitRefIndex;
+    }
+  }
+
+  return indices[indices.length - 1] ?? -1;
 }
 
 function decodeParentResourceSegment(segment: string): string {
