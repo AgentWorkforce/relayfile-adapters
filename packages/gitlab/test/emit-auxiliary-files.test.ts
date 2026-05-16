@@ -370,4 +370,64 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/v1-0__v1.0.json'));
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json'));
   });
+
+  it('normalizes GitLab tag refs and falls back to name-only tag records', async () => {
+    const client = new MemoryClient();
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      tags: [
+        {
+          projectPath: 'acme/api',
+          id: '20:release/foo__bar',
+          ref: 'refs/tags/release/foo__bar',
+          updated_at: '2026-05-12T09:00:00.000Z',
+        },
+        {
+          projectPath: 'acme/api',
+          id: '20:release/name-only',
+          name: 'release/name-only',
+          updated_at: '2026-05-12T09:05:00.000Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json'));
+    assert.ok(client.writes.has('/gitlab/projects/acme/api/tags/release-name-only__release%2Fname-only.json'));
+
+    const index = JSON.parse(client.writes.get('/gitlab/projects/acme/api/tags/_index.json') ?? '[]');
+    assert.deepEqual(
+      index.map((row: { id: string }) => row.id).sort(),
+      ['release/foo__bar', 'release/name-only'],
+    );
+  });
+
+  it('deletes legacy GitLab tag slash paths on complex tag tombstones', async () => {
+    const client = new MemoryClient();
+    client.writes.set('/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/release/foo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      tags: [
+        {
+          projectPath: 'acme/api',
+          id: '20:release/foo__bar',
+          ref: 'refs/tags/release/foo__bar',
+          _deleted: true,
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/release/foo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json'));
+  });
 });

@@ -508,6 +508,14 @@ function gitLabObjectIdResourceMarkerIndex(
       return composedFilenameIndex;
     }
 
+    const lastMultiSegmentTailIndex = [...indices].reverse().find((index) => {
+      const tail = objectId.slice(index + marker.length);
+      return tail.includes('/') && !tail.includes(marker);
+    });
+    if (lastMultiSegmentTailIndex !== undefined) {
+      return lastMultiSegmentTailIndex;
+    }
+
     const firstProjectScopedIndex = indices.find(
       (index) => gitLabObjectIdProjectSegmentCount(objectId, index) >= 2,
     );

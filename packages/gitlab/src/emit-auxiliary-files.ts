@@ -28,8 +28,11 @@ import {
   gitLabByStateAliasPath,
   gitLabByStatusAliasPath,
   gitLabByTitleAliasPath,
+  gitLabFlatRecordFilename,
+  gitLabProjectPrefix,
   gitLabProjectResourceIndexPath,
   gitLabProjectsIndexPath,
+  normalizeGitLabTagRef,
   type GitLabIndexedResourceType,
 } from './path-mapper.js';
 
@@ -92,7 +95,9 @@ export interface GitLabDeploymentEmitRecord extends GitLabRecordContext {
 }
 
 export interface GitLabTagEmitRecord extends GitLabRecordContext {
-  ref: string;
+  id?: string | number;
+  name?: string;
+  ref?: string;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -579,7 +584,8 @@ function planTagRecord(
 ): EmitPlan {
   const projectPath = extractProjectPath(record);
   if (!projectPath) return {};
-  const id = record.ref;
+  const id = extractTagRef(record);
+  if (!id) return {};
   const canonicalPath = computeMetadataPath(projectPath, 'tags', id, id);
 
   if (record._deleted === true) {
@@ -607,10 +613,43 @@ function planTagRecord(
 
 function tagPathsFor(args: { projectPath: string; id: string }): string[] {
   const { projectPath, id } = args;
-  return [
+  return [...new Set([
     computeMetadataPath(projectPath, 'tags', id, id),
     gitLabByRefAliasPath(projectPath, 'tags', id, id),
-  ];
+    legacyGitLabTagCanonicalPath(projectPath, id),
+    legacyGitLabTagByRefAliasPath(projectPath, id),
+  ])];
+}
+
+function extractTagRef(record: GitLabTagEmitRecord): string | null {
+  const raw = firstString(record.ref, record.name, record.id);
+  if (!raw) return null;
+  const normalized = normalizeGitLabTagRef(raw);
+  if (!record.ref && !record.name && normalized.includes(':')) {
+    return normalized.slice(normalized.indexOf(':') + 1);
+  }
+  return normalized;
+}
+
+function firstString(...values: readonly unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+function legacyGitLabTagCanonicalPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagByRefAliasPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/by-ref/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagFlatRecordFilename(ref: string): string {
+  const id = ref.trim().replace(/\.json$/u, '');
+  return id.includes('__') ? `${id}.json` : gitLabFlatRecordFilename(id, id);
 }
 
 function canonicalWrite(

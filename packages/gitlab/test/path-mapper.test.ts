@@ -156,6 +156,10 @@ describe('path mapper', () => {
       computeGitLabPath('tags', 'org/foo/tags/bar/tags/v1-0-0__v1.0.0'),
       '/gitlab/projects/org/foo/tags/bar/tags/v1-0-0__v1.0.0.json',
     );
+    assert.strictEqual(
+      computeGitLabPath('tags', 'org/foo/tags/bar/tags/release/foo__bar'),
+      '/gitlab/projects/org/foo/tags/bar/tags/release-foo-bar__release%2Ffoo__bar.json',
+    );
 
     const pipelinePath = computeMetadataPath(projectPath, 'pipelines', 99, 'main');
     assert.deepStrictEqual(parseGitLabPath(pipelinePath), {

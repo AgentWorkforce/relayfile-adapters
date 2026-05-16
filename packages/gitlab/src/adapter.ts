@@ -13,6 +13,8 @@ import {
   computePipelineJobPath,
   computeSnippetCommentPath,
   gitLabByRefAliasPath,
+  gitLabFlatRecordFilename,
+  gitLabProjectPrefix,
   normalizeGitLabTagRef,
   type GitLabPathContext,
 } from './path-mapper.js';
@@ -343,14 +345,32 @@ export class GitLabAdapter extends IntegrationAdapter {
     ];
 
     if (deleted) {
-      operations.push({
-        path: gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
-        mode: 'delete',
-      });
+      for (const deletePath of [
+        gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
+        legacyGitLabTagCanonicalPath(projectPath, ref),
+        legacyGitLabTagByRefAliasPath(projectPath, ref),
+      ]) {
+        if (!operations.some((operation) => operation.path === deletePath)) {
+          operations.push({ path: deletePath, mode: 'delete' });
+        }
+      }
     }
 
     return fromOperations(operations);
   }
+}
+
+function legacyGitLabTagCanonicalPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagByRefAliasPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/by-ref/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagFlatRecordFilename(ref: string): string {
+  const id = ref.trim().replace(/\.json$/u, '');
+  return id.includes('__') ? `${id}.json` : gitLabFlatRecordFilename(id, id);
 }
 
 function isDeletedTagPush(payload: GitLabTagPushWebhook): boolean {

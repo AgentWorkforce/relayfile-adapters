@@ -167,4 +167,39 @@ describe('GitLabAdapter e2e ingestion', () => {
       },
     ]);
   });
+
+  it('maps complex tag deletion webhooks to fixed and legacy delete operations', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn',
+      projectPath: 'acme/api',
+    });
+
+    const payload = {
+      object_kind: 'tag_push',
+      event_name: 'tag_push',
+      before: 'deadbeef',
+      after: '0000000000000000000000000000000000000000',
+      checkout_sha: null,
+      ref: 'refs/tags/release/foo__bar',
+      commits: [],
+      project: {
+        id: 1,
+        name: 'api',
+        path: 'api',
+        path_with_namespace: 'acme/api',
+      },
+    } as GitLabTagPushWebhook;
+
+    const result = await adapter.routeWebhook(payload, 'tag_push');
+
+    assert.equal(result.filesDeleted, 4);
+    assert.equal(result.filesWritten, 0);
+    assert.deepEqual(result.paths, [
+      '/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json',
+    ]);
+  });
 });
