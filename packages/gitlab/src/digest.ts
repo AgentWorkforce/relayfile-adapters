@@ -65,7 +65,8 @@ function isCanonicalDigestPath(path: string): boolean {
   const leaf = segments.at(-1) ?? '';
   return leaf !== 'LAYOUT.md'
     && leaf !== '_index.json'
-    && !hasDigestAliasDirectory(segments);
+    && !hasDigestAliasDirectory(segments)
+    && !isGitLabLegacyTagCleanupPath(segments);
 }
 
 const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
@@ -158,6 +159,12 @@ function hasGitLabAliasDirectory(segments: readonly string[]): boolean {
     if (isGitLabAliasAt(segments, index)) return true;
   }
   return false;
+}
+
+function isGitLabLegacyTagCleanupPath(segments: readonly string[]): boolean {
+  if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
+  const resourceIndex = gitLabResourceSegmentIndex(segments);
+  return segments[resourceIndex] === 'tags' && segments.length > resourceIndex + 2;
 }
 
 type GitLabResourceSegment =
