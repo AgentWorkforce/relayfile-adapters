@@ -150,14 +150,19 @@ describe('GitLabAdapter e2e ingestion', () => {
 
     const result = await adapter.routeWebhook(payload, 'tag_push');
 
-    assert.equal(result.filesDeleted, 1);
+    assert.equal(result.filesDeleted, 2);
     assert.equal(result.filesWritten, 0);
     assert.deepEqual(result.paths, [
       '/gitlab/projects/acme/api/tags/v1-0__v1.0.json',
+      '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
     ]);
     assert.deepEqual(result.operations, [
       {
         path: '/gitlab/projects/acme/api/tags/v1-0__v1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
         mode: 'delete',
       },
     ]);

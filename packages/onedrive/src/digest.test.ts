@@ -221,7 +221,7 @@ test('digest strips OneDrive wrapper suffixes for encoded ids', async () => {
   });
 });
 
-test('digest preserves .json when items is a real OneDrive folder name', async () => {
+test('digest uses provider names for .json writeback wrapper records', async () => {
   const ctx: DigestContext = {
     provider: 'onedrive',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
@@ -242,8 +242,36 @@ test('digest preserves .json when items is a real OneDrive folder name', async (
     provider: 'onedrive',
     bullets: [
       {
-        text: 'item items/settings.json was modified',
+        text: 'item settings.json was modified',
         canonicalPath: 'onedrive/acct_one/items/settings.json',
+      },
+    ],
+  });
+});
+
+test('digest preserves nested .json files when items is a real OneDrive folder name', async () => {
+  const ctx: DigestContext = {
+    provider: 'onedrive',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-collision',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'item.updated',
+          canonicalPath: 'onedrive/acct_one/items/config/settings.json',
+          content: { id: 'settings', name: 'settings.json', webUrl: 'https://example.test/settings' },
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'onedrive',
+    bullets: [
+      {
+        text: 'item items/config/settings.json was modified',
+        canonicalPath: 'onedrive/acct_one/items/config/settings.json',
       },
     ],
   });

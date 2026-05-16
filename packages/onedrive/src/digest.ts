@@ -194,7 +194,7 @@ function oneDriveWrapperName(event: DigestChangeEvent, leaf: string): string | n
     return null;
   }
   const name = typeof content.name === 'string' ? content.name.trim() : '';
-  if (!name || name === id || name === `${id}.json`) return null;
+  if (!name || name === id) return null;
   return name;
 }
 
