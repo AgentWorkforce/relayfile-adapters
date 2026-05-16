@@ -169,6 +169,92 @@ test('digest classifies failed and skipped GitLab pipeline lifecycle states', as
   });
 });
 
+test('digest classifies created GitLab pipeline, deployment, and job events', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-pipeline',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'pipeline.created',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/meta.json',
+        },
+        {
+          id: 'evt-deployment',
+          timestamp: '2026-05-12T08:01:00.000Z',
+          action: 'deployment.created',
+          canonicalPath: 'gitlab/projects/acme/api/deployments/production__14.json',
+        },
+        {
+          id: 'evt-job',
+          timestamp: '2026-05-12T08:02:00.000Z',
+          action: 'job.created',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'pipeline #1001 was created',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/meta.json',
+      },
+      {
+        text: 'deployment #14 was created',
+        canonicalPath: 'gitlab/projects/acme/api/deployments/production__14.json',
+      },
+      {
+        text: 'job #77 was created',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+      },
+    ],
+  });
+});
+
+test('digest classifies GitLab lifecycle states from record content', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-issue',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          type: 'file.updated',
+          canonicalPath: 'gitlab/projects/acme/api/issues/43__remove-flake/meta.json',
+          content: { state: 'closed' },
+        },
+        {
+          id: 'evt-job',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          type: 'file.updated',
+          canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+          content: { status: 'failed' },
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'issue #43 was closed',
+        canonicalPath: 'gitlab/projects/acme/api/issues/43__remove-flake/meta.json',
+      },
+      {
+        text: 'job #77 failed',
+        canonicalPath: 'gitlab/projects/acme/api/pipelines/1001__main/jobs/77.json',
+      },
+    ],
+  });
+});
+
 test('digest classifies GitLab pipeline jobs as jobs, not parent pipelines', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',

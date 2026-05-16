@@ -72,6 +72,7 @@ jobs:
         id: resolve
         env:
           INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           node scripts/resolve-publish-targets.mjs "$INPUT_PACKAGE" >> "$GITHUB_OUTPUT"
 

@@ -7,6 +7,7 @@ Always run \`ls\` before constructing a path. GitLab projects may live in nested
 \`/gitlab/LAYOUT.md\` is this guide.
 \`/gitlab/_index.json\` lists top-level resource roots.
 \`/gitlab/projects/_index.json\` lists materialized projects.
+\`/gitlab/projects/<namespace>/<project>/meta.json\` stores project metadata and is managed by Cloud syncs; it is read-only for writeback.
 \`/gitlab/projects/<namespace>/<project>/merge_requests/_index.json\`, \`issues/_index.json\`, \`pipelines/_index.json\`, \`commits/_index.json\`, \`deployments/_index.json\`, and \`tags/_index.json\` list records for a project.
 
 Directory records own child files and use \`<id>__<slug>/meta.json\`: merge requests, issues, pipelines, and commits. Merge requests may have \`diff.patch\`, \`discussions/*.json\`, and \`approvals.json\` next to \`meta.json\`; issues and commits may have \`comments/*.json\`; pipelines may have \`jobs/*.json\`. Flat records with no child files use \`<slug>__<id>.json\` or \`<id>.json\` when no useful slug exists.

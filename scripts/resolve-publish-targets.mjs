@@ -125,6 +125,17 @@ function sortByInternalDependencies(packageDirs) {
 }
 
 async function versionOnNpm(name, version) {
+  const mockedPublished = process.env.RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED;
+  if (mockedPublished !== undefined) {
+    const published = new Set(
+      mockedPublished
+        .split(/[\s,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    );
+    return published.has(`${name}@${version}`);
+  }
+
   const url = `https://registry.npmjs.org/${name.replace('/', '%2F')}/${version}`;
   const res = await fetch(url);
   if (res.status === 200) return true;
@@ -143,6 +154,17 @@ async function resolveMissing() {
   return out;
 }
 
+async function filterAlreadyPublished(packageDirs) {
+  const out = [];
+  for (const dir of packageDirs) {
+    const pkg = readPackage(dir);
+    if (!(await versionOnNpm(pkg.name, pkg.version))) {
+      out.push(dir);
+    }
+  }
+  return out;
+}
+
 async function main() {
   const input = (process.argv[2] || '').trim();
   if (!input) {
@@ -156,11 +178,13 @@ async function main() {
 
   const out = new Set();
   const errors = [];
+  let includesMissingToken = false;
 
   for (const token of tokens) {
     if (token === 'all') {
       all.forEach((p) => out.add(p));
     } else if (token === 'missing') {
+      includesMissingToken = true;
       const missing = await resolveMissing();
       missing.forEach((p) => out.add(p));
     } else if (GROUPS[token]) {
@@ -190,7 +214,20 @@ async function main() {
     process.exit(1);
   }
 
-  const list = sortByInternalDependencies([...out]);
+  let list = sortByInternalDependencies([...out]);
+  if (
+    includesMissingToken
+    || process.env.INPUT_VERSION === 'none'
+    || process.env.RESOLVE_PUBLISH_TARGETS_SKIP_PUBLISHED === '1'
+  ) {
+    list = await filterAlreadyPublished(list);
+  }
+
+  if (list.length === 0) {
+    console.error('error: no unpublished packages resolved');
+    process.exit(1);
+  }
+
   console.error(`Resolved ${list.length} package(s): ${list.join(' ')}`);
   process.stdout.write(`packages=${list.join(' ')}\n`);
 }

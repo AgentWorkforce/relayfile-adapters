@@ -14,6 +14,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: Record<string, unknown>;
 }
 
 export interface DigestContext {
@@ -309,9 +310,15 @@ function decodeGitLabDigestId(value: string): string {
 }
 
 function pastTense(event: DigestChangeEvent): string {
+  const terminalVerb = terminalStateVerb(event);
+  if (terminalVerb) return terminalVerb;
+
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (/\b(open|opened|create|created|add|added|write|written)\b/u.test(action)) {
+  if (/\b(open|opened)\b/u.test(action)) {
     return 'was opened';
+  }
+  if (/\b(create|created|add|added|write|written)\b/u.test(action)) {
+    return 'was created';
   }
   if (/\b(merge|merged)\b/u.test(action)) {
     return 'was merged';
@@ -335,4 +342,105 @@ function pastTense(event: DigestChangeEvent): string {
     return 'was deleted';
   }
   return 'was updated';
+}
+
+function terminalStateVerb(event: DigestChangeEvent): string | null {
+  const content = event.content;
+  if (!content) return null;
+  const payload = readRecord(content, 'payload') ?? content;
+  const webhook = readRecord(content, '_webhook');
+  const payloadWebhook = readRecord(payload, '_webhook');
+  const action = [
+    readLowerString(webhook, 'action'),
+    readLowerString(webhook, 'eventType'),
+    readLowerString(payloadWebhook, 'action'),
+    readLowerString(payloadWebhook, 'eventType'),
+    readLowerString(content, 'action'),
+    readLowerString(content, 'eventType'),
+    readLowerString(content, 'type'),
+  ].join('.');
+
+  if (hasActionVerb(action, 'unarchive|unarchived')) return 'was unarchived';
+  if (hasActionVerb(action, 'restore|restored')) return 'was restored';
+  if (hasActionVerb(action, 'archive|archived')) return 'was archived';
+  if (hasActionVerb(action, 'success|succeeded')) return 'succeeded';
+  if (hasActionVerb(action, 'fail|failed')) return 'failed';
+  if (hasActionVerb(action, 'skip|skipped')) return 'was skipped';
+  if (hasActionVerb(action, 'cancel|canceled|cancelled')) return 'was canceled';
+
+  const state =
+    readLowerString(payload, 'state')
+    || readLowerString(content, 'state')
+    || readLowerPath(payload, ['state', 'type'])
+    || readLowerPath(payload, ['state', 'name']);
+  const status =
+    readLowerString(payload, 'status')
+    || readLowerString(content, 'status')
+    || readLowerPath(payload, ['fields', 'status', 'name']);
+  const stateName =
+    readLowerString(payload, 'state_name')
+    || readLowerString(content, 'state_name')
+    || readLowerPath(payload, ['state', 'name']);
+  const path = digestEventPath(event);
+  const merged = payload.merged === true || content.merged === true || state === 'merged';
+
+  if (merged && path.includes('/merge_requests/')) return 'was merged';
+  if (state === 'closed' || status === 'closed') return 'was closed';
+  if (state === 'done' || stateName === 'done' || status === 'done') return 'was completed';
+  if (
+    state === 'canceled'
+    || stateName === 'canceled'
+    || status === 'canceled'
+    || status === 'cancelled'
+  ) {
+    return 'was canceled';
+  }
+  if (status === 'success' || status === 'succeeded') return 'succeeded';
+  if (status === 'failed') return 'failed';
+  if (status === 'skipped') return 'was skipped';
+  if (
+    state === 'archived'
+    || status === 'archived'
+    || state === 'trashed'
+    || status === 'trashed'
+    || content.archived === true
+    || content.in_trash === true
+    || payload.archived === true
+    || payload.in_trash === true
+    || payload.is_archived === true
+  ) {
+    return 'was archived';
+  }
+  return null;
+}
+
+function readRecord(
+  record: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const value = record[key];
+  return isRecord(value) ? value : null;
+}
+
+function readLowerString(record: Record<string, unknown> | null | undefined, key: string): string {
+  if (!record) return '';
+  const value = record[key];
+  return typeof value === 'string' ? value.toLowerCase() : '';
+}
+
+function readLowerPath(record: Record<string, unknown>, path: readonly string[]): string {
+  let current: unknown = record;
+  for (const segment of path) {
+    if (!isRecord(current)) return '';
+    current = current[segment];
+  }
+  return typeof current === 'string' ? current.toLowerCase() : '';
+}
+
+function hasActionVerb(action: string, verbs: string): boolean {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

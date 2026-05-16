@@ -15,6 +15,7 @@ import {
   gitLabByCreatorAliasPath,
   gitLabByPriorityAliasPath,
   gitLabByStateAliasPath,
+  gitLabProjectMetadataPath,
   parseGitLabPath,
 } from '../src/path-mapper.js';
 
@@ -51,6 +52,10 @@ describe('path mapper', () => {
     assert.strictEqual(
       computePipelineJobPath('acme/api', 99, 100, 'main'),
       '/gitlab/projects/acme/api/pipelines/99__main/jobs/100.json',
+    );
+    assert.strictEqual(
+      gitLabProjectMetadataPath('acme/api'),
+      '/gitlab/projects/acme/api/meta.json',
     );
     assert.strictEqual(
       computeMetadataPath('acme/api', 'deployments', 7),

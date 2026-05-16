@@ -96,6 +96,10 @@ export function gitLabProjectPrefix(projectPath: string): string {
   return `/gitlab/projects/${encodeProjectPath(projectPath)}`;
 }
 
+export function gitLabProjectMetadataPath(projectPath: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/meta.json`;
+}
+
 export function gitLabProjectResourceIndexPath(
   projectPath: string,
   objectType: GitLabIndexedResourceType,
