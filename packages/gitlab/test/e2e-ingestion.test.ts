@@ -150,11 +150,13 @@ describe('GitLabAdapter e2e ingestion', () => {
 
     const result = await adapter.routeWebhook(payload, 'tag_push');
 
-    assert.equal(result.filesDeleted, 2);
+    assert.equal(result.filesDeleted, 4);
     assert.equal(result.filesWritten, 0);
     assert.deepEqual(result.paths, [
       '/gitlab/projects/acme/api/tags/v1-0__v1.0.json',
       '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
+      '/gitlab/projects/acme/api/tags/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
     ]);
     assert.deepEqual(result.operations, [
       {
@@ -163,6 +165,14 @@ describe('GitLabAdapter e2e ingestion', () => {
       },
       {
         path: '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/by-ref/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
         mode: 'delete',
       },
     ]);
@@ -193,13 +203,17 @@ describe('GitLabAdapter e2e ingestion', () => {
 
     const result = await adapter.routeWebhook(payload, 'tag_push');
 
-    assert.equal(result.filesDeleted, 4);
+    assert.equal(result.filesDeleted, 8);
     assert.equal(result.filesWritten, 0);
     assert.deepEqual(result.paths, [
       '/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
       '/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json',
       '/gitlab/projects/acme/api/tags/release/foo__bar.json',
       '/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/refs/tags/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs/tags/release/foo__bar.json',
     ]);
   });
 });

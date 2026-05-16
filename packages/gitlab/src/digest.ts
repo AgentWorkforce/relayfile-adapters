@@ -66,7 +66,8 @@ function isCanonicalDigestPath(path: string): boolean {
   return leaf !== 'LAYOUT.md'
     && leaf !== '_index.json'
     && !hasDigestAliasDirectory(segments)
-    && !isGitLabLegacyTagCleanupPath(segments);
+    && !isGitLabLegacyTagCleanupPath(segments)
+    && !isGitLabFullRefTagCleanupPath(segments);
 }
 
 const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
@@ -165,6 +166,16 @@ function isGitLabLegacyTagCleanupPath(segments: readonly string[]): boolean {
   if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
   const resourceIndex = gitLabResourceSegmentIndex(segments);
   return segments[resourceIndex] === 'tags' && segments.length > resourceIndex + 2;
+}
+
+function isGitLabFullRefTagCleanupPath(segments: readonly string[]): boolean {
+  if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
+  const resourceIndex = gitLabResourceSegmentIndex(segments);
+  if (segments[resourceIndex] !== 'tags' || segments.length !== resourceIndex + 2) {
+    return false;
+  }
+  const basename = (segments.at(-1) ?? '').replace(/\.[^.]+$/u, '');
+  return gitLabRecordId('tags', basename).startsWith('refs/tags/');
 }
 
 type GitLabResourceSegment =

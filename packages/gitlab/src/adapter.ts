@@ -345,11 +345,7 @@ export class GitLabAdapter extends IntegrationAdapter {
     ];
 
     if (deleted) {
-      for (const deletePath of [
-        gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
-        legacyGitLabTagCanonicalPath(projectPath, ref),
-        legacyGitLabTagByRefAliasPath(projectPath, ref),
-      ]) {
+      for (const deletePath of tagCleanupPaths(projectPath, ref, tagPayload.ref)) {
         if (!operations.some((operation) => operation.path === deletePath)) {
           operations.push({ path: deletePath, mode: 'delete' });
         }
@@ -358,6 +354,22 @@ export class GitLabAdapter extends IntegrationAdapter {
 
     return fromOperations(operations);
   }
+}
+
+function tagCleanupPaths(projectPath: string, id: string, raw?: string): string[] {
+  const refs = [id, raw, `refs/tags/${id}`].filter(
+    (ref): ref is string => typeof ref === 'string' && ref.length > 0,
+  );
+  return [
+    ...new Set(
+      refs.flatMap((ref) => [
+        computeMetadataPath(projectPath, 'tags', ref, ref),
+        gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
+        legacyGitLabTagCanonicalPath(projectPath, ref),
+        legacyGitLabTagByRefAliasPath(projectPath, ref),
+      ]),
+    ),
+  ];
 }
 
 function legacyGitLabTagCanonicalPath(projectPath: string, ref: string): string {

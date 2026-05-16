@@ -417,6 +417,10 @@ describe('emitGitLabAuxiliaryFiles', () => {
     client.writes.set('/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json', '{}');
     client.writes.set('/gitlab/projects/acme/api/tags/release/foo__bar.json', '{}');
     client.writes.set('/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/by-ref/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/refs/tags/release/foo__bar.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/tags/by-ref/refs/tags/release/foo__bar.json', '{}');
 
     const result = await emitGitLabAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -434,5 +438,9 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json'));
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/release/foo__bar.json'));
     assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/refs/tags/release/foo__bar.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/tags/by-ref/refs/tags/release/foo__bar.json'));
   });
 });

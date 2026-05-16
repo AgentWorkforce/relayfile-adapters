@@ -584,14 +584,15 @@ function planTagRecord(
 ): EmitPlan {
   const projectPath = extractProjectPath(record);
   if (!projectPath) return {};
-  const id = extractTagRef(record);
-  if (!id) return {};
+  const tagRef = extractTagRef(record);
+  if (!tagRef) return {};
+  const { id } = tagRef;
   const canonicalPath = computeMetadataPath(projectPath, 'tags', id, id);
 
   if (record._deleted === true) {
     getReconciler(projectPath, 'tags').remove(id);
     return {
-      deletes: tagPathsFor({ projectPath, id }).map((path) => ({ path })),
+      deletes: tagPathsFor({ projectPath, id, raw: tagRef.raw }).map((path) => ({ path })),
     };
   }
 
@@ -611,23 +612,31 @@ function planTagRecord(
   };
 }
 
-function tagPathsFor(args: { projectPath: string; id: string }): string[] {
-  const { projectPath, id } = args;
-  return [...new Set([
-    computeMetadataPath(projectPath, 'tags', id, id),
-    gitLabByRefAliasPath(projectPath, 'tags', id, id),
-    legacyGitLabTagCanonicalPath(projectPath, id),
-    legacyGitLabTagByRefAliasPath(projectPath, id),
-  ])];
+function tagPathsFor(args: { projectPath: string; id: string; raw?: string }): string[] {
+  const { projectPath, id, raw } = args;
+  const refs = [id, raw, `refs/tags/${id}`].filter(
+    (ref): ref is string => typeof ref === 'string' && ref.length > 0,
+  );
+  return [
+    ...new Set(
+      refs.flatMap((ref) => [
+        computeMetadataPath(projectPath, 'tags', ref, ref),
+        gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
+        legacyGitLabTagCanonicalPath(projectPath, ref),
+        legacyGitLabTagByRefAliasPath(projectPath, ref),
+      ]),
+    ),
+  ];
 }
 
-function extractTagRef(record: GitLabTagEmitRecord): string | null {
+function extractTagRef(record: GitLabTagEmitRecord): { id: string; raw: string } | null {
   const raw = firstString(record.ref, record.name, record.id);
   if (!raw) return null;
   const tagRef = !record.ref && !record.name && raw.includes(':')
     ? raw.slice(raw.indexOf(':') + 1)
     : raw;
-  return normalizeGitLabTagRef(tagRef);
+  const id = normalizeGitLabTagRef(tagRef);
+  return id ? { id, raw: tagRef } : null;
 }
 
 function firstString(...values: readonly unknown[]): string | null {

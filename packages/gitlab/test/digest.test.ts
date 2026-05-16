@@ -263,6 +263,18 @@ test('digest suppresses legacy GitLab tag cleanup paths', async () => {
           action: 'deleted',
           canonicalPath: 'gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json',
         },
+        {
+          id: 'evt-full-ref-canonical',
+          timestamp: '2026-05-12T08:00:04.000Z',
+          action: 'deleted',
+          canonicalPath: 'gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+        },
+        {
+          id: 'evt-full-ref-alias',
+          timestamp: '2026-05-12T08:00:05.000Z',
+          action: 'deleted',
+          canonicalPath: 'gitlab/projects/acme/api/tags/by-ref/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+        },
       ];
     },
   };
