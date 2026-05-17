@@ -40,6 +40,7 @@ export {
   gitLabProjectsIndexPath,
   gitLabRecordDirectorySegment,
   gitLabRootIndexPath,
+  normalizeGitLabTagRef,
   parseGitLabPath,
 } from './path-mapper.js';
 export { ingestPipeline } from './pipeline/ingestion.js';

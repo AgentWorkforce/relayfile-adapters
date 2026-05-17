@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildSummary } from './summary.js';
+import { buildSummary } from '../src/summary.js';
 
 const MAX_SUMMARY_JSON_LENGTH = 1024;
 

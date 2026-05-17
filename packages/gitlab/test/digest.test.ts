@@ -415,6 +415,39 @@ test('digest ignores GitLab merge request alias paths without dropping canonical
   });
 });
 
+test('digest ignores GitLab project by-id alias paths', async () => {
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-project-alias',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'gitlab/projects/by-id/20.json',
+        },
+        {
+          id: 'evt-issue',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'closed',
+          canonicalPath: 'gitlab/projects/acme/api/issues/17__fix-sync-state/meta.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'issue #17 was closed',
+        canonicalPath: 'gitlab/projects/acme/api/issues/17__fix-sync-state/meta.json',
+      },
+    ],
+  });
+});
+
 test('digest identifies GitLab resources from the canonical resource segment, not project path names', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',
