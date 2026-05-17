@@ -32,6 +32,7 @@ const GROUPS = {
   email: ['mailgun', 'sendgrid'],
   commerce: ['shopify', 'stripe'],
   db: ['postgres', 'redis'],
+  social: ['x'],
 };
 
 function listPublishablePackages() {
