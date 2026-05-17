@@ -5,7 +5,11 @@ import {
   computeGitHubPath,
   encodeGitHubPathSegment,
   githubAliasRepoPrefix,
+  githubByAssigneeAliasPath,
+  githubByCreatorAliasPath,
   githubByIdAliasPath,
+  githubByPriorityAliasPath,
+  githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
@@ -162,6 +166,22 @@ describe('path-mapper', () => {
       assert.equal(
         githubByIdAliasPath('octocat', 'hello-world', 'pulls', 42),
         '/github/repos/octocat__hello-world/pulls/by-id/42.json',
+      );
+      assert.equal(
+        githubByStateAliasPath('octocat', 'hello-world', 'issues', 'in progress', 7),
+        '/github/repos/octocat__hello-world/issues/by-state/in-progress/7.json',
+      );
+      assert.equal(
+        githubByAssigneeAliasPath('octocat', 'hello-world', 'issues', 'Mona Lisa', 7),
+        '/github/repos/octocat__hello-world/issues/by-assignee/mona-lisa/7.json',
+      );
+      assert.equal(
+        githubByCreatorAliasPath('octocat', 'hello-world', 'pulls', 'octocat', 42),
+        '/github/repos/octocat__hello-world/pulls/by-creator/octocat/42.json',
+      );
+      assert.equal(
+        githubByPriorityAliasPath('octocat', 'hello-world', 'issues', 'P0 Critical', 7),
+        '/github/repos/octocat__hello-world/issues/by-priority/p0-critical/7.json',
       );
     });
   });

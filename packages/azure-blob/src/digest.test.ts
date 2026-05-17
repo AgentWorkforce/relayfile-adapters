@@ -1,0 +1,161 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { digest, type DigestContext } from './digest.js';
+
+test('digest returns deterministic Azure Blob bullets sorted by event time and id', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents(filter) {
+      assert.deepEqual(filter, { providers: ['azure-blob'] });
+      return [
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'deleted',
+          canonicalPath: 'azure/acct/container/logs/app.log',
+        },
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobCreated',
+          canonicalPath: '/azure/acct/container/data/report.csv',
+        },
+      ];
+    },
+  };
+
+  const first = await digest(ctx);
+  const second = await digest(ctx);
+
+  assert.deepEqual(first, second);
+  assert.deepEqual(first, {
+    provider: 'azure-blob',
+    bullets: [
+      {
+        text: 'blob data/report.csv was uploaded',
+        canonicalPath: 'azure/acct/container/data/report.csv',
+      },
+      {
+        text: 'blob logs/app.log was deleted',
+        canonicalPath: 'azure/acct/container/logs/app.log',
+      },
+    ],
+  });
+});
+
+test('digest classifies Azure Blob archive tier changes', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobTiered',
+          canonicalPath: 'azure/acct/container/old-data.bin',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [
+      {
+        text: 'blob old-data.bin was archived',
+        canonicalPath: 'azure/acct/container/old-data.bin',
+      },
+    ],
+  });
+});
+
+test('digest classifies Azure Blob updates as modified', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobUpdated',
+          canonicalPath: 'azure/acct/container/data/report.csv',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [
+      {
+        text: 'blob data/report.csv was modified',
+        canonicalPath: 'azure/acct/container/data/report.csv',
+      },
+    ],
+  });
+});
+
+test('digest returns null for an empty Azure Blob event window', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [];
+    },
+  };
+
+  assert.equal(await digest(ctx), null);
+});
+
+test('digest keeps real .json suffixes in Azure Blob names', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-json',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobUpdated',
+          canonicalPath: 'azure/acct/container/config/settings.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [
+      {
+        text: 'blob config/settings.json was modified',
+        canonicalPath: 'azure/acct/container/config/settings.json',
+      },
+    ],
+  });
+});
+
+test('digest accepts the actual /azure root canonical path', async () => {
+  const ctx: DigestContext = {
+    provider: 'azure-blob',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-root',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'BlobUpdated',
+          canonicalPath: '/azure',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'azure-blob',
+    bullets: [{ text: 'blob azure was modified', canonicalPath: 'azure' }],
+  });
+});

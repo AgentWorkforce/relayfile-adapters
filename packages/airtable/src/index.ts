@@ -1,4 +1,5 @@
 export * from './airtable-adapter.js';
+export * from './digest.js';
 export * from './fetch-on-demand.js';
 export * from './path-mapper.js';
 export * from './queries.js';

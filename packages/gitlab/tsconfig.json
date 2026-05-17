@@ -18,7 +18,8 @@
   ],
   "exclude": [
     "dist",
-    "test"
+    "test",
+    "src/**/*.test.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }

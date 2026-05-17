@@ -7,9 +7,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 \`/linear/LAYOUT.md\` is this guide.
 \`/linear/issues/\`, \`/linear/comments/\`, \`/linear/users/\`, \`/linear/teams/\`, \`/linear/projects/\`, \`/linear/cycles/\`, \`/linear/milestones/\`, and \`/linear/roadmaps/\` each own their canonical JSON records plus a sibling \`_index.json\`.
 
-Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\` and \`/linear/issues/by-state/<state>/<TEAM-123>.json\` are additional lookups.
-
-Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\` and \`/linear/issues/by-state/<state>/<TEAM-123>.json\` are additional lookups.
+Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, and \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\` are additional lookups.
 
 ## Indexes
 
@@ -35,6 +33,8 @@ Examples:
 ls /linear/issues
 jq '.[0]' /linear/issues/_index.json
 jq '.[] | {identifier, state, title}' /linear/issues/_index.json
+ls /linear/issues/by-assignee
+ls /linear/issues/by-priority
 grep -R "ENG-" /linear/comments
 \`\`\`
 `;

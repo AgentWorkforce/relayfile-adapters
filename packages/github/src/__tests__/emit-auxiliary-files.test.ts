@@ -11,7 +11,11 @@ import type {
   EmitWriteResult,
 } from '@relayfile/adapter-core';
 import {
+  githubByAssigneeAliasPath,
+  githubByCreatorAliasPath,
   githubByIdAliasPath,
+  githubByPriorityAliasPath,
+  githubByStateAliasPath,
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
@@ -135,9 +139,10 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const canonical = githubPullRequestPath('acme', 'widgets', 42, 'Add darkmode toggle');
     const byId = githubByIdAliasPath('acme', 'widgets', 'pulls', 42);
     const byTitle = githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
+    const byState = githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42);
     const indexPath = githubRepoPullsIndexPath('acme', 'widgets');
 
-    for (const p of [canonical, byId, byTitle, indexPath]) {
+    for (const p of [canonical, byId, byTitle, byState, indexPath]) {
       assert.ok(writtenPaths.includes(p), `missing expected write ${p}`);
     }
 
@@ -145,6 +150,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const canonicalBytes = client.files.get(canonical);
     assert.equal(client.files.get(byId), canonicalBytes);
     assert.equal(client.files.get(byTitle), canonicalBytes);
+    assert.equal(client.files.get(byState), canonicalBytes);
 
     // Index row scoped to this repo.
     const indexBytes = client.files.get(indexPath)!;
@@ -210,6 +216,99 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'New Title', 42)));
   });
 
+  it('reconciles a PR state transition by moving the by-state alias', async () => {
+    const priorPayload = {
+      provider: 'github',
+      objectType: 'pull_request',
+      objectId: '42',
+      payload: {
+        owner: 'acme',
+        repo: 'widgets',
+        number: 42,
+        title: 'Stateful PR',
+        state: 'open',
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [githubByIdAliasPath('acme', 'widgets', 'pulls', 42)]: JSON.stringify(priorPayload),
+      },
+    });
+
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 42,
+          title: 'Stateful PR',
+          state: 'closed',
+          updated_at: '2026-05-12T00:00:00Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(
+      client.deletes.some((d) => d.path === githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42)),
+      'expected prior by-state alias to be deleted',
+    );
+    assert.ok(
+      client.writes.some((w) => w.path === githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)),
+      'expected new by-state alias to be written',
+    );
+  });
+
+  it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {
+    const priorPayload = {
+      provider: 'github',
+      objectType: 'issue',
+      objectId: '7',
+      payload: {
+        owner: 'acme',
+        repo: 'widgets',
+        number: 7,
+        title: 'Metadata issue',
+        state: 'open',
+        assignees: [{ login: 'octocat' }],
+        user: { login: 'monalisa' },
+        labels: [{ name: 'P1' }],
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify(priorPayload),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 7,
+          title: 'Metadata issue',
+          state: 'open',
+          assignees: [{ login: 'hubot' }],
+          user: { login: 'maintainer' },
+          labels: [{ name: 'priority:high' }],
+        },
+      ],
+    });
+
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(deletedPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
+    assert.ok(deletedPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
+    assert.ok(deletedPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'P1', 7)));
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'hubot', 7)));
+    assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'maintainer', 7)));
+    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'high', 7)));
+  });
+
   it('writes canonical meta.json + aliases for an issue with per-repo issues index', async () => {
     const client = createClient();
     await emitGitHubAuxiliaryFiles(client, {
@@ -221,6 +320,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
           number: 7,
           title: 'Bug report',
           state: 'open',
+          assignees: [{ login: 'octocat' }],
+          user: { login: 'monalisa' },
+          labels: [{ name: 'P0 Critical' }],
           updated_at: '2026-05-12T00:00:00Z',
         },
       ],
@@ -231,6 +333,10 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubIssuePath('acme', 'widgets', 7, 'Bug report')));
     assert.ok(writtenPaths.includes(githubByIdAliasPath('acme', 'widgets', 'issues', 7)));
     assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)));
+    assert.ok(writtenPaths.includes(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)));
+    assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
+    assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
+    assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'P0 Critical', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
     // No writes leaked into the pulls index for this repo.
@@ -361,6 +467,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     const client = createClient({
       initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
         [githubByIdAliasPath('acme', 'widgets', 'pulls', 42)]: JSON.stringify(priorPayload),
         [githubRepoPullsIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
       },
@@ -369,8 +478,8 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const result = await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
       pullRequests: [
-        // ScopedDeleteTombstone — id + _deleted + owner/repo context.
-        { id: '42', _deleted: true, owner: 'acme', repo: 'widgets' },
+        // Bare tombstone — repo context is recovered from the repo + pulls indexes.
+        { id: '42', _deleted: true },
       ],
     });
 
@@ -380,6 +489,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
     assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
     assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
 
     // No content write happened for the tombstone itself — only the index flush.
     const contentWrites = client.writes.filter(
@@ -403,6 +513,45 @@ describe('emitGitHubAuxiliaryFiles', () => {
     );
   });
 
+  it('index-only bare PR tombstone removes canonical and category aliases when by-id alias is missing', async () => {
+    const priorIndex = [
+      {
+        id: '42',
+        title: 'Doomed PR',
+        updated: '2026-05-12T00:00:00Z',
+        number: 42,
+        state: 'closed',
+        assigneeKeys: ['mona'],
+        creatorKey: 'hubot',
+        priority: 'high',
+      },
+      { id: '99', title: 'Surviving PR', updated: '2026-05-11T00:00:00Z', number: 99, state: 'open' },
+    ];
+
+    const client = createClient({
+      initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
+        [githubRepoPullsIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [{ id: '42', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
+    assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
+    assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
+    assert.ok(deletedPaths.has(githubByAssigneeAliasPath('acme', 'widgets', 'pulls', 'mona', 42)));
+    assert.ok(deletedPaths.has(githubByCreatorAliasPath('acme', 'widgets', 'pulls', 'hubot', 42)));
+    assert.ok(deletedPaths.has(githubByPriorityAliasPath('acme', 'widgets', 'pulls', 'high', 42)));
+  });
+
   it('delete tombstone for an issue drops its per-repo issues index row', async () => {
     const priorPayload = {
       payload: { owner: 'acme', repo: 'widgets', number: 11, title: 'Old issue', state: 'open' },
@@ -413,6 +562,9 @@ describe('emitGitHubAuxiliaryFiles', () => {
     ];
     const client = createClient({
       initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
         [githubByIdAliasPath('acme', 'widgets', 'issues', 11)]: JSON.stringify(priorPayload),
         [githubRepoIssuesIndexPath('acme', 'widgets')]: JSON.stringify(priorIndex),
       },
@@ -420,7 +572,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
-      issues: [{ id: '11', _deleted: true, owner: 'acme', repo: 'widgets' }],
+      issues: [{ id: '11', _deleted: true }],
     });
 
     const indexWrite = client.writes.find(

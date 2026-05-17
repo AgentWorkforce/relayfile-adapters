@@ -34,4 +34,4 @@ jobs:
         run: npx turbo typecheck
 
       - name: Test
-        run: npx turbo test
+        run: npm test

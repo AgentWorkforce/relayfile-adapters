@@ -29,7 +29,7 @@ export interface GitLabAdapterConfig {
 
 export interface IngestOperation {
   path: string;
-  mode: 'update' | 'write';
+  mode: 'delete' | 'update' | 'write';
   content?: string;
   contentType?: 'application/json' | 'text/plain';
   semantics?: FileSemantics;

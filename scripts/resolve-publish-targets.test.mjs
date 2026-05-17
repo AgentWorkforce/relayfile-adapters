@@ -5,11 +5,13 @@ import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
 
-async function resolveTargets(input) {
+async function resolveTargets(input, env = {}) {
   const { stdout } = await execFileAsync('node', [
     'scripts/resolve-publish-targets.mjs',
     input,
-  ]);
+  ], {
+    env: { ...process.env, ...env },
+  });
   const match = stdout.match(/^packages=(.*)$/m);
   assert.ok(match, `expected packages= output, got ${stdout}`);
   return match[1].trim().split(/\s+/);
@@ -64,4 +66,22 @@ test('explicit package input includes required internal dependencies', async () 
   const list = await resolveTargets('github');
 
   assert.deepEqual(list, ['core', 'github']);
+});
+
+test('current-version publish skips already-published internal dependencies', async () => {
+  const list = await resolveTargets('gitlab', {
+    INPUT_VERSION: 'none',
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+  });
+
+  assert.deepEqual(list, ['gitlab']);
+});
+
+test('missing publish skips already-published internal dependencies', async () => {
+  const list = await resolveTargets('missing', {
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+  });
+
+  assert.ok(list.includes('gitlab'), `expected gitlab in ${list.join(' ')}`);
+  assert.ok(!list.includes('core'), `did not expect core in ${list.join(' ')}`);
 });

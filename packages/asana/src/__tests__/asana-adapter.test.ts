@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import {
   AsanaAdapter,
+  asanaTaskByAssigneePath,
+  asanaTaskByIdAliasPath,
+  asanaTaskByStatePath,
   asanaProjectPath,
   asanaSectionPath,
   asanaTaskPath,
@@ -55,6 +58,7 @@ test('AsanaAdapter exposes provider name and supported Asana webhook events', ()
   assert.deepEqual(adapter.supportedEvents(), [
     'task.added',
     'task.changed',
+    'task.completed',
     'task.deleted',
     'task.removed',
     'project.added',
@@ -93,8 +97,13 @@ test('ingestWebhook writes task events with deterministic content and semantics'
     },
   });
 
-  assert.equal(result.filesWritten, 1);
-  assert.deepEqual(result.paths, ['/asana/tasks/12001.json']);
+  assert.equal(result.filesWritten, 4);
+  assert.deepEqual(result.paths, [
+    '/asana/tasks/12001.json',
+    asanaTaskByIdAliasPath('12001'),
+    asanaTaskByStatePath('open', '12001'),
+    asanaTaskByAssigneePath('user_1', '12001'),
+  ]);
   assert.equal(writes[0]?.path, '/asana/tasks/12001.json');
   assert.equal(writes[0]?.semantics?.properties?.['asana.assignee_name'], 'Ada');
   assert.deepEqual(writes[0]?.semantics?.relations, [
@@ -191,8 +200,8 @@ test('ingestWebhook writes every event from raw Asana webhook batches', async ()
     ],
   });
 
-  assert.equal(result.filesWritten, 2);
-  assert.deepEqual(result.paths, ['/asana/tasks/task_1.json', '/asana/projects/project_1.json']);
+  assert.equal(result.filesWritten, 3);
+  assert.deepEqual(result.paths, ['/asana/tasks/task_1.json', '/asana/tasks/by-id/task_1.json', '/asana/projects/project_1.json']);
   assert.deepEqual(writes.map((write) => write.path), result.paths);
   assert.equal(JSON.parse(writes[0]?.content ?? '{}').connectionId, 'conn_asana_123');
 });

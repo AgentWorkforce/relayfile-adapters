@@ -14,8 +14,9 @@
  *     plus a by-uuid alias keyed on the Linear UUID (always emitted — the
  *     stable reconciliation anchor), a by-id alias keyed on the Linear
  *     `TEAM-123` identifier when present (human-readable lookup), a by-title
- *     alias when the title slugs to non-empty, and a by-state alias when both
- *     `state.name` and `identifier` are present. Index row carries
+ *     alias when the title slugs to non-empty, and grouped issue-tracking
+ *     aliases for state, assignee, creator, and priority when the required
+ *     grouping field and `identifier` are present. Index row carries
  *     `{ id, title, updated, identifier, state }`.
  *
  *   * **comment** — canonical `/linear/comments/<slug>__<id>.json`, no
@@ -68,12 +69,16 @@ import { buildLinearRootIndexFile } from './index-emitter.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
   linearCommentPath,
   linearCommentsIndexPath,
   linearCyclesIndexPath,
   linearCyclePath,
+  linearIssueByAssigneePath,
+  linearIssueByCreatorPath,
+  linearIssueByPriorityPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
@@ -116,6 +121,8 @@ import type {
 const LINEAR_PROVIDER_NAME = 'linear';
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 const ISSUES_SCOPE = `${LINEAR_PATH_ROOT}/issues`;
+const PROJECTS_SCOPE = `${LINEAR_PATH_ROOT}/projects`;
+const TEAMS_SCOPE = `${LINEAR_PATH_ROOT}/teams`;
 
 /**
  * Records accepted by `emitLinearAuxiliaryFiles`. Each entry is either a
@@ -295,9 +302,12 @@ async function planIssueWrite(
   const identifier = readNonEmptyString(issue.identifier);
   const title = readNonEmptyString(issue.title);
   const stateName = readIssueStateName(issue);
+  const assigneeId = readIssueAssigneeId(issue);
+  const creatorId = readIssueCreatorId(issue);
+  const priority = issue.priority ?? undefined;
 
   const content = renderContent('issue', issue, connectionId, false);
-  const newPaths = issuePathsFor({ id, identifier, title, stateName });
+  const newPaths = issuePathsFor({ id, identifier, title, stateName, assigneeId, creatorId, priority });
 
   // Reconciliation: the by-uuid alias is the stable anchor — it's always
   // emitted (keyed on the UUID, which is always present) so a prior write
@@ -323,6 +333,9 @@ async function planIssueWrite(
           identifier: prior.identifier,
           title: prior.title,
           stateName: prior.stateName,
+          assigneeId: prior.assigneeId,
+          creatorId: prior.creatorId,
+          priority: prior.priority,
         }),
         newPaths,
       )
@@ -363,6 +376,9 @@ async function planIssueDelete(
     identifier: prior?.identifier,
     title: prior?.title,
     stateName: prior?.stateName,
+    assigneeId: prior?.assigneeId,
+    creatorId: prior?.creatorId,
+    priority: prior?.priority,
   });
   // See planPageDelete in the confluence port — index row must drop too.
   indexReconciler.remove(id);
@@ -373,6 +389,9 @@ interface PriorIssueState {
   identifier?: string | undefined;
   title?: string | undefined;
   stateName?: string | undefined;
+  assigneeId?: string | undefined;
+  creatorId?: string | undefined;
+  priority?: number | string | undefined;
 }
 
 function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueState | null {
@@ -382,6 +401,9 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     identifier: readNonEmptyString(payload.identifier),
     title: readNonEmptyString(payload.title),
     stateName: readPriorStateName(payload),
+    assigneeId: readPriorUserId(payload.assignee) ?? readNonEmptyString(payload.assignee_id),
+    creatorId: readPriorUserId(payload.creator) ?? readNonEmptyString(payload.creator_id),
+    priority: readPriority(payload.priority),
   };
 }
 
@@ -399,8 +421,11 @@ function issuePathsFor(args: {
   identifier?: string | undefined;
   title?: string | undefined;
   stateName?: string | undefined;
+  assigneeId?: string | undefined;
+  creatorId?: string | undefined;
+  priority?: number | string | undefined;
 }): string[] {
-  const { id, identifier, title, stateName } = args;
+  const { id, identifier, title, stateName, assigneeId, creatorId, priority } = args;
   const humanReadable = identifier ?? title;
   const paths: string[] = [];
   // Canonical path.
@@ -421,17 +446,44 @@ function issuePathsFor(args: {
   if (title && slugifies(title)) {
     paths.push(linearByTitleAliasPath(ISSUES_SCOPE, title, id));
   }
-  // by-state alias — only when both state and identifier are present, since
-  // the alias filename is the identifier (Linear's `slugifyStateName`
-  // helper throws on empty input).
+  // Grouped issue-tracking aliases use the public identifier as their stable
+  // human-facing leaf, so they are emitted only when the issue has one.
   if (stateName && identifier) {
     paths.push(linearIssueByStatePath(stateName, identifier));
+  }
+  if (assigneeId && identifier) {
+    paths.push(linearIssueByAssigneePath(assigneeId, identifier));
+  }
+  if (creatorId && identifier) {
+    paths.push(linearIssueByCreatorPath(creatorId, identifier));
+  }
+  if (priority !== undefined && identifier) {
+    paths.push(linearIssueByPriorityPath(priority, identifier));
   }
   return paths;
 }
 
 function readIssueStateName(issue: LinearIssue): string | undefined {
   return readNonEmptyString(issue.state?.name);
+}
+
+function readIssueAssigneeId(issue: LinearIssue): string | undefined {
+  return readNonEmptyString(issue.assignee?.id);
+}
+
+function readIssueCreatorId(issue: LinearIssue): string | undefined {
+  return readNonEmptyString(issue.creator?.id);
+}
+
+function readPriorUserId(value: unknown): string | undefined {
+  return isRecord(value) ? readNonEmptyString(value.id) : undefined;
+}
+
+function readPriority(value: unknown): number | string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return readNonEmptyString(value);
 }
 
 function toIssueNode(issue: LinearIssue): LinearIssueNode {
@@ -441,6 +493,13 @@ function toIssueNode(issue: LinearIssue): LinearIssueNode {
     title: issue.title ?? null,
     state: issue.state
       ? { name: issue.state.name ?? null, type: issue.state.type ?? null }
+      : null,
+    priority: issue.priority ?? null,
+    assignee: issue.assignee
+      ? { id: issue.assignee.id ?? null, name: issue.assignee.name ?? null, email: issue.assignee.email ?? null }
+      : null,
+    creator: issue.creator
+      ? { id: issue.creator.id ?? null, name: issue.creator.name ?? null, email: issue.creator.email ?? null }
       : null,
     updatedAt: issue.updatedAt ?? null,
     createdAt: issue.createdAt ?? null,
@@ -544,6 +603,8 @@ async function emitTeams(
     indexRow: (record) => linearTeamIndexRow(record),
     objectType: 'team',
     connectionId,
+    aliasAnchorPath: (id) => linearByIdAliasPath(TEAMS_SCOPE, id),
+    aliasPaths: teamAliasPaths,
   });
 }
 
@@ -559,6 +620,8 @@ async function emitProjects(
     indexRow: (record) => linearProjectIndexRow(record),
     objectType: 'project',
     connectionId,
+    aliasAnchorPath: (id) => linearByIdAliasPath(PROJECTS_SCOPE, id),
+    aliasPaths: projectAliasPaths,
   });
 }
 
@@ -613,7 +676,16 @@ interface FlatResourceOptions<TRecord extends { id: string }> {
   indexRow: (record: TRecord) => LinearBaseIndexRow;
   objectType: string;
   connectionId: string | undefined;
+  aliasAnchorPath?: (id: string) => string;
+  aliasPaths?: (record: Record<string, unknown>, id: string) => FlatAliasPath[];
 }
+
+type FlatAliasPath =
+  | string
+  | {
+      path: string;
+      collisionPath: string;
+    };
 
 async function emitFlatResource<TRecord extends { id: string }>(
   client: AuxiliaryEmitterClient,
@@ -635,23 +707,31 @@ async function emitFlatResource<TRecord extends { id: string }>(
       contentType: JSON_CONTENT_TYPE,
     }),
   });
+  const priorReader = new PriorAliasReader(client, workspaceId);
+  const aliasReservations = new Map<string, string>();
 
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
       indexReconciler.remove(record.id);
-      return { deletes: [{ path: opts.canonicalPath(record.id) }] };
+      const prior = await readFlatPrior(record.id, priorReader, opts);
+      const paths = await flatResourcePaths(record.id, prior, opts, priorReader);
+      return { deletes: paths.map((path) => ({ path })) };
     }
     const id = readNonEmptyString(record.id);
     if (!id) return {};
     indexReconciler.upsert(opts.indexRow(record));
+    const prior = await readFlatPrior(id, priorReader, opts);
+    const paths = await flatResourcePaths(id, record, opts, priorReader, aliasReservations);
+    const priorPaths = prior ? await flatResourcePaths(id, prior, opts, priorReader) : [];
+    const stalePaths = diffPaths(priorPaths, paths);
+    const content = renderContent(opts.objectType, record, opts.connectionId, false);
     return {
-      writes: [
-        {
-          path: opts.canonicalPath(id),
-          content: renderContent(opts.objectType, record, opts.connectionId, false),
-          contentType: JSON_CONTENT_TYPE,
-        },
-      ],
+      writes: paths.map((path) => ({
+        path,
+        content,
+        contentType: JSON_CONTENT_TYPE,
+      })),
+      deletes: stalePaths.map((path) => ({ path })),
     };
   });
 
@@ -659,6 +739,80 @@ async function emitFlatResource<TRecord extends { id: string }>(
   fanOut.written += indexResult.written;
   fanOut.errors.push(...indexResult.errors);
   return fanOut;
+}
+
+async function readFlatPrior<TRecord extends { id: string }>(
+  id: string,
+  priorReader: PriorAliasReader,
+  opts: FlatResourceOptions<TRecord>,
+): Promise<Record<string, unknown> | null> {
+  if (!opts.aliasAnchorPath || !opts.aliasPaths) return null;
+  return priorReader.read<Record<string, unknown>>(
+    opts.aliasAnchorPath(id),
+    (parsed) => pickPayload(parsed),
+  );
+}
+
+async function flatResourcePaths<TRecord extends { id: string }>(
+  id: string,
+  record: Record<string, unknown> | null,
+  opts: FlatResourceOptions<TRecord>,
+  priorReader: PriorAliasReader,
+  aliasReservations?: Map<string, string>,
+): Promise<string[]> {
+  const aliases = record && opts.aliasPaths ? opts.aliasPaths(record, id) : [];
+  const resolvedAliases: string[] = [];
+  for (const alias of aliases) {
+    resolvedAliases.push(await resolveFlatAliasPath(alias, id, priorReader, aliasReservations));
+  }
+  return [opts.canonicalPath(id), ...resolvedAliases];
+}
+
+async function resolveFlatAliasPath(
+  alias: FlatAliasPath,
+  id: string,
+  priorReader: PriorAliasReader,
+  aliasReservations?: Map<string, string>,
+): Promise<string> {
+  if (typeof alias === 'string') {
+    return alias;
+  }
+  const reservedId = aliasReservations?.get(alias.path);
+  if (reservedId && reservedId !== id) {
+    aliasReservations?.set(alias.collisionPath, id);
+    return alias.collisionPath;
+  }
+  const existing = await priorReader.read<Record<string, unknown>>(alias.path);
+  const existingId =
+    readNonEmptyString(existing?.objectId) ??
+    (existing ? readNonEmptyString(pickPayload(existing)?.id) : undefined);
+  const path = existingId && existingId !== id ? alias.collisionPath : alias.path;
+  aliasReservations?.set(path, id);
+  return path;
+}
+
+function projectAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
+  const paths: FlatAliasPath[] = [linearByIdAliasPath(PROJECTS_SCOPE, id)];
+  const name = readNonEmptyString(record.name);
+  if (name && slugifies(name)) {
+    paths.push({
+      path: linearByTitleAliasPath(PROJECTS_SCOPE, name, id),
+      collisionPath: linearByTitleAliasPath(PROJECTS_SCOPE, name, id, true),
+    });
+  }
+  return paths;
+}
+
+function teamAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
+  const paths: FlatAliasPath[] = [linearByIdAliasPath(TEAMS_SCOPE, id)];
+  const name = readNonEmptyString(record.name) ?? readNonEmptyString(record.key);
+  if (name && slugifies(name)) {
+    paths.push({
+      path: linearByNameAliasPath(TEAMS_SCOPE, name, id),
+      collisionPath: linearByNameAliasPath(TEAMS_SCOPE, name, id, true),
+    });
+  }
+  return paths;
 }
 
 // -- shared helpers ---------------------------------------------------------

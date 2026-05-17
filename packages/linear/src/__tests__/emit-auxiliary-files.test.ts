@@ -13,9 +13,13 @@ import { emitLinearAuxiliaryFiles } from '../emit-auxiliary-files.js';
 import {
   LINEAR_PATH_ROOT,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
   linearCyclesIndexPath,
+  linearIssueByAssigneePath,
+  linearIssueByCreatorPath,
+  linearIssueByPriorityPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
@@ -118,6 +122,85 @@ describe('emitLinearAuxiliaryFiles', () => {
     );
   });
 
+  it('materializes advertised project and team aliases and reconciles renames', async () => {
+    const client = createClient({
+      initialFiles: {
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-1')]: JSON.stringify({
+          provider: 'linear',
+          objectType: 'project',
+          objectId: 'project-1',
+          payload: { id: 'project-1', name: 'Old Project' },
+        }),
+        [linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')]: '{}',
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')]: JSON.stringify({
+          provider: 'linear',
+          objectType: 'team',
+          objectId: 'team-1',
+          payload: { id: 'team-1', name: 'Old Team' },
+        }),
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')]: '{}',
+      },
+    });
+
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{ id: 'project-1', name: 'New Project', updatedAt: '2026-05-12T00:00:00Z' }],
+      teams: [{ id: 'team-1', name: 'New Team', key: 'CORE', updatedAt: '2026-05-12T00:00:00Z' }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearProjectPath('project-1')));
+    assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-1')));
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'New Project', 'project-1')));
+    assert.ok(!client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')));
+    assert.ok(client.files.has(linearTeamPath('team-1')));
+    assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'New Team', 'team-1')));
+    assert.ok(!client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')));
+  });
+
+  it('disambiguates project and team alias slug collisions', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [
+        { id: 'project-1', name: 'Roadmap', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'project-2', name: 'Roadmap!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+      teams: [
+        { id: 'team-1', name: 'Core', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'team-2', name: 'Core!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
+  });
+
+  it('disambiguates project and team alias slug collisions without readFile support', async () => {
+    const client = createClient({ noRead: true });
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [
+        { id: 'project-1', name: 'Roadmap', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'project-2', name: 'Roadmap!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+      teams: [
+        { id: 'team-1', name: 'Core', updatedAt: '2026-05-12T00:00:00Z' },
+        { id: 'team-2', name: 'Core!!!', updatedAt: '2026-05-12T00:00:00Z' },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
+    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
+  });
+
   it('writes an empty index for an explicit empty cycle bucket', async () => {
     const client = createClient();
     const result = await emitLinearAuxiliaryFiles(client, {
@@ -142,6 +225,9 @@ describe('emitLinearAuxiliaryFiles', () => {
       identifier: 'AGE-8',
       title: 'Release Plan',
       state: { id: 'state-1', name: 'In Progress' },
+      assignee: { id: 'user-assignee', name: 'Alice' },
+      creator: { id: 'user-creator', name: 'Casey' },
+      priority: 2,
       updatedAt: '2026-05-12T00:00:00Z',
     };
     const result = await emitLinearAuxiliaryFiles(client, {
@@ -149,8 +235,8 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // Issue emits 5 files (canonical + by-uuid + by-id + by-title + by-state) + 1 issues index + 1 root index.
-    assert.equal(result.written, 7);
+    // Issue emits 8 files (canonical + by-uuid + by-id + by-title + category aliases) + 1 issues index + 1 root index.
+    assert.equal(result.written, 10);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
@@ -159,6 +245,9 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByAssigneePath('user-assignee', 'AGE-8'),
+      linearIssueByCreatorPath('user-creator', 'AGE-8'),
+      linearIssueByPriorityPath(2, 'AGE-8'),
       linearIssuesIndexPath(),
     ];
     const writtenPaths = client.writes.map((w) => w.path);
@@ -276,6 +365,53 @@ describe('emitLinearAuxiliaryFiles', () => {
     );
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearIssueByStatePath('Done', 'AGE-8')));
+  });
+
+  it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'issue',
+      objectId: 'issue-123',
+      payload: {
+        id: 'issue-123',
+        identifier: 'AGE-8',
+        title: 'Release Plan',
+        state: { name: 'Todo' },
+        assignee: { id: 'user-a' },
+        creator: { id: 'user-c' },
+        priority: 1,
+      },
+    };
+    const client = createClient({
+      initialFiles: {
+        [linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')]: JSON.stringify(priorPayload),
+      },
+    });
+
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          id: 'issue-123',
+          identifier: 'AGE-8',
+          title: 'Release Plan',
+          state: { id: 's', name: 'Todo' },
+          assignee: { id: 'user-b' },
+          creator: { id: 'user-d' },
+          priority: 4,
+        },
+      ],
+    });
+
+    const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(deletedPaths.includes(linearIssueByAssigneePath('user-a', 'AGE-8')));
+    assert.ok(deletedPaths.includes(linearIssueByCreatorPath('user-c', 'AGE-8')));
+    assert.ok(deletedPaths.includes(linearIssueByPriorityPath(1, 'AGE-8')));
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(linearIssueByAssigneePath('user-b', 'AGE-8')));
+    assert.ok(writtenPaths.includes(linearIssueByCreatorPath('user-d', 'AGE-8')));
+    assert.ok(writtenPaths.includes(linearIssueByPriorityPath(4, 'AGE-8')));
   });
 
   it('writes canonical user + index row', async () => {

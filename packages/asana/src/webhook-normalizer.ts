@@ -389,13 +389,29 @@ function extractAsanaObjectId(event: AsanaRecord, payload: AsanaRecord): string 
 
 function extractAsanaAction(event: AsanaRecord, payload: AsanaRecord): string {
   const change = getRecord(event.change);
-  const action =
+  const explicitAction =
     readOptionalString(event.action) ??
     readOptionalString(change?.action) ??
-    readOptionalString(payload.action) ??
+    readOptionalString(payload.action);
+  const action =
+    inferAsanaLifecycleAction(event) ??
+    explicitAction ??
     'changed';
 
   return normalizeAction(action);
+}
+
+function inferAsanaLifecycleAction(event: AsanaRecord): string | undefined {
+  const change = getRecord(event.change);
+  const field = readOptionalString(change?.field)?.toLowerCase();
+  const newValue = change?.new_value ?? change?.newValue;
+  if (
+    field === 'completed'
+    && (newValue === true || readOptionalString(newValue)?.toLowerCase() === 'true')
+  ) {
+    return 'completed';
+  }
+  return undefined;
 }
 
 function normalizeAction(action: string): string {
@@ -417,6 +433,10 @@ function normalizeAction(action: string): string {
     case 'update':
     case 'updated':
       return 'changed';
+    case 'complete':
+    case 'completed':
+    case 'done':
+      return 'completed';
     default:
       return normalized || 'changed';
   }

@@ -8,7 +8,16 @@ test('layoutManifest exposes GitLab resources with canonical aliases and writeba
   const manifest = layoutManifest();
 
   assert.equal(manifest.provider, 'gitlab');
-  assert.deepEqual(manifest.aliasSegments, ['by-id', 'by-ref', 'by-status', 'by-title']);
+  assert.deepEqual(manifest.aliasSegments, [
+    'by-assignee',
+    'by-creator',
+    'by-id',
+    'by-priority',
+    'by-ref',
+    'by-state',
+    'by-status',
+    'by-title',
+  ]);
   assert.ok(manifest.resources.length > 0);
 
   for (const resource of manifest.resources) {
@@ -35,6 +44,9 @@ test('gitLabLayoutPromptFile emits a provider-specific root guide', () => {
   assert.match(file.content, /_index\.json/u);
   assert.match(file.content, /by-id/u);
   assert.match(file.content, /by-title/u);
+  assert.match(file.content, /by-assignee/u);
+  assert.match(file.content, /by-creator/u);
+  assert.match(file.content, /by-priority/u);
   assert.match(file.content, /by-ref/u);
   assert.match(file.content, /jq/u);
 });

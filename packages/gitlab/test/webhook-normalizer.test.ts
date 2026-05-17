@@ -219,7 +219,46 @@ describe('normalizeWebhook', () => {
           ref: 'refs/tags/v1.0.0',
         } as GitLabTagPushWebhook,
         'tag_push',
-      ).objectId.includes('tags/refs-tags-v1-0-0__refs%2Ftags%2Fv1.0.0'),
+      ).objectId.includes('tags/v1-0-0__v1.0.0'),
+    );
+  });
+
+  it('normalizes resource-named project path segments without truncating object ids', () => {
+    const resourceNamedProject = {
+      ...project,
+      path_with_namespace: 'org/tags/pipelines/by-ref/api',
+    };
+
+    const tagPayload = {
+      object_kind: 'tag_push',
+      project: resourceNamedProject,
+      after: 'deadbeef',
+      before: 'beadfeed',
+      commits: [],
+      ref: 'release/foo__bar',
+    } as GitLabTagPushWebhook;
+
+    const normalized = normalizeWebhook(tagPayload, 'tag_push');
+    assert.strictEqual(
+      normalized.objectId,
+      'org/tags/pipelines/by-ref/api/tags/release-foo-bar__release%2Ffoo__bar',
+    );
+    assert.strictEqual(
+      computePathFromWebhook(tagPayload, 'tag_push'),
+      '/gitlab/projects/org/tags/pipelines/by-ref/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+    );
+
+    const namespaceWithTagsPayload = {
+      ...tagPayload,
+      project: {
+        ...resourceNamedProject,
+        path_with_namespace: 'org/foo/tags/bar',
+      },
+      ref: 'refs/tags/v1.0.0',
+    } as GitLabTagPushWebhook;
+    assert.strictEqual(
+      computePathFromWebhook(namespaceWithTagsPayload, 'tag_push'),
+      '/gitlab/projects/org/foo/tags/bar/tags/v1-0-0__v1.0.0.json',
     );
   });
 });

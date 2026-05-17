@@ -16,6 +16,7 @@ export type GitLabDirectoryResourceType = 'commits' | 'issues' | 'merge_requests
 export type GitLabFlatResourceType = 'deployments' | 'tags';
 export type GitLabIndexedResourceType = GitLabDirectoryResourceType | GitLabFlatResourceType;
 export type GitLabTitledResourceType = 'commits' | 'issues' | 'merge_requests';
+export type GitLabStatefulResourceType = 'issues' | 'merge_requests';
 
 export interface GitLabPathContext {
   ref?: string | null;
@@ -59,6 +60,14 @@ export function encodeGitLabPathSegment(value: string): string {
   return encodeURIComponent(value);
 }
 
+function assertNonEmptySegment(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return trimmed;
+}
+
 export function encodeProjectPath(projectPath: string): string {
   return projectPath
     .split('/')
@@ -87,6 +96,10 @@ export function gitLabProjectPrefix(projectPath: string): string {
   return `/gitlab/projects/${encodeProjectPath(projectPath)}`;
 }
 
+export function gitLabProjectMetadataPath(projectPath: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/meta.json`;
+}
+
 export function gitLabProjectResourceIndexPath(
   projectPath: string,
   objectType: GitLabIndexedResourceType,
@@ -111,7 +124,7 @@ export function gitLabFlatRecordFilename(
   title?: string | null,
 ): string {
   const id = String(objectId).trim().replace(/\.json$/, '');
-  if (id.includes('__')) {
+  if (!title && isComposedFlatRecordFilename(id)) {
     return `${id}.json`;
   }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);
@@ -119,6 +132,24 @@ export function gitLabFlatRecordFilename(
     return `${encodeGitLabPathSegment(id)}.json`;
   }
   return `${encodeGitLabPathSegment(slug)}__${encodeGitLabPathSegment(id)}.json`;
+}
+
+export function normalizeGitLabTagRef(ref: string): string {
+  return ref.replace(/^refs\/tags\//u, '');
+}
+
+function isComposedFlatRecordFilename(value: string): boolean {
+  const separatorIndex = value.indexOf('__');
+  if (separatorIndex <= 0) {
+    return false;
+  }
+  const slug = value.slice(0, separatorIndex);
+  const encodedId = value.slice(separatorIndex + 2);
+  try {
+    return slug === slugifyAlias(decodeURIComponent(encodedId));
+  } catch {
+    return false;
+  }
 }
 
 export function gitLabByIdAliasPath(
@@ -141,6 +172,54 @@ export function gitLabByTitleAliasPath(
   return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-title/${encodeGitLabPathSegment(
     `${slug}${suffix}__${String(objectId)}`,
   )}.json`;
+}
+
+export function gitLabByStateAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  state: string,
+  objectId: number | string,
+): string {
+  const normalizedState = assertNonEmptySegment(state, 'state');
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-state/${encodeGitLabPathSegment(
+    slugifyAlias(normalizedState),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
+export function gitLabByAssigneeAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  assignee: string,
+  objectId: number | string,
+): string {
+  const normalizedAssignee = assertNonEmptySegment(assignee, 'assignee');
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-assignee/${encodeGitLabPathSegment(
+    slugifyAlias(normalizedAssignee),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
+export function gitLabByCreatorAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  creator: string,
+  objectId: number | string,
+): string {
+  const normalizedCreator = assertNonEmptySegment(creator, 'creator');
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-creator/${encodeGitLabPathSegment(
+    slugifyAlias(normalizedCreator),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
+}
+
+export function gitLabByPriorityAliasPath(
+  projectPath: string,
+  objectType: GitLabStatefulResourceType,
+  priority: string,
+  objectId: number | string,
+): string {
+  const normalizedPriority = assertNonEmptySegment(priority, 'priority');
+  return `${gitLabProjectPrefix(projectPath)}/${objectType}/by-priority/${encodeGitLabPathSegment(
+    slugifyAlias(normalizedPriority),
+  )}/${encodeGitLabPathSegment(String(objectId))}.json`;
 }
 
 export function gitLabByRefAliasPath(
@@ -263,7 +342,7 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
     return null;
   }
 
-  const objectIndex = segments.findIndex((segment, index) => index > 1 && RESOURCE_SEGMENTS.has(segment as GitLabResourceType));
+  const objectIndex = gitLabResourceSegmentIndex(segments);
   if (objectIndex === -1 || objectIndex >= segments.length - 1) {
     return null;
   }
@@ -285,6 +364,16 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
     subResource,
     subResourceId,
   };
+}
+
+function gitLabResourceSegmentIndex(segments: readonly string[]): number {
+  for (let index = segments.length - 2; index > 1; index -= 1) {
+    const segment = segments[index];
+    if (segment && RESOURCE_SEGMENTS.has(segment as GitLabResourceType)) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 export function computeGitLabPath(
@@ -353,14 +442,18 @@ export function computeGitLabPath(
     return computeCanonicalPath('gitlab', objectType, objectId);
   }
 
-  const marker = `/${objectType}/`;
-  const markerIndex = objectId.indexOf(marker);
+  const markerIndex = gitLabObjectIdResourceMarkerIndex(objectType, objectId, context);
   if (markerIndex === -1) {
     return computeCanonicalPath('gitlab', objectType, objectId);
   }
 
+  const marker = `/${objectType}/`;
   const projectPath = objectId.slice(0, markerIndex);
-  const resourceId = objectId.slice(markerIndex + marker.length);
+  const markerTail = objectId.slice(markerIndex + marker.length);
+  const tagRef = objectType === 'tags' ? refPathContext(context) : undefined;
+  const resourceId = objectType === 'tags' && tagRef && tagMarkerTailMatchesRef(markerTail, tagRef)
+    ? tagRef
+    : markerTail;
 
   switch (objectType) {
     case 'merge_requests':
@@ -378,6 +471,78 @@ export function computeGitLabPath(
     default:
       return computeCanonicalPath('gitlab', objectType, objectId);
   }
+}
+
+function gitLabObjectIdResourceMarkerIndex(
+  objectType: string,
+  objectId: string,
+  context: GitLabPathContext,
+): number {
+  const marker = `/${objectType}/`;
+  const indices: number[] = [];
+  let offset = objectId.indexOf(marker);
+  while (offset !== -1) {
+    indices.push(offset);
+    offset = objectId.indexOf(marker, offset + marker.length);
+  }
+  if (indices.length === 0) {
+    return -1;
+  }
+
+  if (objectType === 'tags') {
+    const ref = refPathContext(context);
+    if (ref) {
+      const exactRefIndex = indices.find((index) => tagMarkerTailMatchesRef(objectId.slice(index + marker.length), ref));
+      if (exactRefIndex !== undefined) {
+        return exactRefIndex;
+      }
+    }
+
+    const gitRefPrefix = 'refs/tags/';
+    const gitRefIndex = indices.find((index) => objectId.slice(index + marker.length).startsWith(gitRefPrefix));
+    if (gitRefIndex !== undefined) {
+      return gitRefIndex;
+    }
+
+    const composedFilenameIndex = indices.find((index) => {
+      const tail = objectId.slice(index + marker.length);
+      return !tail.includes('/') && isComposedFlatRecordFilename(tail);
+    });
+    if (composedFilenameIndex !== undefined) {
+      return composedFilenameIndex;
+    }
+
+    const lastMultiSegmentTailIndex = [...indices].reverse().find((index) => {
+      const tail = objectId.slice(index + marker.length);
+      return tail.includes('/') && !tail.includes(marker);
+    });
+    if (lastMultiSegmentTailIndex !== undefined) {
+      return lastMultiSegmentTailIndex;
+    }
+
+    const firstProjectScopedIndex = indices.find(
+      (index) => gitLabObjectIdProjectSegmentCount(objectId, index) >= 2,
+    );
+    if (firstProjectScopedIndex !== undefined) {
+      return firstProjectScopedIndex;
+    }
+  }
+
+  return indices[indices.length - 1] ?? -1;
+}
+
+function gitLabObjectIdProjectSegmentCount(objectId: string, markerIndex: number): number {
+  return objectId
+    .slice(0, markerIndex)
+    .split('/')
+    .filter(Boolean).length;
+}
+
+function tagMarkerTailMatchesRef(tail: string, ref: string): boolean {
+  if (tail === ref) {
+    return true;
+  }
+  return !tail.includes('/') && decodeFlatObjectId(tail) === ref;
 }
 
 function decodeParentResourceSegment(segment: string): string {
@@ -409,7 +574,8 @@ function decodeDirectoryObjectId(segment: string): string {
 }
 
 function decodeFlatObjectId(segment: string): string {
-  const basename = decodeURIComponent(segment.replace(/\.json$/, ''));
-  const separatorIndex = basename.lastIndexOf('__');
-  return separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
+  const basename = segment.replace(/\.json$/, '');
+  const separatorIndex = basename.indexOf('__');
+  const id = separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
+  return decodeURIComponent(id);
 }

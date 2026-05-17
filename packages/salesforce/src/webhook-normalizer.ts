@@ -271,15 +271,20 @@ export function extractSalesforceAction(payload: unknown): string {
   const record = parseSalesforceWebhookPayload(payload);
   const metadata = getRecord(record.metadata);
   const webhook = getRecord(record._webhook);
-  const action =
+  const action = normalizeAction(
     readOptionalString(record.action) ??
     readOptionalString(record.eventAction) ??
     readOptionalString(record.event_action) ??
     readOptionalString(metadata?.action) ??
     readOptionalString(webhook?.action) ??
-    'updated';
+    'updated',
+  );
 
-  return normalizeAction(action);
+  if (action === 'updated' || action === 'upserted') {
+    return inferSalesforceLifecycleAction(record) ?? action;
+  }
+
+  return action;
 }
 
 /**
@@ -542,11 +547,77 @@ function normalizeAction(action: string): string {
     case 'upsert':
     case 'upserted':
       return 'upserted';
+    case 'close':
+    case 'closed':
+      return 'closed';
+    case 'convert':
+    case 'converted':
+      return 'converted';
     case 'update':
     case 'updated':
     default:
       return normalized || 'updated';
   }
+}
+
+function inferSalesforceLifecycleAction(record: SalesforceRecord): string | undefined {
+  const objectType = extractSalesforceObjectType(record).toLowerCase();
+  const data = getWebhookData(record);
+  if (!data) return undefined;
+  const changedFields = getChangedFields(data);
+
+  if (
+    objectType === 'lead' &&
+    fieldChanged(changedFields, 'IsConverted') &&
+    (data.IsConverted === true || data.isConverted === true)
+  ) {
+    return 'converted';
+  }
+
+  if (objectType === 'case') {
+    const status = readOptionalString(data.Status) ?? readOptionalString(data.status);
+    if (
+      (fieldChanged(changedFields, 'IsClosed') && (data.IsClosed === true || data.isClosed === true)) ||
+      (fieldChanged(changedFields, 'Status') && isSalesforceClosedValue(status))
+    ) {
+      return 'closed';
+    }
+  }
+
+  if (objectType === 'opportunity') {
+    const stage = readOptionalString(data.StageName) ?? readOptionalString(data.stageName);
+    if (
+      (fieldChanged(changedFields, 'IsClosed') && (data.IsClosed === true || data.isClosed === true)) ||
+      (fieldChanged(changedFields, 'StageName') && isSalesforceClosedValue(stage))
+    ) {
+      return 'closed';
+    }
+  }
+
+  return undefined;
+}
+
+function getChangedFields(data: SalesforceRecord): Set<string> {
+  const header = getRecord(data.ChangeEventHeader) ?? getRecord(data.changeEventHeader);
+  const raw = header?.changedFields;
+  if (!Array.isArray(raw)) {
+    return new Set();
+  }
+  return new Set(
+    raw
+      .map((field) => readOptionalString(field))
+      .filter((field): field is string => Boolean(field)),
+  );
+}
+
+function fieldChanged(changedFields: Set<string>, field: string): boolean {
+  const lowerFirst = field ? field.charAt(0).toLowerCase() + field.slice(1) : field;
+  return changedFields.has(field) || changedFields.has(lowerFirst);
+}
+
+function isSalesforceClosedValue(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  return normalized === 'closed' || normalized === 'closed won' || normalized === 'closed lost' || normalized === 'converted';
 }
 
 function normalizeHeaders(headers: SalesforceWebhookHeaders): Record<string, string> {

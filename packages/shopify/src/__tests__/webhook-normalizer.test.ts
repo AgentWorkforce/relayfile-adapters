@@ -49,6 +49,22 @@ test('normalizeShopifyWebhook accepts known-good base64 HMAC and builds a normal
   assert.equal(webhook.shopDomain, 'relayfile-test.myshopify.com');
 });
 
+test('normalizeShopifyWebhook preserves paid and cancelled order lifecycle actions', () => {
+  const paid = normalizeShopifyWebhook(orderPayload, {
+    [SHOPIFY_TOPIC_HEADER]: 'orders/paid',
+  });
+  assert.equal(paid.eventType, 'order.paid');
+  const paidWebhook = paid.payload._webhook as Record<string, unknown>;
+  assert.equal(paidWebhook.action, 'paid');
+
+  const cancelled = normalizeShopifyWebhook(orderPayload, {
+    [SHOPIFY_TOPIC_HEADER]: 'orders/cancelled',
+  });
+  assert.equal(cancelled.eventType, 'order.cancel');
+  const cancelledWebhook = cancelled.payload._webhook as Record<string, unknown>;
+  assert.equal(cancelledWebhook.action, 'cancel');
+});
+
 test('validateShopifyWebhookSignature rejects a tampered body', () => {
   const rawBody = JSON.stringify(orderPayload);
   const secret = 'shopify-webhook-secret';

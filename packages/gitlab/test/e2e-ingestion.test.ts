@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GitLabAdapter } from '../src/adapter.js';
 import { renderMergeRequestPatch } from '../src/mr/diff-parser.js';
-import type { GitLabMergeRequestWebhook } from '../src/types.js';
+import type { GitLabMergeRequestWebhook, GitLabTagPushWebhook } from '../src/types.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabAdapter e2e ingestion', () => {
@@ -123,5 +123,97 @@ describe('GitLabAdapter e2e ingestion', () => {
         },
       ]),
     );
+  });
+
+  it('maps tag deletion webhooks to delete operations', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn',
+      projectPath: 'acme/api',
+    });
+
+    const payload = {
+      object_kind: 'tag_push',
+      event_name: 'tag_push',
+      before: 'deadbeef',
+      after: '0000000000000000000000000000000000000000',
+      checkout_sha: null,
+      ref: 'refs/tags/v1.0',
+      commits: [],
+      project: {
+        id: 1,
+        name: 'api',
+        path: 'api',
+        path_with_namespace: 'acme/api',
+      },
+    } as GitLabTagPushWebhook;
+
+    const result = await adapter.routeWebhook(payload, 'tag_push');
+
+    assert.equal(result.filesDeleted, 4);
+    assert.equal(result.filesWritten, 0);
+    assert.deepEqual(result.paths, [
+      '/gitlab/projects/acme/api/tags/v1-0__v1.0.json',
+      '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
+      '/gitlab/projects/acme/api/tags/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+    ]);
+    assert.deepEqual(result.operations, [
+      {
+        path: '/gitlab/projects/acme/api/tags/v1-0__v1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/by-ref/v1-0__v1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+        mode: 'delete',
+      },
+      {
+        path: '/gitlab/projects/acme/api/tags/by-ref/refs-tags-v1-0__refs%2Ftags%2Fv1.0.json',
+        mode: 'delete',
+      },
+    ]);
+  });
+
+  it('maps complex tag deletion webhooks to fixed and legacy delete operations', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn',
+      projectPath: 'acme/api',
+    });
+
+    const payload = {
+      object_kind: 'tag_push',
+      event_name: 'tag_push',
+      before: 'deadbeef',
+      after: '0000000000000000000000000000000000000000',
+      checkout_sha: null,
+      ref: 'refs/tags/release/foo__bar',
+      commits: [],
+      project: {
+        id: 1,
+        name: 'api',
+        path: 'api',
+        path_with_namespace: 'acme/api',
+      },
+    } as GitLabTagPushWebhook;
+
+    const result = await adapter.routeWebhook(payload, 'tag_push');
+
+    assert.equal(result.filesDeleted, 8);
+    assert.equal(result.filesWritten, 0);
+    assert.deepEqual(result.paths, [
+      '/gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/release-foo-bar__release%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs-tags-release-foo-bar__refs%2Ftags%2Frelease%2Ffoo__bar.json',
+      '/gitlab/projects/acme/api/tags/refs/tags/release/foo__bar.json',
+      '/gitlab/projects/acme/api/tags/by-ref/refs/tags/release/foo__bar.json',
+    ]);
   });
 });

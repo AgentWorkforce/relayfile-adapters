@@ -216,6 +216,54 @@ export function githubByIdAliasPath(
   return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-id/${encodeGitHubPathSegment(String(number))}.json`;
 }
 
+export function githubByStateAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  state: string,
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-state/${encodeGitHubPathSegment(
+    slugifyAlias(state),
+  )}/${encodeGitHubPathSegment(String(number))}.json`;
+}
+
+export function githubByAssigneeAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  assignee: string,
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-assignee/${encodeGitHubPathSegment(
+    slugifyAlias(assignee),
+  )}/${encodeGitHubPathSegment(String(number))}.json`;
+}
+
+export function githubByCreatorAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  creator: string,
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-creator/${encodeGitHubPathSegment(
+    slugifyAlias(creator),
+  )}/${encodeGitHubPathSegment(String(number))}.json`;
+}
+
+export function githubByPriorityAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  priority: string,
+  number: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-priority/${encodeGitHubPathSegment(
+    slugifyAlias(priority),
+  )}/${encodeGitHubPathSegment(String(number))}.json`;
+}
+
 const OBJECT_TYPE_ALIASES: Record<string, string> = {
   pr: 'pull_request',
   pulls: 'pull_request',

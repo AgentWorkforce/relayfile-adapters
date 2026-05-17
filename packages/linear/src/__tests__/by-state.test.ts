@@ -4,6 +4,9 @@ import test from 'node:test';
 import {
   LINEAR_CANONICAL_STATES,
   LinearAdapter,
+  linearIssueByAssigneePath,
+  linearIssueByCreatorPath,
+  linearIssueByPriorityPath,
   linearIssueByStatePath,
   linearIssuePath,
   slugifyStateName,
@@ -84,6 +87,19 @@ function createIssuePayload(overrides: Record<string, unknown> = {}): Record<str
     ...overrides,
   };
 }
+
+test('Linear issue category alias helpers use grouped issue-tracking subtrees', () => {
+  assert.equal(
+    linearIssueByAssigneePath('user-assignee', 'ENG-123'),
+    '/linear/issues/by-assignee/user-assignee/ENG-123.json',
+  );
+  assert.equal(
+    linearIssueByCreatorPath('user-creator', 'ENG-123'),
+    '/linear/issues/by-creator/user-creator/ENG-123.json',
+  );
+  assert.equal(linearIssueByPriorityPath(1, 'ENG-123'), '/linear/issues/by-priority/urgent/ENG-123.json');
+  assert.equal(linearIssueByPriorityPath('No Priority', 'ENG-123'), '/linear/issues/by-priority/no-priority/ENG-123.json');
+});
 
 test('Linear issue ingest writes canonical and by-state files with identical bytes', async () => {
   const client = new RecordingClient();

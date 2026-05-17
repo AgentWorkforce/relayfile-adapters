@@ -72,6 +72,7 @@ const result = await adapter.routeWebhook(payload, undefined, headers);
 /gitlab/LAYOUT.md
 /gitlab/_index.json
 /gitlab/projects/_index.json
+/gitlab/projects/{namespace}/{project}/meta.json
 /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/meta.json
 /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/diff.patch
 /gitlab/projects/{namespace}/{project}/merge_requests/{iid}__{slug}/discussions/{id}.json
@@ -94,6 +95,8 @@ const result = await adapter.routeWebhook(payload, undefined, headers);
 /gitlab/projects/{namespace}/{project}/tags/{slug}__{encoded-ref}.json
 /gitlab/projects/{namespace}/{project}/tags/by-ref/{ref-slug}__{encoded-ref}.json
 ```
+
+Project `meta.json` files are managed by Cloud syncs and are read-only for writeback.
 
 ## Writeback paths
 

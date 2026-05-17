@@ -10,7 +10,16 @@ Add an alias subtree whenever the entity has a natural human-readable lookup key
 - `by-title` / `by-name` — for entities whose human-readable label changes independently of the ID.
 - `by-key` — for entities with a provider-issued short key (e.g. Jira `ENG-42`, Linear identifier `ENG-42`).
 - `by-state` / `by-status` — when the consumer cares about the lifecycle bucket (`open`, `closed`, `in-progress`, ...).
+- `by-assignee` — when work items have a current owner/assignee.
+- `by-creator` — when work items track the user who opened or created them.
+- `by-priority` — when work items expose a native priority or a conventional priority label.
 - `by-parent` — when the entity has a single natural parent (issues -> project, pages -> space).
+
+The enforced category matrix lives in `docs/digest-layout-contract.md` and is
+checked by `npm run test:digest-contracts`. If a resource belongs to a matrix
+category such as issue-tracking, add the required aliases (`by-state`,
+`by-assignee`, `by-creator`, and `by-priority` for issue-tracking, `by-status`
+for CI/deploy) in the same change as the layout, emitter, and tests.
 
 Do NOT add an alias for a key that already matches the canonical filename one-to-one — it would be redundant.
 
@@ -21,9 +30,13 @@ Do NOT add an alias for a key that already matches the canonical filename one-to
 ```
 
 For `by-state`, group records under a state subdirectory:
+For `by-assignee`, `by-creator`, and `by-priority`, use the same grouped shape.
 
 ```text
 /<provider>/<resource>/by-state/<state>/<id>.json
+/<provider>/<resource>/by-assignee/<assignee>/<id>.json
+/<provider>/<resource>/by-creator/<creator>/<id>.json
+/<provider>/<resource>/by-priority/<priority>/<id>.json
 ```
 
 ## Collision handling
@@ -32,13 +45,21 @@ Always use `aliasCollisionSuffix` from `packages/core/src/alias-slug.ts` (an 8-c
 
 ## Alias file content
 
-Each alias file is a minimal pointer, not a full copy of the record:
+Alias files may use either of these shapes, but the choice must be consistent
+within a resource and covered by tests:
+
+- Minimal pointer:
 
 ```json
 { "id": "<id>", "canonicalPath": "/<provider>/<resource>/<slug>__<id>.json", "title": "<optional>" }
 ```
 
-Readers follow `canonicalPath` to get the full record. This keeps the cost of adding alias views low and means the canonical record is the single source of truth.
+- Materialized canonical mirror: the same provider envelope as the canonical
+  record, written to the alias path for direct reads.
+
+For minimal pointers, readers follow `canonicalPath` to get the full record. For
+materialized mirrors, readers can use the alias body directly. Do not mix pointer
+and mirror files under the same resource subtree.
 
 ## Read pattern
 

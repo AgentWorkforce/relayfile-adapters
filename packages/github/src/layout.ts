@@ -13,21 +13,21 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   filenameConvention: '<number>__<slug>/meta.json',
   // Top-level aliasSegments is the union of every resource's alias segments
   // so consumers that inspect only the manifest root can discover all
-  // lookup keys. `by-name` belongs here because `github/repos` exposes it.
-  aliasSegments: ['by-id', 'by-name', 'by-title'],
+  // lookup keys.
+  aliasSegments: ['by-assignee', 'by-creator', 'by-id', 'by-priority', 'by-state', 'by-title'],
   resources: [
     {
       path: 'github/repos',
       title: 'Repositories',
       materialization: 'lazy',
-      aliasSegments: ['by-name'],
+      aliasSegments: [],
       writebackResources: [],
     },
     {
       path: 'github/repos/*/*/issues',
       title: 'Issues',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title'],
+      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
       writebackResources: [
         { path: 'github/repos/*/*/issues', schemaId: 'github/issue' },
         { path: 'github/repos/*/*/issues/comments', schemaId: 'github/issue-comment' },
@@ -37,7 +37,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       path: 'github/repos/*/*/pulls',
       title: 'Pull requests',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title'],
+      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
       writebackResources: [
         { path: 'github/repos/*/*/pulls/reviews', schemaId: 'github/pull-request-review' },
       ],

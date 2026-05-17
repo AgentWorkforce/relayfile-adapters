@@ -73,6 +73,43 @@ test('digest classifies "unarchived" as updated, not archived (word-boundary reg
   });
 });
 
+test('digest distinguishes archived Notion records from deleted records', async () => {
+  const ctx: DigestContext = {
+    provider: 'notion',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'page.archived',
+          canonicalPath: 'notion/pages/launch-plan__page_a/page.md',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'page.deleted',
+          canonicalPath: 'notion/pages/old-plan__page_b/page.md',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'notion',
+    bullets: [
+      {
+        text: 'launch-plan was archived',
+        canonicalPath: 'notion/pages/launch-plan__page_a/page.md',
+      },
+      {
+        text: 'old-plan was deleted',
+        canonicalPath: 'notion/pages/old-plan__page_b/page.md',
+      },
+    ],
+  });
+});
+
 test('digest accepts events with canonicalPath === "/notion" (root edge case)', async () => {
   const ctx: DigestContext = {
     provider: 'notion',
@@ -103,4 +140,53 @@ test('digest returns null for an empty Notion event window', async () => {
   };
 
   assert.equal(await digest(ctx), null);
+});
+
+test('digest ignores Notion aliases without dropping canonical alias-shaped IDs', async () => {
+  const ctx: DigestContext = {
+    provider: 'notion',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-alias-db',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'database.updated',
+          canonicalPath: 'notion/databases/by-title/tasks__db_a.json',
+        },
+        {
+          id: 'evt-alias-page',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'notion/pages/by-parent/launch-plan__page_a.json',
+        },
+        {
+          id: 'evt-canonical-db-page',
+          timestamp: '2026-05-12T10:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'notion/databases/by-title/pages/launch-plan__page_a/page.md',
+        },
+        {
+          id: 'evt-canonical-page',
+          timestamp: '2026-05-12T11:00:00.000Z',
+          action: 'page.updated',
+          canonicalPath: 'notion/pages/by-parent/page.md',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'notion',
+    bullets: [
+      {
+        text: 'launch-plan was updated',
+        canonicalPath: 'notion/databases/by-title/pages/launch-plan__page_a/page.md',
+      },
+      {
+        text: 'by-parent was updated',
+        canonicalPath: 'notion/pages/by-parent/page.md',
+      },
+    ],
+  });
 });

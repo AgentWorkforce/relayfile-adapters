@@ -6,3 +6,4 @@ export * from './types.js';
 export * from './queries.js';
 export * from './writeback.js';
 export * from './summary.js';
+export * from './digest.js';

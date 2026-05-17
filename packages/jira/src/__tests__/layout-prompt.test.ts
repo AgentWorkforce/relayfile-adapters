@@ -31,6 +31,8 @@ describe('jira layout prompt', () => {
     assert.match(content, /projects\/by-id/u);
     assert.match(content, /sprints\/by-id/u);
     assert.match(content, /\bjq\b/u);
+    assert.match(content, /jq '\{key, title, state\}' \/jira\/issues\/by-key\/ENG-42\.json/u);
+    assert.doesNotMatch(content, /jq '\.canonicalPath' \/jira\/issues\/by-key\/ENG-42\.json/u);
     // Document the joiner migration so readers know the current vs. target shape.
     assert.match(content, /--/u);
     assert.match(content, /__/u);

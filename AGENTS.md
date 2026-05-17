@@ -7,7 +7,7 @@ Every adapter under `packages/<name>` MUST:
 - Export a `path-mapper.ts` with typed helpers for every canonical record path it emits. Importing the helper is the only supported way to compute a path; consumers must not construct paths by string concatenation.
 - Emit a provider-specific `LAYOUT.md` at the root of its provider tree (e.g. `/<provider>/LAYOUT.md`) of at least ~1000 bytes describing the tree, naming convention, indexes, aliases, and copy-pasteable `jq`/`ls` examples. The 250-300 byte generic fallback is not acceptable for any shipping adapter.
 - Emit `_index.json` files at each resource root listing all materialized records. The row schema MUST include `{ id, title, updated }` at a minimum; additional fields are encouraged when they enable filterless reads (e.g. `state`, `key`, `is_bot`, `parent_id`).
-- Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path resolves to the canonical record; alias content is the minimal pointer `{ id, canonicalPath, ...minimal pointer fields }`.
+- Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path must resolve to the same record as the canonical path. Alias content may be either a minimal pointer `{ id, canonicalPath, ...minimal pointer fields }` or a materialized canonical mirror, but the choice must be consistent within a resource and covered by tests.
 - Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
 ### Generated adapter path templates are not authoritative
@@ -52,7 +52,7 @@ ID format: whatever the provider's stable ID is (UUID, numeric, string key). Do 
 
 - Path shape: `/<provider>/<resource>/by-<key>/<slug>__<id>.json` (e.g. `/notion/pages/by-title/my-page__a1b2c3d4.json`).
 - Collisions: append a deterministic short hash of the ID via `aliasCollisionSuffix`. NEVER pick "first writer wins" — collision handling must be deterministic across sync runs.
-- Each alias file contains a minimal pointer: `{ id, canonicalPath, title? }`. Do not duplicate the full record — readers follow `canonicalPath`.
+- Alias files are either minimal pointers (`{ id, canonicalPath, title? }`) or materialized canonical mirrors. Keep the choice consistent within each resource, and document/test it so readers know whether to follow `canonicalPath` or read the alias body directly.
 
 ### Versioning
 
@@ -315,3 +315,29 @@ Your trajectory helps others understand:
 
 Future agents can query past trajectories to learn from your decisions.
 <!-- prpm:snippet:end @agent-workforce/trail-snippet@1.1.2 -->
+
+# Relayfile Integration Digest Contract
+
+Every adapter that exposes provider records to Relayfile must also expose a
+usable digest contract. When adding or materially changing an adapter:
+
+- Add or update `src/digest.ts` and export it from the package barrel.
+- Classify lifecycle actions explicitly. Terminal states such as `closed`,
+  `merged`, `archived`, `completed`, `canceled`, and `resolved` must not fall
+  through to a generic "updated" line unless the provider has no terminal
+  concept.
+- Do not model terminal lifecycle states as deletion in adapter webhook
+  handling. Only actual upstream deletes should produce delete semantics.
+- Add digest tests beside the adapter tests. Cover at least create/update,
+  terminal state, delete, deterministic sorting, and empty-window behavior.
+- If an adapter intentionally does not participate in digests, document why in
+  the package README or PR and keep the no-op handler covered by a test.
+- Keep digest behavior and layout aliases aligned with the category matrix in
+  `docs/digest-layout-contract.md`. Issue-tracking resources must expose
+  `by-state`, `by-assignee`, `by-creator`, and `by-priority` unless the matrix
+  documents an explicit exception; status-driven build/deploy resources must
+  expose `by-status`.
+- Run `npm run test:digest-contracts` after adding or changing an adapter,
+  digest handler, layout manifest, or category matrix entry.
+
+Full rule: `.claude/rules/relayfile-integration-digests.md`.

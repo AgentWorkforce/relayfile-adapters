@@ -15,6 +15,9 @@ export interface GitHubRepoIndexRow {
 export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   number: number;
   state: string;
+  assigneeKeys?: string[];
+  creatorKey?: string;
+  priority?: string;
 }
 
 export interface GitHubRootIndexRow {

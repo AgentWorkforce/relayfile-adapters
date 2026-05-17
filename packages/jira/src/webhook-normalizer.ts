@@ -408,13 +408,14 @@ function extractJiraEventType(
     readOptionalString(payload.webhookEvent) ??
     readOptionalString(payload.webhook_event);
   const action = normalizeJiraAction(
+    deriveJiraTransitionAction(payload) ??
     readOptionalString(payload.issue_event_type_name) ??
     readOptionalString(payload.eventType) ??
     explicit,
   );
   if (explicit && explicit.includes(':')) {
     const [, explicitAction] = explicit.split(':');
-    return `${objectType}.${normalizeJiraAction(explicitAction)}`;
+    return `${objectType}.${action === 'updated' ? normalizeJiraAction(explicitAction) : action}`;
   }
   return `${objectType}.${action}`;
 }
@@ -423,7 +424,61 @@ function normalizeJiraAction(value: string | undefined): string {
   const normalized = value?.trim().toLowerCase() ?? '';
   if (normalized.includes('delete') || normalized === 'deleted') return 'deleted';
   if (normalized.includes('create') || normalized === 'created') return 'created';
+  if (
+    normalized.includes('done')
+    || normalized.includes('complete')
+    || normalized.includes('resolve')
+    || normalized.includes('closed')
+    || normalized.includes('cancel')
+  ) {
+    return 'completed';
+  }
   return 'updated';
+}
+
+function deriveJiraTransitionAction(payload: JiraRecord): string | undefined {
+  const issue = getRecord(payload.issue);
+  const fields = getRecord(issue?.fields);
+  const status = getRecord(fields?.status);
+  const statusName = readOptionalString(status?.name);
+  const statusCategory = getRecord(status?.statusCategory);
+  const statusCategoryKey = readOptionalString(statusCategory?.key);
+  const resolution = getRecord(fields?.resolution);
+  const resolutionName = readOptionalString(resolution?.name);
+  if (isJiraTerminalValue(statusName) || isJiraTerminalValue(statusCategoryKey) || isJiraTerminalValue(resolutionName)) {
+    return 'completed';
+  }
+
+  const changelog = getRecord(payload.changelog) ?? getRecord(issue?.changelog);
+  const histories = Array.isArray(changelog?.histories) ? changelog.histories : [];
+  for (const history of histories) {
+    if (!isRecord(history)) continue;
+    const items = Array.isArray(history.items) ? history.items : [];
+    for (const item of items) {
+      if (!isRecord(item)) continue;
+      const field = readOptionalString(item.field)?.toLowerCase();
+      if (field !== 'status' && field !== 'resolution') continue;
+      if (isJiraTerminalValue(readOptionalString(item.toString) ?? readOptionalString(item.to))) {
+        return 'completed';
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function isJiraTerminalValue(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase() ?? '';
+  return (
+    normalized === 'done'
+    || normalized === 'resolved'
+    || normalized === 'closed'
+    || normalized === 'complete'
+    || normalized === 'completed'
+    || normalized === 'cancelled'
+    || normalized === 'canceled'
+    || normalized === 'done category'
+  );
 }
 
 function buildNormalizedPayload(

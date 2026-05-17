@@ -12,6 +12,10 @@ import {
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  gitLabByRefAliasPath,
+  gitLabFlatRecordFilename,
+  gitLabProjectPrefix,
+  normalizeGitLabTagRef,
   type GitLabPathContext,
 } from './path-mapper.js';
 import { ingestPipeline } from './pipeline/ingestion.js';
@@ -67,7 +71,7 @@ function fromOperations(operations: IngestOperation[]): IngestResult {
   return {
     filesWritten: operations.filter((operation) => operation.mode === 'write').length,
     filesUpdated: operations.filter((operation) => operation.mode === 'update').length,
-    filesDeleted: 0,
+    filesDeleted: operations.filter((operation) => operation.mode === 'delete').length,
     paths: operations.map((operation) => operation.path),
     errors: [],
     operations,
@@ -323,13 +327,64 @@ export class GitLabAdapter extends IntegrationAdapter {
 
   async ingestTagPush(_normalized: WebhookInput, payload: GitLabWebhookPayload): Promise<IngestResult> {
     const tagPayload = payload as GitLabTagPushWebhook;
-    return fromOperations([
+    const deleted = isDeletedTagPush(tagPayload);
+    const projectPath = tagPayload.project.path_with_namespace;
+    const ref = normalizeGitLabTagRef(tagPayload.ref);
+    const path = computeMetadataPath(projectPath, 'tags', ref, ref);
+    const operations: IngestOperation[] = [
       {
-        path: computeMetadataPath(tagPayload.project.path_with_namespace, 'tags', tagPayload.ref, tagPayload.ref),
-        mode: 'write',
-        content: JSON.stringify(tagPayload, null, 2),
-        contentType: 'application/json',
+        path,
+        mode: deleted ? 'delete' : 'write',
+        ...(deleted
+          ? {}
+          : {
+              content: JSON.stringify(tagPayload, null, 2),
+              contentType: 'application/json' as const,
+            }),
       },
-    ]);
+    ];
+
+    if (deleted) {
+      for (const deletePath of tagCleanupPaths(projectPath, ref, tagPayload.ref)) {
+        if (!operations.some((operation) => operation.path === deletePath)) {
+          operations.push({ path: deletePath, mode: 'delete' });
+        }
+      }
+    }
+
+    return fromOperations(operations);
   }
+}
+
+function tagCleanupPaths(projectPath: string, id: string, raw?: string): string[] {
+  const refs = [id, raw, `refs/tags/${id}`].filter(
+    (ref): ref is string => typeof ref === 'string' && ref.length > 0,
+  );
+  return [
+    ...new Set(
+      refs.flatMap((ref) => [
+        computeMetadataPath(projectPath, 'tags', ref, ref),
+        gitLabByRefAliasPath(projectPath, 'tags', ref, ref),
+        legacyGitLabTagCanonicalPath(projectPath, ref),
+        legacyGitLabTagByRefAliasPath(projectPath, ref),
+      ]),
+    ),
+  ];
+}
+
+function legacyGitLabTagCanonicalPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagByRefAliasPath(projectPath: string, ref: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/tags/by-ref/${legacyGitLabTagFlatRecordFilename(ref)}`;
+}
+
+function legacyGitLabTagFlatRecordFilename(ref: string): string {
+  const id = ref.trim().replace(/\.json$/u, '');
+  return id.includes('__') ? `${id}.json` : gitLabFlatRecordFilename(id, id);
+}
+
+function isDeletedTagPush(payload: GitLabTagPushWebhook): boolean {
+  return payload.checkout_sha === null || /^0+$/u.test(payload.after);
 }

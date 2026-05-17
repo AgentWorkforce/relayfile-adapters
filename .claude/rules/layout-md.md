@@ -37,7 +37,7 @@ Indexes are sorted by \`updated\` descending.
 - By id: \`/foo/<resource>/by-id/<id>.json\`.
 - By <natural key>: \`/foo/<resource>/by-<key>/<slug>__<id>.json\`.
 
-Alias files are minimal pointers (\`{ id, canonicalPath, title? }\`); follow \`canonicalPath\` for the full record. Collisions get a deterministic 8-char hash suffix.
+Alias files are either minimal pointers (\`{ id, canonicalPath, title? }\`) or materialized canonical mirrors; document the choice and keep it consistent within a resource. Collisions get a deterministic 8-char hash suffix.
 
 ## JSONL And Querying
 

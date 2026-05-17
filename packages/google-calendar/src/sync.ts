@@ -141,7 +141,7 @@ export async function ingestGoogleCalendarEvents(
     let path = '/google-calendar/calendars/unknown/events/unknown.json';
     try {
       path = computeGoogleCalendarPath('event', event.id, event.calendarId ?? config.calendarId);
-      if (event.status === 'cancelled' || event.deleted) {
+      if (event.deleted) {
         if (client.deleteFile) {
           await client.deleteFile({ workspaceId, path });
           result.filesDeleted += 1;

@@ -2,12 +2,14 @@ import type { WebhookInput } from '@relayfile/sdk';
 
 import {
   computeCommitCommentPath,
+  encodeProjectPath,
   computeGitLabPath,
   computeIssueCommentPath,
   computeMergeRequestDiscussionPath,
   computeMetadataPath,
   computePipelineJobPath,
   computeSnippetCommentPath,
+  normalizeGitLabTagRef,
   parseGitLabPath,
 } from '../path-mapper.js';
 import type { GitLabSupportedEvent, GitLabWebhookPayload } from '../types.js';
@@ -21,10 +23,10 @@ function pathToObjectId(path: string): string {
       .replace(/\.json$/, '');
   }
   const segments = path.split('/').filter(Boolean);
-  const objectIndex = segments.findIndex((segment) => segment === parsed.objectType);
-  const objectPath = segments
-    .slice(objectIndex + 1)
-    .join('/')
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const prefix = `/gitlab/projects/${encodeProjectPath(parsed.projectPath)}/${parsed.objectType}/`;
+  const objectPath = normalizedPath
+    .slice(prefix.length)
     .replace(/\/(?:meta|metadata)\.json$/, '')
     .replace(/\.json$/, '');
   return `${parsed.projectPath}/${parsed.objectType}/${objectPath}`;
@@ -170,7 +172,8 @@ export function normalizeWebhook(
       };
     }
     case 'tag_push': {
-      const path = computeMetadataPath(projectPath, 'tags', payload.ref, payload.ref);
+      const ref = normalizeGitLabTagRef(payload.ref);
+      const path = computeMetadataPath(projectPath, 'tags', ref, ref);
       return {
         provider: 'gitlab',
         objectType: 'tags',
@@ -178,7 +181,7 @@ export function normalizeWebhook(
         eventType,
         payload: payload as unknown as Record<string, unknown>,
         relations: [`gitlab:project:${projectPath}`],
-        metadata: { projectPath, ref: payload.ref },
+        metadata: { projectPath, ref },
       };
     }
   }
@@ -186,5 +189,8 @@ export function normalizeWebhook(
 
 export function computePathFromWebhook(payload: GitLabWebhookPayload, eventType: GitLabSupportedEvent): string {
   const normalized = normalizeWebhook(payload, eventType);
+  if (normalized.objectType === 'tags' && typeof normalized.metadata?.projectPath === 'string' && typeof normalized.metadata?.ref === 'string') {
+    return computeMetadataPath(normalized.metadata.projectPath, 'tags', normalized.metadata.ref, normalized.metadata.ref);
+  }
   return computeGitLabPath(normalized.objectType, normalized.objectId);
 }

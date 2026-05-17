@@ -30,16 +30,21 @@ Issues are addressable through parallel paths that all resolve to the same canon
 
 - Canonical: \`/jira/issues/<slug>__<id>.json\` (legacy \`--\` joiner still readable).
 - By id: \`/jira/issues/by-id/<id>.json\` — stable when the summary changes.
+- By title: \`/jira/issues/by-title/<summary-slug>__<id>.json\` — grouped by the current issue summary.
 - By key: \`/jira/issues/by-key/<TEAM-123>.json\` — Jira's natural human-readable key.
 - By state: \`/jira/issues/by-state/<status>/<id>.json\` — \`to-do\`, \`in-progress\`, \`done\`, etc.
 - By assignee: \`/jira/issues/by-assignee/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the current assignee. Unassigned issues are not emitted under this prefix.
+- By creator: \`/jira/issues/by-creator/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the issue creator.
+- By priority: \`/jira/issues/by-priority/<priority>/<issueId>.json\` — grouped by the slugged Jira priority name.
 
 Projects and sprints carry a stable reconciliation anchor keyed on the immutable id, so renames leave the alias resolving to the latest payload:
 
 - \`/jira/projects/by-id/<id>.json\` — durable lookup for projects.
+- \`/jira/projects/by-title/<name-slug>__<id>.json\` — grouped by the current project name.
 - \`/jira/sprints/by-id/<id>.json\` — durable lookup for sprints.
+- \`/jira/sprints/by-title/<name-slug>__<id>.json\` — grouped by the current sprint name.
 
-Each alias file is a minimal pointer of the form \`{ id, canonicalPath, title? }\`; readers follow \`canonicalPath\` for the full record. Collisions on a \`by-key\`/\`by-title\` slug get a deterministic 8-character hash suffix (never first-writer-wins).
+Issue, project, and sprint aliases materialize the same provider envelope as the canonical record so reads through an alias return the full current payload. Title aliases include the immutable id after the slug, so same-title records do not collide.
 
 ## JSONL And Querying
 
@@ -50,9 +55,11 @@ Examples:
 \`\`\`bash
 ls /jira/issues
 ls /jira/issues/by-state
+ls /jira/issues/by-assignee
+ls /jira/issues/by-priority
 jq '.[0]' /jira/issues/_index.json
 jq '.[] | select(.state == "In Progress") | {key, title}' /jira/issues/_index.json
-jq '.canonicalPath' /jira/issues/by-key/ENG-42.json
+jq '{key, title, state}' /jira/issues/by-key/ENG-42.json
 grep -R "regression" /jira/issues
 \`\`\`
 `;

@@ -1,3 +1,4 @@
+export * from './digest.js';
 export { TeamsAdapter } from './adapter.js';
 export {
   computePath,

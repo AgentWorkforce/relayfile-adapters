@@ -122,11 +122,9 @@ export class IntercomAdapter extends IntegrationAdapter {
   }
 
   override supportedEvents(): string[] {
-    return SUPPORTED_EVENTS.flatMap((objectType) => [
-      `${objectType}.created`,
-      `${objectType}.updated`,
-      `${objectType}.deleted`,
-    ]);
+    return SUPPORTED_EVENTS.flatMap((objectType) =>
+      ['created', 'updated', 'deleted', 'closed', 'reopened', 'archived'].map((action) => `${objectType}.${action}`),
+    );
   }
 
   override async ingestWebhook(
@@ -289,7 +287,7 @@ export class IntercomAdapter extends IntegrationAdapter {
 
   private isDeleteEvent(event: NormalizedWebhook): boolean {
     const action = getWebhookAction(event.payload) ?? getEventAction(event.eventType);
-    return action === 'deleted' || action === 'delete' || action === 'removed' || action === 'archived';
+    return action === 'deleted' || action === 'delete' || action === 'removed';
   }
 
   private renderContent(workspaceId: string, event: NormalizedWebhook, deleted: boolean): string {

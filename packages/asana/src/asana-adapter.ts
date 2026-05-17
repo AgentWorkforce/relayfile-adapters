@@ -2,6 +2,11 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 import {
+  asanaTaskByAssigneePath,
+  asanaTaskByCreatorPath,
+  asanaTaskByIdAliasPath,
+  asanaTaskByPriorityPath,
+  asanaTaskByStatePath,
   asanaProjectPath,
   asanaSectionPath,
   asanaTaskPath,
@@ -9,6 +14,7 @@ import {
   computeAsanaPath,
   normalizeAsanaObjectType,
 } from './path-mapper.js';
+import { emitAsanaAuxiliaryFiles } from './emit-auxiliary-files.js';
 import { ASANA_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   AsanaAdapterConfig,
@@ -126,6 +132,7 @@ export class AsanaAdapter extends IntegrationAdapter {
     return SUPPORTED_EVENTS.flatMap((objectType) => [
       `${objectType}.added`,
       `${objectType}.changed`,
+      ...(objectType === 'task' ? [`${objectType}.completed`] : []),
       `${objectType}.deleted`,
       `${objectType}.removed`,
     ]);
@@ -180,46 +187,51 @@ export class AsanaAdapter extends IntegrationAdapter {
     if (this.isDeleteEvent(normalized)) {
       if (this.client.deleteFile) {
         await this.client.deleteFile({ workspaceId, path });
+        const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, undefined, true);
         return {
           filesWritten: 0,
           filesUpdated: 0,
-          filesDeleted: 1,
-          paths: [path],
-          errors: [],
+          filesDeleted: 1 + auxiliary.filesDeleted,
+          paths: [path, ...auxiliary.paths],
+          errors: auxiliary.errors,
         };
       }
 
+      const content = this.renderContent(workspaceId, normalized, true);
       const deleteResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, true),
+        content,
         contentType: JSON_CONTENT_TYPE,
         semantics,
       });
+      const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, content, false);
       const counts = inferWriteCounts(deleteResult, true);
       return {
-        filesWritten: counts.filesWritten,
+        filesWritten: counts.filesWritten + auxiliary.filesWritten,
         filesUpdated: counts.filesUpdated,
-        filesDeleted: counts.filesDeleted,
-        paths: [path],
-        errors: [],
+        filesDeleted: counts.filesDeleted + auxiliary.filesDeleted,
+        paths: [path, ...auxiliary.paths],
+        errors: auxiliary.errors,
       };
     }
 
+    const content = this.renderContent(workspaceId, normalized, false);
     const writeResult = await this.client.writeFile({
       workspaceId,
       path,
-      content: this.renderContent(workspaceId, normalized, false),
+      content,
       contentType: JSON_CONTENT_TYPE,
       semantics,
     });
+    const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, content, false);
     const counts = inferWriteCounts(writeResult, false);
     return {
-      filesWritten: counts.filesWritten,
+      filesWritten: counts.filesWritten + auxiliary.filesWritten,
       filesUpdated: counts.filesUpdated,
-      filesDeleted: 0,
-      paths: [path],
-      errors: [],
+      filesDeleted: auxiliary.filesDeleted,
+      paths: [path, ...auxiliary.paths],
+      errors: auxiliary.errors,
     };
   }
 
@@ -313,9 +325,13 @@ export class AsanaAdapter extends IntegrationAdapter {
         continue;
       }
 
-      const action = normalizeAction(
+      let action = normalizeAction(
         asString(eventItem.action) ?? asString(getRecord(eventItem.change)?.action) ?? 'changed',
       );
+      const change = getRecord(eventItem.change);
+      if (action === 'changed' && objectType === 'task' && change?.field === 'completed' && change.new_value === true) {
+        action = 'completed';
+      }
       const payload = mergeAsanaPayload(event, eventItem, objectType, objectId, action);
       const normalized: NormalizedWebhook = {
         provider: this.config.provider || ASANA_PROVIDER_NAME,
@@ -353,6 +369,70 @@ export class AsanaAdapter extends IntegrationAdapter {
       payload: event.payload,
     });
   }
+
+  private async writeTaskAuxiliaryFiles(
+    workspaceId: string,
+    event: NormalizedWebhook,
+    content: string | undefined,
+    deleted: boolean,
+  ): Promise<{ filesWritten: number; filesDeleted: number; paths: string[]; errors: IngestError[] }> {
+    if (normalizeAsanaObjectType(event.objectType) !== 'task') {
+      return { filesWritten: 0, filesDeleted: 0, paths: [], errors: [] };
+    }
+    const auxiliary = await emitAsanaAuxiliaryFiles(this.client, {
+      workspaceId,
+      tasks: [{
+        objectId: event.objectId,
+        payload: event.payload as unknown as AsanaTask,
+        ...(content ? { content } : {}),
+        deleted,
+        ...(event.connectionId ? { connectionId: event.connectionId } : {}),
+      }],
+    });
+    return {
+      filesWritten: auxiliary.written,
+      filesDeleted: auxiliary.deleted,
+      paths: auxiliaryPathsForTask(event.payload, event.objectId),
+      errors: auxiliary.errors.map((error) => ({
+        path: error.path,
+        error: error.error,
+      })),
+    };
+  }
+}
+
+function auxiliaryPathsForTask(payload: Record<string, unknown>, objectId: string): string[] {
+  const paths = [asanaTaskByIdAliasPath(objectId)];
+  const completed = payload.completed;
+  if (typeof completed === 'boolean') {
+    paths.push(asanaTaskByStatePath(completed ? 'completed' : 'open', objectId));
+  }
+  const assignee = getRecord(payload.assignee);
+  const assigneeGid = asString(assignee?.gid) ?? asString(payload.assignee_gid);
+  if (assigneeGid) {
+    paths.push(asanaTaskByAssigneePath(assigneeGid, objectId));
+  }
+  const creator = getRecord(payload.created_by) ?? getRecord(payload.createdBy) ?? getRecord(payload.creator);
+  const creatorGid = asString(creator?.gid) ?? asString(payload.created_by_gid) ?? asString(payload.creator_gid);
+  if (creatorGid) {
+    paths.push(asanaTaskByCreatorPath(creatorGid, objectId));
+  }
+  const priority = asanaTaskPriority(payload.custom_fields) ?? asString(payload.priority);
+  if (priority) {
+    paths.push(asanaTaskByPriorityPath(priority, objectId));
+  }
+  return paths;
+}
+
+function asanaTaskPriority(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined;
+  for (const item of value) {
+    const field = getRecord(item) as AsanaCustomField | undefined;
+    if (!field || asString(field.name)?.toLowerCase() !== 'priority') continue;
+    const priority = readCustomFieldDisplayValue(field);
+    if (priority) return priority;
+  }
+  return undefined;
 }
 
 function applyTaskSemantics(

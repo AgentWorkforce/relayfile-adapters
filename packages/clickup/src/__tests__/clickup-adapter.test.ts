@@ -3,6 +3,9 @@ import test from 'node:test';
 
 import {
   ClickUpAdapter,
+  clickUpTaskByIdAliasPath,
+  clickUpTaskByPriorityPath,
+  clickUpTaskByStatePath,
   clickUpFolderPath,
   clickUpListPath,
   clickUpSpacePath,
@@ -89,7 +92,13 @@ test('ingestWebhook writes task payloads with semantics and deterministic path',
 
   const result = await adapter.ingestWebhook('workspace_1', normalized);
 
-  assert.equal(result.filesWritten, 1);
+  assert.equal(result.filesWritten, 4);
+  assert.deepEqual(result.paths, [
+    '/clickup/tasks/task_123.json',
+    clickUpTaskByIdAliasPath('task_123'),
+    clickUpTaskByStatePath('in progress', 'task_123'),
+    clickUpTaskByPriorityPath('high', 'task_123'),
+  ]);
   assert.equal(client.writes[0]?.path, '/clickup/tasks/task_123.json');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status'], 'in progress');
   assert.equal(client.writes[0]?.semantics?.properties?.['clickup.priority'], 'high');

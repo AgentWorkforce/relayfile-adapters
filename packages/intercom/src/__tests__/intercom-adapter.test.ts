@@ -63,12 +63,21 @@ test('IntercomAdapter exposes provider name and supported webhook events', () =>
     'conversation.created',
     'conversation.updated',
     'conversation.deleted',
+    'conversation.closed',
+    'conversation.reopened',
+    'conversation.archived',
     'contact.created',
     'contact.updated',
     'contact.deleted',
+    'contact.closed',
+    'contact.reopened',
+    'contact.archived',
     'company.created',
     'company.updated',
     'company.deleted',
+    'company.closed',
+    'company.reopened',
+    'company.archived',
   ]);
 });
 
@@ -207,6 +216,33 @@ test('ingestWebhook deletes files for deleted object events', async () => {
   assert.deepEqual(result.paths, ['/intercom/contacts/contact_123.json']);
   assert.equal(client.deleted.length, 1);
   assert.equal(client.deleted[0]?.path, '/intercom/contacts/contact_123.json');
+});
+
+test('ingestWebhook preserves archived conversations as terminal records', async () => {
+  const client = createClient();
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace_1', {
+    provider: 'intercom',
+    eventType: 'conversation.archived',
+    objectType: 'conversation',
+    objectId: 'conv_123',
+    payload: {
+      id: 'conv_123',
+      type: 'conversation',
+      state: 'closed',
+      _webhook: {
+        action: 'archived',
+      },
+    },
+  });
+
+  assert.equal(result.filesWritten, 1);
+  assert.equal(result.filesDeleted, 0);
+  assert.equal(client.deleted.length, 0);
+  assert.equal(client.writes[0]?.path, '/intercom/conversations/conv_123.json');
+  const content = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  assert.equal(content.deleted, false);
 });
 
 test('computeSemantics extracts conversation state, tags, contacts, and comments deterministically', () => {
