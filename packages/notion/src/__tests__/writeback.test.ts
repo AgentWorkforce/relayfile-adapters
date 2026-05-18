@@ -144,9 +144,14 @@ describe('writeback rule matching', () => {
 
   it('maps markdown and comments writeback paths', () => {
     const markdown = resolveWritebackRequest('/notion/pages/page-1/content.md', '# Updated');
+    const markdownObject = resolveWritebackRequest(
+      '/notion/databases/db-1/pages/page-2/content.md',
+      '{"markdown":"# Updated from schema-shaped content"}',
+    );
     const comment = resolveWritebackRequest('/notion/pages/page-1/comments.json', '"Looks good"');
 
     assert.strictEqual(markdown.endpoint, '/v1/pages/page-1/markdown');
+    assert.deepStrictEqual(markdownObject.body.replace_content.new_str, '# Updated from schema-shaped content');
     assert.strictEqual(comment.endpoint, '/v1/comments');
     assert.deepStrictEqual(comment.body, {
       parent: { page_id: 'page-1' },

@@ -297,7 +297,7 @@ export const adapters = [
     slug: 'notion',
     title: 'Notion adapter',
     overview:
-      'The Notion adapter exposes databases, pages, page markdown, blocks, and comments under `/notion`, with writeback routes for creating database pages and updating page content.',
+      'The Notion adapter exposes databases, pages, page markdown, blocks, and comments under `/notion`, with writeback routes for creating database pages, updating page properties/content, archiving pages, and creating page comments.',
     readPaths: [
       ['/notion/databases/<databaseId>/metadata.json', 'Database metadata.'],
       ['/notion/databases/<databaseId>/pages/<pageId>.json', 'Database page records.'],
@@ -310,6 +310,30 @@ export const adapters = [
         children: arr(obj('Notion block object.'), 'Optional child blocks for the new page.'),
         markdown: str('Optional markdown body. When present the adapter uses the Notion markdown API version.'),
       }, { properties: { Name: { type: 'title', value: 'Replace example page title' } } }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}.json', 'Update Notion database page properties', 'Updates properties, archive state, icon, or cover for a page inside a Notion database.', ['properties'], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/properties.json', 'Update Notion database page properties file', 'Updates properties, archive state, icon, or cover through a database page properties sidecar.', ['properties'], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/content.md', 'Replace Notion database page markdown', 'Replaces the rendered markdown body for a page inside a Notion database.', [], {
+        markdown: str('Plain markdown body written to content.md.'),
+      }, { markdown: '# Replace page content' }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/comments.json', 'Create Notion database page comment', 'Creates a Notion comment on a page inside a Notion database from comments.json.', [], notionCommentProps(), {
+        text: 'Replace example comment body.',
+      }),
+      endpoint('/notion/pages/{pageId}.json', 'Update Notion standalone page properties', 'Updates properties, archive state, icon, or cover for a standalone page.', ['properties'], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }),
+      endpoint('/notion/pages/{pageId}/properties.json', 'Update Notion standalone page properties file', 'Updates properties, archive state, icon, or cover through a standalone page properties sidecar.', ['properties'], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }),
+      endpoint('/notion/pages/{pageId}/content.md', 'Replace Notion standalone page markdown', 'Replaces the rendered markdown body for a standalone page.', [], {
+        markdown: str('Plain markdown body written to content.md.'),
+      }, { markdown: '# Replace page content' }),
+      endpoint('/notion/pages/{pageId}/comments.json', 'Create Notion standalone page comment', 'Creates a Notion comment on a standalone page from comments.json.', [], notionCommentProps(), {
+        text: 'Replace example comment body.',
+      }),
     ],
   },
   {
@@ -937,6 +961,23 @@ function salesforceAccountProps() {
     BillingPostalCode: str('Billing postal code.'),
     BillingCountry: str('Billing country.'),
     OwnerId: str('Owner user id.'),
+  };
+}
+
+function notionPagePatchProps() {
+  return {
+    properties: obj('Serialized Notion property map. Each property value should match the adapter property serializer shape.'),
+    archived: bool('Whether to archive or restore the page.'),
+    icon: obj('Notion page icon object.'),
+    cover: obj('Notion page cover object.'),
+  };
+}
+
+function notionCommentProps() {
+  return {
+    text: str('Plain text comment body. A raw string body is also accepted by the resolver.'),
+    discussionId: str('Optional Notion discussion id to append to.'),
+    richText: arr(obj('Notion rich_text object.'), 'Optional rich_text array.'),
   };
 }
 

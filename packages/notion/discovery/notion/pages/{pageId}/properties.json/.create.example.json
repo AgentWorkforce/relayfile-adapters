@@ -1,0 +1,8 @@
+{
+  "properties": {
+    "Status": {
+      "type": "select",
+      "value": "In progress"
+    }
+  }
+}

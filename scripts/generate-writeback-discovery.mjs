@@ -49,7 +49,7 @@ function renderAdapterReadme(adapter) {
     '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resource.resourcePath}/<id>.json\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | \`${escapeMarkdownTableCell(resource.idPatternSource)}\` | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | \`${escapeMarkdownTableCell(resource.idPatternSource)}\` | ${resource.description} |`),
     '',
     '## Operations',
     '',
@@ -62,7 +62,7 @@ function renderAdapterReadme(adapter) {
     '| Delete | `rm <id>.json` for canonical ids. |',
     '',
     '## ID Patterns',
-    ...resources.map((resource) => `- \`${resource.resourcePath}/<id>.json\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`),
+    ...resources.map((resource) => renderIdPattern(resource)),
     '',
     '## Write field contracts',
     '',
@@ -83,7 +83,7 @@ function renderEndpointContract(endpoint) {
   const lines = [
     `### ${endpoint.schema.title}`,
     '',
-    `Resource: \`${resource.resourcePath}/<id>.json\``,
+    `Resource: \`${resourceWritePath(resource)}\``,
     `Schema: \`${resource.schemaPath}\``,
     `Create example: \`${resource.examplePath}\``,
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
@@ -97,6 +97,20 @@ function renderEndpointContract(endpoint) {
   ];
 
   return lines;
+}
+
+function resourceWritePath(resource) {
+  return /\.(?:json|md)$/u.test(resource.resourcePath)
+    ? resource.resourcePath
+    : `${resource.resourcePath}/<id>.json`;
+}
+
+function renderIdPattern(resource) {
+  const writePath = resourceWritePath(resource);
+  if (writePath === resource.resourcePath) {
+    return `- \`${writePath}\`: exact file path.`;
+  }
+  return `- \`${writePath}\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`;
 }
 
 function renderValidationNotes(schema) {

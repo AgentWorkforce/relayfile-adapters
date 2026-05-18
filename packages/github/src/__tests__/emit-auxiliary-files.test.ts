@@ -351,8 +351,41 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'issues', '2026-05-12', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
+    const canonicalBytes = client.files.get(githubIssuePath('acme', 'widgets', 7, 'Bug report'));
+    assert.equal(client.files.get(githubByIdAliasPath('acme', 'widgets', 'issues', 7)), canonicalBytes);
+    assert.equal(
+      client.files.get(githubNumberedByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)),
+      canonicalBytes,
+    );
+    assert.equal(client.files.get(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)), canonicalBytes);
+    assert.equal(client.files.get(githubByEditedAliasPath('acme', 'widgets', 'issues', '2026-05-12', 7)), canonicalBytes);
+
     // No writes leaked into the pulls index for this repo.
     assert.ok(!writtenPaths.includes(githubRepoPullsIndexPath('acme', 'widgets')));
+  });
+
+  it('uses the newest lifecycle timestamp for PR by-edited aliases', async () => {
+    const client = createClient();
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 42,
+          title: 'Follow-up after merge',
+          state: 'closed',
+          merged_at: '2026-05-12T00:00:00Z',
+          closed_at: '2026-05-12T00:00:00Z',
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'pulls', '2026-05-13', 42)));
+    assert.ok(!writtenPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'pulls', '2026-05-12', 42)));
   });
 
   it('writes distinct by-title aliases for duplicate issue titles and keeps cleanup scoped by number', async () => {
