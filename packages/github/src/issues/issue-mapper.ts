@@ -3,8 +3,8 @@ import { fetchIssue, isActualIssue } from './fetcher.js';
 import { ingestIssueComments } from './comment-mapper.js';
 import {
   githubByIdAliasPath,
-  githubByTitleAliasPath,
   githubNumberSlug,
+  githubNumberedByTitleAliasPath,
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
 } from '../path-mapper.js';
@@ -341,11 +341,11 @@ async function writeIssueAliases(
     return;
   }
 
-  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'issues', title, number);
+  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'issues', title, number);
   const aliasPath = await resolveAliasPath(
     vfs,
     baseAliasPath,
-    githubByTitleAliasPath(owner, repo, 'issues', title, number, true),
+    githubNumberedByTitleAliasPath(owner, repo, 'issues', title, number, true),
     content,
   );
   // TODO(issue #106): remove stale by-title aliases when an issue title changes on re-ingest; this wave only writes the current alias.

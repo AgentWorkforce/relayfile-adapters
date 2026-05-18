@@ -134,14 +134,12 @@ const GITHUB_ALIAS_RESOURCE_SEGMENTS = new Set(['issues', 'pulls']);
 
 function hasGitHubAliasDirectory(segments: readonly string[]): boolean {
   if (segments[0] !== 'github' || segments[1] !== 'repos') return false;
-  const resource = segments[3];
-  const alias = segments[4];
-  return Boolean(
-    resource
-    && alias
-    && GITHUB_ALIAS_RESOURCE_SEGMENTS.has(resource)
-    && DIGEST_ALIAS_SEGMENTS.has(alias),
-  );
+  return isGitHubAliasResourcePair(segments[3], segments[4])
+    || isGitHubAliasResourcePair(segments[4], segments[5]);
+}
+
+function isGitHubAliasResourcePair(resource: string | undefined, alias: string | undefined): boolean {
+  return Boolean(resource && alias && GITHUB_ALIAS_RESOURCE_SEGMENTS.has(resource) && DIGEST_ALIAS_SEGMENTS.has(alias));
 }
 
 function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): number {
@@ -152,9 +150,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left) ?? '', digestEventPath(right) ?? '')
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTime(event: DigestChangeEvent): string {

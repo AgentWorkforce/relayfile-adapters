@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const root = new URL('..', import.meta.url).pathname;
 const packagesDir = join(root, 'packages');
@@ -163,9 +164,10 @@ const executableRegressionContracts = [
   },
 ];
 
+function main() {
 const failures = [];
 
-verifyNoProviderDigestHandlerContract();
+verifyNoProviderDigestHandlerContract(failures);
 
 for (const contract of categoryResourceContracts) {
   const layoutPath = join(packagesDir, contract.provider, 'src', 'layout.ts');
@@ -188,7 +190,7 @@ for (const contract of categoryResourceContracts) {
   }
 }
 
-verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases();
+verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases(failures);
 
 for (const contract of executableRegressionContracts) {
   const testPath = join(packagesDir, contract.provider, contract.file);
@@ -197,6 +199,12 @@ for (const contract of executableRegressionContracts) {
     continue;
   }
   const source = readFileSync(testPath, 'utf8');
+  if (contract.file.endsWith('.test.ts')) {
+    if (!activeRegressionContractSatisfied(source, contract.needles)) {
+      failures.push(`${contract.provider}: ${contract.label} (${contract.file} must cover all required evidence in a live assertion test)`);
+    }
+    continue;
+  }
   for (const needle of contract.needles) {
     if (!source.includes(needle)) {
       failures.push(`${contract.provider}: ${contract.label} (missing "${needle}" in ${contract.file})`);
@@ -229,6 +237,11 @@ if (failures.length > 0) {
 console.log('Verified adapter metadata/layout contracts do not require provider digest handlers.');
 console.log(`Verified ${categoryResourceContracts.length} category resource contracts.`);
 console.log(`Verified ${executableRegressionContracts.length} executable regression contracts.`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
 
 function providerPackages() {
   return readdirSync(packagesDir)
@@ -237,7 +250,134 @@ function providerPackages() {
     .sort();
 }
 
-function verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases() {
+export function activeRegressionContractSatisfied(source, needles) {
+  return activeTestBlocks(source).some((block) => (
+    hasAssertion(block) && needles.every((needle) => block.includes(needle))
+  ));
+}
+
+export function activeTestHasAssertion(source, pattern) {
+  return activeTestBlocks(source).some((block) => pattern.test(block) && hasAssertion(block));
+}
+
+function activeTestBlocks(source) {
+  const blocks = [];
+  const callPattern = /(?:^|[^\w.])(test|it)\s*\(/gu;
+  let match;
+  while ((match = callPattern.exec(source)) !== null) {
+    const keyword = match[1];
+    const keywordIndex = keyword ? source.indexOf(keyword, match.index) : match.index;
+    const openParen = source.indexOf('(', keywordIndex + (keyword?.length ?? 0));
+    const closeParen = findMatchingParen(source, openParen);
+    if (closeParen > openParen) {
+      blocks.push(stripComments(source.slice(keywordIndex, closeParen + 1)));
+      callPattern.lastIndex = closeParen + 1;
+    }
+  }
+  return blocks;
+}
+
+function hasAssertion(block) {
+  return /(?:^|[^\w.])assert\.(?:deepEqual|equal|match|ok|rejects|throws|notEqual|notDeepEqual)\s*\(/u.test(block);
+}
+
+function stripComments(source) {
+  let output = '';
+  let i = 0;
+  let quote = null;
+  while (i < source.length) {
+    const char = source[i];
+    const next = source[i + 1];
+    if (quote) {
+      output += char;
+      if (char === '\\') {
+        output += next ?? '';
+        i += 2;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      i += 1;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      output += char;
+      i += 1;
+      continue;
+    }
+    if (char === '/' && next === '/' && source[i - 1] !== '\\') {
+      while (i < source.length && source[i] !== '\n') {
+        output += ' ';
+        i += 1;
+      }
+      continue;
+    }
+    if (char === '/' && next === '*' && source[i - 1] !== '\\') {
+      output += '  ';
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) {
+        output += source[i] === '\n' ? '\n' : ' ';
+        i += 1;
+      }
+      output += '  ';
+      i += 2;
+      continue;
+    }
+    output += char;
+    i += 1;
+  }
+  return output;
+}
+
+function findMatchingParen(source, openParen) {
+  let depth = 0;
+  let quote = null;
+  for (let i = openParen; i < source.length; i += 1) {
+    const char = source[i];
+    if (quote) {
+      if (char === '\\') {
+        i += 1;
+        continue;
+      }
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '/' && source[i + 1] === '/' && source[i - 1] !== '\\') {
+      i += 1;
+      while (i < source.length && source[i] !== '\n') {
+        i += 1;
+      }
+      continue;
+    }
+    if (char === '/' && source[i + 1] === '*' && source[i - 1] !== '\\') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) {
+        i += 1;
+      }
+      i += 1;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+function verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases(failures) {
   const layoutPath = join(packagesDir, 'github', 'src', 'layout.ts');
   const emitterPath = join(packagesDir, 'github', 'src', 'emit-auxiliary-files.ts');
   if (!existsSync(layoutPath) || !existsSync(emitterPath)) {
@@ -266,7 +406,7 @@ function aliasesForResource(layoutSource, resourcePath) {
   return Array.from(aliasMatch[1].matchAll(/'([^']+)'/gu), (match) => match[1]);
 }
 
-function verifyNoProviderDigestHandlerContract() {
+function verifyNoProviderDigestHandlerContract(failures) {
   const source = readFileSync(new URL(import.meta.url), 'utf8');
   const forbiddenNeedles = [
     ['missing src/', 'digest', '.ts'],

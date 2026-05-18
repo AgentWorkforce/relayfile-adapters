@@ -15,6 +15,5 @@ export default {
   test: {
     include: ['packages/core/tests/round-trip/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
-    passWithNoTests: true,
   },
 };

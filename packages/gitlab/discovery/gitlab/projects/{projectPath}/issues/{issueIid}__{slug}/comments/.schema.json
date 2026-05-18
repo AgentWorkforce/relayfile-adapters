@@ -8,12 +8,9 @@
   "properties": {
     "body": {
       "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*",
       "description": "Markdown note body."
-    },
-    "position": {
-      "type": "object",
-      "description": "Optional GitLab position object for diff discussions.",
-      "additionalProperties": true
     },
     "created_at": {
       "type": "string",
@@ -21,7 +18,10 @@
       "description": "Optional timestamp for imports when supported by GitLab."
     },
     "id": {
-      "type": "string",
+      "type": [
+        "integer",
+        "string"
+      ],
       "description": "Provider canonical record id.",
       "readOnly": true
     },
@@ -86,6 +86,6 @@
       "additionalProperties": true
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

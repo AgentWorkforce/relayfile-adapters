@@ -29,7 +29,9 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       title: 'Projects',
       materialization: 'eager',
       aliasSegments: ['by-id', 'by-title'],
-      writebackResources: [],
+      writebackResources: [
+        { path: 'jira/projects', schemaId: 'jira/project' },
+      ],
     },
     {
       path: 'jira/sprints',

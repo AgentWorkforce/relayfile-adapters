@@ -132,6 +132,20 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
       assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
     });
+
+    it('does not collide with canonical or sibling issue alias subtrees', () => {
+      const issueId = '10001';
+      const byEdited = jiraIssueByEditedPath('2026-05-12', issueId);
+      const canonical = jiraIssuePath(issueId, 'Fix login redirect');
+      const byState = jiraIssueByStatePath('In Progress', issueId);
+      const byTitle = jiraIssueByTitleAliasPath('Fix login redirect', issueId);
+      const byPriority = jiraIssueByPriorityPath('High Priority', issueId);
+      const all = new Set([byEdited, canonical, byState, byTitle, byPriority]);
+      assert.equal(all.size, 5, 'by-edited must occupy its own issue namespace');
+      assert.ok(byEdited.startsWith(`${JIRA_PATH_ROOT}/issues/by-edited/2026-05-12/`));
+      const leaf = byEdited.slice(byEdited.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
+    });
   });
 
   describe('jiraProjectByIdAliasPath', () => {
@@ -181,6 +195,31 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
         const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
         assert.equal(extractJiraIdFromPathSegment(leaf), id);
       }
+    });
+  });
+
+  describe('canonical titled paths encode opaque ids', () => {
+    it('keeps issue, project, and sprint ids with slashes inside a single filename and round-trips them', () => {
+      const cases = [
+        { path: jiraIssuePath('../100/01', 'Fix Login Redirect'), id: '../100/01', prefix: `${JIRA_PATH_ROOT}/issues/` },
+        { path: jiraProjectPath('team/../99', 'Engineering Platform'), id: 'team/../99', prefix: `${JIRA_PATH_ROOT}/projects/` },
+        { path: jiraSprintPath('../board/7', 'Sprint 7'), id: '../board/7', prefix: `${JIRA_PATH_ROOT}/sprints/` },
+      ];
+
+      for (const { path, id, prefix } of cases) {
+        assert.ok(path.startsWith(prefix), `expected ${path} to stay under ${prefix}`);
+        const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+        assert.equal(leaf.includes('/'), false, `expected encoded id to stay in one path segment: ${path}`);
+        assert.equal(extractJiraIdFromPathSegment(leaf), id);
+      }
+    });
+
+    it('uses the shared slug helper for titled canonical paths while preserving id fallback', () => {
+      assert.equal(
+        jiraIssuePath('10001', 'Café login redirect'),
+        `${JIRA_PATH_ROOT}/issues/cafe-login-redirect__10001.json`,
+      );
+      assert.equal(jiraIssuePath('10001', '{}'), `${JIRA_PATH_ROOT}/issues/10001.json`);
     });
   });
 

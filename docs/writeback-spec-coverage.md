@@ -34,6 +34,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | sharepoint | None | 0 | 2 | Inline JS schemas. |
 | slack | None | 0 | 4 | Inline JS schemas. |
 | teams | None | 0 | 3 | Inline JS schemas. |
+| x | None | 0 | 0 | Read-only social search adapter; no writeback endpoints. |
 | zendesk | None | 0 | 3 | Inline JS schemas. |
 
 ## Updating This File

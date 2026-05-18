@@ -113,7 +113,7 @@ export function gitLabRecordDirectorySegment(
 ): string {
   const id = String(objectId).trim();
   if (id.includes('__')) {
-    return id;
+    return encodeGitLabPathSegment(id);
   }
   const slug = title ? slugifyAlias(title) : '';
   return slug ? `${encodeGitLabPathSegment(id)}__${encodeGitLabPathSegment(slug)}` : encodeGitLabPathSegment(id);
@@ -124,7 +124,7 @@ export function gitLabFlatRecordFilename(
   title?: string | null,
 ): string {
   const id = String(objectId).trim().replace(/\.json$/, '');
-  if (!title && isComposedFlatRecordFilename(id)) {
+  if (id.includes('__') && !id.includes('/')) {
     return `${id}.json`;
   }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);
@@ -147,6 +147,22 @@ function isComposedFlatRecordFilename(value: string): boolean {
   const encodedId = value.slice(separatorIndex + 2);
   try {
     return slug === slugifyAlias(decodeURIComponent(encodedId));
+  } catch {
+    return false;
+  }
+}
+
+function shouldDecodeComposedFlatRecordFilename(value: string): boolean {
+  if (isComposedFlatRecordFilename(value)) {
+    return true;
+  }
+  const separatorIndex = value.indexOf('__');
+  if (separatorIndex <= 0) {
+    return false;
+  }
+  const encodedId = value.slice(separatorIndex + 2);
+  try {
+    return /^\d+$/u.test(decodeURIComponent(encodedId));
   } catch {
     return false;
   }
@@ -575,7 +591,7 @@ function decodeDirectoryObjectId(segment: string): string {
 
 function decodeFlatObjectId(segment: string): string {
   const basename = segment.replace(/\.json$/, '');
-  const separatorIndex = basename.indexOf('__');
+  const separatorIndex = shouldDecodeComposedFlatRecordFilename(basename) ? basename.indexOf('__') : -1;
   const id = separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
   return decodeURIComponent(id);
 }

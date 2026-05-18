@@ -173,6 +173,8 @@ test('normalizes GitLab slugged nested writeback paths to runtime matchers', () 
     endpoint.path === '/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json'
   );
 
+  assert.ok(discussionEndpoint, 'expected GitLab merge request discussion endpoint');
+  assert.ok(commentEndpoint, 'expected GitLab issue comment endpoint');
   assert.equal(
     discussionEndpoint.resource.pathPatternSource,
     '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$',

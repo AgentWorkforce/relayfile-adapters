@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { ingestIssue } from '../issues/issue-mapper.js';
-import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
+import { githubByIdAliasPath, githubNumberedByTitleAliasPath } from '../path-mapper.js';
 import { ingestPullRequest } from '../pr/diff-writer.js';
 import {
   type GitHubRequestProvider,
@@ -166,8 +166,8 @@ describe('github aliases', () => {
     const firstCanonicalPath = '/github/repos/octocat/hello-world/issues/7__shared-title/meta.json';
     const secondCanonicalPath = '/github/repos/octocat/hello-world/issues/8__shared-title/meta.json';
     const byIdPath = githubByIdAliasPath('octocat', 'hello-world', 'issues', 7);
-    const baseTitlePath = githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7);
-    const collisionTitlePath = githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 8, true);
+    const baseTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7);
+    const collisionTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 8);
 
     assert.strictEqual(vfs.readFile(byIdPath), vfs.readFile(firstCanonicalPath));
     assert.strictEqual(vfs.readFile(baseTitlePath), vfs.readFile(firstCanonicalPath));
@@ -188,10 +188,10 @@ describe('github aliases', () => {
     await ingestIssue(provider, 'octocat', 'hello-world', 9, vfs as never);
 
     const canonicalPath = '/github/repos/octocat/hello-world/issues/9/meta.json';
-    const untitledAliasPath = githubByTitleAliasPath('octocat', 'hello-world', 'issues', '🚀🔥', 9);
+    const untitledAliasPath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', '🚀🔥', 9);
 
     assert.strictEqual(vfs.readFile(untitledAliasPath), vfs.readFile(canonicalPath));
-    assert.ok(untitledAliasPath.endsWith('/by-title/untitled.json'));
+    assert.ok(untitledAliasPath.endsWith('/by-title/untitled__9.json'));
   });
 
   it('writes pull-request by-id aliases that resolve to the canonical metadata file', async () => {
@@ -205,5 +205,20 @@ describe('github aliases', () => {
 
     assert.strictEqual(vfs.readFile(byIdPath), vfs.readFile(canonicalPath));
     assert.ok(byIdPath.includes('/github/repos/octocat__hello-world/pulls/by-id/42.json'));
+  });
+
+  it('overwrites the base numbered pull-request by-title alias on re-ingest', async () => {
+    const { files, vfs } = createMemoryVfs();
+    const title = 'Add fixture-backed GitHub adapter coverage';
+    const baseTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'pulls', title, 42);
+    const collisionTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'pulls', title, 42, true);
+    files.set(baseTitlePath, '{"stale":true}\n');
+
+    await ingestPullRequest(createPullRequestProvider(), 'octocat', 'hello-world', 42, vfs as never);
+
+    const canonicalPath =
+      '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json';
+    assert.strictEqual(vfs.readFile(baseTitlePath), vfs.readFile(canonicalPath));
+    assert.equal(files.has(collisionTitlePath), false);
   });
 });

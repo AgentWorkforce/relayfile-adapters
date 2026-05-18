@@ -267,7 +267,7 @@ describe('issue mapping', () => {
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
       '/github/repos/octocat__hello-world/issues/_index.json',
       '/github/repos/octocat__hello-world/issues/by-id/10.json',
-      '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage.json',
+      '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage__10.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
       '/github/repos/octocat/hello-world/issues/_index.json',

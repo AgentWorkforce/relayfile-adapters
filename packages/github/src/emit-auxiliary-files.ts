@@ -78,10 +78,13 @@ import {
   githubCheckRunPath,
   githubCommitPath,
   githubIssuePath,
+  githubLegacyByTitleAliasPath,
+  githubNumberedByTitleAliasPath,
   githubPullRequestPath,
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
   githubReposIndexPath,
+  githubRepositoryMetaPath,
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
   githubReviewPath,
@@ -89,6 +92,7 @@ import {
 
 const GITHUB_PROVIDER_NAME = 'github' as const;
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
+const NUMBERED_DELETE_RECOVERY_REPO_SCAN_LIMIT = 25;
 
 // ---------------------------------------------------------------------------
 // Public input types
@@ -291,6 +295,10 @@ export async function emitGitHubAuxiliaryFiles(
     return repoReconcilerSlot.current;
   }
 
+  const numberedDeleteRecoveryCache: NumberedDeleteRecoveryCache = {
+    indexRowsByPath: new Map(),
+  };
+
   // --- PRs ----------------------------------------------------------------
   if (pullRequests.length > 0) {
     const fan = await runEmitBatch(client, workspaceId, pullRequests, async (record) => {
@@ -302,6 +310,7 @@ export async function emitGitHubAuxiliaryFiles(
           'pulls',
           priorReader,
           (owner, repo) => getPullReconciler(owner, repo),
+          numberedDeleteRecoveryCache,
         );
       }
       return planNumberedWrite(
@@ -327,6 +336,7 @@ export async function emitGitHubAuxiliaryFiles(
           'issues',
           priorReader,
           (owner, repo) => getIssueReconciler(owner, repo),
+          numberedDeleteRecoveryCache,
         );
       }
       return planNumberedWrite(
@@ -447,6 +457,11 @@ interface NumberedDeleteRecovery {
   prior?: PriorNumberedState | undefined;
 }
 
+interface NumberedDeleteRecoveryCache {
+  repos?: Promise<Record<string, unknown>[]>;
+  indexRowsByPath: Map<string, Promise<Record<string, unknown>[]>>;
+}
+
 async function planNumberedWrite(
   record: GitHubPullRequestEmitRecord | GitHubIssueEmitRecord,
   objectType: 'pull_request' | 'issue',
@@ -504,7 +519,7 @@ async function planNumberedWrite(
         creatorKey: prior.creatorKey,
         priority: prior.priority,
         editedDate: prior.editedDate,
-      })
+      }, { includeLegacyTitleAlias: true })
     : [];
   const stalePaths = diffPaths(priorPaths, newPaths);
 
@@ -529,6 +544,7 @@ async function planNumberedDelete(
   aliasKind: 'pulls' | 'issues',
   priorReader: PriorAliasReader,
   getReconciler: (owner: string, repo: string) => IndexFileReconciler<GitHubRecordIndexRow>,
+  recoveryCache: NumberedDeleteRecoveryCache,
 ): Promise<EmitPlan> {
   const number = readNumberLike(tombstone.id);
   if (number === null) {
@@ -540,7 +556,7 @@ async function planNumberedDelete(
   if (explicitRepoInfo) {
     recovery = explicitRepoInfo;
   } else {
-    recovery = await findRepoInfoForNumberedDelete(client, workspaceId, aliasKind, number);
+    recovery = await findRepoInfoForNumberedDelete(client, workspaceId, aliasKind, number, recoveryCache);
     if (!recovery) {
       return {};
     }
@@ -550,7 +566,7 @@ async function planNumberedDelete(
   const prior =
     await priorReader.read<PriorNumberedState>(idAliasPath, extractPriorNumberedState)
     ?? recovery.prior
-    ?? await findNumberedIndexPrior(client, workspaceId, aliasKind, number, recovery);
+    ?? await findNumberedIndexPrior(client, workspaceId, aliasKind, number, recovery, recoveryCache);
 
   const priorTitle = prior?.title;
   const priorPaths = numberedPathsFor({
@@ -564,7 +580,7 @@ async function planNumberedDelete(
     creatorKey: prior?.creatorKey,
     priority: prior?.priority,
     editedDate: prior?.editedDate,
-  });
+  }, { includeLegacyTitleAlias: true });
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
 
   const paths = priorPaths.length > 0
@@ -582,12 +598,18 @@ async function findRepoInfoForNumberedDelete(
   workspaceId: string,
   aliasKind: 'pulls' | 'issues',
   number: string,
+  recoveryCache: NumberedDeleteRecoveryCache,
 ): Promise<NumberedDeleteRecovery | null> {
   if (!client.readFile) {
     return null;
   }
 
-  const repos = await readJsonArray(client, workspaceId, githubReposIndexPath());
+  const repos = await readJsonArrayCached(client, workspaceId, githubReposIndexPath(), recoveryCache);
+  if (repos.length > NUMBERED_DELETE_RECOVERY_REPO_SCAN_LIMIT) {
+    throw new Error(
+      `Refusing unscoped GitHub ${aliasKind} delete recovery across ${repos.length} repositories; include owner/repo on the tombstone.`,
+    );
+  }
   const matches: NumberedDeleteRecovery[] = [];
   for (const row of repos) {
     const repoInfo = extractRepoInfo(row) ?? repoInfoFromIndexId(readNonEmptyString(row.id));
@@ -595,7 +617,7 @@ async function findRepoInfoForNumberedDelete(
     const indexPath = aliasKind === 'pulls'
       ? githubRepoPullsIndexPath(repoInfo.owner, repoInfo.repo)
       : githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
-    const rows = await readJsonArray(client, workspaceId, indexPath);
+    const rows = await readJsonArrayCached(client, workspaceId, indexPath, recoveryCache);
     const match = rows.find((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number);
     if (match) {
       matches.push({
@@ -614,6 +636,7 @@ async function findNumberedIndexPrior(
   aliasKind: 'pulls' | 'issues',
   number: string,
   repoInfo: { owner: string; repo: string },
+  recoveryCache: NumberedDeleteRecoveryCache,
 ): Promise<PriorNumberedState | null> {
   if (!client.readFile) {
     return null;
@@ -621,9 +644,27 @@ async function findNumberedIndexPrior(
   const indexPath = aliasKind === 'pulls'
     ? githubRepoPullsIndexPath(repoInfo.owner, repoInfo.repo)
     : githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
-  const rows = await readJsonArray(client, workspaceId, indexPath);
+  const rows = await readJsonArrayCached(client, workspaceId, indexPath, recoveryCache);
   const match = rows.find((entry) => readNumberLike(entry.id) === number || readNumberLike(entry.number) === number);
   return match ? priorNumberedStateFromIndexRow(match, repoInfo) : null;
+}
+
+function readJsonArrayCached(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+  recoveryCache: NumberedDeleteRecoveryCache,
+): Promise<Record<string, unknown>[]> {
+  if (path === githubReposIndexPath()) {
+    recoveryCache.repos ??= readJsonArray(client, workspaceId, path);
+    return recoveryCache.repos;
+  }
+  let cached = recoveryCache.indexRowsByPath.get(path);
+  if (!cached) {
+    cached = readJsonArray(client, workspaceId, path);
+    recoveryCache.indexRowsByPath.set(path, cached);
+  }
+  return cached;
 }
 
 async function readJsonArray(
@@ -676,14 +717,22 @@ function numberedPathsFor(args: {
   creatorKey?: string | undefined;
   priority?: string | undefined;
   editedDate?: string | undefined;
-}): string[] {
+}, options: { includeLegacyTitleAlias?: boolean } = {}): string[] {
   const { owner, repo, aliasKind, number, title, state, assigneeKeys, creatorKey, priority, editedDate } = args;
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
   const paths: string[] = [];
   paths.push(canonicalPathFor(objectType, owner, repo, number, title));
   paths.push(githubByIdAliasPath(owner, repo, aliasKind, number));
   if (title && slugifies(title)) {
-    paths.push(githubByTitleAliasPath(owner, repo, aliasKind, title, number));
+    paths.push(githubNumberedByTitleAliasPath(owner, repo, aliasKind, title, number));
+    if (options.includeLegacyTitleAlias) {
+      const titleAliasPath = githubByTitleAliasPath(owner, repo, aliasKind, title, number);
+      const legacyTitleAliasPath = githubLegacyByTitleAliasPath(owner, repo, aliasKind, title, number);
+      paths.push(titleAliasPath);
+      if (legacyTitleAliasPath !== titleAliasPath) {
+        paths.push(legacyTitleAliasPath);
+      }
+    }
   }
   if (state && slugifies(state)) {
     paths.push(githubByStateAliasPath(owner, repo, aliasKind, state, number));
@@ -726,7 +775,7 @@ function buildRecordIndexRow(
   return {
     id: number,
     title: title ?? number,
-    updated: readUpdatedAt(record),
+    updated: readLifecycleEditedAt(record) ?? readUpdatedAt(record),
     number: Number(number),
     state: state ?? '',
     ...withOptionalArray('assigneeKeys', readGitHubAssigneeKeys(record)),
@@ -751,7 +800,7 @@ function planRepositoryWrite(
   const content = renderContent('repository', record, connectionId, false);
   const writes: EmitWrite[] = [
     {
-      path: githubRepositoryMetadataPath(repoInfo.owner, repoInfo.repo),
+      path: githubRepositoryMetaPath(repoInfo.owner, repoInfo.repo),
       content,
       contentType: JSON_CONTENT_TYPE,
     },
@@ -777,7 +826,10 @@ function planRepositoryDelete(
     return {};
   }
   return {
-    deletes: [{ path: githubRepositoryMetadataPath(owner, repo) }],
+    deletes: [
+      { path: githubRepositoryMetaPath(owner, repo) },
+      { path: githubRepositoryMetadataPath(owner, repo) },
+    ],
   };
 }
 
@@ -827,13 +879,13 @@ function flatCanonicalPath(
 ): string | null {
   if (objectType === 'commit') {
     const sha =
-      readNonEmptyString((record as GitHubCommitEmitRecord).sha) ??
-      readNonEmptyString((record as DeleteTombstone).id);
+      readGitHubCommitSha((record as GitHubCommitEmitRecord).sha) ??
+      readGitHubCommitSha((record as DeleteTombstone).id);
     return sha ? githubCommitPath(owner, repo, sha) : null;
   }
   const id =
-    readNumericId((record as { id?: unknown }).id) ??
-    readNonEmptyString((record as DeleteTombstone).id);
+    readGitHubNumericId((record as { id?: unknown }).id) ??
+    readGitHubNumericId((record as DeleteTombstone).id);
   if (!id) return null;
   switch (objectType) {
     case 'review':
@@ -1065,7 +1117,7 @@ function readNonEmptyString(value: unknown): string | undefined {
 }
 
 function readNumberLike(value: unknown): string | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
     return String(value);
   }
   if (typeof value === 'string') {
@@ -1089,6 +1141,17 @@ function readNumericId(value: unknown): string | undefined {
     return trimmed.length > 0 ? trimmed : undefined;
   }
   return undefined;
+}
+
+function readGitHubNumericId(value: unknown): string | undefined {
+  const id = readNumberLike(value);
+  return id ?? undefined;
+}
+
+function readGitHubCommitSha(value: unknown): string | undefined {
+  const sha = readNonEmptyString(value);
+  if (!sha) return undefined;
+  return /^[0-9a-f]{7,40}$/iu.test(sha) ? sha : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

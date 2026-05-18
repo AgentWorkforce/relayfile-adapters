@@ -15,6 +15,7 @@ import {
   gitLabByCreatorAliasPath,
   gitLabByPriorityAliasPath,
   gitLabByStateAliasPath,
+  gitLabFlatRecordFilename,
   gitLabProjectMetadataPath,
   parseGitLabPath,
 } from '../src/path-mapper.js';
@@ -131,6 +132,62 @@ describe('path mapper', () => {
       subResource: undefined,
       subResourceId: undefined,
     });
+  });
+
+  it('preserves already-composed flat record filenames for back-compat', () => {
+    assert.strictEqual(
+      gitLabFlatRecordFilename('ship-fix__abc123'),
+      'ship-fix__abc123.json',
+    );
+    assert.strictEqual(
+      gitLabFlatRecordFilename('ship-fix__abc123', 'Different title'),
+      'ship-fix__abc123.json',
+    );
+    assert.strictEqual(gitLabFlatRecordFilename(12345), '12345.json');
+    assert.strictEqual(gitLabFlatRecordFilename(12345, 'Production Deploy'), 'production-deploy__12345.json');
+
+    const composedPath = computeMetadataPath('acme/api', 'deployments', 'ship-fix__abc123');
+    assert.strictEqual(composedPath, '/gitlab/projects/acme/api/deployments/ship-fix__abc123.json');
+    assert.deepStrictEqual(parseGitLabPath(composedPath), {
+      path: composedPath,
+      projectPath: 'acme/api',
+      objectType: 'deployments',
+      objectId: 'ship-fix__abc123',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+
+    const numericPath = computeMetadataPath('acme/api', 'deployments', 12345, 'Production Deploy');
+    assert.deepStrictEqual(parseGitLabPath(numericPath), {
+      path: numericPath,
+      projectPath: 'acme/api',
+      objectType: 'deployments',
+      objectId: '12345',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+  });
+
+  it('preserves flat provider ids that contain the canonical joiner', () => {
+    const path = computeMetadataPath('acme/api', 'tags', 'release__candidate');
+    assert.strictEqual(path, '/gitlab/projects/acme/api/tags/release__candidate.json');
+    assert.deepStrictEqual(parseGitLabPath(path), {
+      path,
+      projectPath: 'acme/api',
+      objectType: 'tags',
+      objectId: 'release__candidate',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+  });
+
+  it('escapes double-underscore directory ids as one path segment', () => {
+    const path = computeMetadataPath('acme/api', 'pipelines', 'a__b/../c', 'a__b/../c');
+
+    assert.strictEqual(path, '/gitlab/projects/acme/api/pipelines/a__b%2F..%2Fc/meta.json');
+    const recordSegment = path.split('/pipelines/')[1]?.split('/')[0] ?? '';
+    assert.equal(recordSegment.includes('/'), false);
+    assert.equal(recordSegment.includes('../'), false);
   });
 
   it('parses resource-named project path segments from the right resource boundary', () => {
@@ -268,5 +325,33 @@ describe('path mapper', () => {
         subResourceId: undefined,
       },
     );
+  });
+});
+
+// Regression: CORR-1 — gitLabFlatRecordFilename must stay backward-compatible
+// for already-composed (id contains "__") inputs and round-trip plain ids.
+describe('gitLabFlatRecordFilename round-trip (CORR-1)', () => {
+  it('passes a pre-composed id (contains "__") through unchanged with no title', () => {
+    assert.strictEqual(
+      gitLabFlatRecordFilename('ship-fix__abc123'),
+      'ship-fix__abc123.json',
+    );
+  });
+
+  it('stays idempotent for a pre-composed id even when a differing title is supplied', () => {
+    assert.strictEqual(
+      gitLabFlatRecordFilename('ship-fix__abc123', 'Some Different Title'),
+      'ship-fix__abc123.json',
+    );
+  });
+
+  it('round-trips a plain numeric FLAT_RESOURCES id (deployments) with and without a title', () => {
+    const withTitle = computeMetadataPath('acme/api', 'deployments', 12345, 'Prod Deploy');
+    assert.strictEqual(withTitle, '/gitlab/projects/acme/api/deployments/prod-deploy__12345.json');
+    assert.strictEqual(parseGitLabPath(withTitle)?.objectId, '12345');
+
+    const noTitle = computeMetadataPath('acme/api', 'deployments', 12345);
+    assert.strictEqual(noTitle, '/gitlab/projects/acme/api/deployments/12345.json');
+    assert.strictEqual(parseGitLabPath(noTitle)?.objectId, '12345');
   });
 });

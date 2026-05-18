@@ -1,6 +1,6 @@
 version: 1
 title: Relayfile integration scope catalog
-updated: "2026-05-10"
+updated: "2026-05-17"
 purpose: >
   Machine-readable scope inventory for Relayfile adapter evals and app
   registration. Entries start as pending unless scopes were already provided or
@@ -977,6 +977,26 @@ integrations:
       - https://learn.microsoft.com/en-us/graph/teams-changenotifications-teammembership
       - https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0
     notes: "Microsoft Teams uses Microsoft Graph permissions. Nango's `microsoft-teams` provider aliases the shared Microsoft OAuth provider, whose registry default is `offline_access` plus `.default`; Nango's Teams setup guide tells operators to add required delegated Microsoft Graph permissions in Entra, and its maintained messages sync declares `ChannelMessage.Read.All` and `Chat.Read.All`. Relayfile reads team/channel metadata, members, tabs, channel messages/replies, chat metadata/messages, and reactions, and writes channel messages, channel replies, and chat messages. The read surface maps to `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `TeamMember.Read.All`, `TeamsTab.Read.All`, `ChannelMessage.Read.All`, and `Chat.Read.All`. Message create writeback uses delegated `ChannelMessage.Send`; Microsoft documents application message send only through migration-only `Teamwork.Migrate.All`, so that is not included for normal app behavior. Message deletion is delegated-only in Graph's `chatMessage: softDelete` API and requires `ChannelMessage.ReadWrite` for channel messages/replies and `Chat.ReadWrite` for chat messages; the current adapter's delete resolver should use Graph softDelete semantics for real deletion. Graph subscriptions require read permission for the subscribed resource: tenant-wide `/teams/getAllMessages`, `/chats/getAllMessages`, `/teams/getAllChannels`, and `/teams` presets are application-only, while team/channel/chat scoped presets can use delegated or application permissions depending on the resource. This means the full eval surface is a mixed model: delegated OAuth with `offline_access` for user-scoped read/write, plus admin-consented Graph application permissions when tenant-wide subscription presets are enabled."
+
+  - slug: x
+    display_name: X
+    category: social
+    status: implemented
+    package: "@relayfile/adapter-x"
+    nango_slug: x
+    auth_model: bearer_or_oauth2
+    scope_status: needs_review
+    required_scopes:
+      - tweet.read
+      - users.read
+    candidate_scopes:
+      - offline.access
+    sources:
+      - https://docs.x.com/x-api/posts/search/introduction
+      - https://docs.x.com/x-api/posts/search/quickstart/recent-search
+      - https://docs.x.com/x-api/posts/search/integrate/overview
+      - https://docs.x.com/x-api/fundamentals/post-cap
+    notes: "The X adapter is read-only and search-first. It uses recent search by default and full-archive search only when explicitly configured, then materializes saved search runs, matched posts, and capped optional user hydration. X's search quickstart documents Bearer Token authentication for recent search; OAuth 2.0 App-Only is documented for public Post data, while user-context OAuth apps normally request tweet.read and users.read. Cost controls are part of the adapter contract because X bills successful returned resources under pay-per-use."
 
   - slug: zendesk
     display_name: Zendesk

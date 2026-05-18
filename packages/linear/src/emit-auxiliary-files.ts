@@ -382,6 +382,7 @@ async function planIssueDelete(
     assigneeId: prior?.assigneeId,
     creatorId: prior?.creatorId,
     priority: prior?.priority,
+    editedDate: prior?.editedDate,
   });
   // See planPageDelete in the confluence port — index row must drop too.
   indexReconciler.remove(id);

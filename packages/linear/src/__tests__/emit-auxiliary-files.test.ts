@@ -505,6 +505,7 @@ describe('emitLinearAuxiliaryFiles', () => {
         identifier: 'AGE-8',
         title: 'Release Plan',
         state: { name: 'In Progress' },
+        updatedAt: '2026-05-11T00:00:00Z',
       },
     };
     const priorIndex = [
@@ -543,6 +544,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByEditedPath('2026-05-11', 'issue-123'),
     ];
     for (const path of expectedDeletes) {
       assert.ok(deletedPaths.has(path), `expected delete at ${path}`);
@@ -794,6 +796,7 @@ describe('emitLinearAuxiliaryFiles', () => {
         identifier: 'AGE-8',
         title: 'Release Plan',
         state: { name: 'In Progress' },
+        updatedAt: '2026-05-11T00:00:00Z',
       },
     };
     const priorIndex = [
@@ -834,6 +837,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-xyz'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByEditedPath('2026-05-11', 'issue-xyz'),
     ];
     for (const path of expected) {
       assert.ok(

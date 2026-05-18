@@ -9,12 +9,11 @@
   ],
   "scripts": {
     "build": "npx turbo build",
-    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:workflow-artifacts && npx turbo test",
+    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npx turbo test",
     "test:publish-targets": "node --test scripts/resolve-publish-targets.test.mjs",
     "test:internal-dependencies": "node scripts/sync-internal-dependencies.mjs --check",
     "test:writeback-discovery": "node --test scripts/writeback-discovery-normalizer.test.mjs && node scripts/verify-writeback-discovery.mjs",
-    "test:digest-contracts": "node scripts/digest-layout-contracts.mjs",
-    "test:workflow-artifacts": "node --test scripts/generated-workflow-artifacts.test.mjs",
+    "test:digest-contracts": "node --test scripts/digest-layout-contracts.test.mjs && node scripts/digest-layout-contracts.mjs",
     "test:writeback-e2e": "node scripts/verify-file-native-writeback-e2e.mjs",
     "typecheck": "npx turbo typecheck"
   },

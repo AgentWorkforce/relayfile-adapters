@@ -131,3 +131,40 @@ test('digest returns null for an empty Calendly event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest keeps processing when a Calendly path leaf has invalid percent encoding', async () => {
+  const ctx: DigestContext = {
+    provider: 'calendly',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'calendly/scheduled-events/bad%zz.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T08:01:00.000Z',
+          action: 'invitee.created',
+          canonicalPath: 'calendly/invitees/good%40path.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'calendly',
+    bullets: [
+      {
+        text: 'event bad%zz was updated',
+        canonicalPath: 'calendly/scheduled-events/bad%zz.json',
+      },
+      {
+        text: 'invitee good@path was created',
+        canonicalPath: 'calendly/invitees/good%40path.json',
+      },
+    ],
+  });
+});
