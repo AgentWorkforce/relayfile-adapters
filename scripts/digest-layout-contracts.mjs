@@ -76,6 +76,44 @@ const categoryResourceContracts = [
   },
 ];
 
+const activitySummaryFallbackContracts = [
+  {
+    provider: 'github',
+    resources: ['github/repos/*/*/issues', 'github/repos/*/*/pulls'],
+    layoutPrompt: 'src/layout-prompt.ts',
+    emissionTest: 'src/__tests__/emit-auxiliary-files.test.ts',
+    emissionNeedles: ['githubByEditedAliasPath', 'client.files.get(byEdited)', 'canonicalBytes'],
+  },
+  {
+    provider: 'linear',
+    resources: ['linear/issues'],
+    layoutPrompt: 'src/layout-prompt.ts',
+    emissionTest: 'src/__tests__/emit-auxiliary-files.test.ts',
+    emissionNeedles: ['linearIssueByEditedPath', 'canonicalBytes', 'bytes mismatch'],
+  },
+  {
+    provider: 'notion',
+    resources: ['notion/pages'],
+    layoutPrompt: 'src/layout-prompt.ts',
+    emissionTest: 'src/__tests__/emit-auxiliary-files.test.ts',
+    emissionNeedles: ['notionByEditedAliasPath', 'canonicalBytes', '2026-05-12'],
+  },
+  {
+    provider: 'jira',
+    resources: ['jira/issues'],
+    layoutPrompt: 'src/layout-prompt.ts',
+    emissionTest: 'src/__tests__/emit-auxiliary-files.test.ts',
+    emissionNeedles: ['jiraIssueByEditedPath', 'canonicalBytes', 'bytes mismatch'],
+  },
+  {
+    provider: 'confluence',
+    resources: ['confluence/pages'],
+    layoutPrompt: 'src/layout-prompt.ts',
+    emissionTest: 'src/__tests__/emit-auxiliary-files.test.ts',
+    emissionNeedles: ['confluencePageByEditedPath', 'canonicalBytes', 'bytes mismatch'],
+  },
+];
+
 const requiredDocs = [
   {
     file: 'AGENTS.md',
@@ -168,6 +206,7 @@ function main() {
 const failures = [];
 
 verifyNoProviderDigestHandlerContract(failures);
+verifyActivitySummaryFallbackContracts(failures);
 
 for (const contract of categoryResourceContracts) {
   const layoutPath = join(packagesDir, contract.provider, 'src', 'layout.ts');
@@ -236,6 +275,7 @@ if (failures.length > 0) {
 
 console.log('Verified adapter metadata/layout contracts do not require provider digest handlers.');
 console.log(`Verified ${categoryResourceContracts.length} category resource contracts.`);
+console.log(`Verified ${activitySummaryFallbackContracts.length} activity-summary fallback contracts.`);
 console.log(`Verified ${executableRegressionContracts.length} executable regression contracts.`);
 }
 
@@ -419,6 +459,46 @@ function verifyNoProviderDigestHandlerContract(failures) {
   for (const needle of forbiddenNeedles) {
     if (source.includes(needle)) {
       failures.push(`digest/layout contract script still contains stale provider digest requirement: ${needle}`);
+    }
+  }
+}
+
+function verifyActivitySummaryFallbackContracts(failures) {
+  for (const contract of activitySummaryFallbackContracts) {
+    const layoutPath = join(packagesDir, contract.provider, 'src', 'layout.ts');
+    if (!existsSync(layoutPath)) {
+      failures.push(`${contract.provider}: activity-summary fallback contract requires src/layout.ts`);
+      continue;
+    }
+
+    const layoutSource = readFileSync(layoutPath, 'utf8');
+    for (const resource of contract.resources) {
+      const aliases = aliasesForResource(layoutSource, resource);
+      if (!aliases) {
+        failures.push(`${contract.provider}: activity-summary fallback layout missing resource ${resource}`);
+      } else if (!aliases.includes('by-edited')) {
+        failures.push(`${contract.provider}: ${resource} missing by-edited for activity-summary fallback reads`);
+      }
+    }
+
+    const promptPath = join(packagesDir, contract.provider, contract.layoutPrompt);
+    if (!existsSync(promptPath)) {
+      failures.push(`${contract.provider}: activity-summary fallback contract requires ${contract.layoutPrompt}`);
+    } else {
+      const promptSource = readFileSync(promptPath, 'utf8');
+      if (!promptSource.includes('by-edited/YYYY-MM-DD')) {
+        failures.push(`${contract.provider}: ${contract.layoutPrompt} must document by-edited/YYYY-MM-DD`);
+      }
+    }
+
+    const testPath = join(packagesDir, contract.provider, contract.emissionTest);
+    if (!existsSync(testPath)) {
+      failures.push(`${contract.provider}: activity-summary fallback contract requires ${contract.emissionTest}`);
+    } else {
+      const testSource = readFileSync(testPath, 'utf8');
+      if (!activeRegressionContractSatisfied(testSource, contract.emissionNeedles)) {
+        failures.push(`${contract.provider}: ${contract.emissionTest} must assert by-edited alias emission resolves to the canonical record`);
+      }
     }
   }
 }

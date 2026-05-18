@@ -210,7 +210,12 @@ function resourceNameFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'slack' && resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
     return 'direct-messages';
   }
-  return resourcePath.split('/').filter(Boolean).at(-1) ?? adapterSlug;
+  const last = resourcePath.split('/').filter(Boolean).at(-1);
+  if (!last) return adapterSlug;
+  if (/^\{[^}]+\}\.json$/u.test(last)) {
+    return resourcePath.split('/').filter(Boolean).at(-2) ?? adapterSlug;
+  }
+  return last.replace(/\.(?:json|md)$/u, '');
 }
 
 function pathPatternSourceFor(adapterSlug, resourcePath) {
@@ -230,6 +235,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
     }
     if (/^\{[^}]+\}$/.test(segment)) {
       return '[^/]+';
+    }
+    if (segment.includes('{')) {
+      return escapeRegex(segment).replace(/\\\{[^}]+\\\}/g, '[^/]+');
     }
     return escapeRegex(segment);
   });

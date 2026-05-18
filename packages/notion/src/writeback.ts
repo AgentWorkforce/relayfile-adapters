@@ -99,7 +99,7 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   // Standalone pages: see resolveDeleteRequest for why classifyWrite returns
   // null for these paths and why the canonical-id gate substitutes for it.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (route === null && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if ((route === null || route?.kind === 'patch' || route?.kind === 'create') && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
@@ -143,12 +143,11 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
     return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
   }
 
-  // Standalone pages aren't declared in resources.ts (they share the parent
-  // `/notion/pages/...` namespace with markdown/comments resources), so
-  // `classifyWrite` returns null here. The canonical-id gate below replaces
-  // the route check used for database pages.
+  // Standalone pages may be classified when discovery resources are present.
+  // The canonical-id gate keeps aliases and create-like filenames out of the
+  // archive route.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (route === null && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if ((route === null || route?.kind === 'delete') && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
   }
 
@@ -183,6 +182,8 @@ function buildPagePropertiesWriteback(pageId: string, content: string): NotionWr
  * are not supported by this entrypoint.
  */
 function buildMarkdownWriteback(pageId: string, markdown: string): NotionWritebackRequest {
+  const parsed = safeParseJson(markdown);
+  const body = isRecord(parsed) && typeof parsed.markdown === 'string' ? parsed.markdown : markdown;
   return {
     action: 'update_page_markdown',
     method: 'PATCH',
@@ -191,7 +192,7 @@ function buildMarkdownWriteback(pageId: string, markdown: string): NotionWriteba
     body: {
       type: 'replace_content',
       replace_content: {
-        new_str: markdown,
+        new_str: body,
         allow_deleting_content: true,
       },
     },
