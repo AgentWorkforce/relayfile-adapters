@@ -2,7 +2,7 @@ import { GITHUB_API_BASE_URL } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
 import { ingestIssue } from './issues/issue-mapper.js';
 import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
-import { githubRepositoryMetadataPath, githubRepoPrefix } from './path-mapper.js';
+import { githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
 import { ingestPullRequest } from './pr/diff-writer.js';
 import type {
   GitHubAdapterConfig,
@@ -121,7 +121,7 @@ async function materializeRepoInternal(
     mergeIntoTracked(tracked, await writeJsonFile(vfs, ROOT_INDEX_PATH, { repos: nextRepos }));
   }
 
-  mergeIntoTracked(tracked, await writeJsonFile(vfs, githubRepositoryMetadataPath(owner, repo), repoMetadata));
+  mergeIntoTracked(tracked, await writeJsonFile(vfs, githubRepositoryMetaPath(owner, repo), repoMetadata));
 
   const issues = await fetchRepoIssues(provider, config, owner, repo);
   mergeIntoTracked(

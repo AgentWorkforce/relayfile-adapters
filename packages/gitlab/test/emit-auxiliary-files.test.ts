@@ -8,6 +8,7 @@ import {
 
 class MemoryClient {
   writes = new Map<string, string>();
+  deletes: string[] = [];
 
   async writeFile(input: { path: string; content: string }): Promise<void> {
     this.writes.set(input.path, input.content);
@@ -19,6 +20,7 @@ class MemoryClient {
   }
 
   async deleteFile(input: { path: string }): Promise<void> {
+    this.deletes.push(input.path);
     this.writes.delete(input.path);
   }
 }
@@ -160,15 +162,16 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.equal(byTitle.canonicalPath, '/gitlab/projects/acme/api/issues/7__new-title/meta.json');
   });
 
-  it('deletes legacy issue canonical paths recorded in the by-id alias', async () => {
+  it('ignores untrusted issue canonical paths recorded in the by-id alias', async () => {
     const client = new MemoryClient();
+    const foreignPath = '/github/repos/acme/api/issues/7__fix-bug/meta.json';
     client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
       id: '7',
-      canonicalPath: '/gitlab/projects/acme/api/issues/legacy/7.json',
+      canonicalPath: foreignPath,
       title: 'Fix bug',
       state: 'opened',
     }));
-    client.writes.set('/gitlab/projects/acme/api/issues/legacy/7.json', '{}');
+    client.writes.set(foreignPath, '{}');
 
     const result = await emitGitLabAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -184,7 +187,8 @@ describe('emitGitLabAuxiliaryFiles', () => {
     });
 
     assert.deepEqual(result.errors, []);
-    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/legacy/7.json'));
+    assert.ok(client.writes.has(foreignPath));
+    assert.ok(!client.deletes.includes(foreignPath));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/issues/7__fix-bug/meta.json'));
   });
 
@@ -321,15 +325,16 @@ describe('emitGitLabAuxiliaryFiles', () => {
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/failed/9.json'));
   });
 
-  it('deletes legacy pipeline canonical paths recorded in the by-id alias', async () => {
+  it('ignores untrusted pipeline canonical paths recorded in the by-id alias', async () => {
     const client = new MemoryClient();
+    const foreignPath = '/github/repos/acme/api/actions/runs/9.json';
     client.writes.set('/gitlab/projects/acme/api/pipelines/by-id/9.json', JSON.stringify({
       id: '9',
-      canonicalPath: '/gitlab/projects/acme/api/pipelines/legacy/9.json',
+      canonicalPath: foreignPath,
       ref: 'main',
       status: 'running',
     }));
-    client.writes.set('/gitlab/projects/acme/api/pipelines/legacy/9.json', '{}');
+    client.writes.set(foreignPath, '{}');
 
     const result = await emitGitLabAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -345,8 +350,55 @@ describe('emitGitLabAuxiliaryFiles', () => {
     });
 
     assert.deepEqual(result.errors, []);
-    assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/legacy/9.json'));
+    assert.ok(client.writes.has(foreignPath));
+    assert.ok(!client.deletes.includes(foreignPath));
     assert.ok(client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
+  });
+
+  it('ignores untrusted prior canonical paths while deleting issue, pipeline, and commit tombstones', async () => {
+    const client = new MemoryClient();
+    const foreignPath = '/github/repos/acme/api/pulls/1__fix/meta.json';
+    client.writes.set(foreignPath, '{}');
+    client.writes.set('/gitlab/projects/acme/api/issues/by-id/7.json', JSON.stringify({
+      id: '7',
+      canonicalPath: foreignPath,
+      title: 'Fix bug',
+      state: 'opened',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/issues/7__fix-bug/meta.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/issues/by-state/opened/7.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-id/9.json', JSON.stringify({
+      id: '9',
+      canonicalPath: foreignPath,
+      ref: 'main',
+      status: 'running',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/pipelines/9__main/meta.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/pipelines/by-status/running/9.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/commits/by-id/abc123.json', JSON.stringify({
+      id: 'abc123',
+      canonicalPath: foreignPath,
+      title: 'Old commit',
+    }));
+    client.writes.set('/gitlab/projects/acme/api/commits/abc123__old-commit/meta.json', '{}');
+    client.writes.set('/gitlab/projects/acme/api/commits/by-title/old-commit__abc123.json', '{}');
+
+    const result = await emitGitLabAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ projectPath: 'acme/api', iid: 7, _deleted: true }],
+      pipelines: [{ projectPath: 'acme/api', id: 9, _deleted: true }],
+      commits: [{ projectPath: 'acme/api', sha: 'abc123', _deleted: true }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.writes.has(foreignPath));
+    assert.ok(!client.deletes.includes(foreignPath));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/7__fix-bug/meta.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/issues/by-state/opened/7.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/9__main/meta.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/pipelines/by-status/running/9.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/commits/abc123__old-commit/meta.json'));
+    assert.ok(!client.writes.has('/gitlab/projects/acme/api/commits/by-title/old-commit__abc123.json'));
   });
 
   it('deletes GitLab tag canonical and by-ref alias paths on tombstones', async () => {

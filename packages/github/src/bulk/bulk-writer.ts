@@ -6,7 +6,7 @@ import {
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import {
   githubByIdAliasPath,
-  githubByTitleAliasPath,
+  githubNumberedByTitleAliasPath,
   githubPullRequestRoot,
 } from '../path-mapper.js';
 import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileContent } from './batch-fetcher.js';
@@ -876,11 +876,11 @@ async function writeBulkPullRequestAliases(
     return;
   }
 
-  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'pulls', title, number);
+  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
   const aliasPath = await resolveAliasPath(
     vfs,
     baseAliasPath,
-    githubByTitleAliasPath(owner, repo, 'pulls', title, number, true),
+    githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number, true),
     content,
   );
   // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.

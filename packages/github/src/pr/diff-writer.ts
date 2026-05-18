@@ -2,7 +2,7 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
-import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
+import { githubByIdAliasPath, githubNumberedByTitleAliasPath } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
 import {
   buildRepoIssuesIndexFile,
@@ -427,15 +427,9 @@ async function writePullRequestAliases(
     return;
   }
 
-  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'pulls', title, number);
-  const aliasPath = await resolveAliasPath(
-    vfs,
-    baseAliasPath,
-    githubByTitleAliasPath(owner, repo, 'pulls', title, number, true),
-    content,
-  );
+  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
   // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.
-  await runVfsWrite(vfs, aliasPath, content);
+  await runVfsWrite(vfs, baseAliasPath, content);
 }
 
 async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
@@ -474,21 +468,6 @@ function parseGitHubIndexRows(existingContent: string | undefined): GitHubIndexR
   } catch {
     return [];
   }
-}
-
-async function resolveAliasPath(
-  vfs: VfsLike,
-  baseAliasPath: string,
-  collisionAliasPath: string,
-  content: string,
-): Promise<string> {
-  const exists = await pathExists(vfs, baseAliasPath);
-  if (!exists) {
-    return baseAliasPath;
-  }
-
-  const existing = await readVfsContent(vfs, baseAliasPath);
-  return existing === undefined || existing !== content ? collisionAliasPath : baseAliasPath;
 }
 
 async function readVfsContent(vfs: VfsLike, path: string): Promise<string | undefined> {

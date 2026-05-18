@@ -32,6 +32,7 @@ const GROUPS = {
   email: ['mailgun', 'sendgrid'],
   commerce: ['shopify', 'stripe'],
   db: ['postgres', 'redis'],
+  social: ['x'],
 };
 
 function listPublishablePackages() {
@@ -215,6 +216,7 @@ async function main() {
   }
 
   let list = sortByInternalDependencies([...out]);
+  const resolvedCount = list.length;
   if (
     includesMissingToken
     || process.env.INPUT_VERSION === 'none'
@@ -224,6 +226,11 @@ async function main() {
   }
 
   if (list.length === 0) {
+    if (resolvedCount > 0) {
+      console.error('nothing to publish');
+      process.stdout.write('packages=\n');
+      process.exit(0);
+    }
     console.error('error: no unpublished packages resolved');
     process.exit(1);
   }

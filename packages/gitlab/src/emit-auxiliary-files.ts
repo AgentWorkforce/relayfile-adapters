@@ -33,6 +33,7 @@ import {
   gitLabProjectResourceIndexPath,
   gitLabProjectsIndexPath,
   normalizeGitLabTagRef,
+  parseGitLabPath,
   type GitLabIndexedResourceType,
 } from './path-mapper.js';
 
@@ -213,7 +214,7 @@ async function planTitledDirectoryRecord(
   const id = String(objectId);
   const byIdPath = gitLabByIdAliasPath(projectPath, objectType, id);
   const prior = await priorReader.read<PriorTitledDirectoryRecord>(byIdPath, (parsed) => ({
-    canonicalPath: readNonEmptyString(parsed.canonicalPath),
+    canonicalPath: trustedPriorCanonicalPath(readNonEmptyString(parsed.canonicalPath), projectPath, objectType, id),
     title: readNonEmptyString(parsed.title),
     state: readNonEmptyString(parsed.state),
     assigneeKeys: readStringArray(parsed.assigneeKeys),
@@ -380,7 +381,7 @@ async function planPipelineRecord(
   const prior = await priorReader.read<PriorPipelineRecord>(byIdPath, (parsed) => ({
     ref: readNonEmptyString(parsed.ref),
     status: readNonEmptyString(parsed.status),
-    canonicalPath: readNonEmptyString(parsed.canonicalPath),
+    canonicalPath: trustedPriorCanonicalPath(readNonEmptyString(parsed.canonicalPath), projectPath, 'pipelines', id),
   }));
   const isDelete = record._deleted === true;
   const recordRef = readNonEmptyString(record.ref);
@@ -464,7 +465,7 @@ async function planCommitRecord(
   const byIdPath = gitLabByIdAliasPath(projectPath, 'commits', id);
   const prior = await priorReader.read<{ title?: string; canonicalPath?: string }>(byIdPath, (parsed) => ({
     title: readNonEmptyString(parsed.title),
-    canonicalPath: readNonEmptyString(parsed.canonicalPath),
+    canonicalPath: trustedPriorCanonicalPath(readNonEmptyString(parsed.canonicalPath), projectPath, 'commits', id),
   }));
   if (record._deleted === true) {
     const paths = new Set(commitPathsFor({ projectPath, id, title: prior?.title ?? title }));
@@ -726,6 +727,25 @@ function readNonEmptyString(value: unknown): string | undefined {
     return Number.isFinite(value) ? String(value) : undefined;
   }
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function trustedPriorCanonicalPath(
+  canonicalPath: string | undefined,
+  projectPath: string,
+  objectType: GitLabIndexedResourceType,
+  objectId: string,
+): string | undefined {
+  if (!canonicalPath) return undefined;
+  const parsed = parseGitLabPath(canonicalPath);
+  if (
+    parsed?.projectPath === projectPath
+    && parsed.objectType === objectType
+    && parsed.objectId === objectId
+    && parsed.subResource === 'meta.json'
+  ) {
+    return canonicalPath;
+  }
+  return undefined;
 }
 
 function readStringArray(value: unknown): string[] | undefined {

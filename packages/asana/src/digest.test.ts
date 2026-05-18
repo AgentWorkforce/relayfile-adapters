@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { digest, type DigestContext } from './digest.js';
+import { asanaProjectPath, asanaTaskPath } from './path-mapper.js';
 
 test('digest returns deterministic Asana bullets sorted by event time and id', async () => {
   const ctx: DigestContext = {
@@ -14,13 +15,13 @@ test('digest returns deterministic Asana bullets sorted by event time and id', a
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'completed',
-          canonicalPath: '/asana/tasks/fix-login__12345.json',
+          canonicalPath: asanaTaskPath('12345', 'Fix login'),
         },
         {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'added',
-          canonicalPath: 'asana/tasks/setup-ci__67890.json',
+          canonicalPath: asanaTaskPath('67890', 'Setup CI').slice(1),
         },
       ];
     },
@@ -34,12 +35,12 @@ test('digest returns deterministic Asana bullets sorted by event time and id', a
     provider: 'asana',
     bullets: [
       {
-        text: 'task setup-ci was created',
-        canonicalPath: 'asana/tasks/setup-ci__67890.json',
+        text: 'task 67890 was created',
+        canonicalPath: 'asana/tasks/67890.json',
       },
       {
-        text: 'task fix-login was completed',
-        canonicalPath: 'asana/tasks/fix-login__12345.json',
+        text: 'task 12345 was completed',
+        canonicalPath: 'asana/tasks/12345.json',
       },
     ],
   });
@@ -55,13 +56,13 @@ test('digest classifies terminal states distinctly', async () => {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'deleted',
-          canonicalPath: '/asana/projects/old-project__111.json',
+          canonicalPath: asanaProjectPath('111', 'Old project'),
         },
         {
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'done',
-          canonicalPath: '/asana/tasks/ship-feature__222.json',
+          canonicalPath: asanaTaskPath('222', 'Ship feature'),
         },
       ];
     },
@@ -71,8 +72,8 @@ test('digest classifies terminal states distinctly', async () => {
   assert.deepEqual(result, {
     provider: 'asana',
     bullets: [
-      { text: 'project old-project was deleted', canonicalPath: 'asana/projects/old-project__111.json' },
-      { text: 'task ship-feature was completed', canonicalPath: 'asana/tasks/ship-feature__222.json' },
+      { text: 'project 111 was deleted', canonicalPath: 'asana/projects/111.json' },
+      { text: 'task 222 was completed', canonicalPath: 'asana/tasks/222.json' },
     ],
   });
 });
@@ -87,7 +88,7 @@ test('digest renders non-terminal changes as updated', async () => {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'changed',
-          canonicalPath: '/asana/tasks/rename-title__333.json',
+          canonicalPath: asanaTaskPath('333', 'Rename title'),
         },
       ];
     },
@@ -96,7 +97,7 @@ test('digest renders non-terminal changes as updated', async () => {
   assert.deepEqual(await digest(ctx), {
     provider: 'asana',
     bullets: [
-      { text: 'task rename-title was updated', canonicalPath: 'asana/tasks/rename-title__333.json' },
+      { text: 'task 333 was updated', canonicalPath: 'asana/tasks/333.json' },
     ],
   });
 });
@@ -111,7 +112,7 @@ test('digest ignores alias, index, and layout writes', async () => {
           id: 'evt-canonical',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'changed',
-          path: '/asana/tasks/rename-title__333.json',
+          path: asanaTaskPath('333', 'Rename title'),
         },
         {
           id: 'evt-by-id',
@@ -144,12 +145,12 @@ test('digest ignores alias, index, and layout writes', async () => {
   assert.deepEqual(await digest(ctx), {
     provider: 'asana',
     bullets: [
-      { text: 'task rename-title was updated', canonicalPath: 'asana/tasks/rename-title__333.json' },
+      { text: 'task 333 was updated', canonicalPath: 'asana/tasks/333.json' },
     ],
   });
 });
 
-test('digest keeps canonical filenames whose slug starts with by-', async () => {
+test('digest keeps canonical filenames whose id starts with by-', async () => {
   const ctx: DigestContext = {
     provider: 'asana',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
@@ -159,7 +160,7 @@ test('digest keeps canonical filenames whose slug starts with by-', async () => 
           id: 'evt-canonical-by-slug',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'changed',
-          path: '/asana/tasks/by-design__333.json',
+          path: asanaTaskPath('by-design', 'Ignored title'),
         },
       ];
     },
@@ -168,7 +169,7 @@ test('digest keeps canonical filenames whose slug starts with by-', async () => 
   assert.deepEqual(await digest(ctx), {
     provider: 'asana',
     bullets: [
-      { text: 'task by-design was updated', canonicalPath: 'asana/tasks/by-design__333.json' },
+      { text: 'task by-design was updated', canonicalPath: 'asana/tasks/by-design.json' },
     ],
   });
 });

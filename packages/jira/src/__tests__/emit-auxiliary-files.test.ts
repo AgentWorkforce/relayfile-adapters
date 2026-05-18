@@ -316,6 +316,21 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(jiraIssueByStatePath('In Progress', '10001')));
   });
 
+  it('emits by-title aliases for issues, projects, and sprints in one batch', async () => {
+    const client = createClient();
+    await emitJiraAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [makeIssue({ id: '10001', key: 'KAN-42', summary: 'Release Plan' })],
+      projects: [{ id: '99', key: 'KAN', name: 'Kanban Project' }],
+      sprints: [{ id: 7, name: 'Sprint 7', state: 'active' }],
+    });
+
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(jiraIssueByTitleAliasPath('Release Plan', '10001')));
+    assert.ok(writtenPaths.includes(jiraProjectByTitleAliasPath('Kanban Project', '99')));
+    assert.ok(writtenPaths.includes(jiraSprintByTitleAliasPath('Sprint 7', '7')));
+  });
+
   it('writes canonical + by-id + index row for a project record', async () => {
     const client = createClient();
     await emitJiraAuxiliaryFiles(client, {

@@ -9,7 +9,7 @@ import {
 import {
   githubIssuePath,
   githubPullRequestPath,
-  githubRepositoryMetadataPath,
+  githubRepositoryMetaPath,
 } from '../path-mapper.js';
 
 describe('github index emission', () => {
@@ -101,7 +101,7 @@ describe('github index emission', () => {
       },
     ]);
 
-    assert.equal(githubRepositoryMetadataPath('octocat', 'hello-world'), '/github/repos/octocat/hello-world/metadata.json');
+    assert.equal(githubRepositoryMetaPath('octocat', 'hello-world'), '/github/repos/octocat/hello-world/meta.json');
     assert.equal(githubIssuePath('octocat', 'hello-world', 7), '/github/repos/octocat/hello-world/issues/7/meta.json');
     assert.equal(githubPullRequestPath('octocat', 'hello-world', 9), '/github/repos/octocat/hello-world/pulls/9/meta.json');
   });

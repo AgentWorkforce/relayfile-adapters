@@ -76,6 +76,29 @@ describe('JiraAdapter', () => {
     assert.deepEqual(client.writes[0]?.semantics?.relations, [jiraProjectPath('ENG', 'Engineering')]);
   });
 
+  it('preserves normalized terminal issue lifecycle events during ingestion', async () => {
+    const client = createClient();
+    const adapter = createAdapter(client);
+
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'jira',
+      eventType: 'issue.completed',
+      objectType: 'issue',
+      objectId: '10001',
+      payload: {
+        id: '10001',
+        key: 'ENG-42',
+        fields: {
+          summary: 'Fix login redirect',
+          status: { id: '6', name: 'Canceled', statusCategory: { key: 'done', name: 'Done' } },
+        },
+      },
+    });
+
+    const content = JSON.parse(client.writes[0]?.content ?? '{}') as { eventType?: string };
+    assert.equal(content.eventType, 'issue.completed');
+  });
+
   it('ingests project webhooks', async () => {
     const client = createClient();
     const adapter = createAdapter(client);

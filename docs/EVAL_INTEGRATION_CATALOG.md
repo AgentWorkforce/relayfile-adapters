@@ -75,6 +75,12 @@ These integrations should anchor the large eval effort because they cover the ma
 | GitHub | `@relayfile/adapter-github` | `packages/github` | P0 | Pull requests, issues, reviews, commits, checks. |
 | GitLab | `@relayfile/adapter-gitlab` | `packages/gitlab` | P1 | Merge requests, issues, pipelines, jobs, commits. |
 
+### Social & Search
+
+| Integration | Package | Directory | Eval priority | Coordination surface |
+|---|---|---|---|---|
+| X | `@relayfile/adapter-x` | `packages/x` | P1 | Budgeted recent/archive social search, posts, optional user hydration. |
+
 ### CRM & Sales
 
 | Integration | Package | Directory | Eval priority | Coordination surface |
@@ -213,6 +219,7 @@ These are not implemented packages in this repo today, but they should be part o
 | Real-time storage bridge | Google Drive, SharePoint, OneDrive, GCS, S3, Dropbox |
 | Data and runtime state | Postgres, Redis, Airtable, Segment, Mixpanel |
 | Commerce and payments | Shopify, Stripe |
+| Social and search | X |
 | Long-tail provider breadth | Mailgun, SendGrid, Calendly, Box, Azure Blob |
 | Gap validation | Confluence, Google Docs, Freshdesk, ServiceNow, PagerDuty, Monday.com, Discord, Outlook, Figma |
 
@@ -233,6 +240,7 @@ The current publish resolver uses these group aliases. Keep this list aligned wi
 | `email` | `mailgun`, `sendgrid` |
 | `commerce` | `shopify`, `stripe` |
 | `db` | `postgres`, `redis` |
+| `social` | `x` |
 
 ## Sources
 
