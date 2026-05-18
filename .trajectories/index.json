@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-15T13:10:33.804Z",
+  "lastUpdated": "2026-05-17T20:48:00.449Z",
   "trajectories": {
     "traj_q7vhb9378uqk": {
       "title": "Wire Jira privacy-safe adapter storage",
@@ -411,6 +411,41 @@
       "startedAt": "2026-05-15T13:05:27.270Z",
       "completedAt": "2026-05-15T13:10:33.685Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_a1zqsgk4yiah.json"
+    },
+    "traj_o2n3hqf8xhru": {
+      "title": "Review adapter digest lifecycle coverage",
+      "status": "completed",
+      "startedAt": "2026-05-15T15:17:50.065Z",
+      "completedAt": "2026-05-17T19:18:13.269Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_o2n3hqf8xhru.json"
+    },
+    "traj_cik0jtcmd67m": {
+      "title": "Fresh-eyes review relayfile-adapters GitLab Jira digest reconciliation",
+      "status": "completed",
+      "startedAt": "2026-05-15T14:34:39.308Z",
+      "completedAt": "2026-05-15T14:37:42.762Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_cik0jtcmd67m.json"
+    },
+    "traj_pvgpmzs86rh9": {
+      "title": "Fresh-eyes review relayfile-adapters lifecycle and digest work",
+      "status": "completed",
+      "startedAt": "2026-05-15T14:54:12.881Z",
+      "completedAt": "2026-05-15T14:57:38.753Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_pvgpmzs86rh9.json"
+    },
+    "traj_wxhac1kyfu4u": {
+      "title": "Build X social search adapter integration",
+      "status": "completed",
+      "startedAt": "2026-05-17T19:56:29.253Z",
+      "completedAt": "2026-05-17T20:09:47.737Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_wxhac1kyfu4u.json"
+    },
+    "traj_l8qmm63qxvc8": {
+      "title": "Open X adapter PR and integrate Cloud via worktree",
+      "status": "completed",
+      "startedAt": "2026-05-17T20:17:36.976Z",
+      "completedAt": "2026-05-17T20:48:00.332Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_l8qmm63qxvc8.json"
     }
   }
 }
