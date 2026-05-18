@@ -1,26 +1,40 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab merge request discussion",
+  "title": "Notion database page comment",
   "type": "object",
-  "required": [
-    "body"
+  "required": [],
+  "anyOf": [
+    {
+      "required": [
+        "text"
+      ]
+    },
+    {
+      "required": [
+        "richText"
+      ]
+    }
   ],
   "properties": {
-    "body": {
+    "text": {
       "type": "string",
-      "description": "Markdown note body.",
+      "description": "Plain text comment body. A raw string body is also accepted by the resolver.",
       "minLength": 1,
       "pattern": ".*\\S.*"
     },
-    "position": {
-      "type": "object",
-      "description": "Optional GitLab position object for diff discussions.",
-      "additionalProperties": true
-    },
-    "created_at": {
+    "discussionId": {
       "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+      "description": "Optional Notion discussion id to append to."
+    },
+    "richText": {
+      "type": "array",
+      "description": "Optional rich_text array.",
+      "items": {
+        "type": "object",
+        "description": "Notion rich_text object.",
+        "additionalProperties": true
+      },
+      "minItems": 1
     },
     "id": {
       "type": "string",

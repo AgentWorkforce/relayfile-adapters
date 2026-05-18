@@ -149,9 +149,20 @@ property update payload to \`properties.json\` beside a page directory, such
 as \`/notion/pages/<slug>__<id>/properties.json\` or
 \`/notion/databases/<db>/pages/<slug>__<id>/properties.json\`.
 
-Writable database page resources advertise sibling discovery files at
-\`discovery/notion/databases/{databaseId}/pages/.schema.json\` and
-\`discovery/notion/databases/{databaseId}/pages/.create.example.json\`.
+Writable database page resources advertise sibling discovery files under:
+- \`discovery/notion/databases/{databaseId}/pages/.schema.json\`
+- \`discovery/notion/databases/{databaseId}/pages/{pageId}.json/.schema.json\`
+- \`discovery/notion/databases/{databaseId}/pages/{pageId}/properties.json/.schema.json\`
+- \`discovery/notion/databases/{databaseId}/pages/{pageId}/content.md/.schema.json\`
+- \`discovery/notion/databases/{databaseId}/pages/{pageId}/comments.json/.schema.json\`
+
+Standalone page resources advertise matching discovery files under:
+- \`discovery/notion/pages/{pageId}.json/.schema.json\`
+- \`discovery/notion/pages/{pageId}/properties.json/.schema.json\`
+- \`discovery/notion/pages/{pageId}/content.md/.schema.json\`
+- \`discovery/notion/pages/{pageId}/comments.json/.schema.json\`
+
+Every schema has a sibling \`.create.example.json\` file.
 
 ## Common commands
 

@@ -15,7 +15,10 @@ describe('notion layout prompt', () => {
     assert.match(file.content, /_index\.json/u);
     assert.match(file.content, /by-edited\/YYYY-MM-DD/u);
     assert.match(file.content, /discovery\/notion\/databases\/\{databaseId\}\/pages\/\.schema\.json/u);
-    assert.match(file.content, /discovery\/notion\/databases\/\{databaseId\}\/pages\/\.create\.example\.json/u);
+    assert.match(file.content, /discovery\/notion\/databases\/\{databaseId\}\/pages\/\{pageId\}\/content\.md\/\.schema\.json/u);
+    assert.match(file.content, /discovery\/notion\/pages\/\{pageId\}\/comments\.json\/\.schema\.json/u);
+    assert.match(file.content, /Every schema has a sibling `\.create\.example\.json` file\./u);
     assert.match(file.content, /ls \/notion\/pages\/by-edited\/2026-05-12/u);
+    assert.ok(file.content.trim().length > 0);
   });
 });

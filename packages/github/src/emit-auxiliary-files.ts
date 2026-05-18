@@ -1090,12 +1090,18 @@ function readUpdatedAt(record: Record<string, unknown>): string {
 }
 
 function readLifecycleEditedAt(record: Record<string, unknown>): string | undefined {
-  return (
-    readNonEmptyString(record.merged_at) ??
-    readNonEmptyString(record.closed_at) ??
-    readNonEmptyString(record.updated_at) ??
-    readNonEmptyString(record.updatedAt)
-  );
+  const candidates = [
+    readNonEmptyString(record.merged_at),
+    readNonEmptyString(record.closed_at),
+    readNonEmptyString(record.updated_at),
+    readNonEmptyString(record.updatedAt),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => ({ value, timestamp: Date.parse(value) }))
+    .filter((entry) => Number.isFinite(entry.timestamp))
+    .sort((left, right) => right.timestamp - left.timestamp);
+
+  return candidates[0]?.value;
 }
 
 function editedDateSegment(value: string | undefined): string | undefined {

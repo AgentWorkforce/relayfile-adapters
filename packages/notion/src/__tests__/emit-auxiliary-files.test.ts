@@ -127,7 +127,7 @@ describe('emitNotionAuxiliaryFiles', () => {
     );
   });
 
-  it('writes canonical + by-id + by-title + by-database for a database-rooted page', async () => {
+  it('writes canonical + by-id + by-title + by-database + by-edited for a database-rooted page', async () => {
     const client = createClient();
     const page = {
       id: PAGE_A,
@@ -165,6 +165,15 @@ describe('emitNotionAuxiliaryFiles', () => {
     assert.equal(rows[0]!.title, 'Release Plan');
     assert.equal(rows[0]!.parent_type, 'database');
     assert.equal(rows[0]!.parent_id, DATABASE_A);
+
+    const canonicalBytes = client.files.get(notionDatabasePagePath(DATABASE_A, PAGE_A));
+    assert.equal(client.files.get(notionByIdAliasPath(PAGES_SCOPE, PAGE_A)), canonicalBytes);
+    assert.equal(client.files.get(notionByEditedAliasPath(PAGES_SCOPE, '2026-05-12', PAGE_A)), canonicalBytes);
+    assert.equal(client.files.get(notionByTitleAliasPath(PAGES_SCOPE, 'Release Plan', PAGE_A)), canonicalBytes);
+    assert.equal(
+      client.files.get(notionPageByDatabaseAliasPath(DATABASE_A, PAGE_A, 'Tasks', 'Release Plan')),
+      canonicalBytes,
+    );
   });
 
   it('writes by-parent alias for a page whose parent is another page', async () => {

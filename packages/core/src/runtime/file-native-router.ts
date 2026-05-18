@@ -152,34 +152,37 @@ export function classifyWrite(
 ): FileNativeWritebackRoute | null {
   const event = opts.fsEvent ?? "write";
   const normalizedPath = normalizeWritebackPath(path);
-  const resource = findMatchingResource(normalizedPath, resources);
-  if (!resource) {
-    return null;
-  }
+  for (const resource of matchingResources(normalizedPath, resources)) {
+    const id = readWritebackId(normalizedPath, resource);
+    if (!id || isReservedWritebackFilename(id)) {
+      continue;
+    }
 
-  const id = readWritebackId(normalizedPath);
-  if (!id || isReservedWritebackFilename(id)) {
-    return null;
-  }
+    const canonical = testResourceId(resource.idPattern, id);
+    if (event === "delete") {
+      if (!canonical) {
+        continue;
+      }
+      return {
+        kind: "delete",
+        resource,
+        id,
+        canonical,
+      };
+    }
 
-  const canonical = testResourceId(resource.idPattern, id);
-  if (event === "delete") {
-    return canonical
-      ? {
-          kind: "delete",
-          resource,
-          id,
-          canonical,
-        }
-      : null;
-  }
+    if (!canonical && resourceUsesExactFile(resource)) {
+      continue;
+    }
 
-  return {
-    kind: canonical ? "patch" : "create",
-    resource,
-    id,
-    canonical,
-  };
+    return {
+      kind: canonical ? "patch" : "create",
+      resource,
+      id,
+      canonical,
+    };
+  }
+  return null;
 }
 
 export function validatePayload(
@@ -265,7 +268,7 @@ export async function executeFileNativeWriteback(
       request = await options.resolveDeleteRequest(options.path);
     } else {
       const content = options.content ?? "";
-      const payload = parseWritebackJsonObject(content);
+      const payload = parseWritebackPayload(content, route.resource);
       const schema = await loadWritebackSchema(route.resource, options);
       const validation = validatePayload(payload, schema, route.kind);
       if (!validation.ok) {
@@ -384,6 +387,27 @@ function validateFieldValue(
       }
     });
   }
+}
+
+function parseWritebackPayload(
+  content: string,
+  resource: AdapterResourceConfig
+): Record<string, unknown> {
+  if (resource.path.endsWith(".md")) {
+    const parsed = safeParseWritebackJsonObject(content);
+    return parsed ?? { markdown: content };
+  }
+  return parseWritebackJsonObject(content);
+}
+
+function safeParseWritebackJsonObject(content: string): Record<string, unknown> | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return undefined;
+  }
+  return isRecord(parsed) ? parsed : undefined;
 }
 
 function parseWritebackJsonObject(content: string): Record<string, unknown> {
@@ -591,9 +615,16 @@ function findMatchingResource(
   path: string,
   resources: readonly AdapterResourceConfig[]
 ): AdapterResourceConfig | undefined {
+  return matchingResources(path, resources)[0];
+}
+
+function matchingResources(
+  path: string,
+  resources: readonly AdapterResourceConfig[]
+): AdapterResourceConfig[] {
   return [...resources]
     .sort((left, right) => right.path.length - left.path.length)
-    .find((resource) => {
+    .filter((resource) => {
       resource.pathPattern.lastIndex = 0;
       const matched = resource.pathPattern.test(path);
       resource.pathPattern.lastIndex = 0;
@@ -606,7 +637,16 @@ function normalizeWritebackPath(path: string): string {
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }
 
-function readWritebackId(path: string): string | undefined {
+function readWritebackId(
+  path: string,
+  resource?: AdapterResourceConfig
+): string | undefined {
+  if (resource && resourceUsesExactFile(resource)) {
+    const id = readExactFileResourceId(path, resource);
+    if (id) {
+      return id;
+    }
+  }
   const segment = path.split("/").filter(Boolean).at(-1);
   if (!segment || !segment.endsWith(".json")) {
     return undefined;
@@ -616,6 +656,38 @@ function readWritebackId(path: string): string | undefined {
     return undefined;
   }
   return decodeURIComponent(stem);
+}
+
+function resourceUsesExactFile(resource: AdapterResourceConfig): boolean {
+  return /\.(?:json|md)$/u.test(resource.path);
+}
+
+function readExactFileResourceId(
+  path: string,
+  resource: AdapterResourceConfig
+): string | undefined {
+  const pathSegments = path.split("/").filter(Boolean);
+  const resourceSegments = resource.path.split("/").filter(Boolean);
+  if (pathSegments.length !== resourceSegments.length) {
+    return undefined;
+  }
+
+  for (let index = resourceSegments.length - 1; index >= 0; index -= 1) {
+    const resourceSegment = resourceSegments[index];
+    const pathSegment = pathSegments[index];
+    const placeholder = /\{[^}]+\}/u.exec(resourceSegment);
+    if (!placeholder || !pathSegment) {
+      continue;
+    }
+    if (resourceSegment.endsWith(".json") && pathSegment.endsWith(".json")) {
+      return decodeURIComponent(pathSegment.slice(0, -5));
+    }
+    if (resourceSegment.endsWith(".md") && pathSegment.endsWith(".md")) {
+      return decodeURIComponent(pathSegment.slice(0, -3));
+    }
+    return decodeURIComponent(pathSegment);
+  }
+  return undefined;
 }
 
 function isReservedWritebackFilename(stem: string): boolean {
