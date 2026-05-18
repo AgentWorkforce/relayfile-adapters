@@ -715,8 +715,12 @@ function numberedPathsFor(args: {
   if (title && slugifies(title)) {
     paths.push(githubNumberedByTitleAliasPath(owner, repo, aliasKind, title, number));
     if (options.includeLegacyTitleAlias) {
-      paths.push(githubByTitleAliasPath(owner, repo, aliasKind, title, number));
-      paths.push(githubLegacyByTitleAliasPath(owner, repo, aliasKind, title, number));
+      const titleAliasPath = githubByTitleAliasPath(owner, repo, aliasKind, title, number);
+      const legacyTitleAliasPath = githubLegacyByTitleAliasPath(owner, repo, aliasKind, title, number);
+      paths.push(titleAliasPath);
+      if (legacyTitleAliasPath !== titleAliasPath) {
+        paths.push(legacyTitleAliasPath);
+      }
     }
   }
   if (state && slugifies(state)) {

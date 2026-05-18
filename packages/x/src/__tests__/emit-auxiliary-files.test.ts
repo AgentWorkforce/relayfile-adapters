@@ -531,6 +531,10 @@ test('emitXAuxiliaryFiles removes stale search result pointers for the same sear
     [xSearchResultsIndexPath(run.id, run.title)]: JSON.stringify([currentResult, staleResult]),
     [xSearchResultPath(run.id, run.title, post.id)]: JSON.stringify(currentResult),
     [xSearchResultPath(run.id, run.title, staleResult.postId)]: JSON.stringify(staleResult),
+    [xPostByQueryAliasPath(run.id, staleResult.postId)]: JSON.stringify({
+      canonicalPath: xPostPath(staleResult.postId, 'Stale post'),
+      searchIds: [run.id],
+    }),
   });
 
   await emitXAuxiliaryFiles(client, {
@@ -543,7 +547,9 @@ test('emitXAuxiliaryFiles removes stale search result pointers for the same sear
 
   const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
   assert.ok(deletedPaths.includes(xSearchResultPath(run.id, run.title, staleResult.postId)));
+  assert.ok(deletedPaths.includes(xPostByQueryAliasPath(run.id, staleResult.postId)));
   assert.equal(client.files.has(xSearchResultPath(run.id, run.title, staleResult.postId)), false);
+  assert.equal(client.files.has(xPostByQueryAliasPath(run.id, staleResult.postId)), false);
 
   const rewrittenIndex = JSON.parse(client.files.get(xSearchResultsIndexPath(run.id, run.title))!) as XSearchResult[];
   assert.deepEqual(rewrittenIndex.map((result) => result.postId), [post.id]);

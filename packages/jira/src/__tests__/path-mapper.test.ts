@@ -182,6 +182,14 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
         assert.equal(extractJiraIdFromPathSegment(leaf), id);
       }
     });
+
+    it('uses the shared slug helper for titled canonical paths while preserving id fallback', () => {
+      assert.equal(
+        jiraIssuePath('10001', 'Café login redirect'),
+        `${JIRA_PATH_ROOT}/issues/cafe-login-redirect__10001.json`,
+      );
+      assert.equal(jiraIssuePath('10001', '{}'), `${JIRA_PATH_ROOT}/issues/10001.json`);
+    });
   });
 
   describe('jiraSprintByIdAliasPath', () => {

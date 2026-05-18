@@ -206,4 +206,19 @@ describe('github aliases', () => {
     assert.strictEqual(vfs.readFile(byIdPath), vfs.readFile(canonicalPath));
     assert.ok(byIdPath.includes('/github/repos/octocat__hello-world/pulls/by-id/42.json'));
   });
+
+  it('overwrites the base numbered pull-request by-title alias on re-ingest', async () => {
+    const { files, vfs } = createMemoryVfs();
+    const title = 'Add fixture-backed GitHub adapter coverage';
+    const baseTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'pulls', title, 42);
+    const collisionTitlePath = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'pulls', title, 42, true);
+    files.set(baseTitlePath, '{"stale":true}\n');
+
+    await ingestPullRequest(createPullRequestProvider(), 'octocat', 'hello-world', 42, vfs as never);
+
+    const canonicalPath =
+      '/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json';
+    assert.strictEqual(vfs.readFile(baseTitlePath), vfs.readFile(canonicalPath));
+    assert.equal(files.has(collisionTitlePath), false);
+  });
 });

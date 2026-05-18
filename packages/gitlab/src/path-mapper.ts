@@ -152,6 +152,22 @@ function isComposedFlatRecordFilename(value: string): boolean {
   }
 }
 
+function shouldDecodeComposedFlatRecordFilename(value: string): boolean {
+  if (isComposedFlatRecordFilename(value)) {
+    return true;
+  }
+  const separatorIndex = value.indexOf('__');
+  if (separatorIndex <= 0) {
+    return false;
+  }
+  const encodedId = value.slice(separatorIndex + 2);
+  try {
+    return /^\d+$/u.test(decodeURIComponent(encodedId));
+  } catch {
+    return false;
+  }
+}
+
 export function gitLabByIdAliasPath(
   projectPath: string,
   objectType: GitLabIndexedResourceType,
@@ -575,7 +591,7 @@ function decodeDirectoryObjectId(segment: string): string {
 
 function decodeFlatObjectId(segment: string): string {
   const basename = segment.replace(/\.json$/, '');
-  const separatorIndex = basename.indexOf('__');
+  const separatorIndex = shouldDecodeComposedFlatRecordFilename(basename) ? basename.indexOf('__') : -1;
   const id = separatorIndex > 0 ? basename.slice(separatorIndex + 2) : basename;
   return decodeURIComponent(id);
 }

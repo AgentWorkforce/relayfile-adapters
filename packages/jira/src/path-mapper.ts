@@ -38,19 +38,16 @@ export function encodeJiraPathSegment(value: string): string {
   return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
 }
 
-function slugify(value: string): string {
-  return value
-    .replace(/[{}]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase();
-}
-
 function titleSegmentWithId(title: string | undefined, id: string): string {
-  const slug = title ? slugify(title) : '';
+  const slug = title ? titledPathSlug(title) : '';
   // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42") while still
   // encoding opaque provider IDs before they become a filesystem segment.
   return slug ? `${slug}__${encodeJiraPathSegment(id)}` : encodeJiraPathSegment(id);
+}
+
+function titledPathSlug(title: string): string {
+  const slug = slugifyAlias(title.replace(/[{}]/gu, ''));
+  return slug === 'untitled' ? '' : slug;
 }
 
 export function normalizeJiraObjectType(objectType: string): JiraPathObjectType {

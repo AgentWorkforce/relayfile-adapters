@@ -152,7 +152,7 @@ describe('path mapper', () => {
       path: composedPath,
       projectPath: 'acme/api',
       objectType: 'deployments',
-      objectId: 'abc123',
+      objectId: 'ship-fix__abc123',
       subResource: undefined,
       subResourceId: undefined,
     });
@@ -163,6 +163,19 @@ describe('path mapper', () => {
       projectPath: 'acme/api',
       objectType: 'deployments',
       objectId: '12345',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+  });
+
+  it('preserves flat provider ids that contain the canonical joiner', () => {
+    const path = computeMetadataPath('acme/api', 'tags', 'release__candidate');
+    assert.strictEqual(path, '/gitlab/projects/acme/api/tags/release__candidate.json');
+    assert.deepStrictEqual(parseGitLabPath(path), {
+      path,
+      projectPath: 'acme/api',
+      objectType: 'tags',
+      objectId: 'release__candidate',
       subResource: undefined,
       subResourceId: undefined,
     });

@@ -604,7 +604,10 @@ async function staleCurrentSearchResultDeletes(
   if (!priorResults) return [];
   const staleResults = priorResults.filter((result) => !currentPostIds.has(result.postId));
   resultIndex.remove(...staleResults.map((result) => result.id));
-  return staleDeletes(staleResults.map((result) => xSearchResultPath(searchId, titleOrQuery, result.postId)));
+  return staleDeletes([
+    ...staleResults.map((result) => xSearchResultPath(searchId, titleOrQuery, result.postId)),
+    ...staleResults.map((result) => xPostByQueryAliasPath(searchId, result.postId)),
+  ]);
 }
 
 async function readPriorSearchResultsIndex(
