@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 import type { NormalizedWebhook } from './salesforce-adapter.js';
 import { normalizeSalesforceObjectType } from './path-mapper.js';
@@ -214,7 +214,7 @@ export function extractSalesforceConnectionMetadata(
 
   const secretDigest = readOptionalString(normalizedHeaders[SALESFORCE_WEBHOOK_SECRET_HEADER]);
   if (secretDigest) {
-    result.secretDigest = secretDigest;
+    result.secretDigest = digestSalesforceWebhookSecret(secretDigest);
   }
 
   return result;
@@ -329,16 +329,13 @@ export function validateSalesforceWebhookSecret(
     return {
       ok: false,
       reason: 'invalid-secret',
-      receivedSignature: receivedSecret,
     };
   }
 
   const ok = timingSafeEqual(expectedBuffer, headerBuffer);
   return {
     ok,
-    ...(ok
-      ? { receivedSignature: receivedSecret }
-      : { reason: 'invalid-secret', receivedSignature: receivedSecret }),
+    ...(ok ? {} : { reason: 'invalid-secret' }),
   };
 }
 
@@ -718,6 +715,10 @@ function readTimestamp(value: unknown): number | undefined {
     return Number.isFinite(dateMs) ? dateMs : undefined;
   }
   return undefined;
+}
+
+function digestSalesforceWebhookSecret(secret: string): string {
+  return `sha256:${createHash('sha256').update(secret).digest('hex')}`;
 }
 
 function compactObject<T extends Record<string, unknown>>(value: T): T {

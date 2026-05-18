@@ -16,14 +16,16 @@ import {
   githubByIdAliasPath,
   githubByPriorityAliasPath,
   githubByStateAliasPath,
-  githubByTitleAliasPath,
+  githubNumberedByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
   githubIssuePath,
+  githubLegacyByTitleAliasPath,
   githubPullRequestPath,
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
   githubReposIndexPath,
+  githubRepositoryMetaPath,
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
   githubReviewPath,
@@ -138,7 +140,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     const canonical = githubPullRequestPath('acme', 'widgets', 42, 'Add darkmode toggle');
     const byId = githubByIdAliasPath('acme', 'widgets', 'pulls', 42);
-    const byTitle = githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
+    const byTitle = githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
     const byState = githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42);
     const indexPath = githubRepoPullsIndexPath('acme', 'widgets');
 
@@ -199,7 +201,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const deletedPaths = client.deletes.map((d) => d.path);
     // Prior by-title alias removed.
     assert.ok(
-      deletedPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Old Title', 42)),
+      deletedPaths.includes(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Old Title', 42)),
       `expected prior by-title alias in deletes; got: ${deletedPaths.join(', ')}`,
     );
     // Prior canonical meta.json removed (but not the directory itself).
@@ -213,7 +215,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     // New canonical + by-title written.
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(githubPullRequestPath('acme', 'widgets', 42, 'New Title')));
-    assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'New Title', 42)));
+    assert.ok(writtenPaths.includes(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'New Title', 42)));
   });
 
   it('reconciles a PR state transition by moving the by-state alias', async () => {
@@ -332,7 +334,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const indexPath = githubRepoIssuesIndexPath('acme', 'widgets');
     assert.ok(writtenPaths.includes(githubIssuePath('acme', 'widgets', 7, 'Bug report')));
     assert.ok(writtenPaths.includes(githubByIdAliasPath('acme', 'widgets', 'issues', 7)));
-    assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)));
+    assert.ok(writtenPaths.includes(githubNumberedByTitleAliasPath('acme', 'widgets', 'issues', 'Bug report', 7)));
     assert.ok(writtenPaths.includes(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)));
     assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
     assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
@@ -343,7 +345,71 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(!writtenPaths.includes(githubRepoPullsIndexPath('acme', 'widgets')));
   });
 
-  it('writes repository metadata.json (note: metadata.json, not meta.json) + repos _index.json row', async () => {
+  it('writes distinct by-title aliases for duplicate issue titles and keeps cleanup scoped by number', async () => {
+    const client = createClient();
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 1,
+          title: 'Duplicate title',
+          state: 'open',
+          updated_at: '2026-05-12T00:00:00Z',
+        },
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 2,
+          title: 'Duplicate title',
+          state: 'open',
+          updated_at: '2026-05-12T00:00:00Z',
+        },
+      ],
+    });
+
+    const firstAlias = githubNumberedByTitleAliasPath('acme', 'widgets', 'issues', 'Duplicate title', 1);
+    const secondAlias = githubNumberedByTitleAliasPath('acme', 'widgets', 'issues', 'Duplicate title', 2);
+    assert.notEqual(firstAlias, secondAlias);
+    assert.ok(client.files.has(firstAlias));
+    assert.ok(client.files.has(secondAlias));
+
+    const renamedClient = createClient({
+      initialFiles: {
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 1)]: client.files.get(
+          githubByIdAliasPath('acme', 'widgets', 'issues', 1),
+        )!,
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 2)]: client.files.get(
+          githubByIdAliasPath('acme', 'widgets', 'issues', 2),
+        )!,
+        [firstAlias]: client.files.get(firstAlias)!,
+        [secondAlias]: client.files.get(secondAlias)!,
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(renamedClient, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 1,
+          title: 'Renamed title',
+          state: 'open',
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const deletedPaths = new Set(renamedClient.deletes.map((d) => d.path));
+    assert.ok(deletedPaths.has(firstAlias));
+    assert.ok(deletedPaths.has(githubLegacyByTitleAliasPath('acme', 'widgets', 'issues', 'Duplicate title', 1)));
+    assert.ok(!deletedPaths.has(secondAlias), 'renaming issue 1 must not delete issue 2 by-title alias');
+    assert.ok(renamedClient.files.has(secondAlias), 'issue 2 by-title alias must remain materialized');
+  });
+
+  it('writes repository meta.json + repos _index.json row', async () => {
     const client = createClient();
     await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -357,10 +423,11 @@ describe('emitGitHubAuxiliaryFiles', () => {
     });
 
     const writtenPaths = client.writes.map((w) => w.path);
-    const metadataPath = githubRepositoryMetadataPath('acme', 'widgets');
+    const metadataPath = githubRepositoryMetaPath('acme', 'widgets');
     const indexPath = githubReposIndexPath();
     assert.ok(writtenPaths.includes(metadataPath));
-    assert.ok(metadataPath.endsWith('/metadata.json'), 'repo canonical must be metadata.json');
+    assert.ok(metadataPath.endsWith('/meta.json'), 'repo canonical must be meta.json');
+    assert.ok(!writtenPaths.includes(githubRepositoryMetadataPath('acme', 'widgets')));
     assert.ok(writtenPaths.includes(indexPath));
 
     const rows = JSON.parse(client.files.get(indexPath)!) as Array<{
@@ -374,26 +441,55 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
   it('writes flat per-repo canonical paths for review, review_comment, check_run, commit (no aliases, no per-repo index)', async () => {
     const client = createClient();
+    const sha = '0123456789abcdef0123456789abcdef01234567';
     await emitGitHubAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
       reviews: [{ owner: 'acme', repo: 'widgets', id: 555 }],
       reviewComments: [{ owner: 'acme', repo: 'widgets', id: 999 }],
       checkRuns: [{ owner: 'acme', repo: 'widgets', id: 12345 }],
-      commits: [{ owner: 'acme', repo: 'widgets', sha: 'abc123' }],
+      commits: [{ owner: 'acme', repo: 'widgets', sha }],
     });
 
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(githubReviewPath('acme', 'widgets', 555)));
     assert.ok(writtenPaths.includes(githubReviewCommentPath('acme', 'widgets', 999)));
     assert.ok(writtenPaths.includes(githubCheckRunPath('acme', 'widgets', 12345)));
-    assert.ok(writtenPaths.includes(githubCommitPath('acme', 'widgets', 'abc123')));
+    assert.ok(writtenPaths.includes(githubCommitPath('acme', 'widgets', sha)));
     // No per-repo index writes for the flat kinds — only canonical paths.
     assert.ok(!writtenPaths.includes(githubRepoPullsIndexPath('acme', 'widgets')));
     assert.ok(!writtenPaths.includes(githubRepoIssuesIndexPath('acme', 'widgets')));
     assert.ok(!writtenPaths.includes(githubReposIndexPath()));
     // Commit canonical is the dir-form `<sha>/metadata.json`.
-    const commitPath = githubCommitPath('acme', 'widgets', 'abc123');
+    const commitPath = githubCommitPath('acme', 'widgets', sha);
     assert.ok(commitPath.endsWith('/metadata.json'));
+  });
+
+  it('rejects malformed flat-record ids before emitting paths', async () => {
+    const client = createClient();
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      reviews: [{ owner: 'acme', repo: 'widgets', id: '../issues/owned' }],
+      reviewComments: [
+        { owner: 'acme', repo: 'widgets', id: 'a/b' },
+        { owner: 'acme', repo: 'widgets', id: '../comments/owned', _deleted: true },
+      ],
+      checkRuns: [{ owner: 'acme', repo: 'widgets', id: '123/456' }],
+      commits: [
+        { owner: 'acme', repo: 'widgets', sha: 'not/a/sha' },
+        { owner: 'acme', repo: 'widgets', id: '../commits/owned', _deleted: true },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    const unsafeWrites = client.writes.filter(
+      (w) =>
+        w.path.includes('/reviews/') ||
+        w.path.includes('/comments/') ||
+        w.path.includes('/checks/') ||
+        w.path.includes('/commits/'),
+    );
+    assert.deepEqual(unsafeWrites, []);
+    assert.equal(client.deletes.length, 0);
   });
 
   it('multi-tenant: two PRs in two different repos produce two independently scoped _index.json updates', async () => {
@@ -488,7 +584,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
     assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
-    assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
     assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
 
     // No content write happened for the tombstone itself — only the index flush.
@@ -545,11 +641,73 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const deletedPaths = new Set(client.deletes.map((d) => d.path));
     assert.ok(deletedPaths.has(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
     assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
-    assert.ok(deletedPaths.has(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
+    assert.ok(deletedPaths.has(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Doomed PR', 42)));
     assert.ok(deletedPaths.has(githubByStateAliasPath('acme', 'widgets', 'pulls', 'closed', 42)));
     assert.ok(deletedPaths.has(githubByAssigneeAliasPath('acme', 'widgets', 'pulls', 'mona', 42)));
     assert.ok(deletedPaths.has(githubByCreatorAliasPath('acme', 'widgets', 'pulls', 'hubot', 42)));
     assert.ok(deletedPaths.has(githubByPriorityAliasPath('acme', 'widgets', 'pulls', 'high', 42)));
+  });
+
+  it('bare PR delete recovery fails fast instead of scanning every repository', async () => {
+    const repoRows = Array.from({ length: 30 }, (_, index) => ({
+      id: `org-${index}/repo-${index}`,
+      title: `org-${index}/repo-${index}`,
+      updated: '2026-05-12T00:00:00Z',
+    }));
+    const client = createClient({
+      initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify(repoRows),
+      },
+    });
+
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [{ id: '42', _deleted: true }],
+    });
+
+    assert.equal(result.errors.length, 1);
+    assert.match(result.errors[0]!.error, /Refusing unscoped GitHub pulls delete recovery/u);
+    const repoIndexReads = client.reads.filter((r) => r.path === githubReposIndexPath());
+    const perRepoReads = client.reads.filter((r) => r.path.endsWith('/pulls/_index.json'));
+    assert.equal(repoIndexReads.length, 1);
+    assert.equal(perRepoReads.length, 0);
+  });
+
+  it('caches unscoped numbered delete recovery reads across a batch', async () => {
+    const client = createClient({
+      initialFiles: {
+        [githubReposIndexPath()]: JSON.stringify([
+          { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
+          { id: 'beta/gadgets', title: 'beta/gadgets', updated: '2026-05-12T00:00:00Z' },
+        ]),
+        [githubRepoPullsIndexPath('acme', 'widgets')]: JSON.stringify([
+          { id: '42', title: 'Doomed PR', updated: '2026-05-12T00:00:00Z', number: 42, state: 'closed' },
+        ]),
+        [githubRepoPullsIndexPath('beta', 'gadgets')]: JSON.stringify([
+          { id: '7', title: 'Other doomed PR', updated: '2026-05-12T00:00:00Z', number: 7, state: 'closed' },
+        ]),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      pullRequests: [
+        { id: '42', _deleted: true },
+        { id: '7', _deleted: true },
+      ],
+    });
+
+    const readsByPath = new Map<string, number>();
+    for (const read of client.reads) {
+      readsByPath.set(read.path, (readsByPath.get(read.path) ?? 0) + 1);
+    }
+    assert.ok((readsByPath.get(githubReposIndexPath()) ?? 0) <= 2);
+    assert.ok((readsByPath.get(githubRepoPullsIndexPath('acme', 'widgets')) ?? 0) <= 2);
+    assert.ok((readsByPath.get(githubRepoPullsIndexPath('beta', 'gadgets')) ?? 0) <= 2);
+
+    const deletedPaths = new Set(client.deletes.map((deleteInput) => deleteInput.path));
+    assert.ok(deletedPaths.has(githubPullRequestPath('acme', 'widgets', 42, 'Doomed PR')));
+    assert.ok(deletedPaths.has(githubPullRequestPath('beta', 'gadgets', 7, 'Other doomed PR')));
   });
 
   it('delete tombstone for an issue drops its per-repo issues index row', async () => {
@@ -583,7 +741,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.deepEqual(rows.map((r) => r.id), ['22']);
   });
 
-  it('repository delete tombstone removes metadata.json and drops the global repos index row', async () => {
+  it('repository delete tombstone removes current and legacy metadata paths and drops the global repos index row', async () => {
     const priorIndex = [
       { id: 'acme/widgets', title: 'acme/widgets', updated: '2026-05-12T00:00:00Z' },
       { id: 'beta/gadgets', title: 'beta/gadgets', updated: '2026-05-11T00:00:00Z' },
@@ -600,6 +758,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     });
 
     const deletedPaths = client.deletes.map((d) => d.path);
+    assert.ok(deletedPaths.includes(githubRepositoryMetaPath('acme', 'widgets')));
     assert.ok(deletedPaths.includes(githubRepositoryMetadataPath('acme', 'widgets')));
 
     const indexWrite = client.writes.find((w) => w.path === githubReposIndexPath());
@@ -609,7 +768,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
   });
 
   it('captures per-path write failures without aborting the rest of the fan-out', async () => {
-    const failingPath = githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
+    const failingPath = githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
     const client = createClient({ failWriteOn: new Set([failingPath]) });
 
     const result = await emitGitHubAuxiliaryFiles(client, {
@@ -657,7 +816,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
 
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
-    assert.ok(writtenPaths.includes(githubByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42)));
+    assert.ok(writtenPaths.includes(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42)));
   });
 
   it('extracts owner/repo from full_name when explicit owner/repo are absent', async () => {

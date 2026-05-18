@@ -6,6 +6,7 @@ import {
   type AuxiliaryEmitterClient,
   type EmitAuxiliaryFilesResult,
   type EmitPlan,
+  type EmitReadResult,
   type EmitWrite,
 } from '@relayfile/adapter-core';
 
@@ -28,6 +29,7 @@ import {
   xPostByQueryAliasPath,
   xPostPath,
   xPostsIndexPath,
+  extractXObjectIdFromPath,
   xSearchByIdAliasPath,
   xSearchByQueryAliasPath,
   xSearchMetaPath,
@@ -80,6 +82,8 @@ export async function emitXAuxiliaryFiles(
   const posts = [...(input.posts ?? []), ...bundles.flatMap((bundle) => bundle.posts)];
   const users = [...(input.users ?? []), ...bundles.flatMap((bundle) => bundle.users)];
   const results = [...(input.results ?? []), ...bundles.flatMap((bundle) => bundle.results)];
+  const resultSearchIdsByPostId = groupResultSearchIdsByPostId(results);
+  const resultPostIdsBySearchId = groupResultPostIdsBySearchId(results);
 
   const priorReader = new PriorAliasReader(client, workspaceId);
   const searchIndex = new IndexFileReconciler<XSearchIndexRow>({
@@ -117,7 +121,16 @@ export async function emitXAuxiliaryFiles(
   };
 
   accumulate(aggregate, await runEmitBatch(client, workspaceId, searches, (record) =>
-    planSearchRecord(record, priorReader, searchIndex, input.connectionId),
+    planSearchRecord(
+      record,
+      priorReader,
+      searchIndex,
+      input.connectionId,
+      client,
+      workspaceId,
+      resultPostIdsBySearchId,
+      getResultIndex,
+    ),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, users, (record) =>
     planUserRecord(record, priorReader, userIndex, input.connectionId),
@@ -126,7 +139,7 @@ export async function emitXAuxiliaryFiles(
   const postsById = new Map(posts.filter(isFullPost).map((post) => [post.id, post]));
   const resultSearchById = new Map(searches.filter(isFullSearch).map((search) => [search.id, search]));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, posts, (record) =>
-    planPostRecord(record, priorReader, postIndex, usersById, resultSearchById, results, input.connectionId),
+    planPostRecord(record, priorReader, postIndex, usersById, resultSearchById, resultSearchIdsByPostId, input.connectionId),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, results, (record) =>
     planSearchResultRecord(record, resultSearchById.get(record.searchId), postsById, getResultIndex),
@@ -175,27 +188,53 @@ async function planSearchRecord(
   priorReader: PriorAliasReader,
   index: IndexFileReconciler<XSearchIndexRow>,
   connectionId: string | undefined,
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  resultPostIdsBySearchId: ReadonlyMap<string, ReadonlySet<string>>,
+  getResultIndex: (searchId: string, titleOrQuery: string | null | undefined) => IndexFileReconciler<XSearchResult>,
 ): Promise<EmitPlan> {
-  const prior = await priorReader.read<PriorSearchState>(xSearchByIdAliasPath(record.id), readPriorSearchState);
+  const prior = await priorReader.read<PriorSearchState>(xSearchByIdAliasPath(record.id), (parsed) =>
+    readPriorSearchState(parsed, record.id),
+  );
   if (isDeleted(record)) {
+    const indexedPrior = prior ?? await readSearchIndexPrior(client, workspaceId, record.id);
+    const priorResultDeletes = await staleSearchResultDeletes(record.id, indexedPrior, client, workspaceId, {
+      includePostQueryAliases: true,
+    });
     index.remove(record.id);
-    const title = prior?.title ?? record.id;
-    const query = prior?.query ?? record.id;
+    const title = indexedPrior?.title ?? indexedPrior?.query ?? record.id;
+    const query = indexedPrior?.query ?? record.id;
     return {
       deletes: [
-        { path: prior?.canonicalPath ?? xSearchMetaPath(record.id, title) },
+        { path: indexedPrior?.canonicalPath ?? xSearchMetaPath(record.id, title) },
         { path: xSearchByIdAliasPath(record.id) },
         { path: xSearchByQueryAliasPath(query, record.id) },
+        ...priorResultDeletes,
       ],
     };
   }
 
+  const priorResultDeletes = await staleSearchResultDeletes(record.id, prior, client, workspaceId);
   const canonicalPath = xSearchMetaPath(record.id, record.title || record.query);
+  const titleOrQuery = record.title || record.query;
+  const currentResultDeletes = await staleCurrentSearchResultDeletes(
+    record.id,
+    titleOrQuery,
+    resultPostIdsBySearchId.get(record.id) ?? new Set<string>(),
+    getResultIndex(record.id, titleOrQuery),
+    client,
+    workspaceId,
+  );
   const envelope = searchEnvelope(record, canonicalPath, connectionId);
   const content = json(envelope);
+  const priorCanonicalPath = prior
+    ? prior.canonicalPath ?? xSearchMetaPath(record.id, prior.title ?? prior.query ?? record.id)
+    : undefined;
   const deletes = staleDeletes([
-    prior?.canonicalPath && prior.canonicalPath !== canonicalPath ? prior.canonicalPath : undefined,
+    priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorCanonicalPath : undefined,
     prior?.query && prior.query !== record.query ? xSearchByQueryAliasPath(prior.query, record.id) : undefined,
+    ...(priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorResultDeletes.map((deleteInput) => deleteInput.path) : []),
+    ...currentResultDeletes.map((deleteInput) => deleteInput.path),
   ]);
   index.upsert(xSearchIndexRow(record));
   return {
@@ -214,15 +253,17 @@ async function planPostRecord(
   index: IndexFileReconciler<XPostIndexRow>,
   usersById: ReadonlyMap<string, XUser>,
   searchesById: ReadonlyMap<string, XSearchRun>,
-  results: readonly XSearchResult[],
+  resultSearchIdsByPostId: ReadonlyMap<string, readonly string[]>,
   connectionId: string | undefined,
 ): Promise<EmitPlan> {
-  const prior = await priorReader.read<PriorPostState>(xPostByIdAliasPath(record.id), readPriorPostState);
+  const prior = await priorReader.read<PriorPostState>(xPostByIdAliasPath(record.id), (parsed) =>
+    readPriorPostState(parsed, record.id),
+  );
   if (isDeleted(record)) {
     index.remove(record.id);
     return {
       deletes: staleDeletes([
-        prior?.canonicalPath ?? xPostPath(record.id),
+        prior?.canonicalPath ?? xPostPath(record.id, prior?.text),
         xPostByIdAliasPath(record.id),
         prior?.authorKey ? xPostByAuthorAliasPath(prior.authorKey, record.id) : undefined,
         prior?.conversationId ? xPostByConversationAliasPath(prior.conversationId, record.id) : undefined,
@@ -233,18 +274,22 @@ async function planPostRecord(
 
   const author = record.author_id ? usersById.get(record.author_id) : undefined;
   const authorKey = author?.username ?? record.author_id;
-  const searchIds = results.filter((result) => result.postId === record.id).map((result) => result.searchId);
+  const searchIds = resultSearchIdsByPostId.get(record.id) ?? [];
+  const searchIdSet = new Set(searchIds);
   const canonicalPath = xPostPath(record.id, postTitle(record));
   const envelope = postEnvelope(record, canonicalPath, searchIds, author, connectionId);
   const content = json(envelope);
+  const priorCanonicalPath = prior
+    ? prior.canonicalPath ?? xPostPath(record.id, prior.text)
+    : undefined;
   const deletes = staleDeletes([
-    prior?.canonicalPath && prior.canonicalPath !== canonicalPath ? prior.canonicalPath : undefined,
+    priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorCanonicalPath : undefined,
     prior?.authorKey && prior.authorKey !== authorKey ? xPostByAuthorAliasPath(prior.authorKey, record.id) : undefined,
     prior?.conversationId && prior.conversationId !== record.conversation_id
       ? xPostByConversationAliasPath(prior.conversationId, record.id)
       : undefined,
     ...(prior?.searchIds ?? [])
-      .filter((searchId) => !searchIds.includes(searchId))
+      .filter((searchId) => !searchIdSet.has(searchId))
       .map((searchId) => xPostByQueryAliasPath(searchId, record.id)),
   ]);
   index.upsert(xPostIndexRow(record, author?.username));
@@ -271,12 +316,14 @@ async function planUserRecord(
   index: IndexFileReconciler<XUserIndexRow>,
   connectionId: string | undefined,
 ): Promise<EmitPlan> {
-  const prior = await priorReader.read<PriorUserState>(xUserByIdAliasPath(record.id), readPriorUserState);
+  const prior = await priorReader.read<PriorUserState>(xUserByIdAliasPath(record.id), (parsed) =>
+    readPriorUserState(parsed, record.id),
+  );
   if (isDeleted(record)) {
     index.remove(record.id);
     return {
       deletes: staleDeletes([
-        prior?.canonicalPath ?? xUserPath(record.id),
+        prior?.canonicalPath ?? xUserPath(record.id, prior?.username ?? prior?.name),
         xUserByIdAliasPath(record.id),
         prior?.username ? xUserByUsernameAliasPath(prior.username, record.id) : undefined,
       ]),
@@ -287,8 +334,11 @@ async function planUserRecord(
   const canonicalPath = xUserPath(record.id, label);
   const envelope = userEnvelope(record, canonicalPath, connectionId);
   const content = json(envelope);
+  const priorCanonicalPath = prior
+    ? prior.canonicalPath ?? xUserPath(record.id, prior.username ?? prior.name)
+    : undefined;
   const deletes = staleDeletes([
-    prior?.canonicalPath && prior.canonicalPath !== canonicalPath ? prior.canonicalPath : undefined,
+    priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorCanonicalPath : undefined,
     prior?.username && prior.username !== record.username ? xUserByUsernameAliasPath(prior.username, record.id) : undefined,
   ]);
   index.upsert(xUserIndexRow(record));
@@ -424,39 +474,183 @@ function staleDeletes(paths: readonly (string | undefined)[]) {
   return [...new Set(paths.filter((path): path is string => Boolean(path)))].map((path) => ({ path }));
 }
 
-function readPriorSearchState(parsed: Record<string, unknown>): PriorSearchState | null {
-  const canonicalPath = readString(parsed.canonicalPath);
-  if (!canonicalPath) return null;
+function groupResultSearchIdsByPostId(results: readonly XSearchResult[]): Map<string, readonly string[]> {
+  const grouped = new Map<string, string[]>();
+  for (const result of results) {
+    const searchIds = grouped.get(result.postId) ?? [];
+    if (!searchIds.includes(result.searchId)) {
+      searchIds.push(result.searchId);
+      grouped.set(result.postId, searchIds);
+    }
+  }
+  return grouped;
+}
+
+function groupResultPostIdsBySearchId(results: readonly XSearchResult[]): Map<string, ReadonlySet<string>> {
+  const grouped = new Map<string, Set<string>>();
+  for (const result of results) {
+    const postIds = grouped.get(result.searchId) ?? new Set<string>();
+    postIds.add(result.postId);
+    grouped.set(result.searchId, postIds);
+  }
+  return grouped;
+}
+
+async function staleSearchResultDeletes(
+  searchId: string,
+  prior: PriorSearchState | null,
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  options: { includePostQueryAliases?: boolean } = {},
+): Promise<Array<{ path: string }>> {
+  const titleOrQuery = prior?.title ?? prior?.query;
+  if (!titleOrQuery) return [];
+  const indexPath = xSearchResultsIndexPath(searchId, titleOrQuery);
+  const priorResults = await readPriorSearchResultsIndex(client, workspaceId, indexPath);
+  return staleDeletes([
+    indexPath,
+    ...(priorResults ?? []).map((result) => xSearchResultPath(searchId, titleOrQuery, result.postId)),
+    ...(options.includePostQueryAliases
+      ? (priorResults ?? []).map((result) => xPostByQueryAliasPath(searchId, result.postId))
+      : []),
+  ]);
+}
+
+async function staleCurrentSearchResultDeletes(
+  searchId: string,
+  titleOrQuery: string,
+  currentPostIds: ReadonlySet<string>,
+  resultIndex: IndexFileReconciler<XSearchResult>,
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+): Promise<Array<{ path: string }>> {
+  const priorResults = await readPriorSearchResultsIndex(client, workspaceId, xSearchResultsIndexPath(searchId, titleOrQuery));
+  if (!priorResults) return [];
+  const staleResults = priorResults.filter((result) => !currentPostIds.has(result.postId));
+  resultIndex.remove(...staleResults.map((result) => result.id));
+  return staleDeletes(staleResults.map((result) => xSearchResultPath(searchId, titleOrQuery, result.postId)));
+}
+
+async function readPriorSearchResultsIndex(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<readonly XSearchResult[] | null> {
+  if (!client.readFile) return null;
+  let raw: EmitReadResult | null | undefined;
+  try {
+    raw = await client.readFile({ workspaceId, path });
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw.content !== 'string' || raw.content.length === 0) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.content);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+  return parsed.filter((item): item is XSearchResult => {
+    return typeof item === 'object'
+      && item !== null
+      && typeof (item as { postId?: unknown }).postId === 'string'
+      && typeof (item as { searchId?: unknown }).searchId === 'string';
+  });
+}
+
+function readPriorSearchState(parsed: Record<string, unknown>, searchId: string): PriorSearchState | null {
+  const canonicalPath = trustedPriorCanonicalPath(readString(parsed.canonicalPath), 'search', searchId);
   const title = readString(parsed.title);
   const query = readString(parsed.query);
+  if (!canonicalPath && !title && !query) return null;
   return {
-    canonicalPath,
+    ...(canonicalPath ? { canonicalPath } : {}),
     ...(title ? { title } : {}),
     ...(query ? { query } : {}),
   };
 }
 
-function readPriorPostState(parsed: Record<string, unknown>): PriorPostState | null {
-  const canonicalPath = readString(parsed.canonicalPath);
-  if (!canonicalPath) return null;
+async function readSearchIndexPrior(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  searchId: string,
+): Promise<PriorSearchState | null> {
+  try {
+    const raw = await client.readFile?.({ workspaceId, path: xSearchesIndexPath() });
+    if (!raw || typeof raw.content !== 'string') return null;
+    const parsed = JSON.parse(raw.content) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const row = parsed.find((entry) => (
+      typeof entry === 'object'
+      && entry !== null
+      && !Array.isArray(entry)
+      && (entry as { id?: unknown }).id === searchId
+    ));
+    if (typeof row !== 'object' || row === null || Array.isArray(row)) return null;
+    const record = row as Record<string, unknown>;
+    const title = readString(record.title);
+    const query = readString(record.query);
+    return {
+      canonicalPath: xSearchMetaPath(searchId, title ?? query ?? searchId),
+      ...(title ? { title } : {}),
+      ...(query ? { query } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readPriorPostState(parsed: Record<string, unknown>, postId: string): PriorPostState | null {
+  const canonicalPath = trustedPriorCanonicalPath(readString(parsed.canonicalPath), 'post', postId);
   const authorKey = readString(parsed.authorKey) ?? readStringPath(parsed, ['author', 'username']) ?? readStringPath(parsed, ['payload', 'author_id']);
   const conversationId = readString(parsed.conversationId) ?? readStringPath(parsed, ['payload', 'conversation_id']);
+  const text = readStringPath(parsed, ['payload', 'text']);
+  const searchIds = Array.isArray(parsed.searchIds) ? parsed.searchIds.filter((item): item is string => typeof item === 'string') : [];
+  if (!canonicalPath && !authorKey && !conversationId && !text && searchIds.length === 0) return null;
   return {
-    canonicalPath,
+    ...(canonicalPath ? { canonicalPath } : {}),
     ...(authorKey ? { authorKey } : {}),
     ...(conversationId ? { conversationId } : {}),
-    searchIds: Array.isArray(parsed.searchIds) ? parsed.searchIds.filter((item): item is string => typeof item === 'string') : [],
+    ...(text ? { text } : {}),
+    searchIds,
   };
 }
 
-function readPriorUserState(parsed: Record<string, unknown>): PriorUserState | null {
-  const canonicalPath = readString(parsed.canonicalPath);
-  if (!canonicalPath) return null;
+function readPriorUserState(parsed: Record<string, unknown>, userId: string): PriorUserState | null {
+  const canonicalPath = trustedPriorCanonicalPath(readString(parsed.canonicalPath), 'user', userId);
   const username = readString(parsed.username) ?? readStringPath(parsed, ['payload', 'username']);
+  const name = readStringPath(parsed, ['payload', 'name']);
+  if (!canonicalPath && !username && !name) return null;
   return {
-    canonicalPath,
+    ...(canonicalPath ? { canonicalPath } : {}),
     ...(username ? { username } : {}),
+    ...(name ? { name } : {}),
   };
+}
+
+function trustedPriorCanonicalPath(
+  canonicalPath: string | undefined,
+  objectType: 'search' | 'post' | 'user',
+  objectId: string,
+): string | undefined {
+  if (!canonicalPath || !isXCanonicalPathForType(canonicalPath, objectType)) return undefined;
+  try {
+    return extractXObjectIdFromPath(canonicalPath) === objectId ? canonicalPath : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isXCanonicalPathForType(path: string, objectType: 'search' | 'post' | 'user'): boolean {
+  switch (objectType) {
+    case 'search':
+      return /^\/x\/searches\/(?!by-[^/]+\/)[^/]+\/meta\.json$/u.test(path);
+    case 'post':
+      return /^\/x\/posts\/(?!by-[^/]+\/)[^/]+\.json$/u.test(path);
+    case 'user':
+      return /^\/x\/users\/(?!by-[^/]+\/)[^/]+\.json$/u.test(path);
+  }
 }
 
 function isDeleted(record: unknown): record is { id: string; _deleted: true } {
@@ -507,19 +701,21 @@ function accumulate(target: EmitAuxiliaryFilesResult, next: EmitAuxiliaryFilesRe
 }
 
 interface PriorSearchState {
-  canonicalPath: string;
+  canonicalPath?: string;
   title?: string;
   query?: string;
 }
 
 interface PriorPostState {
-  canonicalPath: string;
+  canonicalPath?: string;
   authorKey?: string;
   conversationId?: string;
+  text?: string;
   searchIds: string[];
 }
 
 interface PriorUserState {
-  canonicalPath: string;
+  canonicalPath?: string;
   username?: string;
+  name?: string;
 }

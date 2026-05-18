@@ -14,9 +14,12 @@ import {
   githubCheckRunPath,
   githubCommitPath,
   githubIssuePath,
+  githubLegacyByTitleAliasPath,
+  githubNumberedByTitleAliasPath,
   githubPullRequestPath,
   tryNormalizeGitHubObjectType,
   githubRepoPrefix,
+  githubRepositoryMetaPath,
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
   githubReviewPath,
@@ -105,7 +108,14 @@ describe('path-mapper', () => {
       assert.equal(githubRepoPrefix('my org', 'my repo'), '/github/repos/my%20org/my%20repo');
     });
 
-    it('githubRepositoryMetadataPath', () => {
+    it('githubRepositoryMetaPath', () => {
+      assert.equal(
+        githubRepositoryMetaPath('octocat', 'hello-world'),
+        '/github/repos/octocat/hello-world/meta.json',
+      );
+    });
+
+    it('githubRepositoryMetadataPath is retained for legacy compatibility', () => {
       assert.equal(
         githubRepositoryMetadataPath('octocat', 'hello-world'),
         '/github/repos/octocat/hello-world/metadata.json',
@@ -131,6 +141,9 @@ describe('path-mapper', () => {
         githubReviewPath('octocat', 'hello-world', '123'),
         '/github/repos/octocat/hello-world/reviews/123.json',
       );
+      const encoded = githubReviewPath('octocat', 'hello-world', '../issues/owned');
+      assert.equal(encoded, '/github/repos/octocat/hello-world/reviews/..%2Fissues%2Fowned.json');
+      assert.equal(encoded.includes('/../'), false);
     });
 
     it('githubReviewCommentPath', () => {
@@ -138,12 +151,19 @@ describe('path-mapper', () => {
         githubReviewCommentPath('octocat', 'hello-world', '456'),
         '/github/repos/octocat/hello-world/comments/456.json',
       );
+      const encoded = githubReviewCommentPath('octocat', 'hello-world', 'a/b');
+      assert.equal(encoded, '/github/repos/octocat/hello-world/comments/a%2Fb.json');
+      assert.equal(encoded.includes('/a/b'), false);
     });
 
     it('githubCheckRunPath', () => {
       assert.equal(
         githubCheckRunPath('octocat', 'hello-world', '789'),
         '/github/repos/octocat/hello-world/checks/789.json',
+      );
+      assert.equal(
+        githubCheckRunPath('octocat', 'hello-world', '1/2'),
+        '/github/repos/octocat/hello-world/checks/1%2F2.json',
       );
     });
 
@@ -152,6 +172,9 @@ describe('path-mapper', () => {
         githubCommitPath('octocat', 'hello-world', 'abc123'),
         '/github/repos/octocat/hello-world/commits/abc123/metadata.json',
       );
+      const encoded = githubCommitPath('octocat', 'hello-world', 'a/b');
+      assert.equal(encoded, '/github/repos/octocat/hello-world/commits/a%2Fb/metadata.json');
+      assert.equal(encoded.includes('/a/b/'), false);
     });
 
     it('githubRootIndexPath', () => {
@@ -162,6 +185,10 @@ describe('path-mapper', () => {
       assert.equal(
         githubByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7),
         '/github/repos/octocat__hello-world/issues/by-title/shared-title.json',
+      );
+      assert.equal(
+        githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7),
+        '/github/repos/octocat__hello-world/issues/by-title/shared-title__7.json',
       );
       assert.equal(
         githubByIdAliasPath('octocat', 'hello-world', 'pulls', 42),
@@ -184,6 +211,19 @@ describe('path-mapper', () => {
         '/github/repos/octocat__hello-world/issues/by-priority/p0-critical/7.json',
       );
     });
+
+    it('keys by-title aliases by stable number so duplicate titles do not collide', () => {
+      const first = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7);
+      const second = githubNumberedByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 8);
+
+      assert.equal(first, '/github/repos/octocat__hello-world/issues/by-title/shared-title__7.json');
+      assert.equal(second, '/github/repos/octocat__hello-world/issues/by-title/shared-title__8.json');
+      assert.notEqual(first, second);
+      assert.equal(
+        githubLegacyByTitleAliasPath('octocat', 'hello-world', 'issues', 'Shared title', 7),
+        '/github/repos/octocat__hello-world/issues/by-title/shared-title.json',
+      );
+    });
   });
 
   describe('computeGitHubPath', () => {
@@ -204,7 +244,7 @@ describe('path-mapper', () => {
     it('computes repository path with context', () => {
       assert.equal(
         computeGitHubPath('repository', 'octocat/hello-world', { owner: 'octocat', repo: 'hello-world' }),
-        '/github/repos/octocat/hello-world/metadata.json',
+        '/github/repos/octocat/hello-world/meta.json',
       );
     });
 

@@ -84,9 +84,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || digestEventPath(left).localeCompare(digestEventPath(right))
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left), digestEventPath(right))
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTimeMs(event: DigestChangeEvent): number {
@@ -105,10 +111,17 @@ function normalizeDigestPath(path: string): string {
 }
 
 function xIdentifier(path: string): string {
-  if (path.includes('/searches/')) return `search ${recordBasename(path)}`;
-  if (path.includes('/posts/')) return `post ${recordBasename(path)}`;
-  if (path.includes('/users/')) return `user ${recordBasename(path)}`;
+  if (path.includes('/searches/')) return `search ${recordId(path, 'directory')}`;
+  if (path.includes('/posts/')) return `post ${recordId(path, 'flat')}`;
+  if (path.includes('/users/')) return `user ${recordId(path, 'flat')}`;
   return recordBasename(path);
+}
+
+function recordId(path: string, shape: 'directory' | 'flat'): string {
+  const basename = recordBasename(path);
+  const separatorIndex = basename.indexOf('__');
+  if (separatorIndex <= 0) return basename;
+  return shape === 'directory' ? basename.slice(0, separatorIndex) : basename.slice(separatorIndex + 2);
 }
 
 function recordBasename(path: string): string {
@@ -117,20 +130,28 @@ function recordBasename(path: string): string {
   return (segment ?? path).replace(/\.[^.]+$/u, '');
 }
 
+const ACTION_VERB_PATTERN_1 = actionVerbRegex('search|searched|run|ran');
+const ACTION_VERB_PATTERN_2 = actionVerbRegex('create|created|add|added|write|written');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('delete|deleted|remove|removed');
+
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (hasActionVerb(action, 'search|searched|run|ran')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_1)) {
     return 'ran';
   }
-  if (hasActionVerb(action, 'create|created|add|added|write|written')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_2)) {
     return 'was created';
   }
-  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) {
     return 'was deleted';
   }
   return 'was updated';
 }
 
-function hasActionVerb(action: string, verbs: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+function actionVerbRegex(verbs: string): RegExp {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u');
+}
+
+function hasActionVerb(action: string, pattern: RegExp): boolean {
+  return pattern.test(action);
 }

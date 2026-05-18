@@ -17,6 +17,15 @@ async function resolveTargets(input, env = {}) {
   return match[1].trim().split(/\s+/);
 }
 
+async function resolveTargetsRaw(input, env = {}) {
+  return execFileAsync('node', [
+    'scripts/resolve-publish-targets.mjs',
+    input,
+  ], {
+    env: { ...process.env, ...env },
+  });
+}
+
 function assertBefore(list, dependency, dependent) {
   const dependencyIndex = list.indexOf(dependency);
   const dependentIndex = list.indexOf(dependent);
@@ -75,6 +84,16 @@ test('current-version publish skips already-published internal dependencies', as
   });
 
   assert.deepEqual(list, ['gitlab']);
+});
+
+test('current-version publish exits cleanly when every resolved package is already published', async () => {
+  const result = await resolveTargetsRaw('core', {
+    INPUT_VERSION: 'none',
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+  });
+
+  assert.equal(result.stdout, 'packages=\n');
+  assert.match(result.stderr, /nothing to publish/);
 });
 
 test('missing publish skips already-published internal dependencies', async () => {

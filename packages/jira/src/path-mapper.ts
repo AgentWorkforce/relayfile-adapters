@@ -48,16 +48,9 @@ function slugify(value: string): string {
 
 function titleSegmentWithId(title: string | undefined, id: string): string {
   const slug = title ? slugify(title) : '';
-  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42"). The "__"
-  // separator between slug and ID is the disambiguator. Slugs never contain
-  // "__" because slugify collapses any non-alphanumeric run into a single
-  // "-" (so "_" and runs of "_" never make it through). That guarantees
-  // extractJiraIdFromPathSegment can recover the ID verbatim by capturing
-  // everything after the last "__". This matches the cross-adapter
-  // `<slug>__<id>` convention used by github, linear, notion, and
-  // confluence. The legacy "--" joiner remains readable by the parser so
-  // mounts written before this migration keep resolving.
-  return slug ? `${slug}__${id}` : encodeJiraPathSegment(id);
+  // Preserve hyphens in IDs (e.g. Jira issue keys like "ENG-42") while still
+  // encoding opaque provider IDs before they become a filesystem segment.
+  return slug ? `${slug}__${encodeJiraPathSegment(id)}` : encodeJiraPathSegment(id);
 }
 
 export function normalizeJiraObjectType(objectType: string): JiraPathObjectType {
@@ -251,11 +244,12 @@ export function jiraSprintByTitleAliasPath(name: string, id: string): string {
 }
 
 export function extractJiraIdFromPathSegment(segment: string): string {
-  const decoded = decodeURIComponent(segment);
-  const currentMatch = /__([^/]+)$/u.exec(decoded);
-  if (currentMatch?.[1]) {
-    return currentMatch[1];
+  const basename = segment.replace(/\.json$/u, '');
+  const currentSeparatorIndex = basename.lastIndexOf('__');
+  if (currentSeparatorIndex > 0) {
+    return decodeURIComponent(basename.slice(currentSeparatorIndex + 2));
   }
+  const decoded = decodeURIComponent(basename);
   const legacyMatch = /--([^/]+)$/u.exec(decoded);
   return legacyMatch?.[1] ? legacyMatch[1] : decoded;
 }

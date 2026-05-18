@@ -41,7 +41,7 @@ function assertNonEmptySegment(value: string, label: string): string {
 }
 
 export function encodeXPathSegment(value: string): string {
-  return encodeURIComponent(assertNonEmptySegment(value, 'path segment'));
+  return encodeURIComponent(assertNonEmptySegment(value, 'path segment')).replace(/\./gu, '%2E');
 }
 
 export function xRootIndexPath(): string {
@@ -66,11 +66,9 @@ export function xUsersIndexPath(): string {
 
 export function xRecordDirectorySegment(objectId: string | number, title?: string | null): string {
   const id = String(objectId).trim();
-  if (id.includes('__')) {
-    return encodeXPathSegment(id);
-  }
   const slug = title ? slugifyAlias(title) : '';
-  return slug ? `${encodeXPathSegment(id)}__${encodeXPathSegment(slug)}` : encodeXPathSegment(id);
+  const encodedId = encodeXDirectoryRecordId(id);
+  return slug ? `${encodedId}__${encodeXPathSegment(slug)}` : encodedId;
 }
 
 export function xFlatRecordFilename(objectId: string | number, title?: string | null): string {
@@ -174,11 +172,11 @@ export function parseXRecordName(filename: string): ParsedXRecordName {
   const basename = ext ? filename.slice(0, extIndex) : filename;
   const separatorIndex = basename.lastIndexOf('__');
   if (separatorIndex <= 0 || separatorIndex === basename.length - 2) {
-    return { slug: null, id: decodeURIComponent(basename), ext };
+    return { slug: null, id: safeDecodeURIComponent(basename), ext };
   }
   return {
-    slug: decodeURIComponent(basename.slice(0, separatorIndex)),
-    id: decodeURIComponent(basename.slice(separatorIndex + 2)),
+    slug: safeDecodeURIComponent(basename.slice(0, separatorIndex)),
+    id: safeDecodeURIComponent(basename.slice(separatorIndex + 2)),
     ext,
   };
 }
@@ -195,7 +193,26 @@ export function extractXObjectIdFromPath(path: string): string {
   }
   const searchMatch = /^\/x\/searches\/([^/]+)\/meta\.json$/u.exec(normalized);
   if (searchMatch?.[1]) {
-    return decodeURIComponent(searchMatch[1].split('__')[0] ?? searchMatch[1]);
+    return parseXDirectoryRecordSegment(searchMatch[1]);
   }
   throw new Error(`X path does not include a canonical object id: ${path}`);
+}
+
+function encodeXDirectoryRecordId(id: string): string {
+  const encoded = encodeXPathSegment(id);
+  return id.includes('__') ? encoded.replace(/_/gu, '%5F') : encoded;
+}
+
+function parseXDirectoryRecordSegment(segment: string): string {
+  const separatorIndex = segment.indexOf('__');
+  const encodedId = separatorIndex > 0 ? segment.slice(0, separatorIndex) : segment;
+  return safeDecodeURIComponent(encodedId);
+}
+
+function safeDecodeURIComponent(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }

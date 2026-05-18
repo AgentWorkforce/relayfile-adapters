@@ -134,9 +134,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left) ?? '', digestEventPath(right) ?? '')
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTime(event: DigestChangeEvent): string {
@@ -173,35 +179,48 @@ function airtableIdentifier(path: string): string {
   return id;
 }
 
+const ACTION_VERB_PATTERN_1 = actionVerbRegex('create|created|add|added|write|written');
+const ACTION_VERB_PATTERN_2 = actionVerbRegex('delete|deleted|remove|removed');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('archive|archived');
+const ACTION_VERB_PATTERN_4 = actionVerbRegex('unarchive|unarchived|restore|restored');
+const ACTION_VERB_PATTERN_5 = actionVerbRegex('complete|completed|done');
+const ACTION_VERB_PATTERN_6 = actionVerbRegex('cancel|canceled|cancelled');
+const ACTION_VERB_PATTERN_7 = actionVerbRegex('resolve|resolved');
+const ACTION_VERB_PATTERN_8 = actionVerbRegex('merge|merged');
+
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (hasActionVerb(action, 'create|created|add|added|write|written')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_1)) {
     return 'was created';
   }
-  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_2)) {
     return 'was deleted';
   }
-  if (hasActionVerb(action, 'archive|archived')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) {
     return 'was archived';
   }
-  if (hasActionVerb(action, 'unarchive|unarchived|restore|restored')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_4)) {
     return 'was unarchived';
   }
-  if (hasActionVerb(action, 'complete|completed|done')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_5)) {
     return 'was completed';
   }
-  if (hasActionVerb(action, 'cancel|canceled|cancelled')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_6)) {
     return 'was canceled';
   }
-  if (hasActionVerb(action, 'resolve|resolved')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_7)) {
     return 'was resolved';
   }
-  if (hasActionVerb(action, 'merge|merged')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_8)) {
     return 'was merged';
   }
   return 'was updated';
 }
 
-function hasActionVerb(action: string, verbs: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+function actionVerbRegex(verbs: string): RegExp {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u');
+}
+
+function hasActionVerb(action: string, pattern: RegExp): boolean {
+  return pattern.test(action);
 }

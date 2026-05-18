@@ -215,7 +215,7 @@ describe('GitHub lazy materialization', () => {
 
     await adapter.sync('workspace-1');
 
-    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/metadata.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
   });
@@ -264,7 +264,7 @@ describe('GitHub lazy materialization', () => {
       ),
       false,
     );
-    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/metadata.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
   });
@@ -290,7 +290,7 @@ describe('GitHub lazy materialization', () => {
 
     await adapter.sync('workspace-1');
 
-    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/metadata.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
   });
@@ -334,7 +334,7 @@ describe('GitHub lazy materialization', () => {
       }),
       'expected repo-a to be present in the root index after materialize',
     );
-    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/metadata.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
   });
 
   it('parallel materializeRepo calls share one in-flight fetch and return the same repo paths', async () => {
@@ -355,7 +355,7 @@ describe('GitHub lazy materialization', () => {
     assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 1);
   });
 
-  it('materializeRepo writes metadata plus empty issue and pull indexes for repos with no synced content', async () => {
+  it('materializeRepo writes repo meta plus empty issue and pull indexes for repos with no synced content', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider, { lazy: true });
 
@@ -364,7 +364,7 @@ describe('GitHub lazy materialization', () => {
 
     assert.deepStrictEqual(result.paths.sort(), [
       '/github/repos/octocat/repo-b/issues/_index.json',
-      '/github/repos/octocat/repo-b/metadata.json',
+      '/github/repos/octocat/repo-b/meta.json',
       '/github/repos/octocat/repo-b/pulls/_index.json',
     ]);
     assert.deepStrictEqual(

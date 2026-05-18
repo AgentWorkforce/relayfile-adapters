@@ -47,7 +47,7 @@ export function buildXSearchResultsIndexFile(
 ) {
   return jsonFile(
     xSearchResultsIndexPath(searchId, titleOrQuery),
-    rows.slice().sort((left, right) => left.rank - right.rank || left.postId.localeCompare(right.postId)),
+    rows.slice().sort((left, right) => left.rank - right.rank || compareStrings(left.postId, right.postId)),
   );
 }
 
@@ -101,8 +101,14 @@ function sortRows<TRow extends XIndexRow>(rows: readonly TRow[]): TRow[] {
     const leftMs = Date.parse(left.updated);
     const time = (Number.isNaN(rightMs) ? Number.NEGATIVE_INFINITY : rightMs)
       - (Number.isNaN(leftMs) ? Number.NEGATIVE_INFINITY : leftMs);
-    return time || left.id.localeCompare(right.id);
+    return time || compareStrings(left.id, right.id);
   });
+}
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function jsonFile(path: string, value: unknown) {

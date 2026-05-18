@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { digest, type DigestContext } from '../src/digest.js';
+import { computeMetadataPath } from '../src/path-mapper.js';
 
 test('digest returns deterministic GitLab bullets sorted by event time and id', async () => {
   const ctx: DigestContext = {
@@ -319,7 +320,36 @@ test('digest preserves complex GitLab tag refs with slashes and double underscor
   });
 });
 
-test('digest suppresses legacy GitLab tag cleanup paths', async () => {
+test('digest preserves canonical flat GitLab tag ids containing double underscores', async () => {
+  const canonicalPath = computeMetadataPath('acme/api', 'tags', 'release__candidate', 'release__candidate');
+  const ctx: DigestContext = {
+    provider: 'gitlab',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'tag_push',
+          canonicalPath,
+        },
+      ];
+    },
+  };
+
+  assert.equal(canonicalPath, '/gitlab/projects/acme/api/tags/release__candidate.json');
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gitlab',
+    bullets: [
+      {
+        text: 'tag release__candidate was updated',
+        canonicalPath: 'gitlab/projects/acme/api/tags/release__candidate.json',
+      },
+    ],
+  });
+});
+
+test('digest suppresses legacy GitLab tag cleanup paths without dropping preserved flat tag ids', async () => {
   const ctx: DigestContext = {
     provider: 'gitlab',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
@@ -377,6 +407,10 @@ test('digest suppresses legacy GitLab tag cleanup paths', async () => {
       {
         text: 'tag release/foo__bar was deleted',
         canonicalPath: 'gitlab/projects/acme/api/tags/release-foo-bar__release%2Ffoo__bar.json',
+      },
+      {
+        text: 'tag foo__bar was deleted',
+        canonicalPath: 'gitlab/projects/acme/api/tags/foo__bar.json',
       },
     ],
   });
