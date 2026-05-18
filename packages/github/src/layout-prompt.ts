@@ -8,7 +8,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull r
 \`/github/repos/_index.json\` lists materialized repositories.
 \`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
 \`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
-Issue and pull request aliases include \`by-id/<number>.json\`, \`by-title/<slug>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, and \`by-priority/<priority>/<number>.json\`.
+Issue and pull request aliases include \`by-id/<number>.json\`, \`by-title/<slug>__<number>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, and \`by-priority/<priority>/<number>.json\`.
 
 ## Indexes
 

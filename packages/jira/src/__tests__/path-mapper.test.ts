@@ -167,6 +167,23 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     });
   });
 
+  describe('canonical titled paths encode opaque ids', () => {
+    it('keeps issue, project, and sprint ids with slashes inside a single filename and round-trips them', () => {
+      const cases = [
+        { path: jiraIssuePath('../100/01', 'Fix Login Redirect'), id: '../100/01', prefix: `${JIRA_PATH_ROOT}/issues/` },
+        { path: jiraProjectPath('team/../99', 'Engineering Platform'), id: 'team/../99', prefix: `${JIRA_PATH_ROOT}/projects/` },
+        { path: jiraSprintPath('../board/7', 'Sprint 7'), id: '../board/7', prefix: `${JIRA_PATH_ROOT}/sprints/` },
+      ];
+
+      for (const { path, id, prefix } of cases) {
+        assert.ok(path.startsWith(prefix), `expected ${path} to stay under ${prefix}`);
+        const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+        assert.equal(leaf.includes('/'), false, `expected encoded id to stay in one path segment: ${path}`);
+        assert.equal(extractJiraIdFromPathSegment(leaf), id);
+      }
+    });
+  });
+
   describe('jiraSprintByIdAliasPath', () => {
     it('composes a stable path under sprints/by-id/<id>', () => {
       assert.equal(jiraSprintByIdAliasPath('7'), `${JIRA_PATH_ROOT}/sprints/by-id/7.json`);

@@ -33,8 +33,8 @@ test('X digest summarizes canonical search and post events deterministically', a
   assert.deepEqual(section, {
     provider: 'x',
     bullets: [
-      { text: 'search s1__agent-workflow ran', canonicalPath: 'x/searches/s1__agent-workflow/meta.json' },
-      { text: 'post agent-workflow__1880001 was updated', canonicalPath: 'x/posts/agent-workflow__1880001.json' },
+      { text: 'search s1 ran', canonicalPath: 'x/searches/s1__agent-workflow/meta.json' },
+      { text: 'post 1880001 was updated', canonicalPath: 'x/posts/agent-workflow__1880001.json' },
     ],
   });
 });
@@ -59,5 +59,27 @@ test('X digest classifies deletions', async () => {
     },
   ]);
 
-  assert.equal(section?.bullets[0]?.text, 'user xdevelopers__2244994945 was deleted');
+  assert.equal(section?.bullets[0]?.text, 'user 2244994945 was deleted');
+});
+
+test('X digest uses locale-independent tie-breaks for equal timestamps', async () => {
+  const section = await runDigest([
+    {
+      id: 'evt-é',
+      timestamp: '2026-05-17T10:03:00Z',
+      action: 'updated',
+      canonicalPath: '/x/posts/with-accent__2.json',
+    },
+    {
+      id: 'evt-Z',
+      timestamp: '2026-05-17T10:03:00Z',
+      action: 'updated',
+      canonicalPath: '/x/posts/uppercase__1.json',
+    },
+  ]);
+
+  assert.deepEqual(section?.bullets.map((bullet) => bullet.canonicalPath), [
+    'x/posts/uppercase__1.json',
+    'x/posts/with-accent__2.json',
+  ]);
 });

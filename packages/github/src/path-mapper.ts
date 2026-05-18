@@ -130,6 +130,14 @@ export function githubRootIndexPath(): string {
   return `${GITHUB_PATH_ROOT}/_index.json`;
 }
 
+export function githubRepositoryMetaPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/meta.json`;
+}
+
+/**
+ * @deprecated Legacy repository canonical retained for reader/delete compatibility.
+ * Use githubRepositoryMetaPath for newly emitted repository records.
+ */
 export function githubRepositoryMetadataPath(owner: string, repo: string): string {
   return `${githubRepoPrefix(owner, repo)}/metadata.json`;
 }
@@ -170,26 +178,50 @@ export function githubPullRequestRoot(
 }
 
 export function githubReviewPath(owner: string, repo: string, reviewId: number | string): string {
-  return `${githubRepoPrefix(owner, repo)}/reviews/${reviewId}.json`;
+  return `${githubRepoPrefix(owner, repo)}/reviews/${encodeGitHubPathSegment(String(reviewId))}.json`;
 }
 
 export function githubReviewCommentPath(owner: string, repo: string, commentId: number | string): string {
-  return `${githubRepoPrefix(owner, repo)}/comments/${commentId}.json`;
+  return `${githubRepoPrefix(owner, repo)}/comments/${encodeGitHubPathSegment(String(commentId))}.json`;
 }
 
 export function githubCheckRunPath(owner: string, repo: string, checkRunId: number | string): string {
-  return `${githubRepoPrefix(owner, repo)}/checks/${checkRunId}.json`;
+  return `${githubRepoPrefix(owner, repo)}/checks/${encodeGitHubPathSegment(String(checkRunId))}.json`;
 }
 
 export function githubCommitPath(owner: string, repo: string, sha: string): string {
-  return `${githubRepoPrefix(owner, repo)}/commits/${sha}/metadata.json`;
+  return `${githubRepoPrefix(owner, repo)}/commits/${encodeGitHubPathSegment(sha)}/metadata.json`;
 }
 
 export function githubAliasRepoPrefix(owner: string, repo: string): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(`${owner}__${repo}`)}`;
 }
 
+/**
+ * @deprecated Legacy title-only alias retained for reader/delete compatibility.
+ * Use githubNumberedByTitleAliasPath for newly emitted aliases.
+ */
 export function githubByTitleAliasPath(
+  owner: string,
+  repo: string,
+  kind: 'issues' | 'pulls',
+  title: string,
+  number: number | string,
+  colliding = false,
+): string {
+  const slug = slugifyAlias(title);
+  if (!slug) {
+    throw new Error('GitHub alias title must slug to a non-empty string');
+  }
+
+  const filename = colliding ? `${slug}-${aliasCollisionSuffix(String(number))}` : slug;
+  return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-title/${encodeGitHubPathSegment(filename)}.json`;
+}
+
+/**
+ * Number-suffixed by-title alias for newly emitted issue and PR mirrors.
+ */
+export function githubNumberedByTitleAliasPath(
   owner: string,
   repo: string,
   kind: 'issues' | 'pulls',
@@ -203,9 +235,16 @@ export function githubByTitleAliasPath(
     throw new Error('GitHub alias title must slug to a non-empty string');
   }
 
-  const filename = colliding ? `${slug}-${aliasCollisionSuffix(String(number))}` : slug;
+  const aliasSlug = colliding ? `${slug}-${aliasCollisionSuffix(String(number))}` : slug;
+  const filename = `${aliasSlug}__${String(number)}`;
   return `${githubAliasRepoPrefix(owner, repo)}/${kind}/by-title/${encodeGitHubPathSegment(filename)}.json`;
 }
+
+/**
+ * @deprecated Use githubByTitleAliasPath for legacy read/delete compatibility
+ * and githubNumberedByTitleAliasPath for newly emitted aliases.
+ */
+export const githubLegacyByTitleAliasPath = githubByTitleAliasPath;
 
 export function githubByIdAliasPath(
   owner: string,
@@ -344,7 +383,7 @@ export function computeGitHubPath(
     case 'issue':
       return githubIssuePath(owner, repo, objectId);
     case 'repository':
-      return githubRepositoryMetadataPath(owner, repo);
+      return githubRepositoryMetaPath(owner, repo);
     case 'review':
       return githubReviewPath(owner, repo, objectId);
     case 'review_comment':

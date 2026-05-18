@@ -724,6 +724,15 @@ function normalizeJiraAction(value: string): string {
   const normalized = value.trim().toLowerCase();
   if (normalized.includes('delete') || normalized === 'deleted') return 'deleted';
   if (normalized.includes('create') || normalized === 'created') return 'created';
+  if (
+    normalized.includes('complete') ||
+    normalized.includes('resolve') ||
+    normalized.includes('close') ||
+    normalized.includes('cancel') ||
+    normalized === 'done'
+  ) {
+    return 'completed';
+  }
   return 'updated';
 }
 

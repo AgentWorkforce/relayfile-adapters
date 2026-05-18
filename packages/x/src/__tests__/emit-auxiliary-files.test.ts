@@ -24,7 +24,7 @@ import {
   xUserPath,
   xUsersIndexPath,
 } from '../path-mapper.js';
-import type { XPost, XSearchBundle, XSearchRun, XUser } from '../types.js';
+import type { XPost, XSearchBundle, XSearchResult, XSearchRun, XUser } from '../types.js';
 
 interface CapturingClient {
   writes: Array<{ workspaceId: string; path: string; content: string; contentType?: string }>;
@@ -177,6 +177,15 @@ test('emitXAuxiliaryFiles reconciles renamed searches and changed post alias fie
     title: 'Old query',
     query: 'old query',
   });
+  const oldResult: XSearchResult = {
+    id: post.id,
+    searchId: 's1',
+    postId: post.id,
+    rank: 1,
+    matchedAt: '2026-05-16T10:00:00Z',
+    canonicalPath: xPostPath(post.id, 'Old text'),
+    query: 'old query',
+  };
   const oldPost = JSON.stringify({
     canonicalPath: xPostPath(post.id, 'Old text'),
     authorKey: 'oldauthor',
@@ -186,6 +195,8 @@ test('emitXAuxiliaryFiles reconciles renamed searches and changed post alias fie
   });
   const client = createClient({
     [xSearchByIdAliasPath('s1')]: oldSearch,
+    [xSearchResultsIndexPath('s1', 'Old query')]: JSON.stringify([oldResult]),
+    [xSearchResultPath('s1', 'Old query', post.id)]: JSON.stringify(oldResult),
     [xPostByIdAliasPath(post.id)]: oldPost,
   });
 
@@ -197,8 +208,271 @@ test('emitXAuxiliaryFiles reconciles renamed searches and changed post alias fie
   const deletes = client.deletes.map((deleteInput) => deleteInput.path);
   assert.ok(deletes.includes(xSearchMetaPath('s1', 'Old query')));
   assert.ok(deletes.includes(xSearchByQueryAliasPath('old query', 's1')));
+  assert.ok(deletes.includes(xSearchResultsIndexPath('s1', 'Old query')));
+  assert.ok(deletes.includes(xSearchResultPath('s1', 'Old query', post.id)));
   assert.ok(deletes.includes(xPostPath(post.id, 'Old text')));
   assert.ok(deletes.includes(xPostByAuthorAliasPath('oldauthor', post.id)));
   assert.ok(deletes.includes(xPostByConversationAliasPath('old-convo', post.id)));
   assert.ok(deletes.includes(xPostByQueryAliasPath('old-search', post.id)));
+});
+
+test('emitXAuxiliaryFiles deletes by-query search aliases from index state when by-id prior is missing', async () => {
+  const run = makeRun({
+    id: 'search-delete',
+    title: 'Workflow leads',
+    query: 'agent workflow buyers',
+  });
+  const canonicalPath = xSearchMetaPath(run.id, run.title);
+  const byQueryPath = xSearchByQueryAliasPath(run.query, run.id);
+  const client = createClient({
+    [xSearchesIndexPath()]: JSON.stringify([
+      {
+        id: run.id,
+        title: run.title,
+        updated: run.requestedAt,
+        query: run.query,
+        mode: run.mode,
+        resultCount: run.resultCount,
+        estimatedUsd: run.costEstimate.estimatedUsd,
+      },
+    ]),
+    [canonicalPath]: JSON.stringify({ canonicalPath, title: run.title, query: run.query }),
+    [byQueryPath]: JSON.stringify({ canonicalPath, title: run.title, query: run.query }),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [{ id: run.id, _deleted: true }],
+  });
+
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(deletedPaths.includes(canonicalPath));
+  assert.ok(deletedPaths.includes(byQueryPath));
+  assert.ok(!deletedPaths.includes(xSearchByQueryAliasPath(run.id, run.id)));
+});
+
+test('emitXAuxiliaryFiles deletes reverse post query aliases when a search is deleted', async () => {
+  const run = makeRun({
+    id: 'search-delete',
+    title: 'Workflow leads',
+    query: 'agent workflow buyers',
+  });
+  const priorResult: XSearchResult = {
+    id: `${post.id}:search-delete`,
+    searchId: run.id,
+    postId: post.id,
+    rank: 1,
+    matchedAt: run.requestedAt,
+    canonicalPath: xPostPath(post.id, post.text),
+    query: run.query,
+  };
+  const resultIndexPath = xSearchResultsIndexPath(run.id, run.title);
+  const resultPointerPath = xSearchResultPath(run.id, run.title, post.id);
+  const postByQueryPath = xPostByQueryAliasPath(run.id, post.id);
+  const client = createClient({
+    [xSearchByIdAliasPath(run.id)]: JSON.stringify({
+      canonicalPath: xSearchMetaPath(run.id, run.title),
+      title: run.title,
+      query: run.query,
+    }),
+    [resultIndexPath]: JSON.stringify([priorResult]),
+    [resultPointerPath]: JSON.stringify(priorResult),
+    [postByQueryPath]: JSON.stringify({
+      canonicalPath: xPostPath(post.id, post.text),
+      searchIds: [run.id],
+      payload: post,
+    }),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [{ id: run.id, _deleted: true }],
+  });
+
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(deletedPaths.includes(resultIndexPath));
+  assert.ok(deletedPaths.includes(resultPointerPath));
+  assert.ok(deletedPaths.includes(postByQueryPath));
+  assert.equal(client.files.has(postByQueryPath), false);
+});
+
+test('emitXAuxiliaryFiles ignores untrusted prior canonical paths for search, post, and user cleanup', async () => {
+  const run = makeRun({
+    id: 'search-delete',
+    title: 'Workflow leads',
+    query: 'agent workflow buyers',
+  });
+  const safeSearchPath = xSearchMetaPath(run.id, run.title);
+  const safePostPath = xPostPath(post.id, 'Old text');
+  const safeUserPath = xUserPath(user.id, user.username);
+  const foreignPath = '/github/repos/acme/api/pulls/1__fix/meta.json';
+  const client = createClient({
+    [xSearchByIdAliasPath(run.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      title: run.title,
+      query: run.query,
+    }),
+    [xPostByIdAliasPath(post.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      authorKey: 'oldauthor',
+      conversationId: 'old-convo',
+      searchIds: ['old-search'],
+      payload: { id: post.id, text: 'Old text' },
+    }),
+    [xUserByIdAliasPath(user.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      username: user.username,
+      payload: user,
+    }),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [{ id: run.id, _deleted: true }],
+    posts: [{ id: post.id, _deleted: true }],
+    users: [{ id: user.id, _deleted: true }],
+  });
+
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(!deletedPaths.includes(foreignPath));
+  assert.ok(deletedPaths.includes(safeSearchPath));
+  assert.ok(deletedPaths.includes(safePostPath));
+  assert.ok(deletedPaths.includes(safeUserPath));
+  assert.ok(deletedPaths.includes(xPostByAuthorAliasPath('oldauthor', post.id)));
+  assert.ok(deletedPaths.includes(xPostByConversationAliasPath('old-convo', post.id)));
+  assert.ok(deletedPaths.includes(xPostByQueryAliasPath('old-search', post.id)));
+  assert.ok(deletedPaths.includes(xUserByUsernameAliasPath(user.username!, user.id)));
+});
+
+test('emitXAuxiliaryFiles recomputes stale canonical paths on rename when prior aliases are tampered', async () => {
+  const foreignPath = '/github/repos/acme/api/issues/1__fix/meta.json';
+  const oldSearch = makeRun({ id: 's-rename', title: 'Old search', query: 'old query' });
+  const newSearch = makeRun({ id: oldSearch.id, title: 'New search', query: 'new query' });
+  const oldPost: XPost = { ...post, text: 'Old text' };
+  const newPost: XPost = { ...post, text: 'New text' };
+  const oldUser: XUser = { ...user, username: 'olduser' };
+  const newUser: XUser = { ...user, username: 'newuser' };
+  const client = createClient({
+    [xSearchByIdAliasPath(oldSearch.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      title: oldSearch.title,
+      query: oldSearch.query,
+    }),
+    [xPostByIdAliasPath(oldPost.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      payload: oldPost,
+    }),
+    [xUserByIdAliasPath(oldUser.id)]: JSON.stringify({
+      canonicalPath: foreignPath,
+      username: oldUser.username,
+      payload: oldUser,
+    }),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [newSearch],
+    posts: [newPost],
+    users: [newUser],
+  });
+
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(!deletedPaths.includes(foreignPath));
+  assert.ok(deletedPaths.includes(xSearchMetaPath(oldSearch.id, oldSearch.title)));
+  assert.ok(deletedPaths.includes(xSearchByQueryAliasPath(oldSearch.query, oldSearch.id)));
+  assert.ok(deletedPaths.includes(xPostPath(oldPost.id, oldPost.text)));
+  assert.ok(deletedPaths.includes(xUserPath(oldUser.id, oldUser.username)));
+  assert.ok(deletedPaths.includes(xUserByUsernameAliasPath(oldUser.username!, oldUser.id)));
+});
+
+test('emitXAuxiliaryFiles groups post search aliases and reconciles stale aliases without scanning per post', async () => {
+  const secondRun = makeRun({
+    id: 's2',
+    title: 'Agent workflow buyers',
+    query: '"agent workflow" buyer',
+  });
+  const client = createClient({
+    [xPostByIdAliasPath(post.id)]: JSON.stringify({
+      canonicalPath: xPostPath(post.id, post.text),
+      authorKey: user.username,
+      conversationId: post.conversation_id,
+      searchIds: ['s1', 'stale-search'],
+      payload: post,
+    }),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [makeRun(), secondRun],
+    posts: [post],
+    users: [user],
+    results: [
+      {
+        id: `${post.id}:s1`,
+        searchId: 's1',
+        postId: post.id,
+        rank: 1,
+        matchedAt: '2026-05-17T10:00:00Z',
+        canonicalPath: xPostPath(post.id, post.text),
+        query: '"agent workflow" lang:en -is:retweet',
+      },
+      {
+        id: `${post.id}:s2`,
+        searchId: 's2',
+        postId: post.id,
+        rank: 1,
+        matchedAt: '2026-05-17T10:00:00Z',
+        canonicalPath: xPostPath(post.id, post.text),
+        query: '"agent workflow" buyer',
+      },
+    ],
+  });
+
+  const writtenPaths = client.writes.map((write) => write.path);
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(writtenPaths.includes(xPostByQueryAliasPath('s1', post.id)));
+  assert.ok(writtenPaths.includes(xPostByQueryAliasPath('s2', post.id)));
+  assert.ok(deletedPaths.includes(xPostByQueryAliasPath('stale-search', post.id)));
+});
+
+test('emitXAuxiliaryFiles removes stale search result pointers for the same search run', async () => {
+  const run = makeRun();
+  const staleResult: XSearchResult = {
+    id: '1880002',
+    searchId: run.id,
+    postId: '1880002',
+    rank: 2,
+    matchedAt: '2026-05-16T10:00:00Z',
+    canonicalPath: xPostPath('1880002', 'Stale post'),
+    query: run.query,
+  };
+  const currentResult: XSearchResult = {
+    id: post.id,
+    searchId: run.id,
+    postId: post.id,
+    rank: 1,
+    matchedAt: run.requestedAt,
+    canonicalPath: xPostPath(post.id, post.text),
+    query: run.query,
+  };
+  const client = createClient({
+    [xSearchResultsIndexPath(run.id, run.title)]: JSON.stringify([currentResult, staleResult]),
+    [xSearchResultPath(run.id, run.title, post.id)]: JSON.stringify(currentResult),
+    [xSearchResultPath(run.id, run.title, staleResult.postId)]: JSON.stringify(staleResult),
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    searches: [run],
+    posts: [post],
+    users: [user],
+    results: [currentResult],
+  });
+
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  assert.ok(deletedPaths.includes(xSearchResultPath(run.id, run.title, staleResult.postId)));
+  assert.equal(client.files.has(xSearchResultPath(run.id, run.title, staleResult.postId)), false);
+
+  const rewrittenIndex = JSON.parse(client.files.get(xSearchResultsIndexPath(run.id, run.title))!) as XSearchResult[];
+  assert.deepEqual(rewrittenIndex.map((result) => result.postId), [post.id]);
 });

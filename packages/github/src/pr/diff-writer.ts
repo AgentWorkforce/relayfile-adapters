@@ -2,7 +2,7 @@ import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
-import { githubByIdAliasPath, githubByTitleAliasPath } from '../path-mapper.js';
+import { githubByIdAliasPath, githubNumberedByTitleAliasPath } from '../path-mapper.js';
 import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.js';
 import {
   buildRepoIssuesIndexFile,
@@ -427,11 +427,11 @@ async function writePullRequestAliases(
     return;
   }
 
-  const baseAliasPath = githubByTitleAliasPath(owner, repo, 'pulls', title, number);
+  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
   const aliasPath = await resolveAliasPath(
     vfs,
     baseAliasPath,
-    githubByTitleAliasPath(owner, repo, 'pulls', title, number, true),
+    githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number, true),
     content,
   );
   // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.

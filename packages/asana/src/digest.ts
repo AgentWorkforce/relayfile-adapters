@@ -134,9 +134,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left) ?? '', digestEventPath(right) ?? '')
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTime(event: DigestChangeEvent): string {
@@ -173,20 +179,28 @@ function asanaIdentifier(path: string): string {
   return id;
 }
 
+const ACTION_VERB_PATTERN_1 = actionVerbRegex('create|created|open|opened|add|added|write|written');
+const ACTION_VERB_PATTERN_2 = actionVerbRegex('delete|deleted|remove|removed');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('close|closed|complete|completed|resolve|resolved|done');
+
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (hasActionVerb(action, 'create|created|open|opened|add|added|write|written')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_1)) {
     return 'was created';
   }
-  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_2)) {
     return 'was deleted';
   }
-  if (hasActionVerb(action, 'close|closed|complete|completed|resolve|resolved|done')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) {
     return 'was completed';
   }
   return 'was updated';
 }
 
-function hasActionVerb(action: string, verbs: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+function actionVerbRegex(verbs: string): RegExp {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u');
+}
+
+function hasActionVerb(action: string, pattern: RegExp): boolean {
+  return pattern.test(action);
 }

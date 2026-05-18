@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { digest, type DigestContext } from './digest.js';
+import { clickUpFolderPath, clickUpListPath, clickUpTaskPath } from './path-mapper.js';
 
 test('digest returns deterministic ClickUp bullets sorted by event time and id', async () => {
   const ctx: DigestContext = {
@@ -14,13 +15,13 @@ test('digest returns deterministic ClickUp bullets sorted by event time and id',
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'task.updated',
-          canonicalPath: '/clickup/tasks/abc123__fix-bug.json',
+          canonicalPath: clickUpTaskPath('abc123', 'Fix bug'),
         },
         {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'task.created',
-          canonicalPath: 'clickup/tasks/def456__add-tests.json',
+          canonicalPath: clickUpTaskPath('def456', 'Add tests').slice(1),
         },
       ];
     },
@@ -35,11 +36,11 @@ test('digest returns deterministic ClickUp bullets sorted by event time and id',
     bullets: [
       {
         text: 'task def456 was created',
-        canonicalPath: 'clickup/tasks/def456__add-tests.json',
+        canonicalPath: 'clickup/tasks/def456.json',
       },
       {
         text: 'task abc123 was updated',
-        canonicalPath: 'clickup/tasks/abc123__fix-bug.json',
+        canonicalPath: 'clickup/tasks/abc123.json',
       },
     ],
   });
@@ -55,19 +56,19 @@ test('digest classifies terminal states distinctly', async () => {
           id: 'evt-1',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'completed',
-          canonicalPath: '/clickup/tasks/t1__done-task.json',
+          canonicalPath: clickUpTaskPath('t1', 'Done task'),
         },
         {
           id: 'evt-2',
           timestamp: '2026-05-12T09:00:00.000Z',
           action: 'archived',
-          canonicalPath: '/clickup/lists/l1__old-list.json',
+          canonicalPath: clickUpListPath('l1', 'Old list'),
         },
         {
           id: 'evt-3',
           timestamp: '2026-05-12T10:00:00.000Z',
           action: 'deleted',
-          canonicalPath: '/clickup/folders/f1__temp.json',
+          canonicalPath: clickUpFolderPath('f1', 'Temp'),
         },
       ];
     },
@@ -77,9 +78,9 @@ test('digest classifies terminal states distinctly', async () => {
   assert.deepEqual(result, {
     provider: 'clickup',
     bullets: [
-      { text: 'task t1 was completed', canonicalPath: 'clickup/tasks/t1__done-task.json' },
-      { text: 'list l1 was archived', canonicalPath: 'clickup/lists/l1__old-list.json' },
-      { text: 'folder f1 was deleted', canonicalPath: 'clickup/folders/f1__temp.json' },
+      { text: 'task t1 was completed', canonicalPath: 'clickup/tasks/t1.json' },
+      { text: 'list l1 was archived', canonicalPath: 'clickup/lists/l1.json' },
+      { text: 'folder f1 was deleted', canonicalPath: 'clickup/folders/f1.json' },
     ],
   });
 });

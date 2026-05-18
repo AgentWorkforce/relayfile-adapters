@@ -113,7 +113,7 @@ export function gitLabRecordDirectorySegment(
 ): string {
   const id = String(objectId).trim();
   if (id.includes('__')) {
-    return id;
+    return encodeGitLabPathSegment(id);
   }
   const slug = title ? slugifyAlias(title) : '';
   return slug ? `${encodeGitLabPathSegment(id)}__${encodeGitLabPathSegment(slug)}` : encodeGitLabPathSegment(id);
@@ -124,7 +124,7 @@ export function gitLabFlatRecordFilename(
   title?: string | null,
 ): string {
   const id = String(objectId).trim().replace(/\.json$/, '');
-  if (!title && isComposedFlatRecordFilename(id)) {
+  if (id.includes('__') && !id.includes('/')) {
     return `${id}.json`;
   }
   const slug = title ? slugifyAlias(title) : slugifyAlias(id);

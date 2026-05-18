@@ -134,9 +134,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left) ?? '', digestEventPath(right) ?? '')
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTime(event: DigestChangeEvent): string {
@@ -165,20 +171,28 @@ function dropboxIdentifier(path: string): string {
   return `file ${file}`;
 }
 
+const ACTION_VERB_PATTERN_1 = actionVerbRegex('create|created|add|added|upload|uploaded|write|written');
+const ACTION_VERB_PATTERN_2 = actionVerbRegex('move|moved|rename|renamed');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('delete|deleted|remove|removed');
+
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
-  if (hasActionVerb(action, 'create|created|add|added|upload|uploaded|write|written')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_1)) {
     return 'was created';
   }
-  if (hasActionVerb(action, 'move|moved|rename|renamed')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_2)) {
     return 'was moved';
   }
-  if (hasActionVerb(action, 'delete|deleted|remove|removed')) {
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) {
     return 'was deleted';
   }
   return 'was modified';
 }
 
-function hasActionVerb(action: string, verbs: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+function actionVerbRegex(verbs: string): RegExp {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u');
+}
+
+function hasActionVerb(action: string, pattern: RegExp): boolean {
+  return pattern.test(action);
 }

@@ -135,3 +135,40 @@ test('digest accepts the exact /mailgun root canonical path', async () => {
     bullets: [{ text: 'mailgun was updated', canonicalPath: 'mailgun' }],
   });
 });
+
+test('digest keeps processing when a Mailgun path leaf has invalid percent encoding', async () => {
+  const ctx: DigestContext = {
+    provider: 'mailgun',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'updated',
+          canonicalPath: 'mailgun/domains/mg.example.com/messages/bad%path.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T08:01:00.000Z',
+          action: 'created',
+          canonicalPath: 'mailgun/domains/mg.example.com/messages/good%40path.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'mailgun',
+    bullets: [
+      {
+        text: 'message bad%path was updated',
+        canonicalPath: 'mailgun/domains/mg.example.com/messages/bad%path.json',
+      },
+      {
+        text: 'message good@path was created',
+        canonicalPath: 'mailgun/domains/mg.example.com/messages/good%40path.json',
+      },
+    ],
+  });
+});

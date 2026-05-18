@@ -6,6 +6,7 @@ import {
   SALESFORCE_WEBHOOK_SECRET_HEADER,
   SALESFORCE_WEBHOOK_TIMESTAMP_HEADER,
   assertValidSalesforceWebhookTimestamp,
+  extractSalesforceConnectionMetadata,
   computeSalesforceWebhookSecret,
   normalizeSalesforceWebhook,
   validateSalesforceWebhookSecret,
@@ -154,6 +155,31 @@ test('validateSalesforceWebhookSecret accepts when header matches secret regardl
   // computeSalesforceWebhookSecret is now a deprecated identity helper —
   // it returns the configured secret since no HMAC is computed.
   assert.equal(computeSalesforceWebhookSecret(tamperedPayload, secret), secret);
+});
+
+test('validateSalesforceWebhookSecret never returns reusable shared-secret material', () => {
+  const rawPayload = JSON.stringify(accountPayload);
+  const secret = 'salesforce-webhook-secret';
+  const wrongSecret = 'wrong-secret-value';
+
+  const valid = validateSalesforceWebhookSecret(
+    rawPayload,
+    { [SALESFORCE_WEBHOOK_SECRET_HEADER]: secret },
+    secret,
+  );
+  const invalid = validateSalesforceWebhookSecret(
+    rawPayload,
+    { [SALESFORCE_WEBHOOK_SECRET_HEADER]: wrongSecret },
+    secret,
+  );
+  const metadata = extractSalesforceConnectionMetadata(rawPayload, {
+    [SALESFORCE_WEBHOOK_SECRET_HEADER]: secret,
+  });
+
+  assert.equal(JSON.stringify(valid).includes(secret), false);
+  assert.equal(JSON.stringify(invalid).includes(wrongSecret), false);
+  assert.equal(metadata.secretDigest?.includes(secret), false);
+  assert.match(metadata.secretDigest ?? '', /^sha256:[0-9a-f]{64}$/u);
 });
 
 test('validateSalesforceWebhookSecret rejects a missing X-SFDC-Webhook-Secret header', () => {

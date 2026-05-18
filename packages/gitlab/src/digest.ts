@@ -71,8 +71,7 @@ function isCanonicalDigestPath(path: string): boolean {
     && !isGitLabProjectByIdAliasPath(segments)
     && !hasDigestAliasDirectory(segments)
     && !isGitLabLegacyTagCleanupPath(segments)
-    && !isGitLabFullRefTagCleanupPath(segments)
-    && !isGitLabLegacyFlatTagCleanupPath(segments);
+    && !isGitLabFullRefTagCleanupPath(segments);
 }
 
 const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
@@ -192,19 +191,6 @@ function isGitLabFullRefTagCleanupPath(segments: readonly string[]): boolean {
   return gitLabRecordId('tags', basename).startsWith('refs/tags/');
 }
 
-function isGitLabLegacyFlatTagCleanupPath(segments: readonly string[]): boolean {
-  if (segments[0] !== 'gitlab' || segments[1] !== 'projects') return false;
-  const resourceIndex = gitLabResourceSegmentIndex(segments);
-  if (segments[resourceIndex] !== 'tags' || segments.length !== resourceIndex + 2) {
-    return false;
-  }
-  const leaf = segments.at(-1) ?? '';
-  const basename = leaf.replace(/\.[^.]+$/u, '');
-  if (!basename.includes('__')) return false;
-  const tagId = gitLabRecordId('tags', basename);
-  return leaf !== gitLabFlatRecordFilename(tagId, tagId);
-}
-
 type GitLabResourceSegment =
   | 'commits'
   | 'deployments'
@@ -255,9 +241,15 @@ function compareEvents(left: DigestChangeEvent, right: DigestChangeEvent): numbe
   const rightMs = eventTimeMs(right);
   return (
     leftMs - rightMs
-    || (left.id ?? '').localeCompare(right.id ?? '')
-    || (digestEventPath(left) ?? '').localeCompare(digestEventPath(right) ?? '')
+    || compareDigestStrings(left.id ?? '', right.id ?? '')
+    || compareDigestStrings(digestEventPath(left) ?? '', digestEventPath(right) ?? '')
   );
+}
+
+function compareDigestStrings(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function eventTime(event: DigestChangeEvent): string {
@@ -305,10 +297,22 @@ function gitLabRecordId(resource: GitLabResourceSegment | undefined, basename: s
   const separatorIndex = basename.indexOf('__');
   if (separatorIndex <= 0) return basename;
 
-  if (resource === 'deployments' || resource === 'files' || resource === 'tags') {
-    return resource === 'files' ? basename : decodeGitLabDigestId(basename.slice(separatorIndex + 2));
+  if (resource === 'files') {
+    return basename;
+  }
+  if (resource === 'tags') {
+    return gitLabTagRecordId(basename, separatorIndex);
+  }
+  if (resource === 'deployments') {
+    return decodeGitLabDigestId(basename.slice(separatorIndex + 2));
   }
   return basename.slice(0, separatorIndex);
+}
+
+function gitLabTagRecordId(basename: string, separatorIndex: number): string {
+  const composedId = decodeGitLabDigestId(basename.slice(separatorIndex + 2));
+  const composedBasename = gitLabFlatRecordFilename(composedId, composedId).replace(/\.json$/u, '');
+  return composedBasename === basename ? composedId : decodeGitLabDigestId(basename);
 }
 
 function decodeGitLabDigestId(value: string): string {
@@ -318,6 +322,14 @@ function decodeGitLabDigestId(value: string): string {
     return value;
   }
 }
+
+const ACTION_VERB_PATTERN_1 = actionVerbRegex('unarchive|unarchived');
+const ACTION_VERB_PATTERN_2 = actionVerbRegex('restore|restored');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('archive|archived');
+const ACTION_VERB_PATTERN_4 = actionVerbRegex('success|succeeded');
+const ACTION_VERB_PATTERN_5 = actionVerbRegex('fail|failed');
+const ACTION_VERB_PATTERN_6 = actionVerbRegex('skip|skipped');
+const ACTION_VERB_PATTERN_7 = actionVerbRegex('cancel|canceled|cancelled');
 
 function pastTense(event: DigestChangeEvent): string {
   const terminalVerb = terminalStateVerb(event);
@@ -370,13 +382,13 @@ function terminalStateVerb(event: DigestChangeEvent): string | null {
     readLowerString(content, 'type'),
   ].join('.');
 
-  if (hasActionVerb(action, 'unarchive|unarchived')) return 'was unarchived';
-  if (hasActionVerb(action, 'restore|restored')) return 'was restored';
-  if (hasActionVerb(action, 'archive|archived')) return 'was archived';
-  if (hasActionVerb(action, 'success|succeeded')) return 'succeeded';
-  if (hasActionVerb(action, 'fail|failed')) return 'failed';
-  if (hasActionVerb(action, 'skip|skipped')) return 'was skipped';
-  if (hasActionVerb(action, 'cancel|canceled|cancelled')) return 'was canceled';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_1)) return 'was unarchived';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_2)) return 'was restored';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) return 'was archived';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_4)) return 'succeeded';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_5)) return 'failed';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_6)) return 'was skipped';
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_7)) return 'was canceled';
 
   const state =
     readLowerString(payload, 'state')
@@ -447,8 +459,12 @@ function readLowerPath(record: Record<string, unknown>, path: readonly string[])
   return typeof current === 'string' ? current.toLowerCase() : '';
 }
 
-function hasActionVerb(action: string, verbs: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u').test(action);
+function actionVerbRegex(verbs: string): RegExp {
+  return new RegExp(`(^|[^a-z0-9])(${verbs})([^a-z0-9]|$)`, 'u');
+}
+
+function hasActionVerb(action: string, pattern: RegExp): boolean {
+  return pattern.test(action);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

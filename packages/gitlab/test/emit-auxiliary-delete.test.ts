@@ -80,7 +80,7 @@ test('GitLab issue tombstones delete canonical and alias files using prior by-id
   assert.deepEqual(JSON.parse(indexWrite.content), []);
 });
 
-test('GitLab commit tombstones delete canonical and title aliases using prior by-id context', async () => {
+test('GitLab commit tombstones delete canonical and title aliases while ignoring untrusted prior paths', async () => {
   const writes: Array<{ path: string; content: string }> = [];
   const deletes: string[] = [];
   const seed = new Map<string, unknown>([
@@ -136,7 +136,7 @@ test('GitLab commit tombstones delete canonical and title aliases using prior by
   );
 
   assert.equal(result.errors.length, 0);
-  assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/legacy/abc123.json'));
+  assert.ok(!deletes.includes('/gitlab/projects/acme/api/commits/legacy/abc123.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/abc123__ship-fix/meta.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-id/abc123.json'));
   assert.ok(deletes.includes('/gitlab/projects/acme/api/commits/by-title/ship-fix__abc123.json'));

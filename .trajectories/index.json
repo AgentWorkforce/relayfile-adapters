@@ -1,332 +1,13 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-15T13:10:33.804Z",
+  "lastUpdated": "2026-05-18T14:04:02.653Z",
   "trajectories": {
-    "traj_q7vhb9378uqk": {
-      "title": "Wire Jira privacy-safe adapter storage",
+    "traj_xasxdv23opdv": {
+      "title": "review-loop-mpb8lp2z-2-workflow",
       "status": "completed",
-      "startedAt": "2026-05-09T18:56:17.285Z",
-      "completedAt": "2026-05-09T18:56:17.493Z",
-      "path": ".trajectories/completed/2026-05/traj_q7vhb9378uqk.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_c8nfy3gfqjj6": {
-      "title": "Address relayfile-adapters PR 62 review feedback",
-      "status": "completed",
-      "startedAt": "2026-05-09T19:08:59.937Z",
-      "completedAt": "2026-05-09T19:10:04.508Z",
-      "path": ".trajectories/completed/2026-05/traj_c8nfy3gfqjj6.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_4cuwr7i5avuh": {
-      "title": "Address relayfile-adapters PR 62 follow-up review feedback",
-      "status": "completed",
-      "startedAt": "2026-05-09T19:17:27.352Z",
-      "completedAt": "2026-05-09T19:18:00.585Z",
-      "path": ".trajectories/completed/2026-05/traj_4cuwr7i5avuh.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_jda1vsuedsrv": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "active",
-      "startedAt": "2026-05-09T20:02:38.233Z",
-      "path": ".trajectories/active/traj_jda1vsuedsrv.json"
-    },
-    "traj_jlw60d43y37p": {
-      "title": "Address PR 59 feedback and fix conflicts",
-      "status": "completed",
-      "startedAt": "2026-05-09T14:35:25.119Z",
-      "completedAt": "2026-05-10T19:18:21.143Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_jlw60d43y37p.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_1bv9s1rgebx9": {
-      "title": "Round 3 verification for adapter test wave",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:45:25.666Z",
-      "completedAt": "2026-05-09T02:45:33.633Z",
-      "path": ".trajectories/completed/2026-05/traj_1bv9s1rgebx9.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_1cp55q4ou2fh": {
-      "title": "Review PR 47 Google Calendar adapter alignment",
-      "status": "completed",
-      "startedAt": "2026-05-09T13:45:10.860Z",
-      "completedAt": "2026-05-09T13:47:49.306Z",
-      "path": ".trajectories/completed/2026-05/traj_1cp55q4ou2fh.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_23xtlhiffucc": {
-      "title": "Fix wave1 index adapter gaps",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:28:22.710Z",
-      "completedAt": "2026-05-09T00:35:21.614Z",
-      "path": ".trajectories/completed/2026-05/traj_23xtlhiffucc.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_2jz9s66d4e4y": {
-      "title": "Fresh review address PR comments and push PR 47",
-      "status": "completed",
-      "startedAt": "2026-05-09T14:06:33.133Z",
-      "completedAt": "2026-05-09T14:16:17.661Z",
-      "path": ".trajectories/completed/2026-05/traj_2jz9s66d4e4y.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_9eoa0wuwyfb0": {
-      "title": "tier1-verify-batch-3-workflow",
-      "status": "completed",
-      "startedAt": "2026-05-07T20:30:09.553Z",
-      "completedAt": "2026-05-08T23:31:36.388Z",
-      "path": ".trajectories/completed/2026-05/traj_9eoa0wuwyfb0.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_a1qvsg37i2r9": {
-      "title": "Verify relayfile-adapters turbo typecheck is clean",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:46:39.804Z",
-      "completedAt": "2026-05-09T00:46:46.474Z",
-      "path": ".trajectories/completed/2026-05/traj_a1qvsg37i2r9.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_afa3rotbl7sc": {
-      "title": "Write issue 45 agent relay workflow",
-      "status": "completed",
-      "startedAt": "2026-05-09T09:14:27.219Z",
-      "completedAt": "2026-05-09T09:23:48.329Z",
-      "path": ".trajectories/completed/2026-05/traj_afa3rotbl7sc.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_b5rtmzlzv2gb": {
-      "title": "Round 3 verification for issue #106",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:44:58.005Z",
-      "completedAt": "2026-05-09T00:45:04.040Z",
-      "path": ".trajectories/completed/2026-05/traj_b5rtmzlzv2gb.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_ce7qj6am1dx6": {
-      "title": "wave3-state-and-lazy: Linear by-state aliases and GitHub lazy materialization",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:20:11.271Z",
-      "completedAt": "2026-05-09T02:31:10.406Z",
-      "path": ".trajectories/completed/2026-05/traj_ce7qj6am1dx6.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_cp6xclxps3w3": {
-      "title": "Find tier 3 and tier 4 integration specs",
-      "status": "completed",
-      "startedAt": "2026-05-07T19:35:23.703Z",
-      "completedAt": "2026-05-07T19:36:21.452Z",
-      "path": ".trajectories/completed/2026-05/traj_cp6xclxps3w3.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_dc57wrk7jh0h": {
-      "title": "Address wave1-indexes peer review in relayfile-adapters",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:53:50.159Z",
-      "completedAt": "2026-05-09T01:01:03.439Z",
-      "path": ".trajectories/completed/2026-05/traj_dc57wrk7jh0h.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_dtqftdiubmfm": {
-      "title": "Fix PR 47 Google Calendar adapter review issues",
-      "status": "completed",
-      "startedAt": "2026-05-09T13:52:00.325Z",
-      "completedAt": "2026-05-09T14:02:24.507Z",
-      "path": ".trajectories/completed/2026-05/traj_dtqftdiubmfm.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_frduijl0r31s": {
-      "title": "Verify relayfile-adapters typecheck surface",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:55:24.655Z",
-      "completedAt": "2026-05-09T01:55:28.688Z",
-      "path": ".trajectories/completed/2026-05/traj_frduijl0r31s.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_ft4l3pdp7p38": {
-      "title": "Verify relayfile-adapters typecheck status",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:45:44.969Z",
-      "completedAt": "2026-05-09T00:45:54.563Z",
-      "path": ".trajectories/completed/2026-05/traj_ft4l3pdp7p38.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_fwfai2urcvwb": {
-      "title": "Verify turbo typecheck is clean in relayfile-adapters",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:47:11.091Z",
-      "completedAt": "2026-05-09T02:47:19.120Z",
-      "path": ".trajectories/completed/2026-05/traj_fwfai2urcvwb.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_jnxeadnofxq5": {
-      "title": "tier1-verify-batch-3-workflow",
-      "status": "completed",
-      "startedAt": "2026-05-07T20:38:00.556Z",
-      "completedAt": "2026-05-07T20:43:40.682Z",
-      "path": ".trajectories/completed/2026-05/traj_jnxeadnofxq5.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_jsxz58l1m5vh": {
-      "title": "Address adapter peer review findings for wave2 aliases",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:03:19.666Z",
-      "completedAt": "2026-05-09T02:07:21.934Z",
-      "path": ".trajectories/completed/2026-05/traj_jsxz58l1m5vh.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_k15895zmhz8w": {
-      "title": "tier1-verify-batch-3-workflow",
-      "status": "completed",
-      "startedAt": "2026-05-07T20:11:43.181Z",
-      "completedAt": "2026-05-07T20:16:16.382Z",
-      "path": ".trajectories/completed/2026-05/traj_k15895zmhz8w.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_kc9gwj88o20x": {
-      "title": "Fix issue #106 state aliases and lazy adapter verification gaps",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:37:36.697Z",
-      "completedAt": "2026-05-09T02:43:43.095Z",
-      "path": ".trajectories/completed/2026-05/traj_kc9gwj88o20x.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_l5819oh34eqp": {
-      "title": "Self-reflect wave2 aliases adapter changes",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:37:43.564Z",
-      "completedAt": "2026-05-09T01:40:57.362Z",
-      "path": ".trajectories/completed/2026-05/traj_l5819oh34eqp.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_l9dqx77vep6j": {
-      "title": "Address wave2 alias self-reflection gaps for notion, linear, and github adapters",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:42:31.760Z",
-      "completedAt": "2026-05-09T01:46:42.787Z",
-      "path": ".trajectories/completed/2026-05/traj_l9dqx77vep6j.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_mkpozdu5fxr1": {
-      "title": "Fix conflicts with PR 58",
-      "status": "completed",
-      "startedAt": "2026-05-09T14:16:59.458Z",
-      "completedAt": "2026-05-09T14:20:04.843Z",
-      "path": ".trajectories/completed/2026-05/traj_mkpozdu5fxr1.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_o1y5muotka4w": {
-      "title": "Add adapter mount indexes and per-integration layout prompts for notion, linear, and github",
-      "status": "completed",
-      "startedAt": "2026-05-09T00:08:06.487Z",
-      "completedAt": "2026-05-09T00:19:26.918Z",
-      "path": ".trajectories/completed/2026-05/traj_o1y5muotka4w.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_p0t2n5d0ek0z": {
-      "title": "Verify relayfile-adapters typecheck status for round 2",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:56:20.320Z",
-      "completedAt": "2026-05-09T01:56:27.486Z",
-      "path": ".trajectories/completed/2026-05/traj_p0t2n5d0ek0z.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_rdftspt1yadm": {
-      "title": "tier1-adapters-batch-3-workflow",
-      "status": "completed",
-      "startedAt": "2026-05-07T19:39:58.632Z",
-      "completedAt": "2026-05-07T19:52:58.260Z",
-      "path": ".trajectories/completed/2026-05/traj_rdftspt1yadm.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_s4inhof8b7tl": {
-      "title": "Review PR feedback and update Google Calendar publish support",
-      "status": "completed",
-      "startedAt": "2026-05-09T14:25:35.933Z",
-      "completedAt": "2026-05-09T14:27:22.182Z",
-      "path": ".trajectories/completed/2026-05/traj_s4inhof8b7tl.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_senalnr87cfe": {
-      "title": "Address wave0 naming adapter 80-to-100 verdict",
-      "status": "completed",
-      "startedAt": "2026-05-08T23:56:39.542Z",
-      "completedAt": "2026-05-08T23:57:54.333Z",
-      "path": ".trajectories/completed/2026-05/traj_senalnr87cfe.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_t6n0arcfkuc7": {
-      "title": "Round 1 verification for adapter-notion/linear/github tests",
-      "status": "completed",
-      "startedAt": "2026-05-09T02:44:20.234Z",
-      "completedAt": "2026-05-09T02:44:29.912Z",
-      "path": ".trajectories/completed/2026-05/traj_t6n0arcfkuc7.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_v7kz5lfib27o": {
-      "title": "feat(mount): semantic-key aliases (by-title / by-id) (issue #106 PR 2)",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:20:24.302Z",
-      "completedAt": "2026-05-09T01:36:31.867Z",
-      "path": ".trajectories/completed/2026-05/traj_v7kz5lfib27o.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_voemk8m9w61a": {
-      "title": "Round 2 verification for semantic alias mounts",
-      "status": "completed",
-      "startedAt": "2026-05-09T01:54:28.880Z",
-      "completedAt": "2026-05-09T01:54:34.949Z",
-      "path": ".trajectories/completed/2026-05/traj_voemk8m9w61a.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_xt5ru09pf9aq": {
-      "title": "Ship discoverable schemas for relayfile adapter write endpoints",
-      "status": "completed",
-      "startedAt": "2026-05-07T19:56:13.268Z",
-      "completedAt": "2026-05-08T23:40:14.381Z",
-      "path": ".trajectories/completed/2026-05/traj_xt5ru09pf9aq.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_nnq6f7e78asl": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "active",
-      "startedAt": "2026-05-09T22:43:49.732Z",
-      "path": ".trajectories/active/traj_nnq6f7e78asl.json"
-    },
-    "traj_gq9twwoibke4": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "active",
-      "startedAt": "2026-05-10T01:26:08.072Z",
-      "path": ".trajectories/active/traj_gq9twwoibke4.json"
-    },
-    "traj_32ldy512qsdo": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "active",
-      "startedAt": "2026-05-10T04:01:44.892Z",
-      "path": ".trajectories/active/traj_32ldy512qsdo.json"
-    },
-    "traj_dn6kva9xi8vh": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "active",
-      "startedAt": "2026-05-10T06:57:51.717Z",
-      "path": ".trajectories/active/traj_dn6kva9xi8vh.json"
-    },
-    "traj_lwuwxo5kc3sz": {
-      "title": "046-research-integration-scopes-workflow",
-      "status": "completed",
-      "startedAt": "2026-05-10T07:49:16.228Z",
-      "completedAt": "2026-05-10T07:51:14.884Z",
-      "path": ".trajectories/completed/2026-05/traj_lwuwxo5kc3sz.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
-    },
-    "traj_eq6nyund0mp5": {
-      "title": "Add Atlassian OAuth scopes to scope catalog",
-      "status": "completed",
-      "startedAt": "2026-05-09T19:35:16.593Z",
-      "completedAt": "2026-05-09T19:36:53.534Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_eq6nyund0mp5.json",
-      "compactedInto": "compact_6bxhb5ypxvt2"
+      "startedAt": "2026-05-18T13:43:13.123Z",
+      "completedAt": "2026-05-18T14:04:02.650Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_xasxdv23opdv.json"
     },
     "traj_16jy5n5ejwmn": {
       "title": "Track A: buildSummary() for Tier-1 providers",
@@ -335,61 +16,33 @@
       "completedAt": "2026-05-12T01:36:53.740Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_16jy5n5ejwmn.json"
     },
+    "traj_1bv9s1rgebx9": {
+      "title": "Round 3 verification for adapter test wave",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:45:25.666Z",
+      "completedAt": "2026-05-09T02:45:33.633Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_1bv9s1rgebx9.json"
+    },
+    "traj_1cp55q4ou2fh": {
+      "title": "Review PR 47 Google Calendar adapter alignment",
+      "status": "completed",
+      "startedAt": "2026-05-09T13:45:10.860Z",
+      "completedAt": "2026-05-09T13:47:49.306Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_1cp55q4ou2fh.json"
+    },
+    "traj_23xtlhiffucc": {
+      "title": "Fix wave1 index adapter gaps",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:28:22.710Z",
+      "completedAt": "2026-05-09T00:35:21.614Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_23xtlhiffucc.json"
+    },
     "traj_26dxjcy6eeao": {
       "title": "Implement Tier-2 buildSummary adapters for Salesforce, HubSpot, Stripe, Zendesk, and Asana",
       "status": "completed",
       "startedAt": "2026-05-12T07:43:30.336Z",
       "completedAt": "2026-05-12T07:51:21.689Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_26dxjcy6eeao.json"
-    },
-    "traj_653cvqi7c650": {
-      "title": "Address PR 67 feedback",
-      "status": "abandoned",
-      "startedAt": "2026-05-12T10:04:48.218Z",
-      "completedAt": "2026-05-12T10:19:47.488Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_653cvqi7c650.json"
-    },
-    "traj_aad65ivnpfxj": {
-      "title": "Address PR 68 feedback",
-      "status": "completed",
-      "startedAt": "2026-05-12T10:24:14.001Z",
-      "completedAt": "2026-05-15T10:22:52.332Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_aad65ivnpfxj.json"
-    },
-    "traj_d8xc6lop46pt": {
-      "title": "Track G: Tier-3 buildSummary (9 providers)",
-      "status": "completed",
-      "startedAt": "2026-05-12T08:09:19.612Z",
-      "completedAt": "2026-05-12T08:28:28.057Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_d8xc6lop46pt.json"
-    },
-    "traj_et4ghsuda3uz": {
-      "title": "Finish relayfile adapter lifecycle digest sweep",
-      "status": "completed",
-      "startedAt": "2026-05-15T10:36:32.907Z",
-      "completedAt": "2026-05-15T10:37:12.092Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_et4ghsuda3uz.json"
-    },
-    "traj_vy46it87lscw": {
-      "title": "Implement Tier-2 buildSummary adapters for Salesforce, HubSpot, Stripe, Zendesk, and Asana",
-      "status": "completed",
-      "startedAt": "2026-05-12T06:28:57.987Z",
-      "completedAt": "2026-05-12T06:37:06.442Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_vy46it87lscw.json"
-    },
-    "traj_gp710tis5d5b": {
-      "title": "Address relayfile-adapters PR 97 review comments",
-      "status": "completed",
-      "startedAt": "2026-05-15T11:47:53.245Z",
-      "completedAt": "2026-05-15T11:58:11.229Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_gp710tis5d5b.json"
-    },
-    "traj_9tel0oqwwd1y": {
-      "title": "Add issue-tracking digest category aliases",
-      "status": "completed",
-      "startedAt": "2026-05-15T12:01:17.105Z",
-      "completedAt": "2026-05-15T12:16:08.421Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_9tel0oqwwd1y.json"
     },
     "traj_2jcdbcpmirqj": {
       "title": "Review issue-tracking digest alias coverage",
@@ -398,12 +51,68 @@
       "completedAt": "2026-05-15T12:26:39.246Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_2jcdbcpmirqj.json"
     },
-    "traj_r1g8avti0ax8": {
-      "title": "Review and tighten relayfile-adapters PR 97",
+    "traj_2jz9s66d4e4y": {
+      "title": "Fresh review address PR comments and push PR 47",
       "status": "completed",
-      "startedAt": "2026-05-15T12:49:18.431Z",
-      "completedAt": "2026-05-15T12:57:44.735Z",
-      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_r1g8avti0ax8.json"
+      "startedAt": "2026-05-09T14:06:33.133Z",
+      "completedAt": "2026-05-09T14:16:17.661Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_2jz9s66d4e4y.json"
+    },
+    "traj_2npvaxto407n": {
+      "title": "review-loop-mpb4d8ew-4-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T12:31:40.271Z",
+      "completedAt": "2026-05-18T12:50:30.157Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_2npvaxto407n.json"
+    },
+    "traj_32ldy512qsdo": {
+      "title": "046-research-integration-scopes-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-10T04:01:44.892Z",
+      "completedAt": "2026-05-10T04:32:24.293Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_32ldy512qsdo.json"
+    },
+    "traj_4cuwr7i5avuh": {
+      "title": "Address relayfile-adapters PR 62 follow-up review feedback",
+      "status": "completed",
+      "startedAt": "2026-05-09T19:17:27.352Z",
+      "completedAt": "2026-05-09T19:18:00.585Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_4cuwr7i5avuh.json"
+    },
+    "traj_653cvqi7c650": {
+      "title": "Address PR 67 feedback",
+      "status": "abandoned",
+      "startedAt": "2026-05-12T10:04:48.218Z",
+      "completedAt": "2026-05-12T10:19:47.488Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_653cvqi7c650.json"
+    },
+    "traj_6vnxiez75wmt": {
+      "title": "review-loop-mpb8lp2z-1-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T13:25:45.739Z",
+      "completedAt": "2026-05-18T13:43:13.025Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_6vnxiez75wmt.json"
+    },
+    "traj_9eoa0wuwyfb0": {
+      "title": "tier1-verify-batch-3-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-07T20:30:09.553Z",
+      "completedAt": "2026-05-08T23:31:36.388Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_9eoa0wuwyfb0.json"
+    },
+    "traj_9tel0oqwwd1y": {
+      "title": "Add issue-tracking digest category aliases",
+      "status": "completed",
+      "startedAt": "2026-05-15T12:01:17.105Z",
+      "completedAt": "2026-05-15T12:16:08.421Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_9tel0oqwwd1y.json"
+    },
+    "traj_a1qvsg37i2r9": {
+      "title": "Verify relayfile-adapters turbo typecheck is clean",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:46:39.804Z",
+      "completedAt": "2026-05-09T00:46:46.474Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_a1qvsg37i2r9.json"
     },
     "traj_a1zqsgk4yiah": {
       "title": "Final comprehensive self-review of relayfile-adapters PR 97",
@@ -411,6 +120,342 @@
       "startedAt": "2026-05-15T13:05:27.270Z",
       "completedAt": "2026-05-15T13:10:33.685Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_a1zqsgk4yiah.json"
+    },
+    "traj_aad65ivnpfxj": {
+      "title": "Address PR 68 feedback",
+      "status": "completed",
+      "startedAt": "2026-05-12T10:24:14.001Z",
+      "completedAt": "2026-05-15T10:22:52.332Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_aad65ivnpfxj.json"
+    },
+    "traj_afa3rotbl7sc": {
+      "title": "Write issue 45 agent relay workflow",
+      "status": "completed",
+      "startedAt": "2026-05-09T09:14:27.219Z",
+      "completedAt": "2026-05-09T09:23:48.329Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_afa3rotbl7sc.json"
+    },
+    "traj_b5rtmzlzv2gb": {
+      "title": "Round 3 verification for issue #106",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:44:58.005Z",
+      "completedAt": "2026-05-09T00:45:04.040Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_b5rtmzlzv2gb.json"
+    },
+    "traj_c8nfy3gfqjj6": {
+      "title": "Address relayfile-adapters PR 62 review feedback",
+      "status": "completed",
+      "startedAt": "2026-05-09T19:08:59.937Z",
+      "completedAt": "2026-05-09T19:10:04.508Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_c8nfy3gfqjj6.json"
+    },
+    "traj_ce7qj6am1dx6": {
+      "title": "wave3-state-and-lazy: Linear by-state aliases and GitHub lazy materialization",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:20:11.271Z",
+      "completedAt": "2026-05-09T02:31:10.406Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_ce7qj6am1dx6.json"
+    },
+    "traj_cik0jtcmd67m": {
+      "title": "Fresh-eyes review relayfile-adapters GitLab Jira digest reconciliation",
+      "status": "completed",
+      "startedAt": "2026-05-15T14:34:39.308Z",
+      "completedAt": "2026-05-15T14:37:42.762Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_cik0jtcmd67m.json"
+    },
+    "traj_cp6xclxps3w3": {
+      "title": "Find tier 3 and tier 4 integration specs",
+      "status": "completed",
+      "startedAt": "2026-05-07T19:35:23.703Z",
+      "completedAt": "2026-05-07T19:36:21.452Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_cp6xclxps3w3.json"
+    },
+    "traj_d8xc6lop46pt": {
+      "title": "Track G: Tier-3 buildSummary (9 providers)",
+      "status": "completed",
+      "startedAt": "2026-05-12T08:09:19.612Z",
+      "completedAt": "2026-05-12T08:28:28.057Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_d8xc6lop46pt.json"
+    },
+    "traj_dc57wrk7jh0h": {
+      "title": "Address wave1-indexes peer review in relayfile-adapters",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:53:50.159Z",
+      "completedAt": "2026-05-09T01:01:03.439Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_dc57wrk7jh0h.json"
+    },
+    "traj_dls3i46f27ug": {
+      "title": "review-loop-mpb4d8ew-2-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T11:47:59.919Z",
+      "completedAt": "2026-05-18T12:10:26.235Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_dls3i46f27ug.json"
+    },
+    "traj_dn6kva9xi8vh": {
+      "title": "046-research-integration-scopes-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-10T06:57:51.717Z",
+      "completedAt": "2026-05-10T07:00:31.895Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_dn6kva9xi8vh.json"
+    },
+    "traj_dtqftdiubmfm": {
+      "title": "Fix PR 47 Google Calendar adapter review issues",
+      "status": "completed",
+      "startedAt": "2026-05-09T13:52:00.325Z",
+      "completedAt": "2026-05-09T14:02:24.507Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_dtqftdiubmfm.json"
+    },
+    "traj_eq6nyund0mp5": {
+      "title": "Add Atlassian OAuth scopes to scope catalog",
+      "status": "completed",
+      "startedAt": "2026-05-09T19:35:16.593Z",
+      "completedAt": "2026-05-09T19:36:53.534Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_eq6nyund0mp5.json"
+    },
+    "traj_et4ghsuda3uz": {
+      "title": "Finish relayfile adapter lifecycle digest sweep",
+      "status": "completed",
+      "startedAt": "2026-05-15T10:36:32.907Z",
+      "completedAt": "2026-05-15T10:37:12.092Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_et4ghsuda3uz.json"
+    },
+    "traj_frduijl0r31s": {
+      "title": "Verify relayfile-adapters typecheck surface",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:55:24.655Z",
+      "completedAt": "2026-05-09T01:55:28.688Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_frduijl0r31s.json"
+    },
+    "traj_ft4l3pdp7p38": {
+      "title": "Verify relayfile-adapters typecheck status",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:45:44.969Z",
+      "completedAt": "2026-05-09T00:45:54.563Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_ft4l3pdp7p38.json"
+    },
+    "traj_fwfai2urcvwb": {
+      "title": "Verify turbo typecheck is clean in relayfile-adapters",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:47:11.091Z",
+      "completedAt": "2026-05-09T02:47:19.120Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_fwfai2urcvwb.json"
+    },
+    "traj_gp710tis5d5b": {
+      "title": "Address relayfile-adapters PR 97 review comments",
+      "status": "completed",
+      "startedAt": "2026-05-15T11:47:53.245Z",
+      "completedAt": "2026-05-15T11:58:11.229Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_gp710tis5d5b.json"
+    },
+    "traj_gq9twwoibke4": {
+      "title": "046-research-integration-scopes-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-10T01:26:08.072Z",
+      "completedAt": "2026-05-10T01:57:19.658Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_gq9twwoibke4.json"
+    },
+    "traj_jda1vsuedsrv": {
+      "title": "046-research-integration-scopes-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-09T20:02:38.233Z",
+      "completedAt": "2026-05-09T20:26:59.402Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_jda1vsuedsrv.json"
+    },
+    "traj_jlw60d43y37p": {
+      "title": "Address PR 59 feedback and fix conflicts",
+      "status": "completed",
+      "startedAt": "2026-05-09T14:35:25.119Z",
+      "completedAt": "2026-05-10T19:18:21.143Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_jlw60d43y37p.json"
+    },
+    "traj_jnxeadnofxq5": {
+      "title": "tier1-verify-batch-3-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-07T20:38:00.556Z",
+      "completedAt": "2026-05-07T20:43:40.682Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_jnxeadnofxq5.json"
+    },
+    "traj_jsxz58l1m5vh": {
+      "title": "Address adapter peer review findings for wave2 aliases",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:03:19.666Z",
+      "completedAt": "2026-05-09T02:07:21.934Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_jsxz58l1m5vh.json"
+    },
+    "traj_k15895zmhz8w": {
+      "title": "tier1-verify-batch-3-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-07T20:11:43.181Z",
+      "completedAt": "2026-05-07T20:16:16.382Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_k15895zmhz8w.json"
+    },
+    "traj_k2zbhhdat4bi": {
+      "title": "review-loop-mpb4d8ew-3-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T12:10:26.309Z",
+      "completedAt": "2026-05-18T12:31:40.196Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_k2zbhhdat4bi.json"
+    },
+    "traj_kc9gwj88o20x": {
+      "title": "Fix issue #106 state aliases and lazy adapter verification gaps",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:37:36.697Z",
+      "completedAt": "2026-05-09T02:43:43.095Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_kc9gwj88o20x.json"
+    },
+    "traj_l5819oh34eqp": {
+      "title": "Self-reflect wave2 aliases adapter changes",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:37:43.564Z",
+      "completedAt": "2026-05-09T01:40:57.362Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_l5819oh34eqp.json"
+    },
+    "traj_l8qmm63qxvc8": {
+      "title": "Open X adapter PR and integrate Cloud via worktree",
+      "status": "completed",
+      "startedAt": "2026-05-17T20:17:36.976Z",
+      "completedAt": "2026-05-17T20:48:00.332Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_l8qmm63qxvc8.json"
+    },
+    "traj_l9dqx77vep6j": {
+      "title": "Address wave2 alias self-reflection gaps for notion, linear, and github adapters",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:42:31.760Z",
+      "completedAt": "2026-05-09T01:46:42.787Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_l9dqx77vep6j.json"
+    },
+    "traj_lwuwxo5kc3sz": {
+      "title": "046-research-integration-scopes-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-10T07:49:16.228Z",
+      "completedAt": "2026-05-10T07:51:14.884Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_lwuwxo5kc3sz.json"
+    },
+    "traj_mkpozdu5fxr1": {
+      "title": "Fix conflicts with PR 58",
+      "status": "completed",
+      "startedAt": "2026-05-09T14:16:59.458Z",
+      "completedAt": "2026-05-09T14:20:04.843Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_mkpozdu5fxr1.json"
+    },
+    "traj_mqh320a5zqse": {
+      "title": "review-loop-mpb4d8ew-5-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T12:50:30.228Z",
+      "completedAt": "2026-05-18T13:08:39.752Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_mqh320a5zqse.json"
+    },
+    "traj_o1y5muotka4w": {
+      "title": "Add adapter mount indexes and per-integration layout prompts for notion, linear, and github",
+      "status": "completed",
+      "startedAt": "2026-05-09T00:08:06.487Z",
+      "completedAt": "2026-05-09T00:19:26.918Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_o1y5muotka4w.json"
+    },
+    "traj_o2n3hqf8xhru": {
+      "title": "Review adapter digest lifecycle coverage",
+      "status": "completed",
+      "startedAt": "2026-05-15T15:17:50.065Z",
+      "completedAt": "2026-05-17T19:18:13.269Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_o2n3hqf8xhru.json"
+    },
+    "traj_p0t2n5d0ek0z": {
+      "title": "Verify relayfile-adapters typecheck status for round 2",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:56:20.320Z",
+      "completedAt": "2026-05-09T01:56:27.486Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_p0t2n5d0ek0z.json"
+    },
+    "traj_pvgpmzs86rh9": {
+      "title": "Fresh-eyes review relayfile-adapters lifecycle and digest work",
+      "status": "completed",
+      "startedAt": "2026-05-15T14:54:12.881Z",
+      "completedAt": "2026-05-15T14:57:38.753Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_pvgpmzs86rh9.json"
+    },
+    "traj_q7vhb9378uqk": {
+      "title": "Wire Jira privacy-safe adapter storage",
+      "status": "completed",
+      "startedAt": "2026-05-09T18:56:17.285Z",
+      "completedAt": "2026-05-09T18:56:17.493Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_q7vhb9378uqk.json"
+    },
+    "traj_r1g8avti0ax8": {
+      "title": "Review and tighten relayfile-adapters PR 97",
+      "status": "completed",
+      "startedAt": "2026-05-15T12:49:18.431Z",
+      "completedAt": "2026-05-15T12:57:44.735Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_r1g8avti0ax8.json"
+    },
+    "traj_rdftspt1yadm": {
+      "title": "tier1-adapters-batch-3-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-07T19:39:58.632Z",
+      "completedAt": "2026-05-07T19:52:58.260Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_rdftspt1yadm.json"
+    },
+    "traj_s4inhof8b7tl": {
+      "title": "Review PR feedback and update Google Calendar publish support",
+      "status": "completed",
+      "startedAt": "2026-05-09T14:25:35.933Z",
+      "completedAt": "2026-05-09T14:27:22.182Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_s4inhof8b7tl.json"
+    },
+    "traj_senalnr87cfe": {
+      "title": "Address wave0 naming adapter 80-to-100 verdict",
+      "status": "completed",
+      "startedAt": "2026-05-08T23:56:39.542Z",
+      "completedAt": "2026-05-08T23:57:54.333Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_senalnr87cfe.json"
+    },
+    "traj_t6n0arcfkuc7": {
+      "title": "Round 1 verification for adapter-notion/linear/github tests",
+      "status": "completed",
+      "startedAt": "2026-05-09T02:44:20.234Z",
+      "completedAt": "2026-05-09T02:44:29.912Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_t6n0arcfkuc7.json"
+    },
+    "traj_v7kz5lfib27o": {
+      "title": "feat(mount): semantic-key aliases (by-title / by-id) (issue #106 PR 2)",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:20:24.302Z",
+      "completedAt": "2026-05-09T01:36:31.867Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_v7kz5lfib27o.json"
+    },
+    "traj_voemk8m9w61a": {
+      "title": "Round 2 verification for semantic alias mounts",
+      "status": "completed",
+      "startedAt": "2026-05-09T01:54:28.880Z",
+      "completedAt": "2026-05-09T01:54:34.949Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_voemk8m9w61a.json"
+    },
+    "traj_vy46it87lscw": {
+      "title": "Implement Tier-2 buildSummary adapters for Salesforce, HubSpot, Stripe, Zendesk, and Asana",
+      "status": "completed",
+      "startedAt": "2026-05-12T06:28:57.987Z",
+      "completedAt": "2026-05-12T06:37:06.442Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_vy46it87lscw.json"
+    },
+    "traj_wli7nqxzmtw1": {
+      "title": "review-loop-mpb4d8ew-1-workflow",
+      "status": "completed",
+      "startedAt": "2026-05-18T11:27:12.410Z",
+      "completedAt": "2026-05-18T11:47:59.835Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_wli7nqxzmtw1.json"
+    },
+    "traj_wxhac1kyfu4u": {
+      "title": "Build X social search adapter integration",
+      "status": "completed",
+      "startedAt": "2026-05-17T19:56:29.253Z",
+      "completedAt": "2026-05-17T20:09:47.737Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_wxhac1kyfu4u.json"
+    },
+    "traj_xt5ru09pf9aq": {
+      "title": "Ship discoverable schemas for relayfile adapter write endpoints",
+      "status": "completed",
+      "startedAt": "2026-05-07T19:56:13.268Z",
+      "completedAt": "2026-05-08T23:40:14.381Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_xt5ru09pf9aq.json"
     }
   }
 }

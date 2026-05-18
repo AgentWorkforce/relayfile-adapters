@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { digest, type DigestContext } from './digest.js';
+import {
+  githubByAssigneeAliasPath,
+  githubByCreatorAliasPath,
+  githubByPriorityAliasPath,
+  githubByStateAliasPath,
+  githubByTitleAliasPath,
+} from './path-mapper.js';
 
 test('digest returns deterministic GitHub bullets sorted by event time and id', async () => {
   const ctx: DigestContext = {
@@ -161,10 +168,34 @@ test('digest ignores GitHub alias paths without dropping canonical repos with al
     async changeEvents() {
       return [
         {
-          id: 'evt-alias',
+          id: 'evt-alias-state',
           timestamp: '2026-05-12T08:00:00.000Z',
           action: 'opened',
-          canonicalPath: 'github/repos/acme__api/issues/by-title/add-login.json',
+          canonicalPath: githubByStateAliasPath('acme', 'api', 'issues', 'open', 42),
+        },
+        {
+          id: 'evt-alias-assignee',
+          timestamp: '2026-05-12T08:01:00.000Z',
+          action: 'opened',
+          canonicalPath: githubByAssigneeAliasPath('acme', 'api', 'issues', 'Ada Lovelace', 42),
+        },
+        {
+          id: 'evt-alias-creator',
+          timestamp: '2026-05-12T08:02:00.000Z',
+          action: 'opened',
+          canonicalPath: githubByCreatorAliasPath('acme', 'api', 'issues', 'Grace Hopper', 42),
+        },
+        {
+          id: 'evt-alias-priority',
+          timestamp: '2026-05-12T08:03:00.000Z',
+          action: 'opened',
+          canonicalPath: githubByPriorityAliasPath('acme', 'api', 'issues', 'high', 42),
+        },
+        {
+          id: 'evt-alias-title',
+          timestamp: '2026-05-12T08:04:00.000Z',
+          action: 'opened',
+          canonicalPath: githubByTitleAliasPath('acme', 'api', 'issues', 'Add login', 42),
         },
         {
           id: 'evt-canonical',
