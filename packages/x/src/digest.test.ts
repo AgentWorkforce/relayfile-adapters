@@ -62,6 +62,36 @@ test('X digest classifies deletions', async () => {
   assert.equal(section?.bullets[0]?.text, 'user 2244994945 was deleted');
 });
 
+test('X digest classifies creates and preserves canonical paths', async () => {
+  const section = await runDigest([
+    {
+      id: '4',
+      timestamp: '2026-05-17T10:04:00Z',
+      action: 'created',
+      canonicalPath: '/x/posts/new-post__1880002.json',
+    },
+  ]);
+
+  assert.deepEqual(section?.bullets, [
+    { text: 'post 1880002 was created', canonicalPath: 'x/posts/new-post__1880002.json' },
+  ]);
+});
+
+test('X digest classifies terminal lifecycle actions', async () => {
+  const section = await runDigest([
+    {
+      id: '5',
+      timestamp: '2026-05-17T10:05:00Z',
+      action: 'archived',
+      canonicalPath: '/x/searches/s2__release-train/meta.json',
+    },
+  ]);
+
+  assert.deepEqual(section?.bullets, [
+    { text: 'search s2 was archived', canonicalPath: 'x/searches/s2__release-train/meta.json' },
+  ]);
+});
+
 test('X digest uses locale-independent tie-breaks for equal timestamps', async () => {
   const section = await runDigest([
     {

@@ -132,7 +132,13 @@ function recordBasename(path: string): string {
 
 const ACTION_VERB_PATTERN_1 = actionVerbRegex('search|searched|run|ran');
 const ACTION_VERB_PATTERN_2 = actionVerbRegex('create|created|add|added|write|written');
-const ACTION_VERB_PATTERN_3 = actionVerbRegex('delete|deleted|remove|removed');
+const ACTION_VERB_PATTERN_3 = actionVerbRegex('close|closed');
+const ACTION_VERB_PATTERN_4 = actionVerbRegex('merge|merged');
+const ACTION_VERB_PATTERN_5 = actionVerbRegex('archive|archived');
+const ACTION_VERB_PATTERN_6 = actionVerbRegex('complete|completed');
+const ACTION_VERB_PATTERN_7 = actionVerbRegex('cancel|canceled|cancelled');
+const ACTION_VERB_PATTERN_8 = actionVerbRegex('resolve|resolved');
+const ACTION_VERB_PATTERN_9 = actionVerbRegex('delete|deleted|remove|removed');
 
 function pastTense(event: DigestChangeEvent): string {
   const action = (event.action ?? event.eventType ?? event.type ?? '').toLowerCase();
@@ -143,6 +149,24 @@ function pastTense(event: DigestChangeEvent): string {
     return 'was created';
   }
   if (hasActionVerb(action, ACTION_VERB_PATTERN_3)) {
+    return 'was closed';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_4)) {
+    return 'was merged';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_5)) {
+    return 'was archived';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_6)) {
+    return 'was completed';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_7)) {
+    return 'was canceled';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_8)) {
+    return 'was resolved';
+  }
+  if (hasActionVerb(action, ACTION_VERB_PATTERN_9)) {
     return 'was deleted';
   }
   return 'was updated';

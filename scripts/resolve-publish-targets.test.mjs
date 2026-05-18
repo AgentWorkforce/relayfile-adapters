@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import test from 'node:test';
 
 const execFileAsync = promisify(execFile);
+const corePackage = JSON.parse(readFileSync(new URL('../packages/core/package.json', import.meta.url), 'utf8'));
+const publishedCoreVersion = `${corePackage.name}@${corePackage.version}`;
 
 async function resolveTargets(input, env = {}) {
   const { stdout } = await execFileAsync('node', [
@@ -80,7 +83,7 @@ test('explicit package input includes required internal dependencies', async () 
 test('current-version publish skips already-published internal dependencies', async () => {
   const list = await resolveTargets('gitlab', {
     INPUT_VERSION: 'none',
-    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: publishedCoreVersion,
   });
 
   assert.deepEqual(list, ['gitlab']);
@@ -89,7 +92,7 @@ test('current-version publish skips already-published internal dependencies', as
 test('current-version publish exits cleanly when every resolved package is already published', async () => {
   const result = await resolveTargetsRaw('core', {
     INPUT_VERSION: 'none',
-    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: publishedCoreVersion,
   });
 
   assert.equal(result.stdout, 'packages=\n');
@@ -98,7 +101,7 @@ test('current-version publish exits cleanly when every resolved package is alrea
 
 test('missing publish skips already-published internal dependencies', async () => {
   const list = await resolveTargets('missing', {
-    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: '@relayfile/adapter-core@0.2.24',
+    RESOLVE_PUBLISH_TARGETS_NPM_PUBLISHED: publishedCoreVersion,
   });
 
   assert.ok(list.includes('gitlab'), `expected gitlab in ${list.join(' ')}`);

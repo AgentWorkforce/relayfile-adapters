@@ -41,6 +41,7 @@ import {
   xUserPath,
   xUsersIndexPath,
 } from './path-mapper.js';
+import { slugifyAlias } from './alias-slug.js';
 import type {
   XPost,
   XPostIndexRow,
@@ -84,6 +85,8 @@ export async function emitXAuxiliaryFiles(
   const results = [...(input.results ?? []), ...bundles.flatMap((bundle) => bundle.results)];
   const resultSearchIdsByPostId = groupResultSearchIdsByPostId(results);
   const resultPostIdsBySearchId = groupResultPostIdsBySearchId(results);
+  const collidingSearchQueryIds = aliasCollisionIds(searches.filter(isFullSearch), (search) => search.id, (search) => search.query);
+  const collidingUserUsernameIds = aliasCollisionIds(users.filter(isFullUser), (user) => user.id, (user) => user.username);
 
   const priorReader = new PriorAliasReader(client, workspaceId);
   const searchIndex = new IndexFileReconciler<XSearchIndexRow>({
@@ -130,10 +133,11 @@ export async function emitXAuxiliaryFiles(
       workspaceId,
       resultPostIdsBySearchId,
       getResultIndex,
+      collidingSearchQueryIds,
     ),
   ));
   accumulate(aggregate, await runEmitBatch(client, workspaceId, users, (record) =>
-    planUserRecord(record, priorReader, userIndex, input.connectionId),
+    planUserRecord(record, priorReader, userIndex, input.connectionId, collidingUserUsernameIds),
   ));
   const usersById = new Map(users.filter(isFullUser).map((user) => [user.id, user]));
   const postsById = new Map(posts.filter(isFullPost).map((post) => [post.id, post]));
@@ -192,6 +196,7 @@ async function planSearchRecord(
   workspaceId: string,
   resultPostIdsBySearchId: ReadonlyMap<string, ReadonlySet<string>>,
   getResultIndex: (searchId: string, titleOrQuery: string | null | undefined) => IndexFileReconciler<XSearchResult>,
+  collidingSearchQueryIds: ReadonlySet<string>,
 ): Promise<EmitPlan> {
   const prior = await priorReader.read<PriorSearchState>(xSearchByIdAliasPath(record.id), (parsed) =>
     readPriorSearchState(parsed, record.id),
@@ -208,12 +213,13 @@ async function planSearchRecord(
       deletes: [
         { path: indexedPrior?.canonicalPath ?? xSearchMetaPath(record.id, title) },
         { path: xSearchByIdAliasPath(record.id) },
-        { path: xSearchByQueryAliasPath(query, record.id) },
+        ...searchQueryAliasDeletePaths(query, record.id).map((path) => ({ path })),
         ...priorResultDeletes,
       ],
     };
   }
 
+  const queryAliasColliding = collidingSearchQueryIds.has(record.id);
   const priorResultDeletes = await staleSearchResultDeletes(record.id, prior, client, workspaceId);
   const canonicalPath = xSearchMetaPath(record.id, record.title || record.query);
   const titleOrQuery = record.title || record.query;
@@ -232,7 +238,7 @@ async function planSearchRecord(
     : undefined;
   const deletes = staleDeletes([
     priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorCanonicalPath : undefined,
-    prior?.query && prior.query !== record.query ? xSearchByQueryAliasPath(prior.query, record.id) : undefined,
+    ...searchQueryAliasStalePaths(prior?.query, record.query, record.id, queryAliasColliding),
     ...(priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorResultDeletes.map((deleteInput) => deleteInput.path) : []),
     ...currentResultDeletes.map((deleteInput) => deleteInput.path),
   ]);
@@ -242,7 +248,7 @@ async function planSearchRecord(
     writes: [
       mirrorWrite(canonicalPath, content, searchSemantics(record)),
       mirrorWrite(xSearchByIdAliasPath(record.id), content, searchSemantics(record)),
-      mirrorWrite(xSearchByQueryAliasPath(record.query, record.id), content, searchSemantics(record)),
+      mirrorWrite(xSearchByQueryAliasPath(record.query, record.id, queryAliasColliding), content, searchSemantics(record)),
     ],
   };
 }
@@ -315,6 +321,7 @@ async function planUserRecord(
   priorReader: PriorAliasReader,
   index: IndexFileReconciler<XUserIndexRow>,
   connectionId: string | undefined,
+  collidingUserUsernameIds: ReadonlySet<string>,
 ): Promise<EmitPlan> {
   const prior = await priorReader.read<PriorUserState>(xUserByIdAliasPath(record.id), (parsed) =>
     readPriorUserState(parsed, record.id),
@@ -325,11 +332,12 @@ async function planUserRecord(
       deletes: staleDeletes([
         prior?.canonicalPath ?? xUserPath(record.id, prior?.username ?? prior?.name),
         xUserByIdAliasPath(record.id),
-        prior?.username ? xUserByUsernameAliasPath(prior.username, record.id) : undefined,
+        ...(prior?.username ? userUsernameAliasDeletePaths(prior.username, record.id) : []),
       ]),
     };
   }
 
+  const usernameAliasColliding = record.username ? collidingUserUsernameIds.has(record.id) : false;
   const label = record.username ?? record.name;
   const canonicalPath = xUserPath(record.id, label);
   const envelope = userEnvelope(record, canonicalPath, connectionId);
@@ -339,7 +347,7 @@ async function planUserRecord(
     : undefined;
   const deletes = staleDeletes([
     priorCanonicalPath && priorCanonicalPath !== canonicalPath ? priorCanonicalPath : undefined,
-    prior?.username && prior.username !== record.username ? xUserByUsernameAliasPath(prior.username, record.id) : undefined,
+    ...userUsernameAliasStalePaths(prior?.username, record.username, record.id, usernameAliasColliding),
   ]);
   index.upsert(xUserIndexRow(record));
   const writes: EmitWrite[] = [
@@ -347,7 +355,7 @@ async function planUserRecord(
     mirrorWrite(xUserByIdAliasPath(record.id), content, userSemantics(record)),
   ];
   if (record.username) {
-    writes.push(mirrorWrite(xUserByUsernameAliasPath(record.username, record.id), content, userSemantics(record)));
+    writes.push(mirrorWrite(xUserByUsernameAliasPath(record.username, record.id, usernameAliasColliding), content, userSemantics(record)));
   }
   return { deletes, writes };
 }
@@ -472,6 +480,74 @@ function mirrorWrite(path: string, content: string, semantics?: EmitWrite['seman
 
 function staleDeletes(paths: readonly (string | undefined)[]) {
   return [...new Set(paths.filter((path): path is string => Boolean(path)))].map((path) => ({ path }));
+}
+
+function aliasCollisionIds<T>(
+  records: readonly T[],
+  getId: (record: T) => string,
+  getAliasKey: (record: T) => string | null | undefined,
+): ReadonlySet<string> {
+  const buckets = new Map<string, string[]>();
+  for (const record of records) {
+    const aliasKey = getAliasKey(record);
+    if (!aliasKey) continue;
+    const slug = slugifyAlias(aliasKey);
+    const ids = buckets.get(slug) ?? [];
+    const id = getId(record);
+    if (!ids.includes(id)) ids.push(id);
+    buckets.set(slug, ids);
+  }
+  const colliding = new Set<string>();
+  for (const ids of buckets.values()) {
+    if (ids.length > 1) {
+      for (const id of ids) colliding.add(id);
+    }
+  }
+  return colliding;
+}
+
+function searchQueryAliasDeletePaths(query: string, searchId: string): string[] {
+  return [...new Set([
+    xSearchByQueryAliasPath(query, searchId),
+    xSearchByQueryAliasPath(query, searchId, true),
+  ])];
+}
+
+function searchQueryAliasStalePaths(
+  priorQuery: string | undefined,
+  currentQuery: string,
+  searchId: string,
+  currentColliding: boolean,
+): string[] {
+  const paths = new Set<string>();
+  if (priorQuery && priorQuery !== currentQuery) {
+    for (const path of searchQueryAliasDeletePaths(priorQuery, searchId)) paths.add(path);
+  }
+  paths.add(xSearchByQueryAliasPath(currentQuery, searchId, !currentColliding));
+  return [...paths];
+}
+
+function userUsernameAliasDeletePaths(username: string, userId: string): string[] {
+  return [...new Set([
+    xUserByUsernameAliasPath(username, userId),
+    xUserByUsernameAliasPath(username, userId, true),
+  ])];
+}
+
+function userUsernameAliasStalePaths(
+  priorUsername: string | undefined,
+  currentUsername: string | undefined,
+  userId: string,
+  currentColliding: boolean,
+): string[] {
+  const paths = new Set<string>();
+  if (priorUsername && priorUsername !== currentUsername) {
+    for (const path of userUsernameAliasDeletePaths(priorUsername, userId)) paths.add(path);
+  }
+  if (currentUsername) {
+    paths.add(xUserByUsernameAliasPath(currentUsername, userId, !currentColliding));
+  }
+  return [...paths];
 }
 
 function groupResultSearchIdsByPostId(results: readonly XSearchResult[]): Map<string, readonly string[]> {

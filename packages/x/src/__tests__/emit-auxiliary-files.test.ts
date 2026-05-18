@@ -216,6 +216,78 @@ test('emitXAuxiliaryFiles reconciles renamed searches and changed post alias fie
   assert.ok(deletes.includes(xPostByQueryAliasPath('old-search', post.id)));
 });
 
+test('emitXAuxiliaryFiles writes collision-disambiguated aliases and removes stale ambiguous aliases', async () => {
+  const firstRun = makeRun({
+    id: 's-collide-1',
+    title: 'First colliding search',
+    query: 'Agent Workflow!',
+  });
+  const secondRun = makeRun({
+    id: 's-collide-2',
+    title: 'Second colliding search',
+    query: 'agent workflow',
+  });
+  const firstPost: XPost = { ...post, id: '1880101', author_id: 'u1', text: 'First collision post' };
+  const secondPost: XPost = { ...post, id: '1880102', author_id: 'u2', text: 'Second collision post' };
+  const firstUser: XUser = { id: 'u1', username: 'X Developers', name: 'X Developers' };
+  const secondUser: XUser = { id: 'u2', username: 'x-developers', name: 'X Developers alt' };
+  const firstResult: XSearchResult = {
+    id: firstPost.id,
+    searchId: firstRun.id,
+    postId: firstPost.id,
+    rank: 1,
+    matchedAt: firstRun.requestedAt,
+    canonicalPath: xPostPath(firstPost.id, firstPost.text),
+    query: firstRun.query,
+  };
+  const secondResult: XSearchResult = {
+    id: secondPost.id,
+    searchId: secondRun.id,
+    postId: secondPost.id,
+    rank: 1,
+    matchedAt: secondRun.requestedAt,
+    canonicalPath: xPostPath(secondPost.id, secondPost.text),
+    query: secondRun.query,
+  };
+  const client = createClient({
+    [xSearchByQueryAliasPath(firstRun.query, firstRun.id)]: '{}',
+    [xSearchByQueryAliasPath(secondRun.query, secondRun.id)]: '{}',
+    [xUserByUsernameAliasPath(firstUser.username!, firstUser.id)]: '{}',
+    [xUserByUsernameAliasPath(secondUser.username!, secondUser.id)]: '{}',
+  });
+
+  await emitXAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    bundles: [
+      { run: firstRun, posts: [firstPost], users: [firstUser], results: [firstResult], rawResponses: [] },
+      { run: secondRun, posts: [secondPost], users: [secondUser], results: [secondResult], rawResponses: [] },
+    ],
+  });
+
+  const writtenPaths = client.writes.map((write) => write.path);
+  const deletedPaths = client.deletes.map((deleteInput) => deleteInput.path);
+  for (const expected of [
+    xSearchByQueryAliasPath(firstRun.query, firstRun.id, true),
+    xSearchByQueryAliasPath(secondRun.query, secondRun.id, true),
+    xUserByUsernameAliasPath(firstUser.username!, firstUser.id, true),
+    xUserByUsernameAliasPath(secondUser.username!, secondUser.id, true),
+    xPostByAuthorAliasPath(firstUser.username!, firstPost.id),
+    xPostByAuthorAliasPath(secondUser.username!, secondPost.id),
+  ]) {
+    assert.ok(writtenPaths.includes(expected), `missing ${expected}`);
+  }
+
+  for (const stale of [
+    xSearchByQueryAliasPath(firstRun.query, firstRun.id),
+    xSearchByQueryAliasPath(secondRun.query, secondRun.id),
+    xUserByUsernameAliasPath(firstUser.username!, firstUser.id),
+    xUserByUsernameAliasPath(secondUser.username!, secondUser.id),
+  ]) {
+    assert.ok(deletedPaths.includes(stale), `missing stale delete ${stale}`);
+    assert.equal(client.files.has(stale), false);
+  }
+});
+
 test('emitXAuxiliaryFiles deletes by-query search aliases from index state when by-id prior is missing', async () => {
   const run = makeRun({
     id: 'search-delete',
