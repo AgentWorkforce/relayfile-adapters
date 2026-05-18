@@ -8,7 +8,9 @@ Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull r
 \`/github/repos/_index.json\` lists materialized repositories.
 \`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
 \`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
-Issue and pull request aliases include \`by-id/<number>.json\`, \`by-title/<slug>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, and \`by-priority/<priority>/<number>.json\`.
+Issue and pull request aliases are materialized under \`/github/repos/<owner>__<repo>/<issues|pulls>/...\`, distinct from the canonical \`/github/repos/<owner>/<repo>/...\` tree. Alias views include \`by-id/<number>.json\`, \`by-title/<slug>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, \`by-priority/<priority>/<number>.json\`, and \`by-edited/YYYY-MM-DD/<number>.json\`. The edited-date bucket uses the provider update timestamp, or a merge/close timestamp when that is the most recent activity-summary fallback date.
+
+Writable resources advertise sibling schemas and create examples at \`discovery/github/repos/{owner}/{repo}/issues/.schema.json\`, \`discovery/github/repos/{owner}/{repo}/issues/.create.example.json\`, \`discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json\`, \`discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.create.example.json\`, \`discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/.schema.json\`, and \`discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/.create.example.json\`.
 
 ## Indexes
 
@@ -34,9 +36,13 @@ Examples:
 ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
-ls /github/repos/octocat/hello-world/issues/by-state/open
-ls /github/repos/octocat/hello-world/issues/by-assignee/octocat
-ls /github/repos/octocat/hello-world/issues/by-priority/high
+ls /github/repos/octocat__hello-world/issues/by-state/open
+ls /github/repos/octocat__hello-world/issues/by-assignee/octocat
+ls /github/repos/octocat__hello-world/issues/by-priority/high
+ls /github/repos/octocat__hello-world/issues/by-edited/2026-05-12
+jq '.title' /github/repos/octocat__hello-world/issues/by-edited/2026-05-12/42.json
+jq '.required' discovery/github/repos/{owner}/{repo}/issues/.schema.json
+ls discovery/github/repos/{owner}/{repo}/issues
 grep -R "TODO" /github/repos/octocat/hello-world/pulls
 \`\`\`
 `;

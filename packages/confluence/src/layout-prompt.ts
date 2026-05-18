@@ -32,6 +32,7 @@ Every page is duplicated into the \`by-*\` paths below — they all resolve to i
 - By state: \`/confluence/pages/by-state/<status>/<pageId>.json\` — \`current\`, \`draft\`, \`archived\`, or \`trashed\` (v2 documents only \`current|draft\`; archive/trash variants surface in real mounts).
 - By space: \`/confluence/pages/by-space/<spaceId>/<pageId>.json\` — flat sibling of the space-scoped canonical tree so \`ls\` works without slug resolution.
 - By parent: \`/confluence/pages/by-parent/<parentId>/<pageId>.json\` — only emitted when \`payload.parentId\` is present (top-level pages have no parent record).
+- By edited date: \`/confluence/pages/by-edited/YYYY-MM-DD/<pageId>.json\` — grouped by the page update timestamp for activity-summary fallback reads.
 
 ## Space Aliases
 
@@ -39,6 +40,10 @@ Every page is duplicated into the \`by-*\` paths below — they all resolve to i
 - By id: \`/confluence/spaces/by-id/<spaceId>.json\`.
 - By title: \`/confluence/spaces/by-title/<sanitized-name>.json\`.
 - By key: \`/confluence/spaces/by-key/<KEY>.json\` — the globally-unique human-meaningful space key (e.g. \`ENG\`). Mirrors the v2 \`GET /spaces?keys=\` filter.
+
+## Writeback Discovery
+
+Writable page resources advertise sibling schemas and create examples at \`discovery/confluence/pages/.schema.json\`, \`discovery/confluence/pages/.create.example.json\`, \`discovery/confluence/spaces/{spaceIdOrKey}/pages/.schema.json\`, and \`discovery/confluence/spaces/{spaceIdOrKey}/pages/.create.example.json\`.
 
 ## JSONL And Querying
 
@@ -60,6 +65,11 @@ jq '.payload.title' /confluence/pages/by-state/draft/*.json
 # Walk a page's children
 ls /confluence/pages/by-parent/98765/
 jq '.payload | {id, title, status}' /confluence/pages/by-parent/98765/*.json
+
+# Browse recently edited pages and writeback discovery
+ls /confluence/pages/by-edited/2026-05-12/
+jq '.required' discovery/confluence/pages/.schema.json
+ls discovery/confluence/spaces/{spaceIdOrKey}/pages
 
 # Sorted snapshot from the canonical index
 jq '.[] | {id, title, status}' /confluence/pages/_index.json

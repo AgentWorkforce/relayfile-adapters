@@ -313,6 +313,10 @@ export function notionByIdAliasPath(parentScope: string, id: string): string {
   return `${parentScope}/by-id/${assertSegment(idSuffix(id), 'alias id')}.json`;
 }
 
+export function notionByEditedAliasPath(parentScope: string, editedDate: string, id: string): string {
+  return `${parentScope}/by-edited/${assertSegment(editedDate, 'alias edited date')}/${assertSegment(idSuffix(id), 'alias id')}.json`;
+}
+
 /**
  * `/notion/pages/by-database/<database-slug>__<db_short_id>/<page-slug>__<page_short_id>.json`.
  *

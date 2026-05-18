@@ -7,6 +7,7 @@ import {
   githubAliasRepoPrefix,
   githubByAssigneeAliasPath,
   githubByCreatorAliasPath,
+  githubByEditedAliasPath,
   githubByIdAliasPath,
   githubByPriorityAliasPath,
   githubByStateAliasPath,
@@ -182,6 +183,19 @@ describe('path-mapper', () => {
       assert.equal(
         githubByPriorityAliasPath('octocat', 'hello-world', 'issues', 'P0 Critical', 7),
         '/github/repos/octocat__hello-world/issues/by-priority/p0-critical/7.json',
+      );
+      assert.equal(
+        githubByEditedAliasPath('octocat', 'hello-world', 'pulls', '2026-05-12', 42),
+        '/github/repos/octocat__hello-world/pulls/by-edited/2026-05-12/42.json',
+      );
+      assert.equal(
+        decodeURIComponent(
+          githubByEditedAliasPath('my org', 'my repo', 'issues', '2026-05-12', '7/8')
+            .split('/')
+            .pop()!
+            .replace(/\.json$/u, ''),
+        ),
+        '7/8',
       );
     });
   });

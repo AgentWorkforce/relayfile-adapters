@@ -33,7 +33,8 @@ titles can collide and the canonical filenames append a UUID suffix.
 │   ├── by-id/<dehyphenated-uuid>.json ← duplicate canonical record, keyed by UUID
 │   ├── by-title/<slug>__<short_id>.json
 │   ├── by-database/<db-slug>__<db_short>/<page-slug>__<short>.json
-│   └── by-parent/<page|database>-<parent-slug>__<short>/<page-slug>__<short>.json
+│   ├── by-parent/<page|database>-<parent-slug>__<short>/<page-slug>__<short>.json
+│   └── by-edited/YYYY-MM-DD/<short_id>.json
 ├── databases/
 │   ├── _index.json
 │   ├── <slug>__<id>/
@@ -113,6 +114,11 @@ pages are intentionally **not** materialized under \`by-parent\` because
 the workspace bucket would collect every top-level page and lose its
 navigational value — use \`/notion/pages/_index.json\` instead.
 
+### \`/notion/pages/by-edited/YYYY-MM-DD/<short_id>.json\`
+Edited-date lookup for activity-summary fallback reads. The bucket date is
+derived from Notion's \`last_edited_time\`, so agents can list recently touched
+pages without scanning every page record.
+
 ### \`/notion/databases/by-title/<slug>__<short_id>.json\`
 Database title lookup. Same shape and collision-handling as the page
 by-title alias.
@@ -143,6 +149,10 @@ property update payload to \`properties.json\` beside a page directory, such
 as \`/notion/pages/<slug>__<id>/properties.json\` or
 \`/notion/databases/<db>/pages/<slug>__<id>/properties.json\`.
 
+Writable database page resources advertise sibling discovery files at
+\`discovery/notion/databases/{databaseId}/pages/.schema.json\` and
+\`discovery/notion/databases/{databaseId}/pages/.create.example.json\`.
+
 ## Common commands
 
 \`\`\`bash
@@ -155,8 +165,16 @@ ls /notion/pages/by-database/engineering-wiki__<db_short>/
 # Find every direct child of a parent page
 ls /notion/pages/by-parent/page-<parent-slug>__<short>/
 
+# Find recently edited pages by provider edit date
+ls /notion/pages/by-edited/2026-05-12/
+jq '.id' /notion/pages/by-edited/2026-05-12/a1b2c3d4.json
+
 # Resolve a user UUID by name
 jq -r '.id' /notion/users/by-name/alice-chen__a1b2c3d4.json
+
+# Inspect writeback schema and example files
+jq '.required' discovery/notion/databases/{databaseId}/pages/.schema.json
+ls discovery/notion/databases/{databaseId}/pages
 
 # Browse raw notion records
 ls /notion/pages

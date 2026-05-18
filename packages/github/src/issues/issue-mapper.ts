@@ -1,5 +1,6 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
+import { ingestIssueComments } from './comment-mapper.js';
 import {
   githubByIdAliasPath,
   githubByTitleAliasPath,
@@ -44,15 +45,6 @@ interface IssueMapping {
   title: string | null;
   vfsPath: string;
 }
-
-type IssueCommentIngestor = (
-  provider: unknown,
-  owner: string,
-  repo: string,
-  number: number,
-  vfs: VfsLike,
-  issueTitle?: string,
-) => Promise<IngestResult>;
 
 export function mapIssue(issue: JsonObject, owner: string, repo: string): IssueMapping {
   const issueNumber = readPositiveInteger(issue, 'number');
@@ -103,7 +95,7 @@ export async function ingestIssue(
     mapped.content,
   );
   await writeIssueAliases(vfs, owner, repo, number, mapped.title, mapped.content);
-  const commentResult = await resolveIssueCommentIngestor()(
+  const commentResult = await ingestIssueComments(
     provider,
     owner,
     repo,
@@ -281,23 +273,6 @@ function mappedMetaField(content: string, key: keyof IssueMeta): string {
   const parsed = JSON.parse(content) as IssueMeta;
   const value = parsed[key];
   return typeof value === 'string' ? value : '';
-}
-
-function resolveIssueCommentIngestor(): IssueCommentIngestor {
-  const loader = new Function(
-    'return import("./comment-mapper.js").then((module) => module.ingestIssueComments);',
-  ) as () => Promise<unknown>;
-
-  return async (provider, owner, repo, number, vfs, issueTitle) => {
-    const loaded = await loader();
-    if (typeof loaded !== 'function') {
-      throw new Error(
-        'Issue comment mapper must export ingestIssueComments(provider, owner, repo, number, vfs)',
-      );
-    }
-
-    return loaded(provider, owner, repo, number, vfs, issueTitle) as Promise<IngestResult>;
-  };
 }
 
 async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise<void> {

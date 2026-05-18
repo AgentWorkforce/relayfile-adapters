@@ -57,6 +57,7 @@ import {
   jiraCommentPath,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
+  jiraIssueByEditedPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
@@ -295,6 +296,7 @@ async function planIssueWrite(
     (creatorObject as { accountId?: unknown }).accountId,
   );
   const priorityName = readNonEmptyString((priorityObject as { name?: unknown }).name);
+  const editedDate = editedDateSegment(readIssueEditedAt(issue));
 
   const safe = sanitizeJiraRecordForStorage(issue as unknown as Record<string, unknown>);
   // `sanitizeJiraRecordForStorage` strips the entire `fields.assignee` user
@@ -319,7 +321,16 @@ async function planIssueWrite(
   }
   const content = renderObjectContent(safe, 'issue', id, connectionId, false);
 
-  const newPaths = issuePathsFor({ id, summary, status, key, assigneeAccountId, creatorAccountId, priorityName });
+  const newPaths = issuePathsFor({
+    id,
+    summary,
+    status,
+    key,
+    assigneeAccountId,
+    creatorAccountId,
+    priorityName,
+    editedDate,
+  });
 
   // Reconciliation: read prior by-id to recover summary/status/key and
   // diff against the new alias set. by-id is the stable anchor and is
@@ -371,10 +382,11 @@ interface PriorIssueState {
   assigneeAccountId?: string | undefined;
   creatorAccountId?: string | undefined;
   priorityName?: string | undefined;
+  editedDate?: string | undefined;
 }
 
 function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
-  const { id, summary, status, key, assigneeAccountId, creatorAccountId, priorityName } = args;
+  const { id, summary, status, key, assigneeAccountId, creatorAccountId, priorityName, editedDate } = args;
   const paths: string[] = [];
   // Canonical: `<slug>__<id>.json` — uses the issue summary for the slug,
   // falling back to the key when summary is missing (matches the existing
@@ -400,6 +412,9 @@ function issuePathsFor(args: { id: string } & PriorIssueState): string[] {
   if (priorityName) {
     paths.push(jiraIssueByPriorityPath(priorityName, id));
   }
+  if (editedDate) {
+    paths.push(jiraIssueByEditedPath(editedDate, id));
+  }
   return paths;
 }
 
@@ -424,6 +439,7 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     priorityName: readNonEmptyString(
       (fields as { priorityName?: unknown }).priorityName,
     ),
+    editedDate: editedDateSegment(readIssueEditedAt(payload)),
   };
 }
 
@@ -752,6 +768,18 @@ function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readIssueEditedAt(issue: { fields?: unknown; updated?: unknown }): string | undefined {
+  const fields = isRecord(issue.fields) ? issue.fields : {};
+  return (
+    readNonEmptyString((fields as { updated?: unknown }).updated) ??
+    readNonEmptyString((issue as { updated?: unknown }).updated)
+  );
+}
+
+function editedDateSegment(value: string | undefined): string | undefined {
+  return value?.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

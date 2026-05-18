@@ -210,6 +210,10 @@ export function confluencePageByStatePath(status: string, pageId: string): strin
   return `${CONFLUENCE_PATH_ROOT}/pages/by-state/${slugifyStatusName(status)}/${encodeConfluencePathSegment(pageId)}.json`;
 }
 
+export function confluencePageByEditedPath(editedDate: string, pageId: string): string {
+  return `${CONFLUENCE_PATH_ROOT}/pages/by-edited/${encodeConfluencePathSegment(editedDate)}/${encodeConfluencePathSegment(pageId)}.json`;
+}
+
 export function confluenceByTitleAliasPath(scope: string, title: string, id: string, colliding = false): string {
   const slug = slugifyAlias(title);
   if (!slug) {

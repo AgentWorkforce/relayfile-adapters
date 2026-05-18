@@ -55,6 +55,9 @@ for (const adapter of adapters) {
     if (!adapterMd.includes(`\`${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
       failures.push(`${adapter.slug}: .adapter.md must list ${schemaPath} plus Operations and ID Patterns sections`);
     }
+    if (!adapterMd.includes('*.tmp.json') || !adapterMd.includes('*.partial.json')) {
+      failures.push(`${adapter.slug}: .adapter.md must document ignored temporary/partial writeback filenames`);
+    }
   }
 }
 

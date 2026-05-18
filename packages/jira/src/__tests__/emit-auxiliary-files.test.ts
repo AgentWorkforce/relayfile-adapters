@@ -12,6 +12,7 @@ import {
   jiraCommentPath,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
+  jiraIssueByEditedPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
@@ -175,8 +176,8 @@ describe('emitJiraAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // 5 file writes (canonical + by-id + by-title + by-key + by-state) + 1 issues index + 1 root index.
-    assert.equal(result.written, 7);
+    // 6 file writes (canonical + by-id + by-title + by-key + by-state + by-edited) + 1 issues index + 1 root index.
+    assert.equal(result.written, 8);
     assert.deepEqual(result.errors, []);
 
     const expectedFilePaths = [
@@ -185,6 +186,7 @@ describe('emitJiraAuxiliaryFiles', () => {
       jiraIssueByTitleAliasPath('Release Plan', '10001'),
       jiraIssueByKeyAliasPath('KAN-42'),
       jiraIssueByStatePath('In Progress', '10001'),
+      jiraIssueByEditedPath('2026-05-12', '10001'),
     ];
     const writtenPaths = client.writes.map((w) => w.path);
     for (const expected of expectedFilePaths) {
@@ -235,6 +237,7 @@ describe('emitJiraAuxiliaryFiles', () => {
         fields: {
           summary: 'Old Summary',
           status: { name: 'In Progress' },
+          updated: '2026-05-11T00:00:00Z',
         },
       },
     };
@@ -252,6 +255,7 @@ describe('emitJiraAuxiliaryFiles', () => {
           key: 'KAN-42',
           summary: 'New Summary',
           status: 'In Progress',
+          updated: '2026-05-12T00:00:00Z',
         }),
       ],
     });
@@ -266,6 +270,10 @@ describe('emitJiraAuxiliaryFiles', () => {
       deletedPaths.includes(jiraIssueByTitleAliasPath('Old Summary', '10001')),
       `expected prior by-title alias in deletes, got: ${deletedPaths.join(', ')}`,
     );
+    assert.ok(
+      deletedPaths.includes(jiraIssueByEditedPath('2026-05-11', '10001')),
+      `expected prior by-edited alias in deletes, got: ${deletedPaths.join(', ')}`,
+    );
     // by-key didn't change → not in deletes.
     assert.ok(!deletedPaths.includes(jiraIssueByKeyAliasPath('KAN-42')));
     // by-id is the anchor → never in deletes.
@@ -275,6 +283,7 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(jiraIssuePath('10001', 'New Summary')));
     assert.ok(writtenPaths.includes(jiraIssueByTitleAliasPath('New Summary', '10001')));
     assert.ok(writtenPaths.includes(jiraIssueByKeyAliasPath('KAN-42')));
+    assert.ok(writtenPaths.includes(jiraIssueByEditedPath('2026-05-12', '10001')));
     assert.deepEqual(result.errors, []);
   });
 

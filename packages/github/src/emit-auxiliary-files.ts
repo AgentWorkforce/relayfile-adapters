@@ -70,6 +70,7 @@ import {
 import {
   githubByAssigneeAliasPath,
   githubByCreatorAliasPath,
+  githubByEditedAliasPath,
   githubByIdAliasPath,
   githubByPriorityAliasPath,
   githubByStateAliasPath,
@@ -118,6 +119,8 @@ export interface GitHubPullRequestEmitRecord extends GitHubRepoContext {
   priority?: string;
   updated_at?: string;
   updatedAt?: string;
+  closed_at?: string | null;
+  merged_at?: string | null;
 }
 
 export interface GitHubIssueEmitRecord extends GitHubRepoContext {
@@ -130,6 +133,7 @@ export interface GitHubIssueEmitRecord extends GitHubRepoContext {
   priority?: string;
   updated_at?: string;
   updatedAt?: string;
+  closed_at?: string | null;
 }
 
 export interface GitHubRepositoryEmitRecord extends GitHubRepoContext {
@@ -430,6 +434,7 @@ interface PriorNumberedState {
   assigneeKeys?: string[] | undefined;
   creatorKey?: string | undefined;
   priority?: string | undefined;
+  editedDate?: string | undefined;
   /** owner/repo recovered from the prior payload — needed for delete
    *  tombstones that don't carry repo context. */
   owner?: string | undefined;
@@ -464,6 +469,7 @@ async function planNumberedWrite(
   const assigneeKeys = readGitHubAssigneeKeys(record);
   const creatorKey = readGitHubCreatorKey(record);
   const priority = readPriority(record);
+  const editedDate = editedDateSegment(readLifecycleEditedAt(record));
 
   const content = renderContent(objectType, record, connectionId, false);
 
@@ -483,6 +489,7 @@ async function planNumberedWrite(
     assigneeKeys,
     creatorKey,
     priority,
+    editedDate,
   });
   const priorTitle = prior?.title;
   const priorPaths = prior
@@ -496,6 +503,7 @@ async function planNumberedWrite(
         assigneeKeys: prior.assigneeKeys,
         creatorKey: prior.creatorKey,
         priority: prior.priority,
+        editedDate: prior.editedDate,
       })
     : [];
   const stalePaths = diffPaths(priorPaths, newPaths);
@@ -555,6 +563,7 @@ async function planNumberedDelete(
     assigneeKeys: prior?.assigneeKeys,
     creatorKey: prior?.creatorKey,
     priority: prior?.priority,
+    editedDate: prior?.editedDate,
   });
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
 
@@ -650,6 +659,7 @@ function priorNumberedStateFromIndexRow(
     assigneeKeys: readStringArray(row.assigneeKeys),
     creatorKey: readNonEmptyString(row.creatorKey),
     priority: readNonEmptyString(row.priority),
+    editedDate: editedDateSegment(readNonEmptyString(row.updated)),
     owner: repoInfo.owner,
     repo: repoInfo.repo,
   };
@@ -665,8 +675,9 @@ function numberedPathsFor(args: {
   assigneeKeys?: string[] | undefined;
   creatorKey?: string | undefined;
   priority?: string | undefined;
+  editedDate?: string | undefined;
 }): string[] {
-  const { owner, repo, aliasKind, number, title, state, assigneeKeys, creatorKey, priority } = args;
+  const { owner, repo, aliasKind, number, title, state, assigneeKeys, creatorKey, priority, editedDate } = args;
   const objectType: 'pull_request' | 'issue' = aliasKind === 'pulls' ? 'pull_request' : 'issue';
   const paths: string[] = [];
   paths.push(canonicalPathFor(objectType, owner, repo, number, title));
@@ -687,6 +698,9 @@ function numberedPathsFor(args: {
   }
   if (priority && slugifies(priority)) {
     paths.push(githubByPriorityAliasPath(owner, repo, aliasKind, priority, number));
+  }
+  if (editedDate) {
+    paths.push(githubByEditedAliasPath(owner, repo, aliasKind, editedDate, number));
   }
   return paths;
 }
@@ -894,6 +908,7 @@ function extractPriorNumberedState(parsed: Record<string, unknown>): PriorNumber
     priority: readPriority(payload),
     owner: readNonEmptyString(payload.owner),
     repo: readNonEmptyString(payload.repo),
+    editedDate: editedDateSegment(readLifecycleEditedAt(payload)),
   };
 }
 
@@ -1020,6 +1035,19 @@ function readUpdatedAt(record: Record<string, unknown>): string {
     readNonEmptyString((record as { pushed_at?: unknown }).pushed_at) ??
     ''
   );
+}
+
+function readLifecycleEditedAt(record: Record<string, unknown>): string | undefined {
+  return (
+    readNonEmptyString(record.merged_at) ??
+    readNonEmptyString(record.closed_at) ??
+    readNonEmptyString(record.updated_at) ??
+    readNonEmptyString(record.updatedAt)
+  );
+}
+
+function editedDateSegment(value: string | undefined): string | undefined {
+  return value?.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
 }
 
 function isDeleteRecord(record: unknown): record is ScopedDeleteTombstone {

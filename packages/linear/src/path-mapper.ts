@@ -268,6 +268,10 @@ export function linearIssueByPriorityPath(priority: number | string, identifier:
   )}/${encodeLinearPathSegment(identifier)}.json`;
 }
 
+export function linearIssueByEditedPath(editedDate: string, issueId: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-edited/${encodeLinearPathSegment(editedDate)}/${encodeLinearPathSegment(issueId)}.json`;
+}
+
 export function linearPrioritySlug(priority: number | string): string {
   if (typeof priority === 'number') {
     switch (priority) {

@@ -78,6 +78,7 @@ import {
   linearCyclePath,
   linearIssueByAssigneePath,
   linearIssueByCreatorPath,
+  linearIssueByEditedPath,
   linearIssueByPriorityPath,
   linearIssueByStatePath,
   linearIssuePath,
@@ -305,9 +306,10 @@ async function planIssueWrite(
   const assigneeId = readIssueAssigneeId(issue);
   const creatorId = readIssueCreatorId(issue);
   const priority = issue.priority ?? undefined;
+  const editedDate = editedDateSegment(readIssueEditedAt(issue));
 
   const content = renderContent('issue', issue, connectionId, false);
-  const newPaths = issuePathsFor({ id, identifier, title, stateName, assigneeId, creatorId, priority });
+  const newPaths = issuePathsFor({ id, identifier, title, stateName, assigneeId, creatorId, priority, editedDate });
 
   // Reconciliation: the by-uuid alias is the stable anchor — it's always
   // emitted (keyed on the UUID, which is always present) so a prior write
@@ -336,6 +338,7 @@ async function planIssueWrite(
           assigneeId: prior.assigneeId,
           creatorId: prior.creatorId,
           priority: prior.priority,
+          editedDate: prior.editedDate,
         }),
         newPaths,
       )
@@ -392,6 +395,7 @@ interface PriorIssueState {
   assigneeId?: string | undefined;
   creatorId?: string | undefined;
   priority?: number | string | undefined;
+  editedDate?: string | undefined;
 }
 
 function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueState | null {
@@ -404,6 +408,7 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     assigneeId: readPriorUserId(payload.assignee) ?? readNonEmptyString(payload.assignee_id),
     creatorId: readPriorUserId(payload.creator) ?? readNonEmptyString(payload.creator_id),
     priority: readPriority(payload.priority),
+    editedDate: editedDateSegment(readIssueEditedAt(payload)),
   };
 }
 
@@ -424,8 +429,9 @@ function issuePathsFor(args: {
   assigneeId?: string | undefined;
   creatorId?: string | undefined;
   priority?: number | string | undefined;
+  editedDate?: string | undefined;
 }): string[] {
-  const { id, identifier, title, stateName, assigneeId, creatorId, priority } = args;
+  const { id, identifier, title, stateName, assigneeId, creatorId, priority, editedDate } = args;
   const humanReadable = identifier ?? title;
   const paths: string[] = [];
   // Canonical path.
@@ -460,6 +466,9 @@ function issuePathsFor(args: {
   if (priority !== undefined && identifier) {
     paths.push(linearIssueByPriorityPath(priority, identifier));
   }
+  if (editedDate) {
+    paths.push(linearIssueByEditedPath(editedDate, id));
+  }
   return paths;
 }
 
@@ -484,6 +493,28 @@ function readPriority(value: unknown): number | string | undefined {
     return value;
   }
   return readNonEmptyString(value);
+}
+
+function readIssueEditedAt(issue: {
+  updatedAt?: unknown;
+  updated_at?: unknown;
+  completedAt?: unknown;
+  canceledAt?: unknown;
+  createdAt?: unknown;
+  created_at?: unknown;
+}): string | undefined {
+  return (
+    readNonEmptyString(issue.updatedAt) ??
+    readNonEmptyString(issue.updated_at) ??
+    readNonEmptyString(issue.completedAt) ??
+    readNonEmptyString(issue.canceledAt) ??
+    readNonEmptyString(issue.createdAt) ??
+    readNonEmptyString(issue.created_at)
+  );
+}
+
+function editedDateSegment(value: string | undefined): string | undefined {
+  return value?.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
 }
 
 function toIssueNode(issue: LinearIssue): LinearIssueNode {

@@ -5,6 +5,7 @@ import { emitConfluenceAuxiliaryFiles } from '../emit-auxiliary-files.js';
 import type { RelayFileClientLike, WriteFileInput, DeleteFileInput, ReadFileInput, ReadFileResult } from '../types.js';
 import {
   confluencePageByIdAliasPath,
+  confluencePageByEditedPath,
   confluencePageByParentAliasPath,
   confluencePageBySpaceAliasPath,
   confluencePageByStatePath,
@@ -107,15 +108,16 @@ describe('emitConfluenceAuxiliaryFiles', () => {
       status: 'current',
       spaceId: '12345',
       parentId: '54321',
+      version: { createdAt: '2026-05-12T08:15:00.000Z' },
     };
     const result = await emitConfluenceAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
       pages: [page],
     });
 
-    // Page emits 6 files (canonical + by-id + by-title + by-state + by-space + by-parent),
+    // Page emits 7 files (canonical + by-id + by-title + by-state + by-space + by-parent + by-edited),
     // plus 1 pages index write, plus 1 root index write.
-    assert.equal(result.written, 8);
+    assert.equal(result.written, 9);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
@@ -123,6 +125,7 @@ describe('emitConfluenceAuxiliaryFiles', () => {
       confluencePageByIdAliasPath('98765'),
       confluencePageByTitleAliasPath('Release Plan', '98765'),
       confluencePageByStatePath('current', '98765'),
+      confluencePageByEditedPath('2026-05-12', '98765'),
       confluencePageBySpaceAliasPath('12345', '98765'),
       confluencePageByParentAliasPath('54321', '98765'),
       confluencePagesIndexPath(),
@@ -155,7 +158,13 @@ describe('emitConfluenceAuxiliaryFiles', () => {
       objectType: 'page',
       objectId: '98765',
       deleted: false,
-      payload: { id: '98765', title: 'Old Title', status: 'current', spaceId: '12345' },
+      payload: {
+        id: '98765',
+        title: 'Old Title',
+        status: 'current',
+        spaceId: '12345',
+        version: { createdAt: '2026-05-11T00:00:00.000Z' },
+      },
     };
     const client = createClient({
       initialFiles: {
@@ -166,7 +175,13 @@ describe('emitConfluenceAuxiliaryFiles', () => {
     const result = await emitConfluenceAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
       pages: [
-        { id: '98765', title: 'New Title', status: 'current', spaceId: '12345' },
+        {
+          id: '98765',
+          title: 'New Title',
+          status: 'current',
+          spaceId: '12345',
+          version: { createdAt: '2026-05-12T00:00:00.000Z' },
+        },
       ],
     });
 
@@ -182,6 +197,10 @@ describe('emitConfluenceAuxiliaryFiles', () => {
       deletedPaths.includes(confluencePagePath('98765', 'Old Title', '12345')),
       `expected prior canonical path in deletes`,
     );
+    assert.ok(
+      deletedPaths.includes(confluencePageByEditedPath('2026-05-11', '98765')),
+      `expected prior by-edited alias in deletes`,
+    );
     // by-id stays (no rename impact).
     assert.ok(!deletedPaths.includes(confluencePageByIdAliasPath('98765')));
 
@@ -189,6 +208,7 @@ describe('emitConfluenceAuxiliaryFiles', () => {
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(confluencePageByTitleAliasPath('New Title', '98765')));
     assert.ok(writtenPaths.includes(confluencePagePath('98765', 'New Title', '12345')));
+    assert.ok(writtenPaths.includes(confluencePageByEditedPath('2026-05-12', '98765')));
 
     assert.deepEqual(result.errors, []);
   });

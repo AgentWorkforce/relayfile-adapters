@@ -318,26 +318,23 @@ Future agents can query past trajectories to learn from your decisions.
 
 # Relayfile Integration Digest Contract
 
-Every adapter that exposes provider records to Relayfile must also expose a
-usable digest contract. When adding or materially changing an adapter:
+Relayfile digest rendering is generic upstream over workspace events. Every
+adapter that exposes provider records to Relayfile must expose usable metadata
+and layout aliases for that generic renderer. When adding or materially changing
+an adapter:
 
-- Add or update `src/digest.ts` and export it from the package barrel.
 - Classify lifecycle actions explicitly. Terminal states such as `closed`,
   `merged`, `archived`, `completed`, `canceled`, and `resolved` must not fall
   through to a generic "updated" line unless the provider has no terminal
   concept.
 - Do not model terminal lifecycle states as deletion in adapter webhook
   handling. Only actual upstream deletes should produce delete semantics.
-- Add digest tests beside the adapter tests. Cover at least create/update,
-  terminal state, delete, deterministic sorting, and empty-window behavior.
-- If an adapter intentionally does not participate in digests, document why in
-  the package README or PR and keep the no-op handler covered by a test.
 - Keep digest behavior and layout aliases aligned with the category matrix in
   `docs/digest-layout-contract.md`. Issue-tracking resources must expose
   `by-state`, `by-assignee`, `by-creator`, and `by-priority` unless the matrix
   documents an explicit exception; status-driven build/deploy resources must
   expose `by-status`.
 - Run `npm run test:digest-contracts` after adding or changing an adapter,
-  digest handler, layout manifest, or category matrix entry.
+  layout manifest, or category matrix entry.
 
 Full rule: `.claude/rules/relayfile-integration-digests.md`.

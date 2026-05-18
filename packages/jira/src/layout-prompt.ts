@@ -36,6 +36,7 @@ Issues are addressable through parallel paths that all resolve to the same canon
 - By assignee: \`/jira/issues/by-assignee/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the current assignee. Unassigned issues are not emitted under this prefix.
 - By creator: \`/jira/issues/by-creator/<accountId>/<issueId>.json\` — grouped by the Atlassian \`accountId\` of the issue creator.
 - By priority: \`/jira/issues/by-priority/<priority>/<issueId>.json\` — grouped by the slugged Jira priority name.
+- By edited date: \`/jira/issues/by-edited/YYYY-MM-DD/<issueId>.json\` — grouped by the issue \`updated\` timestamp so activity-summary fallback reads can list recently touched work without scanning the full issue index.
 
 Projects and sprints carry a stable reconciliation anchor keyed on the immutable id, so renames leave the alias resolving to the latest payload:
 
@@ -45,6 +46,15 @@ Projects and sprints carry a stable reconciliation anchor keyed on the immutable
 - \`/jira/sprints/by-title/<name-slug>__<id>.json\` — grouped by the current sprint name.
 
 Issue, project, and sprint aliases materialize the same provider envelope as the canonical record so reads through an alias return the full current payload. Title aliases include the immutable id after the slug, so same-title records do not collide.
+
+## Writeback Discovery
+
+Writable resources advertise sibling schemas and minimal create examples:
+
+- \`discovery/jira/issues/.schema.json\` and \`discovery/jira/issues/.create.example.json\`
+- \`discovery/jira/issues/{issueIdOrKey}/comments/.schema.json\` and \`discovery/jira/issues/{issueIdOrKey}/comments/.create.example.json\`
+- \`discovery/jira/issues/{issueIdOrKey}/transitions/.schema.json\` and \`discovery/jira/issues/{issueIdOrKey}/transitions/.create.example.json\`
+- \`discovery/jira/projects/.schema.json\` and \`discovery/jira/projects/.create.example.json\`
 
 ## JSONL And Querying
 
@@ -57,9 +67,12 @@ ls /jira/issues
 ls /jira/issues/by-state
 ls /jira/issues/by-assignee
 ls /jira/issues/by-priority
+ls /jira/issues/by-edited/2026-05-12
 jq '.[0]' /jira/issues/_index.json
 jq '.[] | select(.state == "In Progress") | {key, title}' /jira/issues/_index.json
 jq '{key, title, state}' /jira/issues/by-key/ENG-42.json
+jq '.required' discovery/jira/issues/.schema.json
+ls discovery/jira/issues/{issueIdOrKey}/comments
 grep -R "regression" /jira/issues
 \`\`\`
 `;

@@ -619,7 +619,16 @@ function readWritebackId(path: string): string | undefined {
 }
 
 function isReservedWritebackFilename(stem: string): boolean {
-  return stem === ".schema" || stem === ".create.example" || stem === ".adapter";
+  return (
+    stem === ".schema" ||
+    stem === ".create.example" ||
+    stem === ".adapter" ||
+    stem === ".tmp" ||
+    stem === ".partial" ||
+    stem === "partial" ||
+    stem.endsWith(".tmp") ||
+    stem.endsWith(".partial")
+  );
 }
 
 function testResourceId(pattern: RegExp, id: string): boolean {

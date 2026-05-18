@@ -5,6 +5,7 @@ import {
   computeConfluencePath,
   confluenceByIdAliasPath,
   confluenceByTitleAliasPath,
+  confluencePageByEditedPath,
   confluencePageByIdAliasPath,
   confluencePageByParentAliasPath,
   confluencePageBySpaceAliasPath,
@@ -152,6 +153,13 @@ describe('confluence path-mapper', () => {
       const parentAliasPath = confluencePageByParentAliasPath('44444', '98765');
       const parentLeaf = parentAliasPath.split('/').pop()!.replace(/\.json$/u, '');
       assert.equal(extractConfluenceIdFromPathSegment(parentLeaf), '98765');
+    });
+
+    it('emits by-edited aliases and round-trips the canonical page id', () => {
+      const aliasPath = confluencePageByEditedPath('2026-05-12', '98765');
+      assert.equal(aliasPath, '/confluence/pages/by-edited/2026-05-12/98765.json');
+      const leaf = aliasPath.split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(extractConfluenceIdFromPathSegment(leaf), '98765');
     });
   });
 

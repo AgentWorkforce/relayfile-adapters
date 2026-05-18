@@ -11,13 +11,13 @@ export type {
 export const layoutManifest: CoreLayoutManifestProvider = () => ({
   provider: 'jira',
   filenameConvention: '<key-or-slug>__<id>.json',
-  aliasSegments: ['by-assignee', 'by-creator', 'by-id', 'by-key', 'by-priority', 'by-title', 'by-state'],
+  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-key', 'by-priority', 'by-title', 'by-state'],
   resources: [
     {
       path: 'jira/issues',
       title: 'Issues',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title', 'by-key', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
+      aliasSegments: ['by-id', 'by-title', 'by-key', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'by-edited'],
       writebackResources: [
         { path: 'jira/issues', schemaId: 'jira/issue' },
         { path: 'jira/issues/comments', schemaId: 'jira/comment' },

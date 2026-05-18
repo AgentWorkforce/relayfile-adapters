@@ -6,6 +6,7 @@ import {
   extractJiraIdFromPathSegment,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
+  jiraIssueByEditedPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
@@ -117,6 +118,22 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     });
   });
 
+  describe('jiraIssueByEditedPath', () => {
+    it('composes a stable path under issues/by-edited/<date>/<issueId>', () => {
+      assert.equal(
+        jiraIssueByEditedPath('2026-05-12', '10001'),
+        `${JIRA_PATH_ROOT}/issues/by-edited/2026-05-12/10001.json`,
+      );
+    });
+
+    it('round-trips the issue id from the leaf segment', () => {
+      const issueId = '100/01';
+      const path = jiraIssueByEditedPath('2026-05-12', issueId);
+      const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
+    });
+  });
+
   describe('jiraProjectByIdAliasPath', () => {
     it('composes a stable path under projects/by-id/<id>', () => {
       assert.equal(jiraProjectByIdAliasPath('99'), `${JIRA_PATH_ROOT}/projects/by-id/99.json`);
@@ -201,6 +218,8 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     assert.throws(() => jiraIssueByCreatorAliasPath('acct-abc', ''), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('high', ''), /non-empty/u);
+    assert.throws(() => jiraIssueByEditedPath('', '10001'), /non-empty/u);
+    assert.throws(() => jiraIssueByEditedPath('2026-05-12', ''), /non-empty/u);
     assert.throws(() => jiraIssueByTitleAliasPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByTitleAliasPath('title', ''), /non-empty/u);
     assert.throws(() => jiraProjectByIdAliasPath(''), /non-empty/u);
