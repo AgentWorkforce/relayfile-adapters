@@ -13,6 +13,7 @@ import type {
 import {
   githubByAssigneeAliasPath,
   githubByCreatorAliasPath,
+  githubByEditedAliasPath,
   githubByIdAliasPath,
   githubByPriorityAliasPath,
   githubByStateAliasPath,
@@ -142,9 +143,10 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const byId = githubByIdAliasPath('acme', 'widgets', 'pulls', 42);
     const byTitle = githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'Add darkmode toggle', 42);
     const byState = githubByStateAliasPath('acme', 'widgets', 'pulls', 'open', 42);
+    const byEdited = githubByEditedAliasPath('acme', 'widgets', 'pulls', '2026-05-12', 42);
     const indexPath = githubRepoPullsIndexPath('acme', 'widgets');
 
-    for (const p of [canonical, byId, byTitle, byState, indexPath]) {
+    for (const p of [canonical, byId, byTitle, byState, byEdited, indexPath]) {
       assert.ok(writtenPaths.includes(p), `missing expected write ${p}`);
     }
 
@@ -153,6 +155,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.equal(client.files.get(byId), canonicalBytes);
     assert.equal(client.files.get(byTitle), canonicalBytes);
     assert.equal(client.files.get(byState), canonicalBytes);
+    assert.equal(client.files.get(byEdited), canonicalBytes);
 
     // Index row scoped to this repo.
     const indexBytes = client.files.get(indexPath)!;
@@ -174,6 +177,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
         number: 42,
         title: 'Old Title',
         state: 'open',
+        updated_at: '2026-05-11T00:00:00Z',
       },
     };
     const client = createClient({
@@ -209,6 +213,10 @@ describe('emitGitHubAuxiliaryFiles', () => {
       deletedPaths.includes(githubPullRequestPath('acme', 'widgets', 42, 'Old Title')),
       `expected prior canonical meta.json in deletes`,
     );
+    assert.ok(
+      deletedPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'pulls', '2026-05-11', 42)),
+      `expected prior by-edited alias in deletes`,
+    );
     // by-id alias stays put (it's the anchor — same path before and after).
     assert.ok(!deletedPaths.includes(githubByIdAliasPath('acme', 'widgets', 'pulls', 42)));
 
@@ -216,6 +224,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(githubPullRequestPath('acme', 'widgets', 42, 'New Title')));
     assert.ok(writtenPaths.includes(githubNumberedByTitleAliasPath('acme', 'widgets', 'pulls', 'New Title', 42)));
+    assert.ok(writtenPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'pulls', '2026-05-12', 42)));
   });
 
   it('reconciles a PR state transition by moving the by-state alias', async () => {
@@ -339,6 +348,7 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(writtenPaths.includes(githubByAssigneeAliasPath('acme', 'widgets', 'issues', 'octocat', 7)));
     assert.ok(writtenPaths.includes(githubByCreatorAliasPath('acme', 'widgets', 'issues', 'monalisa', 7)));
     assert.ok(writtenPaths.includes(githubByPriorityAliasPath('acme', 'widgets', 'issues', 'P0 Critical', 7)));
+    assert.ok(writtenPaths.includes(githubByEditedAliasPath('acme', 'widgets', 'issues', '2026-05-12', 7)));
     assert.ok(writtenPaths.includes(indexPath));
 
     // No writes leaked into the pulls index for this repo.

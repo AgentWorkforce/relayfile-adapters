@@ -77,6 +77,20 @@ test("classifyWrite chooses the most specific matching resource", () => {
   assert.equal(route?.resource.name, "comments");
 });
 
+test("classifyWrite ignores temporary and partial writeback filenames", () => {
+  for (const path of [
+    "/linear/issues/.tmp.json",
+    "/linear/issues/.partial.json",
+    "/linear/issues/partial.json",
+    "/linear/issues/draft.tmp.json",
+    "/linear/issues/draft.partial.json",
+    `/linear/issues/${issueId}/comments/comment.tmp.json`,
+    `/linear/issues/${issueId}/comments/comment.partial.json`,
+  ]) {
+    assert.equal(classifyWrite(path, resources), null, path);
+  }
+});
+
 test("validatePayload enforces create required fields", () => {
   const schema = issueSchema();
   const result = validatePayload({ priority: 2 }, schema, "create");

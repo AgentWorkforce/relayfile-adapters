@@ -6,6 +6,7 @@ import { layoutManifest } from './layout.js';
 const CANONICAL_ALIAS_SEGMENTS = new Set([
   'by-assignee',
   'by-creator',
+  'by-edited',
   'by-id',
   'by-priority',
   'by-state',
@@ -19,6 +20,7 @@ test('layoutManifest exposes GitHub resources with canonical aliases and writeba
   assert.deepEqual(manifest.aliasSegments, [
     'by-assignee',
     'by-creator',
+    'by-edited',
     'by-id',
     'by-priority',
     'by-state',

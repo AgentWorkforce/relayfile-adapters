@@ -1,5 +1,5 @@
 ---
-description: Provider adapters must keep Relayfile digests and lifecycle state wired
+description: Provider adapters must keep Relayfile digest metadata and lifecycle state wired
 paths:
   - packages/*/src/**
   - packages/*/test/**
@@ -8,34 +8,30 @@ paths:
 
 # Relayfile integration digests
 
-Relayfile digests are part of the adapter contract. If an adapter writes
-provider records that agents can read, the adapter must also make those records
-summarizable in the activity digest.
+Relayfile digests are rendered generically upstream from workspace events. If an
+adapter writes provider records that agents can read, the adapter must expose
+stable record metadata and layout aliases that make those records summarizable
+without provider-specific digest bullet code.
 
 ## Required for adapters
 
-- Export a real `digest` handler from `src/digest.ts` and the package `src/index.ts`.
-- The digest handler must use `ctx.changeEvents({ providers: [ctx.provider] })`
-  and return deterministic bullets sorted by event time and id.
 - Lifecycle verbs must be provider-aware. Explicitly classify terminal-state
   actions such as `closed`, `merged`, `archived`, `completed`, `canceled`, and
   `resolved`.
 - Webhook ingestion must preserve terminal lifecycle state as record data.
   Do not convert `closed`/`merged`/`archived`/`completed` into deletion unless
   the upstream object was actually deleted.
-- Add tests for create/update, terminal state, delete, deterministic ordering,
-  and empty windows.
 - Keep the provider layout aligned with the category matrix in
   `docs/digest-layout-contract.md`. For example, issue-tracking resources must
   expose `by-state`, `by-assignee`, `by-creator`, and `by-priority`; CI/deploy
   resources must expose `by-status` unless the matrix documents an explicit
   exception.
 - Run `npm run test:digest-contracts` whenever adding or materially changing an
-  adapter, digest handler, layout manifest, or category matrix entry.
+  adapter, layout manifest, or category matrix entry.
 
-## No-op handlers
+## Provider-specific handlers
 
-A digest handler that returns `null` is a temporary placeholder, not a pattern.
-Do not add new no-op digest handlers for providers that expose records in
-Relayfile. If a provider intentionally has no digest output, document that
-choice and test the exclusion.
+Adapters do not own provider-specific digest rendering. Do not add new
+adapter-owned bullet renderers or require `DigestSection`-style output in the
+adapter contract. Existing compatibility helpers may remain during a deprecation
+window, but layout/category metadata is the contract enforced here.

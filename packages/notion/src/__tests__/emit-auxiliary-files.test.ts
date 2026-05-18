@@ -12,6 +12,7 @@ import type {
 import { emitNotionAuxiliaryFiles } from '../emit-auxiliary-files.js';
 import {
   notionByIdAliasPath,
+  notionByEditedAliasPath,
   notionByNameAliasPath,
   notionByTitleAliasPath,
   notionDatabaseMetadataPath,
@@ -133,6 +134,7 @@ describe('emitNotionAuxiliaryFiles', () => {
       title: 'Release Plan',
       parent: { type: 'database_id', database_id: DATABASE_A } as const,
       databaseTitle: 'Tasks',
+      lastEditedTime: '2026-05-12T09:30:00.000Z',
     };
     const result = await emitNotionAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
@@ -146,6 +148,7 @@ describe('emitNotionAuxiliaryFiles', () => {
     // appear in the canonical filename.
     assert.ok(writtenPaths.has(notionDatabasePagePath(DATABASE_A, PAGE_A)));
     assert.ok(writtenPaths.has(notionByIdAliasPath(PAGES_SCOPE, PAGE_A)));
+    assert.ok(writtenPaths.has(notionByEditedAliasPath(PAGES_SCOPE, '2026-05-12', PAGE_A)));
     assert.ok(writtenPaths.has(notionByTitleAliasPath(PAGES_SCOPE, 'Release Plan', PAGE_A)));
     assert.ok(
       writtenPaths.has(
@@ -199,6 +202,7 @@ describe('emitNotionAuxiliaryFiles', () => {
         id: PAGE_A,
         title: 'Old Title',
         parent_type: 'workspace',
+        lastEditedTime: '2026-05-11T00:00:00.000Z',
       },
     };
     const client = createClient({
@@ -214,6 +218,7 @@ describe('emitNotionAuxiliaryFiles', () => {
           id: PAGE_A,
           title: 'New Title',
           parent: { type: 'workspace', workspace: true } as const,
+          lastEditedTime: '2026-05-12T00:00:00.000Z',
         },
       ],
     });
@@ -221,10 +226,12 @@ describe('emitNotionAuxiliaryFiles', () => {
     const deletedPaths = new Set(client.deletes.map((d) => d.path));
     // Old by-title alias gone.
     assert.ok(deletedPaths.has(notionByTitleAliasPath(PAGES_SCOPE, 'Old Title', PAGE_A)));
+    assert.ok(deletedPaths.has(notionByEditedAliasPath(PAGES_SCOPE, '2026-05-11', PAGE_A)));
     // by-id anchor stays in writes (we always re-emit it).
     const writtenPaths = new Set(client.writes.map((w) => w.path));
     assert.ok(writtenPaths.has(notionByIdAliasPath(PAGES_SCOPE, PAGE_A)));
     assert.ok(writtenPaths.has(notionByTitleAliasPath(PAGES_SCOPE, 'New Title', PAGE_A)));
+    assert.ok(writtenPaths.has(notionByEditedAliasPath(PAGES_SCOPE, '2026-05-12', PAGE_A)));
     // Canonical (id-only) stays at the same path — no delete should have
     // been queued for it.
     assert.ok(!deletedPaths.has(notionStandalonePagePath(PAGE_A)));

@@ -6,6 +6,7 @@ import {
   extractJiraIdFromPathSegment,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
+  jiraIssueByEditedPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByPriorityPath,
@@ -113,6 +114,36 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
       const issueId = '10001';
       const path = jiraIssueByPriorityPath('Highest Priority', issueId);
       const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
+    });
+  });
+
+  describe('jiraIssueByEditedPath', () => {
+    it('composes a stable path under issues/by-edited/<date>/<issueId>', () => {
+      assert.equal(
+        jiraIssueByEditedPath('2026-05-12', '10001'),
+        `${JIRA_PATH_ROOT}/issues/by-edited/2026-05-12/10001.json`,
+      );
+    });
+
+    it('round-trips the issue id from the leaf segment', () => {
+      const issueId = '100/01';
+      const path = jiraIssueByEditedPath('2026-05-12', issueId);
+      const leaf = path.slice(path.lastIndexOf('/') + 1).replace(/\.json$/u, '');
+      assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
+    });
+
+    it('does not collide with canonical or sibling issue alias subtrees', () => {
+      const issueId = '10001';
+      const byEdited = jiraIssueByEditedPath('2026-05-12', issueId);
+      const canonical = jiraIssuePath(issueId, 'Fix login redirect');
+      const byState = jiraIssueByStatePath('In Progress', issueId);
+      const byTitle = jiraIssueByTitleAliasPath('Fix login redirect', issueId);
+      const byPriority = jiraIssueByPriorityPath('High Priority', issueId);
+      const all = new Set([byEdited, canonical, byState, byTitle, byPriority]);
+      assert.equal(all.size, 5, 'by-edited must occupy its own issue namespace');
+      assert.ok(byEdited.startsWith(`${JIRA_PATH_ROOT}/issues/by-edited/2026-05-12/`));
+      const leaf = byEdited.slice(byEdited.lastIndexOf('/') + 1).replace(/\.json$/u, '');
       assert.equal(extractJiraIdFromPathSegment(leaf), issueId);
     });
   });
@@ -226,6 +257,8 @@ describe('jira path-mapper aliases (by-assignee, by-id)', () => {
     assert.throws(() => jiraIssueByCreatorAliasPath('acct-abc', ''), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByPriorityPath('high', ''), /non-empty/u);
+    assert.throws(() => jiraIssueByEditedPath('', '10001'), /non-empty/u);
+    assert.throws(() => jiraIssueByEditedPath('2026-05-12', ''), /non-empty/u);
     assert.throws(() => jiraIssueByTitleAliasPath('', '10001'), /non-empty/u);
     assert.throws(() => jiraIssueByTitleAliasPath('title', ''), /non-empty/u);
     assert.throws(() => jiraProjectByIdAliasPath(''), /non-empty/u);

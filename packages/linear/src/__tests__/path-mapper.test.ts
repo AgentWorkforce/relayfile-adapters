@@ -6,6 +6,7 @@ import {
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearIssueByEditedPath,
   normalizeLinearObjectType,
   normalizeNangoLinearModel,
   tryNormalizeLinearObjectType,
@@ -90,6 +91,12 @@ describe('linear path-mapper', () => {
         linearByIdAliasPath('/linear/issues', 'AGE-8'),
         '/linear/issues/by-id/AGE-8.json',
       );
+      assert.equal(
+        linearIssueByEditedPath('2026-05-12', 'issue-123'),
+        '/linear/issues/by-edited/2026-05-12/issue-123.json',
+      );
+      const leaf = linearIssueByEditedPath('2026-05-12', 'issue/123').split('/').pop()!.replace(/\.json$/u, '');
+      assert.equal(decodeURIComponent(leaf), 'issue/123');
     });
   });
 

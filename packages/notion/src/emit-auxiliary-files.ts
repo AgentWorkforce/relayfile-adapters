@@ -70,6 +70,7 @@ import { slugifyAlias } from './alias-slug.js';
 import { buildNotionRootIndexFile } from './index-emitter.js';
 import {
   notionByIdAliasPath,
+  notionByEditedAliasPath,
   notionByNameAliasPath,
   notionByTitleAliasPath,
   notionDatabaseMetadataPath,
@@ -481,6 +482,7 @@ interface PriorPageState {
   parentType?: 'database' | 'page' | 'workspace' | undefined;
   parentId?: string | undefined;
   parentTitle?: string | undefined;
+  editedDate?: string | undefined;
 }
 
 interface PriorDatabaseState {
@@ -492,7 +494,7 @@ interface PriorUserState {
 }
 
 function pagePathsFor(args: { id: string } & PriorPageState, pagesScope: string): string[] {
-  const { id, title, databaseId, databaseTitle, parentType, parentId, parentTitle } = args;
+  const { id, title, databaseId, databaseTitle, parentType, parentId, parentTitle, editedDate } = args;
   const paths: string[] = [];
 
   // Canonical: id-only, nested under the owning database when applicable.
@@ -506,6 +508,9 @@ function pagePathsFor(args: { id: string } & PriorPageState, pagesScope: string)
 
   // by-id (stable reconciliation anchor)
   paths.push(notionByIdAliasPath(pagesScope, id));
+  if (editedDate) {
+    paths.push(notionByEditedAliasPath(pagesScope, editedDate, id));
+  }
 
   if (title && slugifies(title)) {
     paths.push(notionByTitleAliasPath(pagesScope, title, id));
@@ -620,7 +625,15 @@ function derivePageState(page: NotionPageLike): PriorPageState {
     readNonEmptyString(page.parent_title ?? undefined) ??
     readNonEmptyString(page.parentTitle ?? undefined);
 
-  return { title, databaseId, databaseTitle, parentType, parentId, parentTitle };
+  return {
+    title,
+    databaseId,
+    databaseTitle,
+    parentType,
+    parentId,
+    parentTitle,
+    editedDate: editedDateSegment(readPageEditedAt(page)),
+  };
 }
 
 function readPageTitle(page: NotionPageLike): string | undefined {
@@ -656,6 +669,19 @@ function readDatabaseTitle(database: NotionDatabaseLike): string | undefined {
 
 function readUserIsBot(user: NotionUserLike): boolean {
   return readNonEmptyString(user.type) === 'bot';
+}
+
+function readPageEditedAt(page: NotionPageLike): string | undefined {
+  return (
+    readNonEmptyString(page.last_edited_time) ??
+    readNonEmptyString(page.lastEditedTime) ??
+    readNonEmptyString(page.created_time) ??
+    readNonEmptyString(page.createdTime)
+  );
+}
+
+function editedDateSegment(value: string | undefined): string | undefined {
+  return value?.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
 }
 
 function readParent(parent: NotionParent | undefined): {
@@ -707,6 +733,7 @@ function extractPriorPageState(parsed: Record<string, unknown>): PriorPageState 
     parentId,
     parentTitle:
       readNonEmptyString(payload.parent_title) ?? readNonEmptyString(payload.parentTitle),
+    editedDate: editedDateSegment(readPageEditedAt(payload as NotionPageLike)),
   };
 }
 

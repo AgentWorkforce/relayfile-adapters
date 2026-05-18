@@ -11,13 +11,13 @@ export type {
 export const layoutManifest: CoreLayoutManifestProvider = () => ({
   provider: 'confluence',
   filenameConvention: '<slug>__<id>.json',
-  aliasSegments: ['by-id', 'by-key', 'by-parent', 'by-space', 'by-state', 'by-title'],
+  aliasSegments: ['by-edited', 'by-id', 'by-key', 'by-parent', 'by-space', 'by-state', 'by-title'],
   resources: [
     {
       path: 'confluence/pages',
       title: 'Pages',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-space', 'by-parent'],
+      aliasSegments: ['by-id', 'by-title', 'by-state', 'by-space', 'by-parent', 'by-edited'],
       writebackResources: [
         { path: 'confluence/pages', schemaId: 'confluence/page' },
       ],

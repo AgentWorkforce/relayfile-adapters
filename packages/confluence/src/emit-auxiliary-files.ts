@@ -54,6 +54,7 @@ import {
 import { slugifyAlias } from './alias-slug.js';
 import {
   confluencePageByIdAliasPath,
+  confluencePageByEditedPath,
   confluencePageByParentAliasPath,
   confluencePageBySpaceAliasPath,
   confluencePageByStatePath,
@@ -230,10 +231,11 @@ async function planPageWrite(
   const status = readNonEmptyString(page.status);
   const spaceId = readNonEmptyString(page.spaceId);
   const parentId = readNonEmptyString(page.parentId);
+  const editedDate = editedDateSegment(readPageEditedAt(page));
 
   const content = renderPageContent(page, connectionId, false);
 
-  const newPaths = pagePathsFor({ id, title, status, spaceId, parentId });
+  const newPaths = pagePathsFor({ id, title, status, spaceId, parentId, editedDate });
 
   // Reconciliation: read the prior by-id alias and compute paths that no
   // longer apply. Anchored on by-id so it survives every other field change.
@@ -373,6 +375,7 @@ interface PriorPageState {
   status?: string | undefined;
   spaceId?: string | undefined;
   parentId?: string | undefined;
+  editedDate?: string | undefined;
 }
 
 interface PriorSpaceState {
@@ -381,7 +384,7 @@ interface PriorSpaceState {
 }
 
 function pagePathsFor(args: { id: string } & PriorPageState): string[] {
-  const { id, title, status, spaceId, parentId } = args;
+  const { id, title, status, spaceId, parentId, editedDate } = args;
   const paths: string[] = [];
   // Canonical path: title + spaceId derived.
   paths.push(confluencePagePath(id, title, spaceId));
@@ -392,6 +395,9 @@ function pagePathsFor(args: { id: string } & PriorPageState): string[] {
   }
   if (status) {
     paths.push(confluencePageByStatePath(status, id));
+  }
+  if (editedDate) {
+    paths.push(confluencePageByEditedPath(editedDate, id));
   }
   if (spaceId) {
     paths.push(confluencePageBySpaceAliasPath(spaceId, id));
@@ -442,6 +448,7 @@ function extractPriorPageState(parsed: Record<string, unknown>): PriorPageState 
       readNonEmptyString(payload.spaceId) ?? readNonEmptyString(payload.space_id),
     parentId:
       readNonEmptyString(payload.parentId) ?? readNonEmptyString(payload.parent_id),
+    editedDate: editedDateSegment(readPageEditedAt(payload as ConfluencePage)),
   };
 }
 
@@ -529,6 +536,14 @@ function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readPageEditedAt(page: ConfluencePage): string | undefined {
+  return readNonEmptyString(page.version?.createdAt) ?? readNonEmptyString(page.createdAt);
+}
+
+function editedDateSegment(value: string | undefined): string | undefined {
+  return value?.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

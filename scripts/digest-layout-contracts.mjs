@@ -7,8 +7,6 @@ const root = new URL('..', import.meta.url).pathname;
 const packagesDir = join(root, 'packages');
 
 const nonProviderPackages = new Set(['core', 'webhook-server']);
-const appendOnlyLifecycleProviders = new Set(['segment']);
-
 const categoryResourceContracts = [
   {
     category: 'issue-tracking',
@@ -93,17 +91,11 @@ const requiredDocs = [
   },
   {
     file: 'docs/digest-layout-contract.md',
-    needles: ['issue-tracking', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'test:digest-contracts'],
+    needles: ['generic upstream', 'issue-tracking', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'test:digest-contracts'],
   },
 ];
 
 const executableRegressionContracts = [
-  {
-    provider: 'jira',
-    file: 'src/digest.test.ts',
-    needles: ['jiraIssuePath(', 'release-plan__ENG-42'],
-    label: 'digest tests must use the real <slug>__<id> path mapper output',
-  },
   {
     provider: 'jira',
     file: 'src/__tests__/emit-auxiliary-files.test.ts',
@@ -133,12 +125,6 @@ const executableRegressionContracts = [
     file: 'src/__tests__/webhook-normalizer.test.ts',
     needles: ['classifies canceled issue status transitions as completed events', 'Cancelled'],
     label: 'canceled terminal webhook states must normalize to completed events',
-  },
-  {
-    provider: 'github',
-    file: 'src/digest.test.ts',
-    needles: ['path-only Relayfile change events', "path: '/github/repos/acme/api/issues/46__path-only/meta.json'"],
-    label: 'digest tests must cover path-only Relayfile events',
   },
   {
     provider: 'github',
@@ -181,81 +167,7 @@ const executableRegressionContracts = [
 function main() {
 const failures = [];
 
-for (const provider of providerPackages()) {
-  const packageRoot = join(packagesDir, provider);
-  const digestPath = join(packageRoot, 'src', 'digest.ts');
-  const indexPath = join(packageRoot, 'src', 'index.ts');
-  const digestTestPaths = [
-    join(packageRoot, 'src', 'digest.test.ts'),
-    join(packageRoot, 'src', '__tests__', 'digest.test.ts'),
-    join(packageRoot, 'test', 'digest.test.ts'),
-  ].filter(existsSync);
-
-  if (!existsSync(digestPath)) {
-    failures.push(`${provider}: missing src/digest.ts`);
-    continue;
-  }
-
-  const digestSource = readFileSync(digestPath, 'utf8');
-  if (!/ctx\.changeEvents\s*\(\s*\{\s*providers\s*:\s*\[\s*ctx\.provider\s*\]\s*\}\s*\)/u.test(digestSource)) {
-    failures.push(`${provider}: digest must scope ctx.changeEvents to ctx.provider`);
-  }
-  if (!digestSource.includes('event.path') || !digestSource.includes('digestEventPath')) {
-    failures.push(`${provider}: digest must accept path-only Relayfile change events, not only canonicalPath`);
-  }
-  if (
-    digestSource.includes(`startsWith('/${provider}/')`)
-    && !digestSource.includes(`event.canonicalPath === '/${provider}'`)
-    && !digestSource.includes(`canonicalPath === '/${provider}'`)
-    && !digestSource.includes(`digestEventPath(event) === '/${provider}'`)
-  ) {
-    failures.push(`${provider}: digest canonical-path filter must accept exact /${provider}`);
-  }
-  const pathMapperPath = join(packageRoot, 'src', 'path-mapper.ts');
-  if (existsSync(pathMapperPath)) {
-    for (const actualRoot of relayfileRoots(readFileSync(pathMapperPath, 'utf8'))) {
-      const root = actualRoot.replace(/^\/+/u, '');
-      if (!digestAcceptsExactRoot(digestSource, root)) {
-        failures.push(`${provider}: digest canonical-path filter must accept actual Relayfile root ${actualRoot}`);
-      }
-      if (!digestAcceptsRootChildren(digestSource, root)) {
-        failures.push(`${provider}: digest canonical-path filter must accept children under actual Relayfile root ${actualRoot}`);
-      }
-    }
-  }
-
-  if (!existsSync(indexPath) || !readFileSync(indexPath, 'utf8').includes("from './digest.js'")) {
-    failures.push(`${provider}: package barrel must export src/digest.ts`);
-  }
-
-  if (digestTestPaths.length === 0) {
-    failures.push(`${provider}: missing digest test`);
-    continue;
-  }
-
-  const testSource = digestTestPaths.map((path) => readFileSync(path, 'utf8')).join('\n');
-  assertActiveTestCoverage(failures, provider, testSource, /deterministic|sorted/i, 'deterministic sorting');
-  assertActiveTestCoverage(failures, provider, testSource, /empty/i, 'empty-window behavior');
-  assertActiveTestCoverage(
-    failures,
-    provider,
-    testSource,
-    /create|created|update|updated|upsert|upserted|upload|uploaded|insert|inserted|set|sent|received/i,
-    'create/update classification',
-  );
-  if (appendOnlyLifecycleProviders.has(provider)) {
-    assertSourceMentions(failures, provider, digestSource, /append-only|immutable/i, 'documented append-only lifecycle exception');
-    assertActiveTestCoverage(failures, provider, testSource, /upsert|upserted/i, 'append-only upsert classification');
-  } else {
-    assertActiveTestCoverage(
-      failures,
-      provider,
-      testSource,
-      /delete|deleted|remove|removed|closed|merged|archiv|completed|canceled|cancelled|resolved|solved|trashed|locked|failed|succeeded|refunded|voided|expired|truncate/i,
-      'provider lifecycle classification',
-    );
-  }
-}
+verifyNoProviderDigestHandlerContract(failures);
 
 for (const contract of categoryResourceContracts) {
   const layoutPath = join(packagesDir, contract.provider, 'src', 'layout.ts');
@@ -322,7 +234,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Verified digest contracts for ${providerPackages().length} provider packages.`);
+console.log('Verified adapter metadata/layout contracts do not require provider digest handlers.');
 console.log(`Verified ${categoryResourceContracts.length} category resource contracts.`);
 console.log(`Verified ${executableRegressionContracts.length} executable regression contracts.`);
 }
@@ -336,18 +248,6 @@ function providerPackages() {
     .filter((name) => existsSync(join(packagesDir, name, 'package.json')))
     .filter((name) => !nonProviderPackages.has(name))
     .sort();
-}
-
-function assertSourceMentions(failures, provider, source, pattern, label) {
-  if (!pattern.test(source)) {
-    failures.push(`${provider}: digest test must cover ${label}`);
-  }
-}
-
-export function assertActiveTestCoverage(failures, provider, source, pattern, label) {
-  if (!activeTestHasAssertion(source, pattern)) {
-    failures.push(`${provider}: digest test must cover ${label} in a live assertion test`);
-  }
 }
 
 export function activeRegressionContractSatisfied(source, needles) {
@@ -477,31 +377,6 @@ function findMatchingParen(source, openParen) {
   return -1;
 }
 
-function relayfileRoots(pathMapperSource) {
-  const roots = new Set();
-  for (const match of pathMapperSource.matchAll(/(?:export\s+)?const\s+[A-Z0-9_]*(?:ROOT|PATH_ROOT|RELAYFILE_ROOT|DEFAULT_ROOT)\s*=\s*['"](\/[a-z0-9-]+)['"]/gu)) {
-    roots.add(match[1]);
-  }
-  return [...roots].sort();
-}
-
-function digestAcceptsExactRoot(digestSource, root) {
-  return (
-    digestSource.includes(`event.canonicalPath === '${root}'`)
-    || digestSource.includes(`event.canonicalPath === "${root}"`)
-    || digestSource.includes(`event.canonicalPath === "/${root}"`)
-    || digestSource.includes(`event.canonicalPath === '/${root}'`)
-    || digestSource.includes(`canonicalPath === '${root}'`)
-    || digestSource.includes(`canonicalPath === "${root}"`)
-    || digestSource.includes(`canonicalPath === "/${root}"`)
-    || digestSource.includes(`canonicalPath === '/${root}'`)
-    || digestSource.includes(`digestEventPath(event) === '${root}'`)
-    || digestSource.includes(`digestEventPath(event) === "${root}"`)
-    || digestSource.includes(`digestEventPath(event) === "/${root}"`)
-    || digestSource.includes(`digestEventPath(event) === '/${root}'`)
-  );
-}
-
 function verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases(failures) {
   const layoutPath = join(packagesDir, 'github', 'src', 'layout.ts');
   const emitterPath = join(packagesDir, 'github', 'src', 'emit-auxiliary-files.ts');
@@ -519,15 +394,6 @@ function verifyGithubRepoLayoutDoesNotAdvertiseMissingAliases(failures) {
   }
 }
 
-function digestAcceptsRootChildren(digestSource, root) {
-  return (
-    digestSource.includes(`startsWith('${root}/')`)
-    || digestSource.includes(`startsWith("${root}/")`)
-    || digestSource.includes(`startsWith('/${root}/')`)
-    || digestSource.includes(`startsWith("/${root}/")`)
-  );
-}
-
 function aliasesForResource(layoutSource, resourcePath) {
   const resourceIndex = layoutSource.indexOf(`path: '${resourcePath}'`);
   if (resourceIndex < 0) return null;
@@ -538,4 +404,21 @@ function aliasesForResource(layoutSource, resourcePath) {
   const aliasMatch = layoutSource.slice(aliasIndex, resourceEnd).match(/aliasSegments:\s*\[([^\]]*)\]/u);
   if (!aliasMatch) return null;
   return Array.from(aliasMatch[1].matchAll(/'([^']+)'/gu), (match) => match[1]);
+}
+
+function verifyNoProviderDigestHandlerContract(failures) {
+  const source = readFileSync(new URL(import.meta.url), 'utf8');
+  const forbiddenNeedles = [
+    ['missing src/', 'digest', '.ts'],
+    ['package barrel must export src/', 'digest', '.ts'],
+    ['missing ', 'digest', ' test'],
+    ['Digest', 'Section'],
+    ['ctx', '.changeEvents'],
+  ].map((parts) => parts.join(''));
+
+  for (const needle of forbiddenNeedles) {
+    if (source.includes(needle)) {
+      failures.push(`digest/layout contract script still contains stale provider digest requirement: ${needle}`);
+    }
+  }
 }

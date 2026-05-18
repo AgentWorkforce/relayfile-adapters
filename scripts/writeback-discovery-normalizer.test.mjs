@@ -161,6 +161,30 @@ test('normalizes existing writeback discovery adapter endpoints without changing
   assert.equal(commentEndpoint.resource.schemaPath, '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json');
 });
 
+test('normalizes GitLab slugged nested writeback paths to runtime matchers', () => {
+  const gitlab = adapters.find((adapter) => adapter.slug === 'gitlab');
+  assert.ok(gitlab);
+
+  const normalized = normalizeWritebackDiscoveryAdapter(gitlab);
+  const discussionEndpoint = normalized.endpoints.find((endpoint) =>
+    endpoint.path === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/new.json'
+  );
+  const commentEndpoint = normalized.endpoints.find((endpoint) =>
+    endpoint.path === '/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json'
+  );
+
+  assert.ok(discussionEndpoint, 'expected GitLab merge request discussion endpoint');
+  assert.ok(commentEndpoint, 'expected GitLab issue comment endpoint');
+  assert.equal(
+    discussionEndpoint.resource.pathPatternSource,
+    '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$',
+  );
+  assert.equal(
+    commentEndpoint.resource.pathPatternSource,
+    '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$',
+  );
+});
+
 test('attaches optional layoutManifest-style writeback metadata by static path segments', () => {
   const github = adapters.find((adapter) => adapter.slug === 'github');
   assert.ok(github);

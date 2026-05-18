@@ -28,9 +28,14 @@ describe('jira layout prompt', () => {
     assert.match(content, /by-key/u);
     assert.match(content, /by-id/u);
     assert.match(content, /by-assignee/u);
+    assert.match(content, /by-edited\/YYYY-MM-DD/u);
     assert.match(content, /projects\/by-id/u);
     assert.match(content, /sprints\/by-id/u);
     assert.match(content, /\bjq\b/u);
+    assert.match(content, /discovery\/jira\/issues\/\.schema\.json/u);
+    assert.match(content, /discovery\/jira\/issues\/\.create\.example\.json/u);
+    assert.match(content, /discovery\/jira\/issues\/\{issueIdOrKey\}\/comments\/\.schema\.json/u);
+    assert.match(content, /ls \/jira\/issues\/by-edited\/2026-05-12/u);
     assert.match(content, /jq '\{key, title, state\}' \/jira\/issues\/by-key\/ENG-42\.json/u);
     assert.doesNotMatch(content, /jq '\.canonicalPath' \/jira\/issues\/by-key\/ENG-42\.json/u);
     // Document the joiner migration so readers know the current vs. target shape.

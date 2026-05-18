@@ -6,6 +6,7 @@ import { layoutManifest } from './layout.js';
 const CANONICAL_ALIAS_SEGMENTS = new Set([
   'by-assignee',
   'by-creator',
+  'by-edited',
   'by-id',
   'by-key',
   'by-name',
@@ -21,6 +22,7 @@ test('layoutManifest exposes Jira resources with canonical aliases and writeback
   assert.deepEqual(manifest.aliasSegments, [
     'by-assignee',
     'by-creator',
+    'by-edited',
     'by-id',
     'by-key',
     'by-priority',

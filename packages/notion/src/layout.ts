@@ -11,13 +11,13 @@ export type {
 export const layoutManifest: CoreLayoutManifestProvider = () => ({
   provider: 'notion',
   filenameConvention: '<slug>__<id>.json',
-  aliasSegments: ['by-database', 'by-id', 'by-name', 'by-parent', 'by-title'],
+  aliasSegments: ['by-database', 'by-edited', 'by-id', 'by-name', 'by-parent', 'by-title'],
   resources: [
     {
       path: 'notion/pages',
       title: 'Pages',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title', 'by-database', 'by-parent'],
+      aliasSegments: ['by-id', 'by-title', 'by-database', 'by-parent', 'by-edited'],
       writebackResources: [
         { path: 'notion/pages', schemaId: 'notion/page' },
         { path: 'notion/pages/comments', schemaId: 'notion/comment' },

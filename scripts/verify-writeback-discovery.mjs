@@ -24,6 +24,9 @@ for (const adapter of adapters) {
   const adapterMdPath = join(root, 'packages', adapter.slug, 'discovery', adapter.slug, '.adapter.md');
   const hasAdapterMd = await assertFile(adapterMdPath, `${adapter.slug} adapter README`);
   const adapterMd = hasAdapterMd ? await readFile(adapterMdPath, 'utf8') : '';
+  if (!adapterMd.includes('*.tmp.json') || !adapterMd.includes('*.partial.json')) {
+    failures.push(`${adapter.slug}: .adapter.md must document ignored temporary/partial writeback filenames`);
+  }
 
   for (const endpoint of adapter.endpoints) {
     const resourcePath = endpoint.path.replace(/\/new\.json$/, '');

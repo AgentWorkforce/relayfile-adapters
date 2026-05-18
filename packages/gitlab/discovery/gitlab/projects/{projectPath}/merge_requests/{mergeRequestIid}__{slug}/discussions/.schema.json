@@ -1,63 +1,93 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gitlab/merge-request-discussion",
   "title": "GitLab merge request discussion",
   "type": "object",
-  "additionalProperties": true,
+  "required": [
+    "body"
+  ],
   "properties": {
-    "id": {
-      "type": "string",
-      "readOnly": true,
-      "description": "GitLab discussion ID assigned by the server."
-    },
     "body": {
       "type": "string",
       "minLength": 1,
-      "description": "Markdown note body for the discussion."
+      "pattern": ".*\\S.*",
+      "description": "Markdown note body."
     },
     "position": {
       "type": "object",
-      "description": "Optional GitLab diff position payload for line-level discussions."
+      "description": "Optional GitLab position object for diff discussions.",
+      "additionalProperties": true
     },
     "created_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Optional import timestamp when supported by GitLab."
+      "description": "Optional timestamp for imports when supported by GitLab."
     },
-    "updated_at": {
+    "id": {
       "type": "string",
-      "format": "date-time",
-      "readOnly": true,
-      "description": "GitLab server timestamp for the most recent discussion update."
+      "description": "Provider canonical record id.",
+      "readOnly": true
     },
     "createdAt": {
       "type": "string",
       "format": "date-time",
-      "readOnly": true,
-      "description": "Relayfile-normalized creation timestamp."
+      "description": "Provider creation timestamp.",
+      "readOnly": true
     },
     "updatedAt": {
       "type": "string",
       "format": "date-time",
-      "readOnly": true,
-      "description": "Relayfile-normalized update timestamp."
+      "description": "Provider last update timestamp.",
+      "readOnly": true
     },
     "url": {
       "type": "string",
       "format": "uri",
-      "readOnly": true,
-      "description": "Provider URL for the discussion when available."
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
     },
     "_webhook": {
       "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
       "readOnly": true,
-      "description": "Webhook metadata attached by Relayfile."
+      "additionalProperties": true
     },
     "_connection": {
       "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
-      "description": "Connection metadata attached by Relayfile."
+      "additionalProperties": true
     }
   },
-  "required": ["body"]
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

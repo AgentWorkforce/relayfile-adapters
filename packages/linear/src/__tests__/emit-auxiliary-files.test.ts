@@ -19,6 +19,7 @@ import {
   linearCyclesIndexPath,
   linearIssueByAssigneePath,
   linearIssueByCreatorPath,
+  linearIssueByEditedPath,
   linearIssueByPriorityPath,
   linearIssueByStatePath,
   linearIssuePath,
@@ -235,8 +236,8 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // Issue emits 8 files (canonical + by-uuid + by-id + by-title + category aliases) + 1 issues index + 1 root index.
-    assert.equal(result.written, 10);
+    // Issue emits 9 files (canonical + by-uuid + by-id + by-title + category aliases + by-edited) + 1 issues index + 1 root index.
+    assert.equal(result.written, 11);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
@@ -248,6 +249,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearIssueByAssigneePath('user-assignee', 'AGE-8'),
       linearIssueByCreatorPath('user-creator', 'AGE-8'),
       linearIssueByPriorityPath(2, 'AGE-8'),
+      linearIssueByEditedPath('2026-05-12', 'issue-123'),
       linearIssuesIndexPath(),
     ];
     const writtenPaths = client.writes.map((w) => w.path);
@@ -289,6 +291,7 @@ describe('emitLinearAuxiliaryFiles', () => {
         identifier: 'AGE-8',
         title: 'Old Title',
         state: { name: 'In Progress' },
+        updatedAt: '2026-05-11T00:00:00Z',
       },
     };
     const client = createClient({
@@ -305,6 +308,7 @@ describe('emitLinearAuxiliaryFiles', () => {
           identifier: 'AGE-8',
           title: 'New Title',
           state: { id: 's', name: 'In Progress' },
+          updatedAt: '2026-05-12T00:00:00Z',
         },
       ],
     });
@@ -319,11 +323,16 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(!deletedPaths.includes(linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8')));
     // by-uuid alias stays — it's keyed on the UUID, which never changes.
     assert.ok(!deletedPaths.includes(linearByUuidAliasPath(ISSUES_SCOPE, 'issue-123')));
+    assert.ok(
+      deletedPaths.includes(linearIssueByEditedPath('2026-05-11', 'issue-123')),
+      `expected prior by-edited alias in deletes, got: ${deletedPaths.join(', ')}`,
+    );
 
     // New by-title alias and canonical path landed.
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearByTitleAliasPath(ISSUES_SCOPE, 'New Title', 'issue-123')));
     assert.ok(writtenPaths.includes(linearIssuePath('issue-123', 'AGE-8')));
+    assert.ok(writtenPaths.includes(linearIssueByEditedPath('2026-05-12', 'issue-123')));
 
     assert.deepEqual(result.errors, []);
   });
@@ -496,6 +505,7 @@ describe('emitLinearAuxiliaryFiles', () => {
         identifier: 'AGE-8',
         title: 'Release Plan',
         state: { name: 'In Progress' },
+        updatedAt: '2026-05-11T00:00:00Z',
       },
     };
     const priorIndex = [
@@ -534,6 +544,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByEditedPath('2026-05-11', 'issue-123'),
     ];
     for (const path of expectedDeletes) {
       assert.ok(deletedPaths.has(path), `expected delete at ${path}`);
@@ -785,6 +796,7 @@ describe('emitLinearAuxiliaryFiles', () => {
         identifier: 'AGE-8',
         title: 'Release Plan',
         state: { name: 'In Progress' },
+        updatedAt: '2026-05-11T00:00:00Z',
       },
     };
     const priorIndex = [
@@ -825,6 +837,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-xyz'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByEditedPath('2026-05-11', 'issue-xyz'),
     ];
     for (const path of expected) {
       assert.ok(

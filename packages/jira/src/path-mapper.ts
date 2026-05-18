@@ -201,6 +201,10 @@ export function jiraIssueByPriorityPath(priorityName: string, issueId: string): 
   return `${JIRA_PATH_ROOT}/issues/by-priority/${encodeJiraPathSegment(slug)}/${encodeJiraPathSegment(issueId)}.json`;
 }
 
+export function jiraIssueByEditedPath(editedDate: string, issueId: string): string {
+  return `${JIRA_PATH_ROOT}/issues/by-edited/${encodeJiraPathSegment(editedDate)}/${encodeJiraPathSegment(issueId)}.json`;
+}
+
 // -- Project alias paths ---------------------------------------------------
 
 /**

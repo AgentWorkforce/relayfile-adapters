@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computePath,
+  notionByEditedAliasPath,
   normalizeNangoNotionModel,
   notionByIdAliasPath,
   notionByNameAliasPath,
@@ -101,6 +102,14 @@ describe('path mapping', () => {
       // The dehyphenated form preserves all 32 hex characters, so a
       // parser can re-hyphenate to recover the original UUID with no
       // information loss. Pin the recovery to lock the format.
+      const recovered = `${leaf.slice(0, 8)}-${leaf.slice(8, 12)}-${leaf.slice(12, 16)}-${leaf.slice(16, 20)}-${leaf.slice(20)}`;
+      assert.strictEqual(recovered, PAGE_UUID);
+    });
+
+    it('notionByEditedAliasPath: date bucket plus by-id leaf round-trips to the canonical uuid', () => {
+      const composed = notionByEditedAliasPath('/notion/pages', '2026-05-12', PAGE_UUID);
+      assert.strictEqual(composed, '/notion/pages/by-edited/2026-05-12/8a3c9b5022f04d2ca07d7e02d2cf6f9e.json');
+      const leaf = leafOf(composed).replace(/\.json$/u, '');
       const recovered = `${leaf.slice(0, 8)}-${leaf.slice(8, 12)}-${leaf.slice(12, 16)}-${leaf.slice(16, 20)}-${leaf.slice(20)}`;
       assert.strictEqual(recovered, PAGE_UUID);
     });

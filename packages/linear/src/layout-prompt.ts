@@ -7,7 +7,9 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 \`/linear/LAYOUT.md\` is this guide.
 \`/linear/issues/\`, \`/linear/comments/\`, \`/linear/users/\`, \`/linear/teams/\`, \`/linear/projects/\`, \`/linear/cycles/\`, \`/linear/milestones/\`, and \`/linear/roadmaps/\` each own their canonical JSON records plus a sibling \`_index.json\`.
 
-Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, and \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\` are additional lookups.
+Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\`, and \`/linear/issues/by-edited/YYYY-MM-DD/<issue-uuid>.json\` are additional lookups. The edited-date bucket is formatted as \`YYYY-MM-DD\` and uses the first available timestamp in this order: \`updatedAt\`, \`updated_at\`, \`completedAt\`, \`canceledAt\`, \`createdAt\`, then \`created_at\`.
+
+Writable resources advertise sibling schemas and create examples at \`discovery/linear/issues/.schema.json\`, \`discovery/linear/issues/.create.example.json\`, \`discovery/linear/issues/{issueId}/comments/.schema.json\`, and \`discovery/linear/issues/{issueId}/comments/.create.example.json\`.
 
 ## Indexes
 
@@ -35,6 +37,10 @@ jq '.[0]' /linear/issues/_index.json
 jq '.[] | {identifier, state, title}' /linear/issues/_index.json
 ls /linear/issues/by-assignee
 ls /linear/issues/by-priority
+ls /linear/issues/by-edited/2026-05-12
+jq '.identifier' /linear/issues/by-edited/2026-05-12/11111111-1111-1111-1111-111111111111.json
+jq '.required' discovery/linear/issues/.schema.json
+ls discovery/linear/issues/{issueId}/comments
 grep -R "ENG-" /linear/comments
 \`\`\`
 `;
