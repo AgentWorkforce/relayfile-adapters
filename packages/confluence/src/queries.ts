@@ -38,6 +38,11 @@ function normalizeUpdated(...values: Array<string | null | undefined>): string {
   return '';
 }
 
+function readOptionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 export function getConfluencePageHumanReadable(page: { title?: string | null }): string | undefined {
   return normalizeString(page.title ?? undefined);
 }
@@ -50,7 +55,15 @@ export function confluencePageIndexRow(page: ConfluencePage): ConfluencePageInde
   return {
     id: page.id,
     title: normalizeIndexTitle(page.title),
-    updated: normalizeUpdated(page.version?.createdAt, page.createdAt),
+    updated: normalizeUpdated(
+      readOptionalString(page, 'updated'),
+      readOptionalString(page, 'updatedAt'),
+      readOptionalString(page, 'updated_at'),
+      page.version?.createdAt,
+      page.version ? readOptionalString(page.version, 'created_at') : undefined,
+      page.createdAt,
+      readOptionalString(page, 'created_at'),
+    ),
     spaceId: normalizeIndexTitle(page.spaceId),
     status: normalizeIndexTitle(page.status),
   };
@@ -60,7 +73,13 @@ export function confluenceSpaceIndexRow(space: ConfluenceSpace): ConfluenceSpace
   return {
     id: space.id,
     title: normalizeIndexTitle(space.name) || normalizeIndexTitle(space.key),
-    updated: normalizeUpdated(space.createdAt),
+    updated: normalizeUpdated(
+      readOptionalString(space, 'updated'),
+      readOptionalString(space, 'updatedAt'),
+      readOptionalString(space, 'updated_at'),
+      space.createdAt,
+      readOptionalString(space, 'created_at'),
+    ),
     key: normalizeIndexTitle(space.key),
   };
 }
