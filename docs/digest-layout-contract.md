@@ -46,6 +46,27 @@ Resources outside this matrix only need a `by-state`, `by-status`,
 durable bucket that agents naturally browse by. Add the resource to the matrix
 when that is true; do not rely on prose alone.
 
+## Activity-Summary Fallback Contract
+
+The `activity-summary` skill falls back to provider `by-edited/YYYY-MM-DD`
+aliases when a requested time window is not covered by a precomputed digest.
+Priority providers must therefore materialize those aliases with the same bytes
+as the canonical record:
+
+- GitHub issues and pull requests:
+  `/github/repos/<owner>__<repo>/<issues|pulls>/by-edited/YYYY-MM-DD/<number>.json`
+- Linear issues:
+  `/linear/issues/by-edited/YYYY-MM-DD/<issue-id>.json`
+- Notion pages:
+  `/notion/pages/by-edited/YYYY-MM-DD/<page-id-suffix>.json`
+- Jira issues:
+  `/jira/issues/by-edited/YYYY-MM-DD/<issue-id>.json`
+- Confluence pages:
+  `/confluence/pages/by-edited/YYYY-MM-DD/<page-id>.json`
+
+When a resource's edited timestamp changes, adapter reconciliation must remove
+the stale date bucket and write the new one.
+
 ## Review Checklist
 
 When adding or materially changing an adapter:
@@ -57,4 +78,6 @@ When adding or materially changing an adapter:
 3. Add the provider/resource to the category matrix above and to
    `scripts/digest-layout-contracts.mjs` when the category behavior should be
    enforced across future work.
-4. Run `npm run test:digest-contracts` before opening or updating the PR.
+4. Add or update `by-edited/YYYY-MM-DD` emission tests when the resource can
+   participate in activity-summary fallback.
+5. Run `npm run test:digest-contracts` before opening or updating the PR.
