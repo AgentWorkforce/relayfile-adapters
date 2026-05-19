@@ -129,7 +129,7 @@ const requiredDocs = [
   },
   {
     file: 'docs/digest-layout-contract.md',
-    needles: ['generic upstream', 'issue-tracking', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'test:digest-contracts'],
+    needles: ['generic upstream', 'issue-tracking', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'by-edited/YYYY-MM-DD', 'activity-summary', 'test:digest-contracts'],
   },
 ];
 
