@@ -33,9 +33,11 @@ for (const adapter of adapters) {
     const schemaPath = `${resourcePath}/.schema.json`;
     const examplePath = `${resourcePath}/.create.example.json`;
 
-    const legacySchemaFile = join(root, 'packages', adapter.slug, 'discovery', endpoint.path.replace(/new\.json$/, 'new.schema.json').slice(1));
-    if (await fileExists(legacySchemaFile)) {
-      failures.push(`${adapter.slug}: legacy new.schema.json must be renamed to .schema.json: ${legacySchemaFile}`);
+    if (endpoint.path.endsWith('/new.json')) {
+      const legacySchemaFile = join(root, 'packages', adapter.slug, 'discovery', endpoint.path.replace(/new\.json$/, 'new.schema.json').slice(1));
+      if (await fileExists(legacySchemaFile)) {
+        failures.push(`${adapter.slug}: legacy new.schema.json must be renamed to .schema.json: ${legacySchemaFile}`);
+      }
     }
 
     const schemaFile = join(root, 'packages', adapter.slug, 'discovery', schemaPath.slice(1));
@@ -57,6 +59,9 @@ for (const adapter of adapters) {
 
     if (!adapterMd.includes(`\`${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
       failures.push(`${adapter.slug}: .adapter.md must list ${schemaPath} plus Operations and ID Patterns sections`);
+    }
+    if (/\.(?:json|md)$/.test(resourcePath) && adapterMd.includes(`\`${resourcePath}/<id>.json\``)) {
+      failures.push(`${adapter.slug}: .adapter.md must document exact-file resource ${resourcePath}, not ${resourcePath}/<id>.json`);
     }
   }
 }

@@ -151,16 +151,18 @@ export const adapters = [
     slug: 'gitlab',
     title: 'GitLab adapter',
     overview:
-      'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, and jobs under `/gitlab`, with writeback routes for merge request discussions and issue notes.',
+      'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, jobs, deployments, and tags under `/gitlab`, with writeback routes for merge request discussions and issue notes.',
     readPaths: [
       ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/meta.json', 'Merge request metadata.'],
       ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/discussions/<discussionId>.json', 'Merge request discussions.'],
       ['/gitlab/projects/<namespace>/<project>/issues/<iid>__<slug>/meta.json', 'Issue metadata.'],
       ['/gitlab/projects/<namespace>/<project>/pipelines/<pipelineId>__<ref>/jobs/<jobId>.json', 'Pipeline job records.'],
+      ['/gitlab/projects/<namespace>/<project>/deployments/<deploymentId>/meta.json', 'Deployment records.'],
+      ['/gitlab/projects/<namespace>/<project>/tags/<tagRef>/meta.json', 'Tag records.'],
     ],
     endpoints: [
-      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/new.json', 'Create GitLab merge request discussion', 'Creates a discussion on a merge request.', ['body'], gitlabNoteProps(), { body: 'Replace example discussion body.' }),
-      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json', 'Create GitLab issue note', 'Creates a note on an issue.', ['body'], gitlabNoteProps(), { body: 'Replace example note body.' }),
+      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/new.json', 'Create GitLab merge request discussion', 'Creates a discussion on a merge request.', ['body'], gitlabDiscussionProps(), { body: 'Replace example discussion body.' }),
+      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json', 'Create GitLab issue note', 'Creates a note on an issue.', ['body'], gitlabIssueNoteProps(), { body: 'Replace example note body.' }),
     ],
   },
   {
@@ -297,7 +299,7 @@ export const adapters = [
     slug: 'notion',
     title: 'Notion adapter',
     overview:
-      'The Notion adapter exposes databases, pages, page markdown, blocks, and comments under `/notion`, with writeback routes for creating database pages and updating page content.',
+      'The Notion adapter exposes databases, pages, page markdown, blocks, and comments under `/notion`, with writeback routes for creating database pages, updating page properties/content, archiving pages, and creating page comments.',
     readPaths: [
       ['/notion/databases/<databaseId>/metadata.json', 'Database metadata.'],
       ['/notion/databases/<databaseId>/pages/<pageId>.json', 'Database page records.'],
@@ -310,6 +312,30 @@ export const adapters = [
         children: arr(obj('Notion block object.'), 'Optional child blocks for the new page.'),
         markdown: str('Optional markdown body. When present the adapter uses the Notion markdown API version.'),
       }, { properties: { Name: { type: 'title', value: 'Replace example page title' } } }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}.json', 'Update Notion database page properties', 'Updates properties, archive state, icon, or cover for a page inside a Notion database.', [], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }, notionPagePatchRequirement()),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/properties.json', 'Update Notion database page properties file', 'Updates properties, archive state, icon, or cover through a database page properties sidecar.', [], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }, notionPagePatchRequirement()),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/content.md', 'Replace Notion database page markdown', 'Replaces the rendered markdown body for a page inside a Notion database.', [], {
+        markdown: str('Plain markdown body written to content.md.'),
+      }, { markdown: '# Replace page content' }),
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/comments.json', 'Create Notion database page comment', 'Creates a Notion comment on a page inside a Notion database from comments.json.', [], notionCommentProps(), {
+        text: 'Replace example comment body.',
+      }, notionCommentRequirement()),
+      endpoint('/notion/pages/{pageId}.json', 'Update Notion standalone page properties', 'Updates properties, archive state, icon, or cover for a standalone page.', [], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }, notionPagePatchRequirement()),
+      endpoint('/notion/pages/{pageId}/properties.json', 'Update Notion standalone page properties file', 'Updates properties, archive state, icon, or cover through a standalone page properties sidecar.', [], notionPagePatchProps(), {
+        properties: { Status: { type: 'select', value: 'In progress' } },
+      }, notionPagePatchRequirement()),
+      endpoint('/notion/pages/{pageId}/content.md', 'Replace Notion standalone page markdown', 'Replaces the rendered markdown body for a standalone page.', [], {
+        markdown: str('Plain markdown body written to content.md.'),
+      }, { markdown: '# Replace page content' }),
+      endpoint('/notion/pages/{pageId}/comments.json', 'Create Notion standalone page comment', 'Creates a Notion comment on a standalone page from comments.json.', [], notionCommentProps(), {
+        text: 'Replace example comment body.',
+      }, notionCommentRequirement()),
     ],
   },
   {
@@ -751,10 +777,17 @@ function confluencePageProps(options = {}) {
   };
 }
 
-function gitlabNoteProps() {
+function gitlabDiscussionProps() {
   return {
-    body: str('Markdown note body.'),
+    body: str('Markdown note body.', undefined, { minLength: 1, pattern: '.*\\S.*' }),
     position: obj('Optional GitLab position object for diff discussions.'),
+    created_at: str('Optional timestamp for imports when supported by GitLab.', 'date-time'),
+  };
+}
+
+function gitlabIssueNoteProps() {
+  return {
+    body: str('Markdown note body.', undefined, { minLength: 1, pattern: '.*\\S.*' }),
     created_at: str('Optional timestamp for imports when supported by GitLab.', 'date-time'),
   };
 }
@@ -937,6 +970,43 @@ function salesforceAccountProps() {
     BillingPostalCode: str('Billing postal code.'),
     BillingCountry: str('Billing country.'),
     OwnerId: str('Owner user id.'),
+  };
+}
+
+function notionPagePatchProps() {
+  return {
+    properties: obj('Serialized Notion property map. Each property value should match the adapter property serializer shape.'),
+    archived: bool('Whether to archive or restore the page.'),
+    icon: obj('Notion page icon object.'),
+    cover: obj('Notion page cover object.'),
+  };
+}
+
+function notionPagePatchRequirement() {
+  return {
+    anyOf: [
+      { required: ['properties'] },
+      { required: ['archived'] },
+      { required: ['icon'] },
+      { required: ['cover'] },
+    ],
+  };
+}
+
+function notionCommentProps() {
+  return {
+    text: str('Plain text comment body. A raw string body is also accepted by the resolver.', undefined, { minLength: 1, pattern: '.*\\S.*' }),
+    discussionId: str('Optional Notion discussion id to append to.'),
+    richText: { ...arr(obj('Notion rich_text object.'), 'Optional rich_text array.'), minItems: 1 },
+  };
+}
+
+function notionCommentRequirement() {
+  return {
+    anyOf: [
+      { required: ['text'] },
+      { required: ['richText'] },
+    ],
   };
 }
 

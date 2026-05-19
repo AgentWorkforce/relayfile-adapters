@@ -24,7 +24,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | intercom | None | 0 | 3 | Inline JS schemas. |
 | jira | None | 0 | 4 | Inline JS schemas. |
 | linear | None | 0 | 2 | Inline JS schemas; provider source is GraphQL, not OpenAPI. |
-| notion | None | 0 | 1 | Inline JS schemas. |
+| notion | None | 0 | 9 | Inline JS schemas cover database page creates, page property updates, content replacement, and comments. |
 | onedrive | None | 0 | 2 | Inline JS schemas. |
 | pipedrive | None | 0 | 4 | Inline JS schemas. |
 | postgres | None | 0 | 2 | Inline JS schemas; database/table shape is runtime-native rather than provider OpenAPI. |

@@ -56,13 +56,14 @@ describe('notion writeback id extraction', () => {
     );
   });
 
-  it('passes synthetic ids (used in fixture tests) straight through', () => {
-    // `page-1` is not UUID-shaped; the API will validate. This preserves
-    // backwards-compatibility with the existing writeback test suite.
-    const req = resolveWritebackRequest(
-      '/notion/pages/page-1/content.md',
-      '# Body',
+  it('rejects synthetic ids on exact-file sidecars before dispatch', () => {
+    assert.throws(
+      () => resolveWritebackRequest('/notion/pages/page-1/content.md', '# Body'),
+      /No Notion writeback rule matched/,
     );
-    assert.strictEqual(req.endpoint, '/v1/pages/page-1/markdown');
+    assert.throws(
+      () => resolveWritebackRequest('/notion/pages/page-1/comments.json', '"Body"'),
+      /No Notion writeback rule matched/,
+    );
   });
 });

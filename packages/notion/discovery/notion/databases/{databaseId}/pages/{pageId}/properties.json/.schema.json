@@ -1,26 +1,49 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab merge request discussion",
+  "title": "Update Notion database page properties file",
   "type": "object",
-  "required": [
-    "body"
+  "required": [],
+  "anyOf": [
+    {
+      "required": [
+        "properties"
+      ]
+    },
+    {
+      "required": [
+        "archived"
+      ]
+    },
+    {
+      "required": [
+        "icon"
+      ]
+    },
+    {
+      "required": [
+        "cover"
+      ]
+    }
   ],
   "properties": {
-    "body": {
-      "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
-    },
-    "position": {
+    "properties": {
       "type": "object",
-      "description": "Optional GitLab position object for diff discussions.",
+      "description": "Serialized Notion property map. Each property value should match the adapter property serializer shape.",
       "additionalProperties": true
     },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+    "archived": {
+      "type": "boolean",
+      "description": "Whether to archive or restore the page."
+    },
+    "icon": {
+      "type": "object",
+      "description": "Notion page icon object.",
+      "additionalProperties": true
+    },
+    "cover": {
+      "type": "object",
+      "description": "Notion page cover object.",
+      "additionalProperties": true
     },
     "id": {
       "type": "string",

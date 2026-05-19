@@ -99,7 +99,7 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   // Standalone pages: see resolveDeleteRequest for why classifyWrite returns
   // null for these paths and why the canonical-id gate substitutes for it.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (route === null && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if ((route === null || route?.kind === 'patch' || route?.kind === 'create') && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
   }
 
@@ -114,22 +114,22 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
   }
 
   const databaseContentMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/content\.md$/);
-  if (databaseContentMatch) {
+  if (databaseContentMatch && isCanonicalStandalonePageSegment(databaseContentMatch[2])) {
     return buildMarkdownWriteback(extractNotionId(databaseContentMatch[2]), content);
   }
 
   const standaloneContentMatch = path.match(/^\/notion\/pages\/([^/]+)\/content\.md$/);
-  if (standaloneContentMatch) {
+  if (standaloneContentMatch && isCanonicalStandalonePageSegment(standaloneContentMatch[1])) {
     return buildMarkdownWriteback(extractNotionId(standaloneContentMatch[1]), content);
   }
 
   const databaseCommentsMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/comments\.json$/);
-  if (databaseCommentsMatch) {
+  if (databaseCommentsMatch && isCanonicalStandalonePageSegment(databaseCommentsMatch[2])) {
     return buildCommentWriteback(extractNotionId(databaseCommentsMatch[2]), content);
   }
 
   const standaloneCommentsMatch = path.match(/^\/notion\/pages\/([^/]+)\/comments\.json$/);
-  if (standaloneCommentsMatch) {
+  if (standaloneCommentsMatch && isCanonicalStandalonePageSegment(standaloneCommentsMatch[1])) {
     return buildCommentWriteback(extractNotionId(standaloneCommentsMatch[1]), content);
   }
 
@@ -143,12 +143,11 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
     return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
   }
 
-  // Standalone pages aren't declared in resources.ts (they share the parent
-  // `/notion/pages/...` namespace with markdown/comments resources), so
-  // `classifyWrite` returns null here. The canonical-id gate below replaces
-  // the route check used for database pages.
+  // Standalone pages may be classified when discovery resources are present.
+  // The canonical-id gate keeps aliases and create-like filenames out of the
+  // archive route.
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
-  if (route === null && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
+  if ((route === null || route?.kind === 'delete') && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));
   }
 
@@ -157,22 +156,27 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
 
 /**
  * Build a `PATCH /v1/pages/{id}` request to update a page's properties,
- * archived flag, icon, or cover. The payload must include a `properties`
- * object; everything else is optional.
+ * archived flag, icon, or cover.
  */
 function buildPagePropertiesWriteback(pageId: string, content: string): NotionWritebackRequest {
   const payload = parseJson(content);
   rejectReadOnlyFields(payload);
-  const properties = extractSerializedProperties(payload);
+  const properties = extractOptionalSerializedProperties(payload);
+  const archived = readBoolean(payload, 'archived');
+  const icon = readObject(payload, 'icon');
+  const cover = readObject(payload, 'cover');
+  if (properties === undefined && archived === undefined && icon === undefined && cover === undefined) {
+    throw new Error('Writeback payload must include properties, archived, icon, or cover');
+  }
   return {
     action: 'update_page_properties',
     method: 'PATCH',
     endpoint: `/v1/pages/${encodeURIComponent(pageId)}`,
     body: {
       properties,
-      archived: readBoolean(payload, 'archived'),
-      icon: readObject(payload, 'icon'),
-      cover: readObject(payload, 'cover'),
+      archived,
+      icon,
+      cover,
     },
   };
 }
@@ -183,6 +187,8 @@ function buildPagePropertiesWriteback(pageId: string, content: string): NotionWr
  * are not supported by this entrypoint.
  */
 function buildMarkdownWriteback(pageId: string, markdown: string): NotionWritebackRequest {
+  const parsed = safeParseJson(markdown);
+  const body = isRecord(parsed) && typeof parsed.markdown === 'string' ? parsed.markdown : markdown;
   return {
     action: 'update_page_markdown',
     method: 'PATCH',
@@ -191,7 +197,7 @@ function buildMarkdownWriteback(pageId: string, markdown: string): NotionWriteba
     body: {
       type: 'replace_content',
       replace_content: {
-        new_str: markdown,
+        new_str: body,
         allow_deleting_content: true,
       },
     },
@@ -211,6 +217,9 @@ function buildMarkdownWriteback(pageId: string, markdown: string): NotionWriteba
 function buildCommentWriteback(pageId: string, content: string): NotionWritebackRequest {
   const parsed = safeParseJson(content);
   if (typeof parsed === 'string') {
+    if (!parsed.trim()) {
+      throw new Error('comments.json writeback expects a non-empty comment body');
+    }
     return {
       action: 'create_comment',
       method: 'POST',
@@ -231,6 +240,11 @@ function buildCommentWriteback(pageId: string, content: string): NotionWriteback
   if (!isRecord(comment)) {
     throw new Error('comments.json writeback expects a JSON object, JSON array, or plain string');
   }
+  const richText = Array.isArray(comment.richText) && comment.richText.length > 0 ? comment.richText : undefined;
+  const text = typeof comment.text === 'string' && comment.text.trim() ? comment.text : undefined;
+  if (!richText && !text) {
+    throw new Error('comments.json writeback expects text or richText');
+  }
 
   return {
     action: 'create_comment',
@@ -240,14 +254,13 @@ function buildCommentWriteback(pageId: string, content: string): NotionWriteback
       parent: { page_id: pageId },
       discussion_id: typeof comment.discussionId === 'string' ? comment.discussionId : undefined,
       rich_text:
-        Array.isArray(comment.richText) && comment.richText.length > 0
-          ? comment.richText
-          : [
-              {
-                type: 'text',
-                text: { content: typeof comment.text === 'string' ? comment.text : JSON.stringify(comment), link: null },
-              },
-            ],
+        richText ??
+        [
+          {
+            type: 'text',
+            text: { content: text, link: null },
+          },
+        ],
     },
   };
 }
@@ -310,6 +323,13 @@ function extractSerializedProperties(payload: Record<string, unknown>): Record<s
     }),
   );
   return deserializePropertyMap(propertyEntries);
+}
+
+function extractOptionalSerializedProperties(payload: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!Object.hasOwn(payload, 'properties')) {
+    return undefined;
+  }
+  return extractSerializedProperties(payload);
 }
 
 /** Parse `content` as a JSON object, throwing if it isn't an object. */
