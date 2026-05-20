@@ -448,7 +448,9 @@ export interface LinearIssueNode {
   labels?: { nodes?: Array<LinearLabelReferenceNode> } | null;
   url?: string | null;
   createdAt?: string | null;
+  created_at?: string | null;
   updatedAt?: string | null;
+  updated_at?: string | null;
 }
 
 export interface LinearProjectNode {
@@ -464,7 +466,9 @@ export interface LinearProjectNode {
   teams?: { nodes?: Array<{ id?: string | null; key?: string | null; name?: string | null }> } | null;
   url?: string | null;
   createdAt?: string | null;
+  created_at?: string | null;
   updatedAt?: string | null;
+  updated_at?: string | null;
 }
 
 export interface LinearCommentNode {
@@ -474,7 +478,9 @@ export interface LinearCommentNode {
   user?: { id?: string | null; name?: string | null; email?: string | null; displayName?: string | null } | null;
   url?: string | null;
   createdAt?: string | null;
+  created_at?: string | null;
   updatedAt?: string | null;
+  updated_at?: string | null;
 }
 
 export interface LinearBaseIndexRow {
@@ -547,7 +553,7 @@ export function linearIssueIndexRow(issue: LinearIssueNode): LinearIssueIndexRow
   return {
     id: issue.id,
     title: normalizeIndexTitle(issue.title),
-    updated: normalizeUpdated(issue.updatedAt, issue.createdAt),
+    updated: normalizeUpdated(issue.updatedAt, issue.updated_at, issue.createdAt, issue.created_at),
     identifier: normalizeIndexTitle(issue.identifier),
     state: normalizeIndexTitle(issue.state?.name),
   };
@@ -557,7 +563,7 @@ export function linearCommentIndexRow(comment: LinearCommentNode): LinearBaseInd
   return {
     id: comment.id,
     title: normalizeIndexTitle(comment.body) || normalizeIndexTitle(comment.issue?.title),
-    updated: normalizeUpdated(comment.updatedAt, comment.createdAt),
+    updated: normalizeUpdated(comment.updatedAt, comment.updated_at, comment.createdAt, comment.created_at),
   };
 }
 

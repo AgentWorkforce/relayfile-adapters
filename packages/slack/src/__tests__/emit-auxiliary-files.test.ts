@@ -101,7 +101,7 @@ describe('emitSlackAuxiliaryFiles', () => {
     const client = createClient();
     const result = await emitSlackAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
-      channels: [{ id: 'C001', name: 'general', updated: '2026-05-12T00:00:00Z' }],
+      channels: [{ id: 'C001', name: 'general', updated_at: '2026-05-12T00:00:00Z' }],
     });
 
     assert.deepEqual(result.errors, []);
@@ -128,7 +128,7 @@ describe('emitSlackAuxiliaryFiles', () => {
           name: 'sam',
           real_name: 'Sam Smith',
           profile: { display_name: 'Sam Smith' },
-          updated: '2026-05-12T00:00:00Z',
+          updatedAt: '2026-05-12T00:00:00Z',
         },
       ],
     });
@@ -150,6 +150,7 @@ describe('emitSlackAuxiliaryFiles', () => {
     assert.equal(rows[0]!.id, 'U001');
     assert.equal(rows[0]!.name, 'sam', 'handle persisted on index row');
     assert.equal(rows[0]!.title, 'Sam Smith');
+    assert.equal(rows[0]!.updated, '2026-05-12T00:00:00Z');
     assert.equal(rows[0]!.is_bot, false);
   });
 
