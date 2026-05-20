@@ -38,8 +38,8 @@ describe('linear index emission', () => {
         id: 'issue-1',
         identifier: 'AGE-8',
         title: 'First issue',
-        createdAt: '2026-04-01T08:00:00.000Z',
-        updatedAt: '2026-04-03T10:00:00.000Z',
+        created_at: '2026-04-01T08:00:00.000Z',
+        updated_at: '2026-04-03T10:00:00.000Z',
         state: null,
       }),
     ];
@@ -53,7 +53,7 @@ describe('linear index emission', () => {
       linearCommentIndexRow({
         id: 'comment-1',
         issue: { title: 'Fallback title' },
-        createdAt: '2026-04-01T06:00:00.000Z',
+        created_at: '2026-04-01T06:00:00.000Z',
       }),
     ];
     const userRows = [

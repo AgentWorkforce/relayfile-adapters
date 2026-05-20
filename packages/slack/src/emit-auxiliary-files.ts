@@ -421,7 +421,7 @@ function planChannelWrite(
   indexReconciler.upsert({
     id,
     title: name ?? '',
-    updated: readNonEmptyString(channel.updated) ?? '',
+    updated: readProviderUpdated(channel),
   });
 
   return { writes, deletes };
@@ -594,7 +594,7 @@ function planUserWrite(
   indexReconciler.upsert({
     id,
     title: displayName ?? '',
-    updated: readNonEmptyString(user.updated) ?? '',
+    updated: readProviderUpdated(user),
     is_bot: isBot,
     ...(handle ? { name: handle } : {}),
   });
@@ -889,6 +889,15 @@ function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readProviderUpdated(record: Record<string, unknown>): string {
+  return (
+    readNonEmptyString(record.updated) ??
+    readNonEmptyString(record.updatedAt) ??
+    readNonEmptyString(record.updated_at) ??
+    ''
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
