@@ -70,6 +70,63 @@ describe('confluence index emission', () => {
     assert.deepEqual(JSON.parse(file.content), []);
   });
 
+  it('uses updated_at-only timestamps for deterministic page and space index ordering', () => {
+    const pageIndex = buildConfluenceIndexFile('pages', [
+      confluencePageIndexRow({
+        id: 'page-old',
+        title: 'Old page',
+        spaceId: 'ENG',
+        status: 'current',
+        updated_at: '2026-04-01T08:00:00.000Z',
+      }),
+      confluencePageIndexRow({
+        id: 'page-new',
+        title: 'New page',
+        spaceId: 'ENG',
+        status: 'current',
+        updated_at: '2026-04-03T10:00:00.000Z',
+      }),
+      confluencePageIndexRow({
+        id: 'page-mid',
+        title: 'Mid page',
+        spaceId: 'ENG',
+        status: 'current',
+        updated_at: '2026-04-02T09:00:00.000Z',
+      }),
+    ]);
+    const spaceIndex = buildConfluenceIndexFile('spaces', [
+      confluenceSpaceIndexRow({
+        id: 'space-old',
+        key: 'OLD',
+        name: 'Old space',
+        updated_at: '2026-04-01T08:00:00.000Z',
+      }),
+      confluenceSpaceIndexRow({
+        id: 'space-new',
+        key: 'NEW',
+        name: 'New space',
+        updated_at: '2026-04-03T10:00:00.000Z',
+      }),
+      confluenceSpaceIndexRow({
+        id: 'space-mid',
+        key: 'MID',
+        name: 'Mid space',
+        updated_at: '2026-04-02T09:00:00.000Z',
+      }),
+    ]);
+
+    assert.deepEqual(JSON.parse(pageIndex.content), [
+      { id: 'page-new', title: 'New page', updated: '2026-04-03T10:00:00.000Z', spaceId: 'ENG', status: 'current' },
+      { id: 'page-mid', title: 'Mid page', updated: '2026-04-02T09:00:00.000Z', spaceId: 'ENG', status: 'current' },
+      { id: 'page-old', title: 'Old page', updated: '2026-04-01T08:00:00.000Z', spaceId: 'ENG', status: 'current' },
+    ]);
+    assert.deepEqual(JSON.parse(spaceIndex.content), [
+      { id: 'space-new', title: 'New space', updated: '2026-04-03T10:00:00.000Z', key: 'NEW' },
+      { id: 'space-mid', title: 'Mid space', updated: '2026-04-02T09:00:00.000Z', key: 'MID' },
+      { id: 'space-old', title: 'Old space', updated: '2026-04-01T08:00:00.000Z', key: 'OLD' },
+    ]);
+  });
+
   it('re-exports the index and layout helpers from the barrel', async () => {
     const barrel = await import('../index.js');
 
