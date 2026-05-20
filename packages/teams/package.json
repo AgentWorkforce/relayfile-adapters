@@ -36,7 +36,7 @@
     "directory": "packages/teams"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.1"
+    "@relayfile/adapter-core": "^0.3.2"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
