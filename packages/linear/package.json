@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-linear",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Linear adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -55,7 +55,7 @@
     "directory": "packages/linear"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.2"
+    "@relayfile/adapter-core": "^0.3.3"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
