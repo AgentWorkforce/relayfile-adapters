@@ -11,9 +11,10 @@ Some generated discovery inputs still contain endpoint-looking strings such as `
 ## File-native operations
 
 Read existing records by opening canonical resource files. Some adapters use a
-bare stable id such as `<uuid>.json`; others emit human-readable files such as
-`<slug>__<id>.json`. Inspect the live directory or follow an adapter alias when
-one is available instead of guessing the filename.
+bare stable id such as `<uuid>.json`; others emit adapter-specific
+human-readable filenames such as Jira's `<summary-slug>__<issue-id>.json`.
+Inspect the live directory or follow an adapter alias when one is available
+instead of guessing the filename.
 
 ```bash
 cat /linear/issues/<uuid>.json
@@ -22,7 +23,7 @@ cat /jira/issues/<summary-slug>__<issue-id>.json
 
 Edit existing records by writing mutable fields to the canonical file. The
 runtime classifies the path as a patch when the basename matches the resource's
-`idPattern`, including slug-prefixed canonical filenames.
+`idPattern`, including adapter-specific canonical filenames.
 
 ```bash
 printf '%s\n' '{"title":"Updated title"}' > /linear/issues/<uuid>.json
