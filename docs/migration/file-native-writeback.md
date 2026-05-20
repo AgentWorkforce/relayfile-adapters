@@ -10,19 +10,27 @@ Some generated discovery inputs still contain endpoint-looking strings such as `
 
 ## File-native operations
 
-Read existing records by opening canonical resource files:
+Read existing records by opening canonical resource files. Some adapters use a
+bare stable id such as `<uuid>.json`; others emit adapter-specific
+human-readable filenames such as Jira's `<summary-slug>__<issue-id>.json`.
+Inspect the live directory or follow an adapter alias when one is available
+instead of guessing the filename.
 
 ```bash
 cat /linear/issues/<uuid>.json
+cat /jira/issues/<summary-slug>__<issue-id>.json
 ```
 
-Edit existing records by writing mutable fields to the canonical file. The runtime classifies the path as a patch when the basename matches the resource's `idPattern`.
+Edit existing records by writing mutable fields to the canonical file. The
+runtime classifies the path as a patch when the basename matches the resource's
+`idPattern`, including adapter-specific canonical filenames.
 
 ```bash
 printf '%s\n' '{"title":"Updated title"}' > /linear/issues/<uuid>.json
+printf '%s\n' '{"fields":{"description":"Updated"}}' > /jira/issues/<summary-slug>__<issue-id>.json
 ```
 
-Create records by writing the create payload to a non-canonical filename in the resource directory. The adapter creates the provider record, writes the canonical `<real-id>.json` file, and records status for the draft path.
+Create records by writing the create payload to a non-canonical filename in the resource directory. The adapter creates the provider record, writes the canonical file using that adapter's filename convention, and records status for the draft path.
 
 ```bash
 printf '%s\n' '{"teamId":"<team-id>","title":"New issue"}' > "/linear/issues/create request.json"
@@ -32,6 +40,7 @@ Delete records by removing a canonical resource file. Delete events on non-canon
 
 ```bash
 rm /linear/issues/<uuid>.json
+rm /jira/issues/<summary-slug>__<issue-id>.json
 ```
 
 ## Discovering payload shape
@@ -65,7 +74,7 @@ Use the status surface before retrying a write. For example, if a create fails b
 | GitLab | `^[A-Za-z0-9_.:-]+$` | `/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/discussions/<draft>.json` |
 | HubSpot | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/hubspot/contacts/<draft>.json` |
 | Intercom | `^[A-Za-z0-9_-]+$` | `/intercom/conversations/<draft>.json` |
-| Jira | comments: `^(?:[A-Za-z0-9_.~-]+--)?\d+$`; issues/projects: bare `KEY-123` or `\d+`, slug-prefixed forms also canonical | `/jira/issues/<draft>.json` |
+| Jira | comments: `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?\d+$`; issues/projects: bare `KEY-123` or `\d+`, plus slug-prefixed `<slug>__<id>` and legacy `<slug>--<id>` forms | `/jira/issues/<draft>.json` |
 | Linear | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?(?:[0-9a-f]{32}\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$` — canonical filename is bare or slug-prefixed, dehyphenated 32-hex or canonical UUID | `/linear/issues/<draft>.json` |
 | Notion | `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?(?:[0-9a-f]{32}\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$` — canonical filename is bare or slug-prefixed, dehyphenated 32-hex or canonical UUID | `/notion/databases/<databaseId>/pages/<draft>.json` |
 | Pipedrive | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/pipedrive/deals/<draft>.json` |

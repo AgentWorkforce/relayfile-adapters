@@ -288,6 +288,18 @@ describe('JiraAdapter', () => {
       endpoint: '/rest/api/3/issue/ENG-42',
       body: { fields: { summary: 'Renamed' } },
     });
+    assert.deepEqual(
+      resolveJiraWritebackRequest(
+        '/jira/issues/relayfile-writeback-test-20260513t120136z__10035.json',
+        '{"fields":{"description":"Edited through RelayFile"}}',
+      ),
+      {
+        action: 'update_issue',
+        method: 'PUT',
+        endpoint: '/rest/api/3/issue/10035',
+        body: { fields: { description: 'Edited through RelayFile' } },
+      },
+    );
     assert.throws(
       () => resolveJiraWritebackRequest('/jira/issues/ENG-42.json', '{"id":"10001","fields":{"summary":"Renamed"}}'),
       (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',

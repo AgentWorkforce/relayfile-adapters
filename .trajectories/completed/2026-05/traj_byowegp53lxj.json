@@ -1,0 +1,53 @@
+{
+  "id": "traj_byowegp53lxj",
+  "version": 1,
+  "task": {
+    "title": "Address relayfile-adapters PR 104 feedback"
+  },
+  "status": "completed",
+  "startedAt": "2026-05-20T08:32:18.094Z",
+  "completedAt": "2026-05-20T08:35:35.353Z",
+  "agents": [
+    {
+      "name": "default",
+      "role": "lead",
+      "joinedAt": "2026-05-20T08:34:13.920Z"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "chap_djkf3lvwltum",
+      "title": "Work",
+      "agentName": "default",
+      "startedAt": "2026-05-20T08:34:13.920Z",
+      "endedAt": "2026-05-20T08:35:35.353Z",
+      "events": [
+        {
+          "ts": 1779266053922,
+          "type": "decision",
+          "content": "Made generated operation wording adapter-neutral: Made generated operation wording adapter-neutral",
+          "raw": {
+            "question": "Made generated operation wording adapter-neutral",
+            "chosen": "Made generated operation wording adapter-neutral",
+            "alternatives": [],
+            "reasoning": "PR feedback showed provider-specific filename examples were leaking into GitHub, Pipedrive, Salesforce, and Notion sidecar docs; fixing the generator prevents drift across all adapters."
+          },
+          "significance": "high"
+        }
+      ]
+    }
+  ],
+  "retrospective": {
+    "summary": "Addressed PR 104 review feedback by making generated writeback Operations guidance adapter-neutral, regenerating adapter discovery docs, and validating discovery plus Jira tests/typecheck.",
+    "approach": "Standard approach",
+    "confidence": 0.92
+  },
+  "commits": [],
+  "filesChanged": [],
+  "projectId": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters-issue-780",
+  "tags": [],
+  "_trace": {
+    "startRef": "d9d486f866440ee3802e1468b7154319495393fc",
+    "endRef": "d9d486f866440ee3802e1468b7154319495393fc"
+  }
+}
