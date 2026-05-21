@@ -1,31 +1,37 @@
 export const HUBSPOT_LAYOUT_PROMPT = `# HubSpot Mount Layout
 
 \`/hubspot/\` mirrors HubSpot CRM objects as id-stable JSON files. HubSpot ids
-are stable numeric strings; there are no titles to disambiguate, so the
-canonical path is the raw id directly.
+are stable numeric strings, so the canonical filename is the raw id directly —
+no slug, no UUID normalization, no collision suffix.
+
+Always run \`ls\` before constructing a path. The adapter writes
+numeric-id filenames (\`/hubspot/<bucket>/<id>.json\`) and you should
+inspect the live directory rather than guessing a filename. The
+\`_index.json\` in each bucket is the cheapest way to scan a list of ids
+with their human-readable titles.
 
 ## Tree
 
 \`\`\`
 /hubspot/
-├── LAYOUT.md
-├── _index.json
+├── LAYOUT.md                          ← this guide
+├── _index.json                        ← bucket roster: [{ id, title }]
 ├── contacts/
-│   ├── _index.json                  ← { id, updated, archived? }
-│   ├── <id>.json                    ← canonical contact record
-│   └── by-id/<id>.json              ← duplicate canonical record
+│   ├── _index.json                    ← { id, title, updated, archived? }
+│   ├── <id>.json                      ← canonical contact record
+│   └── by-id/<id>.json                ← canonical mirror, id-keyed lookup
 ├── companies/
-│   ├── _index.json                  ← { id, updated, archived? }
-│   ├── <id>.json                    ← canonical company record
-│   └── by-id/<id>.json              ← duplicate canonical record
+│   ├── _index.json                    ← { id, title, updated, archived? }
+│   ├── <id>.json                      ← canonical company record
+│   └── by-id/<id>.json                ← canonical mirror, id-keyed lookup
 ├── deals/
-│   ├── _index.json                  ← { id, updated, archived? }
-│   ├── <id>.json                    ← canonical deal record
-│   └── by-id/<id>.json              ← duplicate canonical record
+│   ├── _index.json                    ← { id, title, updated, archived? }
+│   ├── <id>.json                      ← canonical deal record
+│   └── by-id/<id>.json                ← canonical mirror, id-keyed lookup
 └── tickets/
-    ├── _index.json                  ← { id, updated, archived? }
-    ├── <id>.json                    ← canonical ticket record
-    └── by-id/<id>.json              ← duplicate canonical record
+    ├── _index.json                    ← { id, title, updated, archived? }
+    ├── <id>.json                      ← canonical ticket record
+    └── by-id/<id>.json                ← canonical mirror, id-keyed lookup
 \`\`\`
 
 ## Indexes
@@ -33,25 +39,60 @@ canonical path is the raw id directly.
 Every object bucket has an \`_index.json\` containing rows with this shape:
 
 \`\`\`json
-{ "id": "123456", "updated": "2026-05-21T09:30:00.000Z", "archived": false }
+{
+  "id": "123456",
+  "title": "Ada Lovelace",
+  "updated": "2026-05-21T09:30:00.000Z",
+  "archived": false
+}
 \`\`\`
 
-\`archived\` is omitted when the source record does not carry an archived flag.
+\`title\` is derived per bucket:
+- contacts: \`firstname lastname\`, else \`email\`, else \`id\`
+- companies: \`name\`, else \`domain\`, else \`id\`
+- deals: \`dealname\`, else \`id\`
+- tickets: \`subject\`, else \`id\`
+
+\`archived\` is omitted when the source record does not carry an archived
+flag. Rows are sorted by \`updated\` descending.
 
 ## Aliases
 
 The only alias subtree is \`by-id/<id>.json\`. It mirrors the canonical record
-and supports lookups by the raw HubSpot id without scanning an index. Because
-HubSpot ids are already stable numeric strings, no title, slug, UUID
-normalization, or collision suffix is needed.
+exactly (full payload, not a minimal pointer) and supports lookups by the raw
+HubSpot id without scanning an index. Because HubSpot ids are already stable
+numeric strings, no \`by-title\`, \`by-name\`, or other natural-key alias trees
+are emitted.
+
+## JSONL And Querying
+
+Indexes are JSON arrays, not JSONL. Use \`ls\`, \`jq\`, and \`grep\` to query
+them:
+
+\`\`\`bash
+# 1. List every contact id we have
+ls /hubspot/contacts/
+
+# 2. Find the id and title of every active (non-archived) deal
+jq '.[] | select(.archived != true) | { id, title }' /hubspot/deals/_index.json
+
+# 3. Resolve a deal id from its name
+jq -r '.[] | select(.title=="Q3 Enterprise Renewal") | .id' /hubspot/deals/_index.json
+
+# 4. Find every ticket whose canonical payload is in pipeline stage "open"
+grep -l '"hs_pipeline_stage":"open"' /hubspot/tickets/*.json
+
+# 5. Pull a record by id via the alias (skips index scan)
+jq '.payload.properties' /hubspot/companies/by-id/789.json
+\`\`\`
 
 ## Writes
 
-Resolve the numeric id from the bucket \`_index.json\`, then PATCH the matching
-HubSpot CRM object:
+Resolve the numeric id from the bucket \`_index.json\` or \`by-id/\` alias,
+then PATCH the matching HubSpot CRM object:
 
 \`\`\`bash
-id=$(jq -r '.[] | select(.id=="123456") | .id' /hubspot/contacts/_index.json)
+id=$(jq -r '.[] | select(.title=="Ada Lovelace") | .id' /hubspot/contacts/_index.json)
 curl -X PATCH "https://api.hubapi.com/crm/v3/objects/contacts/$id" \\
   -d '{ "properties": { "firstname": "Ada" } }'
 \`\`\`
@@ -77,9 +118,10 @@ Writable models advertise discovery schemas and create examples at:
 ## Terminal States
 
 Closed deals, where \`properties.dealstage\` starts with \`closed\` such as
-\`closedwon\` or \`closedlost\`, remain readable with their status field.
-Archived tickets also remain readable. Only an explicit deletion removes the
-canonical file, the by-id alias, and the matching index row.
+\`closedwon\` or \`closedlost\`, remain readable with their status field set.
+Archived tickets (\`archived: true\`) also remain readable. Only an explicit
+deletion removes the canonical file, the \`by-id\` alias, and the matching
+index row.
 `;
 
 export function hubspotLayoutPromptFile(): {

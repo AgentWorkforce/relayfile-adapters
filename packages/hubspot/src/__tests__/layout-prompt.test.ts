@@ -28,6 +28,26 @@ describe('hubspotLayoutPromptFile', () => {
   it('ends with a newline', () => {
     assert.equal(hubspotLayoutPromptFile().content.endsWith('\n'), true);
   });
+
+  // .claude/rules/testing.md → LAYOUT.md emitter tests must assert content
+  // length and required substrings to catch a regression to the ~288-byte
+  // generic fallback.
+  it('renders a non-fallback body (>= 1000 bytes)', () => {
+    assert.ok(
+      hubspotLayoutPromptFile().content.length >= 1000,
+      'LAYOUT.md content must be at least 1000 bytes; shorter content suggests a regression to the generic fallback',
+    );
+  });
+
+  it('mentions ls, _index.json, jq, and every by-* subtree', () => {
+    const content = hubspotLayoutPromptFile().content;
+    // `ls` must appear as a standalone command (in fenced/backtick form),
+    // not as a substring of "models" or "tools".
+    assert.match(content, /`ls`|`ls /u, '`ls` must be present as a documented command');
+    assert.match(content, /_index\.json/u, '_index.json must be documented');
+    assert.match(content, /\bjq\b/u, 'jq must appear in querying examples');
+    assert.match(content, /by-id/u, 'by-id alias subtree must be documented');
+  });
 });
 
 describe('HubSpot resources', () => {

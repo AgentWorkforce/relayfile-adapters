@@ -85,6 +85,7 @@ const CASES = [
   {
     bucket: 'contacts',
     id: '1001',
+    title: 'Ada',
     record: {
       id: '1001',
       updatedAt: '2026-05-21T09:00:00.000Z',
@@ -94,6 +95,7 @@ const CASES = [
   {
     bucket: 'companies',
     id: '2001',
+    title: 'Example',
     record: {
       id: '2001',
       updatedAt: '2026-05-21T10:00:00.000Z',
@@ -103,6 +105,7 @@ const CASES = [
   {
     bucket: 'deals',
     id: '3001',
+    title: 'Expansion',
     record: {
       id: '3001',
       updatedAt: '2026-05-21T11:00:00.000Z',
@@ -112,6 +115,7 @@ const CASES = [
   {
     bucket: 'tickets',
     id: '4001',
+    title: 'Login issue',
     record: {
       id: '4001',
       updatedAt: '2026-05-21T12:00:00.000Z',
@@ -139,12 +143,14 @@ describe('emitHubSpotAuxiliaryFiles', () => {
 
       const rows = JSON.parse(client.files.get(indexPath) ?? '[]') as Array<{
         id: string;
+        title: string;
         updated: string;
         archived?: boolean;
       }>;
       assert.deepEqual(rows, [
         {
           id: testCase.id,
+          title: testCase.title,
           updated: testCase.record.updatedAt,
         },
       ]);
@@ -264,7 +270,11 @@ describe('emitHubSpotAuxiliaryFiles', () => {
 
     assert.equal(canonical.payload?.properties?.email, 'second@example.com');
     assert.equal(alias.payload?.properties?.email, 'second@example.com');
-    assert.deepEqual(rows, [{ id: '1002', updated: '2026-05-21T10:00:00.000Z' }]);
+    // Both records have no firstname/lastname → contact title falls back to
+    // email, and the second (winning) record's email is what lands in the row.
+    assert.deepEqual(rows, [
+      { id: '1002', title: 'second@example.com', updated: '2026-05-21T10:00:00.000Z' },
+    ]);
     assert.equal([...client.files.keys()].filter((path) => path.includes('/by-id/1002.json')).length, 1);
   });
 
@@ -293,10 +303,92 @@ describe('emitHubSpotAuxiliaryFiles', () => {
       assert.deepEqual(JSON.parse(client.files.get(index) ?? '[]'), [
         {
           id: testCase.id,
+          title: testCase.title,
           updated: testCase.record.updatedAt,
         },
       ]);
     }
+  });
+
+  // AGENTS.md requires _index.json rows to carry { id, title, updated } at
+  // minimum. Title derivation is documented in layout-prompt.ts; this test
+  // pins the per-bucket fallback chain (composed name → email → id, etc.).
+  it('derives index title per bucket with documented fallbacks', async () => {
+    const client = createClient();
+
+    await emitHubSpotAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      records: {
+        contacts: [
+          {
+            id: '7001',
+            updatedAt: '2026-05-21T09:00:00.000Z',
+            properties: { firstname: 'Grace', lastname: 'Hopper' },
+          },
+          {
+            id: '7002',
+            updatedAt: '2026-05-21T09:00:00.000Z',
+            properties: { email: 'no-name@example.com' },
+          },
+          {
+            id: '7003',
+            updatedAt: '2026-05-21T09:00:00.000Z',
+            properties: {},
+          },
+        ],
+        companies: [
+          {
+            id: '8001',
+            updatedAt: '2026-05-21T10:00:00.000Z',
+            properties: { domain: 'example.com' },
+          },
+          {
+            id: '8002',
+            updatedAt: '2026-05-21T10:00:00.000Z',
+            properties: {},
+          },
+        ],
+        deals: [
+          {
+            id: '9001',
+            updatedAt: '2026-05-21T11:00:00.000Z',
+            properties: {},
+          },
+        ],
+        tickets: [
+          {
+            id: '9501',
+            updatedAt: '2026-05-21T12:00:00.000Z',
+            properties: {},
+          },
+        ],
+      },
+    });
+
+    const contactRows = JSON.parse(
+      client.files.get('/hubspot/contacts/_index.json') ?? '[]',
+    ) as Array<{ id: string; title: string }>;
+    const titlesById = new Map(contactRows.map((row) => [row.id, row.title]));
+    assert.equal(titlesById.get('7001'), 'Grace Hopper');
+    assert.equal(titlesById.get('7002'), 'no-name@example.com');
+    assert.equal(titlesById.get('7003'), '7003');
+
+    const companyRows = JSON.parse(
+      client.files.get('/hubspot/companies/_index.json') ?? '[]',
+    ) as Array<{ id: string; title: string }>;
+    const companyTitles = new Map(companyRows.map((row) => [row.id, row.title]));
+    assert.equal(companyTitles.get('8001'), 'example.com');
+    assert.equal(companyTitles.get('8002'), '8002');
+
+    const dealRows = JSON.parse(
+      client.files.get('/hubspot/deals/_index.json') ?? '[]',
+    ) as Array<{ id: string; title: string }>;
+    assert.equal(dealRows[0]?.title, '9001');
+
+    const ticketRows = JSON.parse(
+      client.files.get('/hubspot/tickets/_index.json') ?? '[]',
+    ) as Array<{ id: string; title: string }>;
+    assert.equal(ticketRows[0]?.title, '9501');
   });
 });
 

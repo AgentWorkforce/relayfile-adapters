@@ -43,6 +43,7 @@ export interface EmitHubSpotAuxiliaryFilesInput {
 
 interface HubSpotIndexRow {
   id: string;
+  title: string;
   updated: string;
   archived?: boolean;
 }
@@ -176,7 +177,7 @@ async function planWrite<TRecord extends HubSpotCrmObject>(
   const paths = hubSpotPathsFor(resource, id);
   const writes: EmitWrite[] = paths.map((path) => ({ path, content, contentType: JSON_CONTENT_TYPE }));
 
-  indexReconciler.upsert(buildIndexRow(id, record));
+  indexReconciler.upsert(buildIndexRow(id, record, resource.objectType));
   return { writes };
 }
 
@@ -248,9 +249,14 @@ function renderLifecycleFields(
   return lifecycle;
 }
 
-function buildIndexRow(id: string, record: HubSpotCrmObject): HubSpotIndexRow {
+function buildIndexRow(
+  id: string,
+  record: HubSpotCrmObject,
+  objectType: HubSpotObjectType,
+): HubSpotIndexRow {
   return {
     id,
+    title: buildIndexTitle(id, record, objectType),
     updated: normalizeUpdated(
       record.updatedAt,
       record.properties?.lastmodifieddate,
@@ -260,6 +266,40 @@ function buildIndexRow(id: string, record: HubSpotCrmObject): HubSpotIndexRow {
     ),
     ...(typeof record.archived === 'boolean' ? { archived: record.archived } : {}),
   };
+}
+
+// AGENTS.md requires _index.json rows to carry { id, title, updated } at
+// minimum. HubSpot ids are stable numeric strings, but each object type has a
+// human-readable name in its properties that should populate `title`:
+//   contact  → "<firstname> <lastname>", else email, else id
+//   company  → name, else domain, else id
+//   deal     → dealname, else id
+//   ticket   → subject, else id
+// The bare id is the last-resort fallback so the row contract is never empty.
+function buildIndexTitle(
+  id: string,
+  record: HubSpotCrmObject,
+  objectType: HubSpotObjectType,
+): string {
+  const properties = record.properties ?? {};
+  switch (objectType) {
+    case 'contact': {
+      const first = readNonEmptyString(properties.firstname);
+      const last = readNonEmptyString(properties.lastname);
+      const composed = [first, last].filter((part): part is string => Boolean(part)).join(' ').trim();
+      return composed || readNonEmptyString(properties.email) || id;
+    }
+    case 'company':
+      return (
+        readNonEmptyString(properties.name) ??
+        readNonEmptyString(properties.domain) ??
+        id
+      );
+    case 'deal':
+      return readNonEmptyString(properties.dealname) ?? id;
+    case 'ticket':
+      return readNonEmptyString(properties.subject) ?? id;
+  }
 }
 
 function compareIndexRows(left: HubSpotIndexRow, right: HubSpotIndexRow): number {
