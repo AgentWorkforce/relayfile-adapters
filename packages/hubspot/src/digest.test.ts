@@ -102,3 +102,84 @@ test('digest returns null for an empty HubSpot event window', async () => {
 
   assert.equal(await digest(ctx), null);
 });
+
+test('digest emits one bullet per canonical record and skips the by-id alias mirror', async () => {
+  // emitHubSpotAuxiliaryFiles writes canonical + by-id alias for every record;
+  // the digest must collapse the pair to a single bullet, not duplicate it.
+  const ctx: DigestContext = {
+    provider: 'hubspot',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'created',
+          canonicalPath: '/hubspot/deals/501.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'created',
+          canonicalPath: '/hubspot/deals/by-id/501.json',
+        },
+        {
+          id: 'evt-3',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/hubspot/contacts/301.json',
+        },
+        {
+          id: 'evt-4',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/hubspot/contacts/by-id/301.json',
+        },
+      ];
+    },
+  };
+
+  const result = await digest(ctx);
+  assert.deepEqual(result, {
+    provider: 'hubspot',
+    bullets: [
+      { text: 'deal 501 was created', canonicalPath: 'hubspot/deals/501.json' },
+      { text: 'contact 301 was updated', canonicalPath: 'hubspot/contacts/301.json' },
+    ],
+  });
+});
+
+test('digest handles id-only canonical paths produced by emitHubSpotAuxiliaryFiles', async () => {
+  // emit-aux writes /hubspot/<bucket>/<id>.json with no slug prefix because
+  // HubSpot CRM ids are stable numeric strings. hubspotIdentifier must surface
+  // the bare id when no `<slug>__<id>` form is present.
+  const ctx: DigestContext = {
+    provider: 'hubspot',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents() {
+      return [
+        {
+          id: 'evt-1',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'deal.closed',
+          canonicalPath: '/hubspot/deals/501.json',
+        },
+        {
+          id: 'evt-2',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'ticket.archived',
+          canonicalPath: '/hubspot/tickets/401.json',
+        },
+      ];
+    },
+  };
+
+  const result = await digest(ctx);
+  assert.deepEqual(result, {
+    provider: 'hubspot',
+    bullets: [
+      { text: 'deal 501 was closed', canonicalPath: 'hubspot/deals/501.json' },
+      { text: 'ticket 401 was archived', canonicalPath: 'hubspot/tickets/401.json' },
+    ],
+  });
+});

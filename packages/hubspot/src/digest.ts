@@ -74,6 +74,10 @@ const DIGEST_ALIAS_PROVIDER_SEGMENTS = new Set([
   'confluence',
   'github',
   'gitlab',
+  // HubSpot now emits /hubspot/<bucket>/by-id/<id>.json alias mirrors via
+  // emitHubSpotAuxiliaryFiles. Without hubspot in this set, every canonical
+  // change event would produce a duplicate digest bullet for its alias.
+  'hubspot',
   'jira',
   'linear',
   'notion',
@@ -99,8 +103,12 @@ const DIGEST_ALIAS_SEGMENTS = new Set([
 
 const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
   'channels',
+  // HubSpot CRM buckets — parents of /hubspot/<bucket>/by-id/<id>.json aliases.
+  'companies',
   'commits',
+  'contacts',
   'databases',
+  'deals',
   'deployments',
   'issues',
   'pages',
@@ -112,6 +120,7 @@ const DIGEST_ALIAS_PARENT_SEGMENTS = new Set([
   'tags',
   'tasks',
   'teams',
+  'tickets',
   'users',
 ]);
 

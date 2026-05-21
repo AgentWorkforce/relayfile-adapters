@@ -7,12 +7,13 @@ export interface AdapterResourceConfig {
   readonly createExample: string;
 }
 
+// HubSpot CRM object ids are numeric strings - no slug-prefix form (tightened from 0.2.x)
 export const resources = [
   {
     name: "contacts",
     path: "/hubspot/contacts",
     pathPattern: /^\/hubspot\/contacts(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
+    idPattern: /^[0-9]+$/,
     schema: "discovery/hubspot/contacts/.schema.json",
     createExample: "discovery/hubspot/contacts/.create.example.json",
   },
@@ -20,7 +21,7 @@ export const resources = [
     name: "companies",
     path: "/hubspot/companies",
     pathPattern: /^\/hubspot\/companies(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
+    idPattern: /^[0-9]+$/,
     schema: "discovery/hubspot/companies/.schema.json",
     createExample: "discovery/hubspot/companies/.create.example.json",
   },
@@ -28,7 +29,7 @@ export const resources = [
     name: "deals",
     path: "/hubspot/deals",
     pathPattern: /^\/hubspot\/deals(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
+    idPattern: /^[0-9]+$/,
     schema: "discovery/hubspot/deals/.schema.json",
     createExample: "discovery/hubspot/deals/.create.example.json",
   },
@@ -36,7 +37,7 @@ export const resources = [
     name: "tickets",
     path: "/hubspot/tickets",
     pathPattern: /^\/hubspot\/tickets(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
+    idPattern: /^[0-9]+$/,
     schema: "discovery/hubspot/tickets/.schema.json",
     createExample: "discovery/hubspot/tickets/.create.example.json",
   },
