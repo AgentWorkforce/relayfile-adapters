@@ -140,11 +140,15 @@ function normalizeDigestPath(path: string): string {
 function googleDriveIdentifier(path: string, event?: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[2] ?? path;
-  const wrapperName = segments[1] === 'files' && segments.length === 3
+  const isWrapper = segments[1] === 'files' && segments.length === 3;
+  const wrapperName = isWrapper
     ? googleDriveWrapperName(event, leaf)
     : null;
   if (wrapperName) {
     return `file ${wrapperName}`;
+  }
+  if (isWrapper) {
+    return `file ${decodePathLeafId(leaf)}`;
   }
   // Skip provider prefix and account to get the file path
   const file = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;

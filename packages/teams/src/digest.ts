@@ -140,7 +140,7 @@ function normalizeDigestPath(path: string): string {
 function teamsIdentifier(path: string): string {
   const segments = path.split('/').filter(Boolean);
   const terminal = segments.at(-1);
-  const segment = terminal === 'metadata.json'
+  const segment = terminal === 'meta.json' || terminal === 'metadata.json'
     ? segments.at(-2) ?? path
     : terminal ?? path;
   const basename = segment.replace(/\.[^.]+$/u, '');

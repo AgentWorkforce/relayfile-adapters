@@ -145,11 +145,15 @@ function normalizeDigestPath(path: string): string {
 function onedriveIdentifier(path: string, event?: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[3] ?? path;
-  const wrapperName = segments[2] === 'items' && segments.length === 4
+  const isWrapper = segments[2] === 'items' && segments.length === 4;
+  const wrapperName = isWrapper
     ? oneDriveWrapperName(event, leaf)
     : null;
   if (wrapperName) {
     return `item ${wrapperName}`;
+  }
+  if (isWrapper) {
+    return `item ${decodePathLeafId(leaf)}`;
   }
   // Skip provider prefix and account to get the item path
   const item = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;

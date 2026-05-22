@@ -140,11 +140,15 @@ function normalizeDigestPath(path: string): string {
 function sharepointIdentifier(path: string, event?: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[4] ?? path;
-  const wrapperName = segments[3] === 'items' && segments.length === 5
+  const isWrapper = segments[3] === 'items' && segments.length === 5;
+  const wrapperName = isWrapper
     ? sharePointWrapperName(event, leaf)
     : null;
   if (wrapperName) {
     return `item ${wrapperName}`;
+  }
+  if (isWrapper) {
+    return `item ${decodePathLeafId(leaf)}`;
   }
   // Skip provider prefix, site, drive to get the item path
   const item = segments.length > 3 ? segments.slice(3).join('/') : segments.at(-1) ?? path;
