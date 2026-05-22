@@ -12,6 +12,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: unknown;
 }
 
 export interface DigestContext {
@@ -49,7 +50,8 @@ export interface DigestAliasConfig {
 export interface CreateDigestHandlerOptions {
   readonly provider?: string;
   readonly pathPrefix?: string;
-  readonly identify: (canonicalPath: string) => string;
+  readonly pathPrefixes?: readonly string[];
+  readonly identify: (canonicalPath: string, event: DigestChangeEvent) => string;
   readonly actionRules?: readonly DigestActionRule[];
   readonly defaultPastTense?: string;
   readonly alias?: DigestAliasConfig;
@@ -117,13 +119,13 @@ export function createDigestHandler(options: CreateDigestHandlerOptions): Digest
 
   return async (ctx: DigestContext) => {
     const provider = options.provider ?? ctx.provider;
-    const prefix = normalizeDigestPath(options.pathPrefix ?? provider);
+    const prefixes = normalizeDigestPrefixes(options.pathPrefixes, options.pathPrefix ?? provider);
     const events = await ctx.changeEvents({ providers: [ctx.provider] });
     const bullets = events
       .filter((event) =>
         hasDigestPath(
           event,
-          prefix,
+          prefixes,
           provider,
           aliasMode,
           aliasSegments,
@@ -136,7 +138,7 @@ export function createDigestHandler(options: CreateDigestHandlerOptions): Digest
       .map((event) => {
         const canonicalPath = normalizeDigestPath(digestEventPath(event));
         return {
-          text: `${options.identify(canonicalPath)} ${pastTense(event, canonicalPath, compiledRules, defaultPastTense, options.classify)}`,
+          text: `${options.identify(canonicalPath, event)} ${pastTense(event, canonicalPath, compiledRules, defaultPastTense, options.classify)}`,
           canonicalPath,
         };
       });
@@ -147,7 +149,7 @@ export function createDigestHandler(options: CreateDigestHandlerOptions): Digest
 
 function hasDigestPath(
   event: DigestChangeEvent,
-  prefix: string,
+  prefixes: readonly string[],
   provider: string,
   aliasMode: "parent-scoped" | "any",
   aliasSegments: ReadonlySet<string>,
@@ -159,12 +161,12 @@ function hasDigestPath(
     return false;
   }
 
-  const prefixMatch = (
+  const prefixMatch = prefixes.some((prefix) => (
     eventPath === prefix
     || eventPath === `/${prefix}`
     || eventPath.startsWith(`${prefix}/`)
     || eventPath.startsWith(`/${prefix}/`)
-  );
+  ));
   if (!prefixMatch) return false;
 
   const canonicalPath = normalizeDigestPath(eventPath);
@@ -246,6 +248,23 @@ function digestEventPath(event: DigestChangeEvent): string {
 
 function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, "");
+}
+
+function normalizeDigestPrefixes(
+  pathPrefixes: readonly string[] | undefined,
+  fallbackPrefix: string,
+): readonly string[] {
+  const source = pathPrefixes && pathPrefixes.length > 0 ? pathPrefixes : [fallbackPrefix];
+  const prefixes = Array.from(
+    new Set(
+      source
+        .map((prefix) => normalizeDigestPath(prefix))
+        .filter((prefix) => prefix.length > 0),
+    ),
+  );
+
+  if (prefixes.length > 0) return prefixes;
+  return [normalizeDigestPath(fallbackPrefix)];
 }
 
 function pastTense(

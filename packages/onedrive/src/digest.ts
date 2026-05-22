@@ -1,57 +1,29 @@
-export interface DigestWindow {
-  readonly from: string;
-  readonly to: string;
-}
+import {
+  createDigestHandler,
+  type DigestBullet,
+  type DigestChangeEvent,
+  type DigestContext,
+  type DigestHandler,
+  type DigestSection,
+  type DigestWindow,
+} from "@relayfile/adapter-core";
 
-export interface DigestChangeEvent {
-  readonly id?: string;
-  readonly timestamp?: string;
-  readonly occurredAt?: string;
-  readonly eventType?: string;
-  readonly type?: string;
-  readonly action?: string;
-  readonly canonicalPath?: string;
-  readonly path?: string;
-  readonly content?: unknown;
-}
-
-export interface DigestContext {
-  readonly provider: string;
-  readonly window: DigestWindow;
-  changeEvents(filter?: {
-    providers?: string[];
-    paths?: string[];
-  }): Promise<readonly DigestChangeEvent[]>;
-}
-
-export interface DigestBullet {
-  readonly text: string;
-  readonly canonicalPath: string;
-}
-
-export interface DigestSection {
-  readonly provider: string;
-  readonly bullets: readonly DigestBullet[];
-}
-
-export type DigestHandler = (ctx: DigestContext) => Promise<DigestSection | null>;
-
-export const digest: DigestHandler = async (ctx) => {
-  const events = await ctx.changeEvents({ providers: [ctx.provider] });
-  const bullets = events
-    .filter(hasDigestPath)
-    .slice()
-    .sort(compareEvents)
-    .map((event) => {
-      const canonicalPath = normalizeDigestPath(digestEventPath(event));
-      return {
-        text: `${onedriveIdentifier(canonicalPath, event)} ${pastTense(event)}`,
-        canonicalPath,
-      };
-    });
-
-  return bullets.length === 0 ? null : { provider: ctx.provider, bullets };
+export type {
+  DigestBullet,
+  DigestChangeEvent,
+  DigestContext,
+  DigestHandler,
+  DigestSection,
+  DigestWindow,
 };
+
+export const digest: DigestHandler = createDigestHandler({
+  provider: "onedrive",
+  identify: (canonicalPath, event) => onedriveIdentifier(canonicalPath, event),
+  alias: { segments: [] },
+  acceptEvent: (event) => hasDigestPath(event),
+  classify: (event) => pastTense(event),
+});
 
 function hasDigestPath(event: DigestChangeEvent): boolean {
   return (
@@ -170,22 +142,26 @@ function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, '');
 }
 
-function onedriveIdentifier(path: string, event: DigestChangeEvent): string {
+function onedriveIdentifier(path: string, event?: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[3] ?? path;
-  const wrapperName = segments[2] === 'items' && segments.length === 4
+  const isWrapper = segments[2] === 'items' && segments.length === 4;
+  const wrapperName = isWrapper
     ? oneDriveWrapperName(event, leaf)
     : null;
   if (wrapperName) {
     return `item ${wrapperName}`;
+  }
+  if (isWrapper) {
+    return `item ${decodePathLeafId(leaf)}`;
   }
   // Skip provider prefix and account to get the item path
   const item = segments.length > 2 ? segments.slice(2).join('/') : segments.at(-1) ?? path;
   return `item ${item}`;
 }
 
-function oneDriveWrapperName(event: DigestChangeEvent, leaf: string): string | null {
-  const content = event.content;
+function oneDriveWrapperName(event: DigestChangeEvent | undefined, leaf: string): string | null {
+  const content = event?.content;
   const id = decodePathLeafId(leaf);
   if (!(
     isRecord(content)

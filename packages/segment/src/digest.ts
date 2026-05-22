@@ -1,61 +1,29 @@
-export interface DigestWindow {
-  readonly from: string;
-  readonly to: string;
-}
+import {
+  createDigestHandler,
+  type DigestBullet,
+  type DigestChangeEvent,
+  type DigestContext,
+  type DigestHandler,
+  type DigestSection,
+  type DigestWindow,
+} from "@relayfile/adapter-core";
 
-export interface DigestChangeEvent {
-  readonly id?: string;
-  readonly timestamp?: string;
-  readonly occurredAt?: string;
-  readonly eventType?: string;
-  readonly type?: string;
-  readonly action?: string;
-  readonly canonicalPath?: string;
-  readonly path?: string;
-}
-
-export interface DigestContext {
-  readonly provider: string;
-  readonly window: DigestWindow;
-  changeEvents(filter?: {
-    providers?: string[];
-    paths?: string[];
-  }): Promise<readonly DigestChangeEvent[]>;
-}
-
-export interface DigestBullet {
-  readonly text: string;
-  readonly canonicalPath: string;
-}
-
-export interface DigestSection {
-  readonly provider: string;
-  readonly bullets: readonly DigestBullet[];
-}
-
-export type DigestHandler = (ctx: DigestContext) => Promise<DigestSection | null>;
-
-/**
- * Segment is an append-only event adapter. Records are immutable once
- * written — there is no delete or terminal lifecycle state. The digest
- * surfaces created and upserted events so agents can see new activity.
- */
-export const digest: DigestHandler = async (ctx) => {
-  const events = await ctx.changeEvents({ providers: [ctx.provider] });
-  const bullets = events
-    .filter(hasDigestPath)
-    .slice()
-    .sort(compareEvents)
-    .map((event) => {
-      const canonicalPath = normalizeDigestPath(digestEventPath(event));
-      return {
-        text: `${segmentIdentifier(canonicalPath)} ${pastTense(event)}`,
-        canonicalPath,
-      };
-    });
-
-  return bullets.length === 0 ? null : { provider: ctx.provider, bullets };
+export type {
+  DigestBullet,
+  DigestChangeEvent,
+  DigestContext,
+  DigestHandler,
+  DigestSection,
+  DigestWindow,
 };
+
+export const digest: DigestHandler = createDigestHandler({
+  provider: "segment",
+  identify: (canonicalPath) => segmentIdentifier(canonicalPath),
+  alias: { segments: [] },
+  acceptEvent: (event) => hasDigestPath(event),
+  classify: (event) => pastTense(event),
+});
 
 function hasDigestPath(event: DigestChangeEvent): boolean {
   return (

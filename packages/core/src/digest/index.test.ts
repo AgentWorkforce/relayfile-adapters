@@ -112,3 +112,38 @@ test("createDigestHandler supports custom acceptEvent and classify hooks", async
     ],
   });
 });
+
+test("createDigestHandler supports multiple path prefixes", async () => {
+  const digest = createDigestHandler({
+    provider: "delta",
+    pathPrefixes: ["delta", "delta-legacy"],
+    identify: (path) => path,
+    actionRules: [{ verbs: "create|created", pastTense: "was created" }],
+  });
+
+  const ctx: DigestContext = {
+    provider: "delta",
+    window: { from: "2026-01-01T00:00:00.000Z", to: "2026-01-02T00:00:00.000Z" },
+    async changeEvents() {
+      return [
+        { id: "1", timestamp: "2026-01-01T08:00:00.000Z", action: "created", canonicalPath: "/delta/items/a.json" },
+        { id: "2", timestamp: "2026-01-01T09:00:00.000Z", action: "created", canonicalPath: "/delta-legacy/items/b.json" },
+        { id: "3", timestamp: "2026-01-01T10:00:00.000Z", action: "created", canonicalPath: "/other/items/c.json" },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: "delta",
+    bullets: [
+      {
+        text: "delta/items/a.json was created",
+        canonicalPath: "delta/items/a.json",
+      },
+      {
+        text: "delta-legacy/items/b.json was created",
+        canonicalPath: "delta-legacy/items/b.json",
+      },
+    ],
+  });
+});

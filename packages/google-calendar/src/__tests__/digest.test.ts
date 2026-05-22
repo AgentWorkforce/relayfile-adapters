@@ -7,7 +7,7 @@ test('digest returns deterministic Google Calendar bullets sorted by event time 
   const ctx: DigestContext = {
     provider: 'google-calendar',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
-    async changeEvents(filter) {
+    async changeEvents(filter: Parameters<DigestContext['changeEvents']>[0]) {
       assert.deepEqual(filter, { providers: ['google-calendar'] });
       return [
         {
