@@ -334,6 +334,12 @@ an adapter:
   `by-state`, `by-assignee`, `by-creator`, and `by-priority` unless the matrix
   documents an explicit exception; status-driven build/deploy resources must
   expose `by-status`.
+- If an adapter exports a digest compatibility handler, build it with
+  `createDigestHandler` and shared digest types from `@relayfile/adapter-core`.
+  Adapter-local code should only identify provider records, declare lifecycle
+  action rules, optionally narrow canonical record paths, and configure alias
+  segments. Do not reimplement sorting, path prefix filtering, alias/index/layout
+  suppression, or digest bullet assembly in adapter packages.
 - Run `npm run test:digest-contracts` after adding or changing an adapter,
   layout manifest, or category matrix entry.
 

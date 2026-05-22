@@ -1,0 +1,70 @@
+{
+  "name": "@relayfile/adapter-docker-hub",
+  "version": "0.1.0",
+  "description": "Docker Hub adapter package for Relayfile",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "relayfile",
+    "docker-hub",
+    "docker",
+    "adapter"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/docker-hub"
+  },
+  "dependencies": {
+    "@relayfile/adapter-core": "^0.3.10"
+  },
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
+  },
+  "devDependencies": {
+    "@agent-relay/sdk": "^6.0.7",
+    "@relayfile/sdk": "^0.6.0",
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
