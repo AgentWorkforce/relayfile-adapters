@@ -535,6 +535,10 @@ function readFolderIds(value: unknown): string[] {
 function parseIsoDay(value: string): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
+  const directMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:$|[T\s])/);
+  if (directMatch?.[1]) {
+    return directMatch[1];
+  }
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) {
     const direct = trimmed.slice(0, 10);

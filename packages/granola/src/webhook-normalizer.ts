@@ -60,6 +60,16 @@ function parsePayload(rawPayload: unknown): Record<string, unknown> {
 }
 
 function extractObjectType(payload: Record<string, unknown>): 'folder' | 'note' {
+  const folderId = readNonEmptyString(payload.folder_id) ?? readNonEmptyString(payload.folderId);
+  if (folderId) return 'folder';
+
+  const noteId = readNonEmptyString(payload.note_id) ?? readNonEmptyString(payload.noteId);
+  if (noteId) return 'note';
+
+  const genericId = readNonEmptyString(payload.id) ?? readNonEmptyString(payload.object_id);
+  if (genericId?.startsWith('fol_')) return 'folder';
+  if (genericId?.startsWith('not_')) return 'note';
+
   const source = readNonEmptyString(payload.object)
     ?? readNonEmptyString(payload.object_type)
     ?? readNonEmptyString(payload.type)
