@@ -61,7 +61,7 @@
     "directory": "packages/x"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.6"
+    "@relayfile/adapter-core": "^0.3.7"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
