@@ -53,6 +53,17 @@ export interface CreateDigestHandlerOptions {
   readonly actionRules?: readonly DigestActionRule[];
   readonly defaultPastTense?: string;
   readonly alias?: DigestAliasConfig;
+  /**
+   * Optional additional event-level guard. Called after provider-prefix and
+   * canonical-path checks pass. Return false to skip an event.
+   */
+  readonly acceptEvent?: (event: DigestChangeEvent, canonicalPath: string) => boolean;
+  /**
+   * Optional custom classifier. Return a verb phrase (for example
+   * "was merged") to override rule-based matching for that event.
+   * Return null/undefined to fall back to actionRules/defaultPastTense.
+   */
+  readonly classify?: (event: DigestChangeEvent, canonicalPath: string) => string | null | undefined;
 }
 
 const DEFAULT_ALIAS_SEGMENTS = new Set([
@@ -110,14 +121,22 @@ export function createDigestHandler(options: CreateDigestHandlerOptions): Digest
     const events = await ctx.changeEvents({ providers: [ctx.provider] });
     const bullets = events
       .filter((event) =>
-        hasDigestPath(event, prefix, provider, aliasMode, aliasSegments, aliasParents),
+        hasDigestPath(
+          event,
+          prefix,
+          provider,
+          aliasMode,
+          aliasSegments,
+          aliasParents,
+          options.acceptEvent,
+        ),
       )
       .slice()
       .sort(compareEvents)
       .map((event) => {
         const canonicalPath = normalizeDigestPath(digestEventPath(event));
         return {
-          text: `${options.identify(canonicalPath)} ${pastTense(event, compiledRules, defaultPastTense)}`,
+          text: `${options.identify(canonicalPath)} ${pastTense(event, canonicalPath, compiledRules, defaultPastTense, options.classify)}`,
           canonicalPath,
         };
       });
@@ -133,18 +152,26 @@ function hasDigestPath(
   aliasMode: "parent-scoped" | "any",
   aliasSegments: ReadonlySet<string>,
   aliasParents: ReadonlySet<string>,
+  acceptEvent: CreateDigestHandlerOptions["acceptEvent"],
 ): boolean {
   const eventPath = digestEventPath(event);
   if (!eventPath || !isCanonicalDigestPath(eventPath, provider, aliasMode, aliasSegments, aliasParents)) {
     return false;
   }
 
-  return (
+  const prefixMatch = (
     eventPath === prefix
     || eventPath === `/${prefix}`
     || eventPath.startsWith(`${prefix}/`)
     || eventPath.startsWith(`/${prefix}/`)
   );
+  if (!prefixMatch) return false;
+
+  const canonicalPath = normalizeDigestPath(eventPath);
+  if (acceptEvent) {
+    return acceptEvent(event, canonicalPath);
+  }
+  return true;
 }
 
 function isCanonicalDigestPath(
@@ -223,9 +250,15 @@ function normalizeDigestPath(path: string): string {
 
 function pastTense(
   event: DigestChangeEvent,
+  canonicalPath: string,
   rules: readonly CompiledActionRule[],
   defaultPastTense: string,
+  classify: CreateDigestHandlerOptions["classify"],
 ): string {
+  if (classify) {
+    const custom = classify(event, canonicalPath);
+    if (custom) return custom;
+  }
   const action = (event.action ?? event.eventType ?? event.type ?? "").toLowerCase();
   for (const rule of rules) {
     if (rule.regex.test(action)) {
