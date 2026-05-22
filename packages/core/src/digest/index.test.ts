@@ -75,3 +75,40 @@ test("createDigestHandler supports provider aliases with alias.mode=any", async 
     ],
   });
 });
+
+test("createDigestHandler supports custom acceptEvent and classify hooks", async () => {
+  const digest = createDigestHandler({
+    provider: "gamma",
+    identify: (path) => path,
+    actionRules: [{ verbs: "create|created", pastTense: "was created" }],
+    acceptEvent: (event, canonicalPath) =>
+      canonicalPath !== "gamma/skip/me.json" && event.id !== "skip-id",
+    classify: (event, canonicalPath) => {
+      if (canonicalPath.endsWith("/terminal.json")) return "was closed";
+      if ((event.action ?? "") === "noop") return "was updated";
+      return null;
+    },
+  });
+
+  const ctx: DigestContext = {
+    provider: "gamma",
+    window: { from: "2026-01-01T00:00:00.000Z", to: "2026-01-02T00:00:00.000Z" },
+    async changeEvents() {
+      return [
+        { id: "skip-id", timestamp: "2026-01-01T08:00:00.000Z", action: "created", canonicalPath: "/gamma/items/a.json" },
+        { id: "ok-1", timestamp: "2026-01-01T09:00:00.000Z", action: "created", canonicalPath: "/gamma/skip/me.json" },
+        { id: "ok-2", timestamp: "2026-01-01T10:00:00.000Z", action: "created", canonicalPath: "/gamma/items/terminal.json" },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: "gamma",
+    bullets: [
+      {
+        text: "gamma/items/terminal.json was closed",
+        canonicalPath: "gamma/items/terminal.json",
+      },
+    ],
+  });
+});
