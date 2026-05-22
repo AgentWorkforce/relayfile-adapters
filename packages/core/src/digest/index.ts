@@ -12,6 +12,7 @@ export interface DigestChangeEvent {
   readonly action?: string;
   readonly canonicalPath?: string;
   readonly path?: string;
+  readonly content?: unknown;
 }
 
 export interface DigestContext {
@@ -49,7 +50,7 @@ export interface DigestAliasConfig {
 export interface CreateDigestHandlerOptions {
   readonly provider?: string;
   readonly pathPrefix?: string;
-  readonly identify: (canonicalPath: string) => string;
+  readonly identify: (canonicalPath: string, event: DigestChangeEvent) => string;
   readonly actionRules?: readonly DigestActionRule[];
   readonly defaultPastTense?: string;
   readonly alias?: DigestAliasConfig;
@@ -136,7 +137,7 @@ export function createDigestHandler(options: CreateDigestHandlerOptions): Digest
       .map((event) => {
         const canonicalPath = normalizeDigestPath(digestEventPath(event));
         return {
-          text: `${options.identify(canonicalPath)} ${pastTense(event, canonicalPath, compiledRules, defaultPastTense, options.classify)}`,
+          text: `${options.identify(canonicalPath, event)} ${pastTense(event, canonicalPath, compiledRules, defaultPastTense, options.classify)}`,
           canonicalPath,
         };
       });

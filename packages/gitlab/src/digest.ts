@@ -109,7 +109,11 @@ function isGitLabProjectByIdAliasPath(segments: readonly string[]): boolean {
 function isGitLabLegacyTagCleanupPath(segments: readonly string[]): boolean {
   if (segments[0] !== "gitlab" || segments[1] !== "projects") return false;
   const resourceIndex = gitLabResourceSegmentIndex(segments);
-  return segments[resourceIndex] === "tags" && segments.length > resourceIndex + 2;
+  if (segments[resourceIndex] !== "tags") return false;
+  return (
+    segments.length > resourceIndex + 2 ||
+    segments[resourceIndex - 1] === "refs"
+  );
 }
 
 function isGitLabFullRefTagCleanupPath(segments: readonly string[]): boolean {

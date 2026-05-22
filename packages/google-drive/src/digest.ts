@@ -1,57 +1,29 @@
-export interface DigestWindow {
-  readonly from: string;
-  readonly to: string;
-}
+import {
+  createDigestHandler,
+  type DigestBullet,
+  type DigestChangeEvent,
+  type DigestContext,
+  type DigestHandler,
+  type DigestSection,
+  type DigestWindow,
+} from "@relayfile/adapter-core";
 
-export interface DigestChangeEvent {
-  readonly id?: string;
-  readonly timestamp?: string;
-  readonly occurredAt?: string;
-  readonly eventType?: string;
-  readonly type?: string;
-  readonly action?: string;
-  readonly canonicalPath?: string;
-  readonly path?: string;
-  readonly content?: unknown;
-}
-
-export interface DigestContext {
-  readonly provider: string;
-  readonly window: DigestWindow;
-  changeEvents(filter?: {
-    providers?: string[];
-    paths?: string[];
-  }): Promise<readonly DigestChangeEvent[]>;
-}
-
-export interface DigestBullet {
-  readonly text: string;
-  readonly canonicalPath: string;
-}
-
-export interface DigestSection {
-  readonly provider: string;
-  readonly bullets: readonly DigestBullet[];
-}
-
-export type DigestHandler = (ctx: DigestContext) => Promise<DigestSection | null>;
-
-export const digest: DigestHandler = async (ctx) => {
-  const events = await ctx.changeEvents({ providers: [ctx.provider] });
-  const bullets = events
-    .filter(hasDigestPath)
-    .slice()
-    .sort(compareEvents)
-    .map((event) => {
-      const canonicalPath = normalizeDigestPath(digestEventPath(event));
-      return {
-        text: `${googleDriveIdentifier(canonicalPath, event)} ${pastTense(event)}`,
-        canonicalPath,
-      };
-    });
-
-  return bullets.length === 0 ? null : { provider: ctx.provider, bullets };
+export type {
+  DigestBullet,
+  DigestChangeEvent,
+  DigestContext,
+  DigestHandler,
+  DigestSection,
+  DigestWindow,
 };
+
+export const digest: DigestHandler = createDigestHandler({
+  provider: "google-drive",
+  identify: (canonicalPath, event) => googleDriveIdentifier(canonicalPath, event),
+  alias: { segments: [] },
+  acceptEvent: (event) => hasDigestPath(event),
+  classify: (event) => pastTense(event),
+});
 
 function hasDigestPath(event: DigestChangeEvent): boolean {
   return (
@@ -165,7 +137,7 @@ function normalizeDigestPath(path: string): string {
   return path.replace(/^\/+/u, '');
 }
 
-function googleDriveIdentifier(path: string, event: DigestChangeEvent): string {
+function googleDriveIdentifier(path: string, event?: DigestChangeEvent): string {
   const segments = path.split('/').filter(Boolean);
   const leaf = segments[2] ?? path;
   const wrapperName = segments[1] === 'files' && segments.length === 3
@@ -179,8 +151,8 @@ function googleDriveIdentifier(path: string, event: DigestChangeEvent): string {
   return `file ${file}`;
 }
 
-function googleDriveWrapperName(event: DigestChangeEvent, leaf: string): string | null {
-  const content = event.content;
+function googleDriveWrapperName(event: DigestChangeEvent | undefined, leaf: string): string | null {
+  const content = event?.content;
   const id = decodePathLeafId(leaf);
   if (!(
     isRecord(content)
