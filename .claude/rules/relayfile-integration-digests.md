@@ -35,3 +35,11 @@ Adapters do not own provider-specific digest rendering. Do not add new
 adapter-owned bullet renderers or require `DigestSection`-style output in the
 adapter contract. Existing compatibility helpers may remain during a deprecation
 window, but layout/category metadata is the contract enforced here.
+
+When an adapter needs to export a digest compatibility handler, it must build it
+with `createDigestHandler` and the shared digest types from
+`@relayfile/adapter-core`. Keep adapter-local code limited to provider-specific
+record identification, lifecycle action rules, optional canonical-record
+guards, and alias segment configuration. Do not copy sorting, path prefix
+filtering, alias/index/layout suppression, or bullet assembly logic into the
+adapter.

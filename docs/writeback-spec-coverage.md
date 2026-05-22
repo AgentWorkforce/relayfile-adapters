@@ -14,6 +14,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | box | None | 0 | 2 | Inline JS schemas. |
 | clickup | None | 0 | 5 | Inline JS schemas. |
 | confluence | None | 0 | 2 | Inline JS schemas. |
+| docker-hub | None | 0 | 0 | Read-only Composio bridge adapter for repositories, tags, and webhooks; writeback actions are tracked for a later cloud-side integration. |
 | dropbox | None | 0 | 2 | Inline JS schemas. |
 | gcs | None | 0 | 2 | Inline JS schemas. |
 | gitlab | None | 0 | 2 | Inline JS schemas. |
