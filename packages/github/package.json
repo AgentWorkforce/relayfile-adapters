@@ -48,7 +48,7 @@
     "@relayfile/sdk": ">=0.6.0 <1"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.5"
+    "@relayfile/adapter-core": "^0.3.6"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.6.0",
