@@ -7,7 +7,7 @@ test('digest returns deterministic Mailgun bullets sorted by event time and id',
   const ctx: DigestContext = {
     provider: 'mailgun',
     window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
-    async changeEvents(filter) {
+    async changeEvents(filter: Parameters<DigestContext['changeEvents']>[0]) {
       assert.deepEqual(filter, { providers: ['mailgun'] });
       return [
         {
