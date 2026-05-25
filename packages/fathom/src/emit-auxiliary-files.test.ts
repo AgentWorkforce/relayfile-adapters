@@ -3,10 +3,13 @@ import test from 'node:test';
 
 import { emitFathomAuxiliaryFiles } from './emit-auxiliary-files.js';
 import {
+  fathomByIdAliasPath,
   fathomMeetingByDayIndexPath,
   fathomMeetingByRecordedByIndexPath,
   fathomMeetingByTeamIndexPath,
   fathomMeetingsIndexPath,
+  fathomRecordingSummariesIndexPath,
+  fathomRecordingTranscriptsIndexPath,
 } from './path-mapper.js';
 
 function makeClient() {
@@ -95,4 +98,53 @@ test('emitFathomAuxiliaryFiles removes stale grouped indexes after meeting delet
   assert.equal(client.files.has(fathomMeetingByDayIndexPath('2026-05-22')), false);
   assert.equal(client.files.has(fathomMeetingByTeamIndexPath('Sales')), false);
   assert.equal(client.files.has(fathomMeetingByRecordedByIndexPath('khaliq@agentrelay.com')), false);
+});
+
+test('emitFathomAuxiliaryFiles anchors meeting artifacts to recording_id when present', async () => {
+  const client = makeClient();
+
+  await emitFathomAuxiliaryFiles(client, {
+    workspaceId: 'rw_test',
+    meetings: [
+      {
+        id: 'meeting-internal-1',
+        recording_id: 148996864,
+        meeting_title: 'Fathom Demo',
+        created_at: '2026-05-22T20:38:43Z',
+      },
+    ],
+    recordingSummaries: [
+      {
+        id: 'summary-internal-1',
+        recording_id: 148996864,
+        created_at: '2026-05-22T20:38:43Z',
+      },
+    ],
+    recordingTranscripts: [
+      {
+        id: 'transcript-internal-1',
+        recording_id: 148996864,
+        created_at: '2026-05-22T20:38:43Z',
+      },
+    ],
+  });
+
+  const meetings = JSON.parse(client.files.get(fathomMeetingsIndexPath()) ?? '[]') as Array<Record<string, unknown>>;
+  assert.equal(meetings[0]?.id, '148996864');
+  assert.equal(meetings[0]?.canonicalPath, '/fathom/meetings/148996864.json');
+
+  const summaries = JSON.parse(client.files.get(fathomRecordingSummariesIndexPath()) ?? '[]') as Array<Record<string, unknown>>;
+  assert.equal(summaries[0]?.id, '148996864');
+  assert.equal(summaries[0]?.canonicalPath, '/fathom/recordings/148996864/summary.json');
+
+  const transcripts = JSON.parse(client.files.get(fathomRecordingTranscriptsIndexPath()) ?? '[]') as Array<Record<string, unknown>>;
+  assert.equal(transcripts[0]?.id, '148996864');
+  assert.equal(transcripts[0]?.canonicalPath, '/fathom/recordings/148996864/transcript.json');
+
+  assert.ok(client.files.has(fathomByIdAliasPath('meetings', '148996864')));
+  assert.ok(client.files.has(fathomByIdAliasPath('recording-summaries', '148996864')));
+  assert.ok(client.files.has(fathomByIdAliasPath('recording-transcripts', '148996864')));
+  assert.equal(client.files.has(fathomByIdAliasPath('meetings', 'meeting-internal-1')), false);
+  assert.equal(client.files.has(fathomByIdAliasPath('recording-summaries', 'summary-internal-1')), false);
+  assert.equal(client.files.has(fathomByIdAliasPath('recording-transcripts', 'transcript-internal-1')), false);
 });

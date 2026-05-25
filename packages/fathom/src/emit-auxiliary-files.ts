@@ -70,8 +70,9 @@ export async function emitFathomAuxiliaryFiles(
     {
       resource: 'recording-summaries',
       indexPath: fathomRecordingSummariesIndexPath(),
-      canonicalPath: (record) => fathomRecordingSummaryPath(readId(record.id)),
-      title: (record) => `summary ${record.id}`,
+      idForResource: (record) => readRecordingScopedId(record),
+      canonicalPath: (record) => fathomRecordingSummaryPath(readRecordingScopedId(record)),
+      title: (record) => `summary ${readRecordingScopedId(record)}`,
       updated: (record) => readString(record.created_at) ?? new Date().toISOString(),
       objectType: 'recording-summary',
       connectionId: input.connectionId,
@@ -86,8 +87,9 @@ export async function emitFathomAuxiliaryFiles(
     {
       resource: 'recording-transcripts',
       indexPath: fathomRecordingTranscriptsIndexPath(),
-      canonicalPath: (record) => fathomRecordingTranscriptPath(readId(record.id)),
-      title: (record) => `transcript ${record.id}`,
+      idForResource: (record) => readRecordingScopedId(record),
+      canonicalPath: (record) => fathomRecordingTranscriptPath(readRecordingScopedId(record)),
+      title: (record) => `transcript ${readRecordingScopedId(record)}`,
       updated: (record) => readString(record.created_at) ?? new Date().toISOString(),
       objectType: 'recording-transcript',
       connectionId: input.connectionId,
@@ -145,7 +147,8 @@ async function emitMeetingsResource(
   const previousGroupPaths = collectMeetingGroupPaths(indexRows);
 
   for (const record of records) {
-    const id = readId(record.id);
+    const sourceId = readId(record.id);
+    const id = isDeleteRecord(record) ? sourceId : readRecordingScopedId(record);
     const aliasPath = fathomByIdAliasPath('meetings', id);
 
     if (isDeleteRecord(record)) {
@@ -171,6 +174,10 @@ async function emitMeetingsResource(
       ...(tags.length > 0 ? { tags } : {}),
     };
     rowMap.set(id, row);
+    if (sourceId !== id) {
+      rowMap.delete(sourceId);
+      await safeDelete(client, workspaceId, fathomByIdAliasPath('meetings', sourceId), aggregate);
+    }
 
     const aliasPayload = JSON.stringify(
       {
@@ -203,6 +210,7 @@ async function emitMeetingsResource(
 interface EmitResourceOptions<TRecord extends { id: string }> {
   resource: 'meetings' | 'recording-summaries' | 'recording-transcripts' | 'teams' | 'team-members';
   indexPath: string;
+  idForResource?: (record: TRecord) => string;
   canonicalPath: (record: TRecord) => string;
   title: (record: TRecord) => string;
   updated: (record: TRecord) => string;
@@ -225,7 +233,8 @@ async function emitResource<TRecord extends { id: string }>(
   const rowMap = new Map(indexRows.map((row) => [row.id, row]));
 
   for (const record of records) {
-    const id = readId(record.id);
+    const sourceId = readId(record.id);
+    const id = isDeleteRecord(record) ? sourceId : (options.idForResource?.(record as TRecord) ?? sourceId);
     const aliasPath = fathomByIdAliasPath(options.resource, id);
 
     if (isDeleteRecord(record)) {
@@ -242,6 +251,10 @@ async function emitResource<TRecord extends { id: string }>(
       canonicalPath,
     };
     rowMap.set(id, row);
+    if (sourceId !== id) {
+      rowMap.delete(sourceId);
+      await safeDelete(client, workspaceId, fathomByIdAliasPath(options.resource, sourceId), aggregate);
+    }
 
     const aliasPayload = JSON.stringify(
       {
@@ -291,6 +304,13 @@ function readId(value: unknown): string {
     return String(value);
   }
   throw new Error('Fathom record id must be a non-empty string or finite number');
+}
+
+function readRecordingScopedId(record: { id: unknown; recording_id?: unknown }): string {
+  if (record.recording_id !== undefined && record.recording_id !== null) {
+    return readId(record.recording_id);
+  }
+  return readId(record.id);
 }
 
 function readString(value: unknown): string | undefined {
