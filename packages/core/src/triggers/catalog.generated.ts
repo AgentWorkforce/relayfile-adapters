@@ -450,6 +450,12 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
+    "packageName": "@relayfile/adapter-fathom",
+    "packagePath": "packages/fathom",
+    "provider": "fathom",
+    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
+  },
+  {
     "packageName": "@relayfile/gcs",
     "packagePath": "packages/gcs",
     "provider": "gcs",
