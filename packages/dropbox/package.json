@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/dropbox",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Dropbox storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -15,6 +15,21 @@
       "types": "./dist/path-mapper.d.ts",
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
+    },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
+    "./emit-auxiliary-files": {
+      "types": "./dist/emit-auxiliary-files.d.ts",
+      "import": "./dist/emit-auxiliary-files.js",
+      "default": "./dist/emit-auxiliary-files.js"
+    },
+    "./webhook-normalizer": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
     },
     "./writeback": {
       "types": "./dist/writeback.d.ts",

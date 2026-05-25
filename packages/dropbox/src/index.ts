@@ -11,3 +11,6 @@ export * from './delta-fetcher.js';
 export * from './metadata.js';
 export * from './subscriptions.js';
 export * from './digest.js';
+export * from './layout-prompt.js';
+export * from './emit-auxiliary-files.js';
+export * from './webhook-normalizer.js';

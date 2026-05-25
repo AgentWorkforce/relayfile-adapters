@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dropbox shared link",
+  "type": "object",
+  "required": [
+    "url"
+  ],
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Dropbox shared URL."
+    },
+    "name": {
+      "type": "string",
+      "description": "Shared link display name."
+    },
+    "path_lower": {
+      "type": "string",
+      "description": "Underlying file/folder normalized path."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "file",
+        "folder"
+      ],
+      "description": "Shared link target object type."
+    },
+    "expires": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Expiration timestamp when applicable."
+    }
+  },
+  "additionalProperties": true,
+  "description": "Full Dropbox shared-link metadata schema for Relayfile discovery."
+}
