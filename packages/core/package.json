@@ -17,7 +17,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "adapter-core": "./dist/cli.js"
+    "adapter-core": "./dist/src/cli.js"
   },
   "files": [
     "dist",
