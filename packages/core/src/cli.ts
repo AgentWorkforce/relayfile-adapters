@@ -28,6 +28,7 @@ import {
   validateMappingSpec,
 } from "./spec/parser.js";
 import type { MappingSpec } from "./spec/types.js";
+import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
@@ -54,6 +55,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "docs-check":
       await handleDocsCheck(flags);
+      return;
+    case "triggers":
+      await handleTriggers(args);
       return;
     case "help":
     case undefined:
@@ -314,6 +318,42 @@ async function handleDocsCheck(
   );
 }
 
+async function handleTriggers(args: string[]): Promise<void> {
+  const [subcommand, ...rest] = args;
+  const flags = parseFlags(rest);
+  const repoRoot = readOptionalString(flags["repo-root"]);
+
+  switch (subcommand) {
+    case "generate": {
+      const generation = await writeTriggerCatalog({ repoRoot });
+      process.stdout.write(`${JSON.stringify(renderTriggerSummary("generate", generation), null, 2)}\n`);
+      return;
+    }
+    case "check": {
+      const generation = await writeTriggerCatalog({ check: true, repoRoot });
+      process.stdout.write(`${JSON.stringify(renderTriggerSummary("check", generation), null, 2)}\n`);
+      return;
+    }
+    case "help":
+    case undefined:
+      printTriggersHelp();
+      return;
+    default:
+      throw new Error(`Unknown triggers command "${subcommand}"`);
+  }
+}
+
+function renderTriggerSummary(
+  command: "check" | "generate",
+  generation: Awaited<ReturnType<typeof writeTriggerCatalog>>
+): Record<string, unknown> {
+  return {
+    command: `triggers ${command}`,
+    providers: Object.keys(generation.catalog).length,
+    adaptersWithoutKnownTriggers: generation.adaptersWithoutKnownTriggers,
+  };
+}
+
 function parseFlags(args: string[]): Record<string, string | boolean> {
   const output: Record<string, string | boolean> = {};
 
@@ -370,6 +410,17 @@ Commands:
   docs-to-spec --url <docs-url> --out <dir> [--service <name>] [--paths <a,b>]
   docs-update --spec <openapi.yaml> [--mapping <mapping.yaml>] [--force]
   docs-check --spec <openapi.yaml>
+  triggers generate [--repo-root <path>]
+  triggers check [--repo-root <path>]
+`);
+}
+
+function printTriggersHelp(): void {
+  process.stdout.write(`adapter-core triggers
+
+Commands:
+  triggers generate [--repo-root <path>]
+  triggers check [--repo-root <path>]
 `);
 }
 
