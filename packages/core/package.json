@@ -16,7 +16,7 @@
   "scripts": {
     "build": "rm -rf dist/tests/round-trip && tsc -p tsconfig.json",
     "clean": "rm -rf dist",
-    "test": "node --test dist/tests/**/*.test.js dist/src/**/*.test.js",
+    "test": "node --import tsx --test dist/tests/**/*.test.js dist/src/**/*.test.js",
     "test:round-trip": "vitest run tests/round-trip",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit"
@@ -34,6 +34,7 @@
     "@agent-relay/sdk": "^6.0.7",
     "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.5.2",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "vitest": "^3.0.0"
   },
