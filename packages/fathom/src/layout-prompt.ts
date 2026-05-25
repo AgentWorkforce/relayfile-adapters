@@ -15,9 +15,12 @@ export const FATHOM_LAYOUT_PROMPT = `# Fathom Mount Layout
 ├── LAYOUT.md
 ├── _index.json
 ├── meetings/
-│   ├── _index.json                          ← rows { id, title, updated, canonicalPath }
+│   ├── _index.json                          ← rows { id, title, updated, canonicalPath, day?, team?, recordedBy?, tags? }
 │   ├── <recording-id>.json                  ← canonical meeting payload
-│   └── by-id/<recording-id>.json            ← by-id alias wrapper
+│   ├── by-id/<recording-id>.json            ← by-id alias wrapper
+│   ├── by-day/YYYY-MM-DD/_index.json        ← meetings grouped by created date
+│   ├── by-team/<team>/_index.json           ← meetings grouped by recorded_by.team
+│   └── by-recorded-by/<email>/_index.json   ← meetings grouped by recorded_by.email
 ├── recording-summaries/
 │   ├── _index.json                          ← rows for summary resources
 │   └── by-id/<recording-id>.json            ← summary alias wrapper
@@ -41,6 +44,7 @@ export const FATHOM_LAYOUT_PROMPT = `# Fathom Mount Layout
 ## Semantics
 
 - Canonical meeting file id is the Fathom \`recording_id\` converted to string.
+- Meeting indexes include tag-like facets: \`day\`, \`team\`, \`recordedBy\`, and \`tags\`.
 - Recording summary and transcript resources are anchored to the same recording id.
 - Team and team-member ids are stable strings from sync models (team name or email).
 - Alias files include \`canonicalPath\` and payload wrapper metadata for fast lookup.

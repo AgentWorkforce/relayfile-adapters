@@ -43,6 +43,18 @@ export function fathomMeetingsIndexPath(): string {
   return `${FATHOM_PATH_ROOT}/meetings/_index.json`;
 }
 
+export function fathomMeetingByDayIndexPath(day: string): string {
+  return `${FATHOM_PATH_ROOT}/meetings/by-day/${encodeFathomPathSegment(day)}/_index.json`;
+}
+
+export function fathomMeetingByTeamIndexPath(team: string): string {
+  return `${FATHOM_PATH_ROOT}/meetings/by-team/${encodeFathomPathSegment(team)}/_index.json`;
+}
+
+export function fathomMeetingByRecordedByIndexPath(email: string): string {
+  return `${FATHOM_PATH_ROOT}/meetings/by-recorded-by/${encodeFathomPathSegment(email)}/_index.json`;
+}
+
 export function fathomRecordingSummariesIndexPath(): string {
   return `${FATHOM_PATH_ROOT}/recording-summaries/_index.json`;
 }
