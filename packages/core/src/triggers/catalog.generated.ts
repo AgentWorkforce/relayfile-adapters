@@ -84,7 +84,8 @@ export const KNOWN_TRIGGER_CATALOG = {
     "pull_request.opened",
     "pull_request.synchronize",
     "pull_request_review.submitted",
-    "pull_request_review_comment.created"
+    "pull_request_review_comment.created",
+    "push"
   ],
   "gitlab": [
     "build.canceled",
