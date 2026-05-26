@@ -49,7 +49,7 @@ function renderAdapterReadme(adapter) {
     '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | \`${escapeMarkdownTableCell(resource.idPatternSource)}\` | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
     '',
     '## Operations',
     '',
@@ -111,6 +111,12 @@ function renderIdPattern(resource) {
     return `- \`${writePath}\`: exact file path.`;
   }
   return `- \`${writePath}\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`;
+}
+
+function resourceIdPatternCell(resource) {
+  return resourceWritePath(resource) === resource.resourcePath
+    ? 'exact file path'
+    : `\`${escapeMarkdownTableCell(resource.idPatternSource)}\``;
 }
 
 function renderValidationNotes(schema) {

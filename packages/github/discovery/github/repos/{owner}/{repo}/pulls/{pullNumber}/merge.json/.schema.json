@@ -19,7 +19,7 @@
     },
     "merge_method": {
       "type": "string",
-      "description": "Merge strategy. Defaults to squash.",
+      "description": "Merge strategy. When omitted, GitHub uses the repository default.",
       "enum": [
         "merge",
         "squash",

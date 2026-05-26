@@ -273,6 +273,9 @@ function idPatternFor(adapterSlug, resourcePath) {
     return pattern('^[A-Za-z0-9_.:-]+$');
   }
   if (adapterSlug === 'github') {
+    if (resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
+      return pattern('^[1-9]\\d*(?:__.*)?$');
+    }
     if (resourcePath.endsWith('/issues')) {
       return pattern('^[1-9]\\d*$');
     }

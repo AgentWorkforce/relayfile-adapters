@@ -34,6 +34,17 @@ const resources: readonly AdapterResourceConfig[] = [
     createExample:
       "discovery/linear/issues/{issueId}/comments/.create.example.json",
   },
+  {
+    name: "merge",
+    path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json",
+    pathPattern:
+      /^\/github\/repos\/[^/]+\/[^/]+\/pulls\/[1-9]\d*(?:__[^/]+)?\/merge\.json$/,
+    idPattern: /^[1-9]\d*(?:__.*)?$/,
+    schema:
+      "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.schema.json",
+    createExample:
+      "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.create.example.json",
+  },
 ];
 
 const issueId = "11111111-1111-1111-1111-111111111111";
@@ -75,6 +86,18 @@ test("classifyWrite chooses the most specific matching resource", () => {
   );
   assert.equal(route?.kind, "create");
   assert.equal(route?.resource.name, "comments");
+});
+
+test("classifyWrite maps slugged exact-file resources to patch", () => {
+  const route = classifyWrite(
+    "/github/repos/acme/widgets/pulls/7__finish-feature/merge.json",
+    resources
+  );
+
+  assert.equal(route?.kind, "patch");
+  assert.equal(route?.canonical, true);
+  assert.equal(route?.id, "7__finish-feature");
+  assert.equal(route?.resource.name, "merge");
 });
 
 test("classifyWrite ignores temporary and partial writeback filenames", () => {

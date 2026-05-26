@@ -147,11 +147,11 @@ export const adapters = [
       }),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json', 'pulls/merge', { merge_method: 'squash' }, {
         title: 'Merge GitHub pull request',
-        description: 'Merges a pull request. Defaults to squash when no merge method is supplied.',
+        description: 'Merges a pull request. Uses the repository default merge strategy when no merge method is supplied.',
         schemaOverrides: {
           type: 'object',
           properties: {
-            merge_method: en(['merge', 'squash', 'rebase'], 'Merge strategy. Defaults to squash.'),
+            merge_method: en(['merge', 'squash', 'rebase'], 'Merge strategy. When omitted, GitHub uses the repository default.'),
             sha: str('Expected head SHA. GitHub refuses the merge if the pull request head has moved.'),
             metadata: obj('Optional submission metadata.', {
               connectionId: str('Relayfile connection id override.'),

@@ -188,7 +188,7 @@ describe('writeback', () => {
     });
   });
 
-  it('handleWriteback defaults pull request merge method to squash', async () => {
+  it('handleWriteback omits merge method when the payload does not specify one', async () => {
     const { handler, provider } = createHandler(() => ({
       status: 200,
       headers: {},
@@ -203,7 +203,7 @@ describe('writeback', () => {
 
     assert.strictEqual(result.success, true);
     assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/7/merge');
-    assert.deepStrictEqual(provider.requests[0]?.body, { merge_method: 'squash' });
+    assert.deepStrictEqual(provider.requests[0]?.body, {});
   });
 
   it('handleWriteback treats a 2xx merge response without a JSON object body as success', async () => {

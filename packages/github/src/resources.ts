@@ -36,7 +36,7 @@ export const resources = [
     name: "merge",
     path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json",
     pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/pulls\/[1-9]\d*(?:__[^\/]+)?\/merge\.json$/,
-    idPattern: /^\d+$/,
+    idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.create.example.json",
   },
