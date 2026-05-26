@@ -7,10 +7,11 @@ adapter:
 # canonicalizes the upstream `new_meeting_content_ready` payload to the runtime
 # event type `new-meeting-content-ready`, which is the name persona triggers and
 # deploy-time lint match against.
+#
+# No destination-path template is declared: fathom uses a hand-written
+# normalizer + path-mapper rather than the schema-driven runtime, and its
+# normalizer resolves the record id from `recording_id ?? id ?? recordingId`
+# (a fallback a single `{{...}}` template can't express). The trigger-catalog
+# generator consumes only the event-name key below.
 webhooks:
-  new-meeting-content-ready:
-    path: /fathom/meetings/{{recording_id}}.json
-    extract:
-      - recording_id
-      - event
-      - created_at
+  new-meeting-content-ready: {}
