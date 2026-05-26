@@ -421,6 +421,7 @@ function buildMergePullRequest(
   if (payload.method !== undefined) body.merge_method = payload.method;
   if (payload.commitTitle !== undefined) body.commit_title = payload.commitTitle;
   if (payload.commitMessage !== undefined) body.commit_message = payload.commitMessage;
+  if (payload.sha !== undefined) body.sha = payload.sha;
   return {
     method: 'PUT',
     baseUrl: GITHUB_API_BASE_URL,
@@ -571,6 +572,7 @@ function parseMergePayload(content: string): GitHubMergePullRequestWritebackInpu
   const commitMessage =
     optionalTrimmedString(object.commitMessage, 'Pull request merge payload.commitMessage') ??
     optionalTrimmedString(object.commit_message, 'Pull request merge payload.commit_message');
+  const sha = optionalTrimmedString(object.sha, 'Pull request merge payload.sha');
   const metadataValue = object.metadata;
   const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
 
@@ -578,6 +580,7 @@ function parseMergePayload(content: string): GitHubMergePullRequestWritebackInpu
     ...(method ? { method } : {}),
     ...(commitTitle ? { commitTitle } : {}),
     ...(commitMessage ? { commitMessage } : {}),
+    ...(sha ? { sha } : {}),
     ...(metadata ? { metadata } : {}),
   };
 }

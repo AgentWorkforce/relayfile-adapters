@@ -228,6 +228,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'gitlab' && resourcePath.includes('/issues/{issueIid}__{slug}/comments')) {
     return '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$';
   }
+  if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
+    return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
+  }
 
   const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
     if (segment === '{projectPath}') {

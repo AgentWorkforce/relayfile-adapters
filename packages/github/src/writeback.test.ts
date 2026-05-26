@@ -165,6 +165,7 @@ describe('writeback', () => {
         method: 'rebase',
         commitTitle: 'Merge PR #7',
         commitMessage: 'Ship it.',
+        sha: 'reviewed-head',
         metadata: {
           connectionId: 'conn-merge',
           providerConfigKey: 'github-custom',
@@ -183,6 +184,7 @@ describe('writeback', () => {
       merge_method: 'rebase',
       commit_title: 'Merge PR #7',
       commit_message: 'Ship it.',
+      sha: 'reviewed-head',
     });
   });
 
@@ -219,6 +221,20 @@ describe('writeback', () => {
 
     assert.strictEqual(result.success, true);
     assert.strictEqual(result.externalId, undefined);
+  });
+
+  it('handleWriteback rejects invalid pull request merge payloads', async () => {
+    const { handler, provider } = createHandler();
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7/merge.json',
+      JSON.stringify({ merge_method: null, commit_title: 42 }),
+    );
+
+    assert.strictEqual(result.success, false);
+    assert.match(result.error ?? '', /merge payload\.method must be one of merge, squash, rebase/);
+    assert.strictEqual(provider.requests.length, 0);
   });
 
   it('handleWriteback returns a typed error for invalid JSON', async () => {

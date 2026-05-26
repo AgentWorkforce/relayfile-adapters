@@ -81,6 +81,7 @@ export interface GitHubMergePullRequestWritebackInput {
   method?: GitHubMergeMethod;
   commitTitle?: string;
   commitMessage?: string;
+  sha?: string;
   metadata?: AgentReviewMetadata;
 }
 

@@ -40,6 +40,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'by-edited'],
       writebackResources: [
         { path: 'github/repos/*/*/pulls/reviews', schemaId: 'github/pull-request-review' },
+        { path: 'github/repos/*/*/pulls/*/merge.json', schemaId: 'github/pull-request-merge' },
       ],
     },
   ],

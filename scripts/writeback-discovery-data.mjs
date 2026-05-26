@@ -93,7 +93,7 @@ export const adapters = [
     slug: 'github',
     title: 'GitHub adapter',
     overview:
-      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, and submitting pull request reviews.',
+      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, submitting pull request reviews, and merging pull requests.',
     readPaths: [
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
@@ -139,6 +139,21 @@ export const adapters = [
             },
             metadata: obj('Optional submission metadata.', {
               commitSha: str('Commit SHA to anchor the review to.'),
+              connectionId: str('Relayfile connection id override.'),
+              providerConfigKey: str('GitHub provider config key override.'),
+            }),
+          },
+        },
+      }),
+      contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json', 'pulls/merge', { merge_method: 'squash' }, {
+        title: 'Merge GitHub pull request',
+        description: 'Merges a pull request. Defaults to squash when no merge method is supplied.',
+        schemaOverrides: {
+          type: 'object',
+          properties: {
+            merge_method: en(['merge', 'squash', 'rebase'], 'Merge strategy. Defaults to squash.'),
+            sha: str('Expected head SHA. GitHub refuses the merge if the pull request head has moved.'),
+            metadata: obj('Optional submission metadata.', {
               connectionId: str('Relayfile connection id override.'),
               providerConfigKey: str('GitHub provider config key override.'),
             }),
