@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dropbox shared folder",
+  "type": "object",
+  "required": [
+    "shared_folder_id"
+  ],
+  "properties": {
+    "shared_folder_id": {
+      "type": "string",
+      "description": "Dropbox shared-folder id."
+    },
+    "shared_folder_name": {
+      "type": "string",
+      "description": "Human-readable shared folder name."
+    },
+    "is_team_folder": {
+      "type": "boolean",
+      "description": "Whether this is a team folder."
+    },
+    "parent_shared_folder_id": {
+      "type": "string",
+      "description": "Parent shared-folder id when nested."
+    }
+  },
+  "additionalProperties": true,
+  "description": "Full Dropbox shared-folder metadata schema for Relayfile discovery."
+}

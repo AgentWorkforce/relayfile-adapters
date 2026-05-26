@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dropbox folder",
+  "type": "object",
+  "required": [
+    "path_display"
+  ],
+  "properties": {
+    "path_display": {
+      "type": "string",
+      "description": "Dropbox display path for the folder."
+    },
+    "name": {
+      "type": "string",
+      "description": "Folder name."
+    },
+    "path_lower": {
+      "type": "string",
+      "description": "Normalized lower-case folder path.",
+      "readOnly": true
+    },
+    "parent_shared_folder_id": {
+      "type": "string",
+      "description": "Parent shared-folder id when this folder is in a shared mount."
+    }
+  },
+  "additionalProperties": true,
+  "description": "Full Dropbox folder metadata schema for Relayfile discovery."
+}

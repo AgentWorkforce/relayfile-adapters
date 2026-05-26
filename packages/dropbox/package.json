@@ -16,6 +16,21 @@
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
     },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
+    "./emit-auxiliary-files": {
+      "types": "./dist/emit-auxiliary-files.d.ts",
+      "import": "./dist/emit-auxiliary-files.js",
+      "default": "./dist/emit-auxiliary-files.js"
+    },
+    "./webhook-normalizer": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
+    },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",
