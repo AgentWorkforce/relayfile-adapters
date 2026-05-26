@@ -26,11 +26,11 @@ export const DROPBOX_LAYOUT_PROMPT = `# Dropbox Mount Layout
 │   └── by-path/<path>.json
 ├── shared-folders/
 │   ├── _index.json
-│   ├── <shared-folder-id>.json
+│   ├── <slug>__<shared-folder-id>.json
 │   └── by-id/<shared-folder-id>.json
 └── shared-links/
     ├── _index.json
-    ├── <shared-link-id>.json
+    ├── <slug>__<shared-link-id>.json
     └── by-id/<shared-link-id>.json
 \`\`\`
 

@@ -276,7 +276,10 @@ async function emitSharedFolders(
       continue;
     }
     const id = readId(idValue);
-    const canonicalPath = computeDropboxPath('shared-folder', id);
+    const sharedFolderName = readString(record.shared_folder_name) ?? id;
+    const canonicalPath = computeDropboxPath('shared-folder', id, {
+      name: sharedFolderName,
+    });
     const byId = dropboxByIdAliasPath('shared-folders', id);
 
     if (isDeleteRecord(record)) {
@@ -287,7 +290,7 @@ async function emitSharedFolders(
 
     rows.set(id, {
       id,
-      title: readString(record.shared_folder_name) ?? id,
+      title: sharedFolderName,
       updated: new Date().toISOString(),
       canonicalPath,
     });
@@ -341,7 +344,10 @@ async function emitSharedLinks(
       });
       continue;
     }
-    const canonicalPath = computeDropboxPath('shared-link', id);
+    const sharedLinkTitle = readString(record.name) ?? readString(record.url) ?? id;
+    const canonicalPath = computeDropboxPath('shared-link', id, {
+      name: sharedLinkTitle,
+    });
     const byId = dropboxByIdAliasPath('shared-links', id);
 
     if (isDeleteRecord(record)) {
@@ -352,7 +358,7 @@ async function emitSharedLinks(
 
     rows.set(id, {
       id,
-      title: readString(record.name) ?? readString(record.url) ?? id,
+      title: sharedLinkTitle,
       updated: new Date().toISOString(),
       canonicalPath,
     });

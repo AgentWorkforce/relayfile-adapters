@@ -107,12 +107,16 @@ export function dropboxFolderPath(id: string, title?: string | null): string {
   return `${DROPBOX_PATH_ROOT}/folders/${encodePathSegment(leaf)}.json`;
 }
 
-export function dropboxSharedFolderPath(sharedFolderId: string): string {
-  return `${DROPBOX_PATH_ROOT}/shared-folders/${encodePathSegment(sharedFolderId)}.json`;
+export function dropboxSharedFolderPath(sharedFolderId: string, name?: string | null): string {
+  const normalizedId = assertNonEmpty(sharedFolderId, 'object id');
+  const leaf = stableLeafName(normalizedId, name);
+  return `${DROPBOX_PATH_ROOT}/shared-folders/${encodePathSegment(leaf)}.json`;
 }
 
-export function dropboxSharedLinkPath(sharedLinkId: string): string {
-  return `${DROPBOX_PATH_ROOT}/shared-links/${encodePathSegment(sharedLinkId)}.json`;
+export function dropboxSharedLinkPath(sharedLinkId: string, name?: string | null): string {
+  const normalizedId = assertNonEmpty(sharedLinkId, 'object id');
+  const leaf = stableLeafName(normalizedId, name);
+  return `${DROPBOX_PATH_ROOT}/shared-links/${encodePathSegment(leaf)}.json`;
 }
 
 export function dropboxFilesIndexPath(): string {
@@ -167,10 +171,10 @@ export function computeDropboxPath(
     return dropboxFolderPath(id, name);
   }
   if (normalizedType === 'shared-folder') {
-    return dropboxSharedFolderPath(id);
+    return dropboxSharedFolderPath(id, name);
   }
   if (normalizedType === 'shared-link') {
-    return dropboxSharedLinkPath(id);
+    return dropboxSharedLinkPath(id, name);
   }
 
   throw new Error(`Unsupported Dropbox object type: ${objectType}`);
@@ -195,7 +199,7 @@ export function toObjectRelayfilePath(input: ObjectPathInput): string {
     return computeDropboxPath(objectType, objectId, { path, name });
   }
   if (objectType === 'shared-folder' || objectType === 'shared-link') {
-    return computeDropboxPath(objectType, objectId);
+    return computeDropboxPath(objectType, objectId, { path, name });
   }
   return computeDropboxPath(objectType, objectId, { path, name });
 }
@@ -227,9 +231,11 @@ export function parseRelayfilePath(path: string): {
 
   if (segments[0] === DROPBOX_PATH_ROOT.slice(1)) {
     const last = segments.at(-1) ?? null;
+    const resource = segments[1];
+    const isAliasPath = segments[2] === 'by-id' || segments[2] === 'by-path';
     const id =
-      last && segments.length >= 3 && segments[1] !== '_index'
-        ? decodeObjectIdFromLeaf(last)
+      last && segments.length >= 3 && resource !== '_index' && !isAliasPath
+        ? decodeObjectIdFromLeaf(last, resource)
         : last;
     return { resource: 'object', id, segments };
   }
@@ -264,8 +270,16 @@ function normalizeDropboxObjectType(objectType: string): DropboxPathObjectType {
   throw new Error(`Unsupported Dropbox object type: ${objectType}`);
 }
 
-function decodeObjectIdFromLeaf(leaf: string): string {
-  const separatorIndex = leaf.lastIndexOf('__');
+function decodeObjectIdFromLeaf(leaf: string, resource?: string): string {
+  if (
+    resource !== 'files' &&
+    resource !== 'folders' &&
+    resource !== 'shared-folders' &&
+    resource !== 'shared-links'
+  ) {
+    return leaf;
+  }
+  const separatorIndex = leaf.indexOf('__');
   if (separatorIndex === -1) {
     return leaf;
   }

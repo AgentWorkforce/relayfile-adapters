@@ -80,8 +80,9 @@ test('toObjectRelayfilePath routes folder and shared object types correctly', ()
   const sharedFolderPath = toObjectRelayfilePath({
     id: '845281924',
     objectType: 'shared-folder',
+    name: 'Team Docs',
   });
-  assert.equal(sharedFolderPath, '/dropbox/shared-folders/845281924.json');
+  assert.equal(sharedFolderPath, '/dropbox/shared-folders/team-docs__845281924.json');
   const parsedSharedFolder = parseRelayfilePath(sharedFolderPath);
   assert.equal(parsedSharedFolder.resource, 'object');
   assert.equal(parsedSharedFolder.id, '845281924');
@@ -89,14 +90,16 @@ test('toObjectRelayfilePath routes folder and shared object types correctly', ()
   const sharedFolderLegacyType = toObjectRelayfilePath({
     id: '845281924',
     objectType: 'DropboxSharedFolder',
+    name: 'Team Docs',
   });
-  assert.equal(sharedFolderLegacyType, '/dropbox/shared-folders/845281924.json');
+  assert.equal(sharedFolderLegacyType, '/dropbox/shared-folders/team-docs__845281924.json');
 
   const sharedLinkLegacyType = toObjectRelayfilePath({
     id: 'sl:abc123',
     objectType: 'sharedlink',
+    name: 'Roadmap Link',
   });
-  assert.equal(sharedLinkLegacyType, '/dropbox/shared-links/sl%3Aabc123.json');
+  assert.equal(sharedLinkLegacyType, '/dropbox/shared-links/roadmap-link__sl%3Aabc123.json');
   const parsedSharedLink = parseRelayfilePath(sharedLinkLegacyType);
   assert.equal(parsedSharedLink.resource, 'object');
   assert.equal(parsedSharedLink.id, 'sl:abc123');
@@ -117,6 +120,18 @@ test('parseRelayfilePath requires a trailing id for lifecycle records', () => {
   const entryPath = parseRelayfilePath('/dropbox/cursors/cursor%2F123.json');
   assert.equal(entryPath.resource, 'lifecycle');
   assert.equal(entryPath.id, 'cursor/123');
+});
+
+test('parseRelayfilePath preserves shared IDs containing "__"', () => {
+  const sharedFolderPath = '/dropbox/shared-folders/team-docs__sf__123.json';
+  const parsedSharedFolder = parseRelayfilePath(sharedFolderPath);
+  assert.equal(parsedSharedFolder.resource, 'object');
+  assert.equal(parsedSharedFolder.id, 'sf__123');
+
+  const sharedLinkPath = '/dropbox/shared-links/roadmap-link__sl%3Aabc__123.json';
+  const parsedSharedLink = parseRelayfilePath(sharedLinkPath);
+  assert.equal(parsedSharedLink.resource, 'object');
+  assert.equal(parsedSharedLink.id, 'sl:abc__123');
 });
 
 test('dropboxRootIndexPath returns the provider root index path', () => {
