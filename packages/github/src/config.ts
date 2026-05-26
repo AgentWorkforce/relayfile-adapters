@@ -1,15 +1,29 @@
 export const GITHUB_API_BASE_URL = "https://api.github.com";
 import type { GitHubAdapterConfig } from './types.js';
 
+/**
+ * GitHub webhook events this adapter ingests. These are exactly the names a
+ * persona author uses in `integrations.github.triggers[].on` (they flow into
+ * `KNOWN_TRIGGER_CATALOG` via `adapter-core triggers generate`), so the inline
+ * notes below double as authoring hints. Names are `<event>.<action>` (or just
+ * `<event>` when GitHub sends no action, e.g. `push`) taken verbatim from
+ * GitHub's webhook payloads — see
+ * https://docs.github.com/en/webhooks/webhook-events-and-payloads
+ *
+ * Keep in sync with `DEFAULT_GITHUB_EVENTS` (types.ts) and the router's
+ * `EVENT_MAP` (webhook/event-map.ts) — every event the router ingests should
+ * be listed here so it lands in the trigger catalog.
+ */
 const DEFAULT_SUPPORTED_EVENTS = [
-  'pull_request.opened',
-  'pull_request.synchronize',
-  'pull_request.closed',
-  'pull_request_review.submitted',
-  'pull_request_review_comment.created',
-  'issues.opened',
-  'issues.closed',
-  'check_run.completed',
+  'pull_request.opened', // a PR was opened — the usual entry point for review/CI agents
+  'pull_request.synchronize', // new commits were pushed to an open PR (re-review / re-run CI)
+  'pull_request.closed', // a PR was closed (check `merged` in the payload to tell merge from abandon)
+  'pull_request_review.submitted', // someone (human or bot) submitted a review — has `review.state` (approved / changes_requested / commented)
+  'pull_request_review_comment.created', // an inline review comment was added to a PR's diff
+  'push', // commits were pushed to a branch or tag (no action suffix; routed to ingestPushCommits)
+  'issues.opened', // an issue was opened
+  'issues.closed', // an issue was closed
+  'check_run.completed', // a CI check finished — `check_run.conclusion` is success / failure / timed_out / cancelled / …
 ] as const;
 
 export const DEFAULT_CONFIG: GitHubAdapterConfig = {
