@@ -151,6 +151,76 @@ describe('writeback', () => {
     assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/12/reviews');
   });
 
+  it('handleWriteback merges pull requests through the GitHub merge endpoint', async () => {
+    const { handler, provider } = createHandler(() => ({
+      status: 200,
+      headers: {},
+      data: { merged: true, sha: 'abc123' } satisfies JsonObject,
+    }));
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7/merge.json',
+      JSON.stringify({
+        method: 'rebase',
+        commitTitle: 'Merge PR #7',
+        commitMessage: 'Ship it.',
+        metadata: {
+          connectionId: 'conn-merge',
+          providerConfigKey: 'github-custom',
+        },
+      }),
+    );
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.externalId, 'abc123');
+    assert.strictEqual(provider.requests.length, 1);
+    assert.strictEqual(provider.requests[0]?.method, 'PUT');
+    assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/7/merge');
+    assert.strictEqual(provider.requests[0]?.connectionId, 'conn-merge');
+    assert.strictEqual(provider.requests[0]?.headers?.['Provider-Config-Key'], 'github-custom');
+    assert.deepStrictEqual(provider.requests[0]?.body, {
+      merge_method: 'rebase',
+      commit_title: 'Merge PR #7',
+      commit_message: 'Ship it.',
+    });
+  });
+
+  it('handleWriteback defaults pull request merge method to squash', async () => {
+    const { handler, provider } = createHandler(() => ({
+      status: 200,
+      headers: {},
+      data: { merged: true, sha: 'def456' } satisfies JsonObject,
+    }));
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7__finish-feature/merge.json',
+      JSON.stringify({}),
+    );
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/7/merge');
+    assert.deepStrictEqual(provider.requests[0]?.body, { merge_method: 'squash' });
+  });
+
+  it('handleWriteback treats a 2xx merge response without a JSON object body as success', async () => {
+    const { handler } = createHandler(() => ({
+      status: 204,
+      headers: {},
+      data: null,
+    }));
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/7/merge.json',
+      JSON.stringify({ method: 'squash' }),
+    );
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.externalId, undefined);
+  });
+
   it('handleWriteback returns a typed error for invalid JSON', async () => {
     const { handler } = createHandler();
     const result = await handler.handleWriteback(
@@ -294,6 +364,27 @@ describe('writeback', () => {
     assert.strictEqual(update.method, 'PATCH');
     assert.strictEqual(update.endpoint, '/repos/acme/widgets/issues/comments/123');
     assert.deepStrictEqual(update.body, { body: 'Updated comment body.' });
+  });
+
+  it('resolves pull request merge writebacks to GitHub merge requests', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42/merge.json',
+      JSON.stringify({
+        method: 'merge',
+        commitTitle: 'Merge pull request #42',
+        commitMessage: 'Approved by automation.',
+      }),
+    );
+
+    assert.strictEqual(request.method, 'PUT');
+    assert.strictEqual(request.baseUrl, 'https://api.github.com');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/42/merge');
+    assert.strictEqual(request.connectionId, '');
+    assert.deepStrictEqual(request.body, {
+      merge_method: 'merge',
+      commit_title: 'Merge pull request #42',
+      commit_message: 'Approved by automation.',
+    });
   });
 
   it('rejects read-only fields in issue writebacks', () => {
