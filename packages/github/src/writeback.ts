@@ -9,6 +9,8 @@ import {
   type AgentReviewMetadata,
   type GitHubIssueCommentWritebackInput,
   type GitHubIssueWritebackInput,
+  type GitHubMergeMethod,
+  type GitHubMergePullRequestWritebackInput,
   type GitHubRequestProvider,
   type GitHubCreateReviewInput,
   type JsonObject,
@@ -27,6 +29,8 @@ const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
 // and tolerate an optional `__<slug>` suffix on the same segment.
 const REVIEW_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/([^/]+?)(?:\.json)?$/;
+const MERGE_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/merge\.json$/;
 const ISSUE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([^/]+?)(?:\.json)?$/;
 const ISSUE_COMMENT_WRITEBACK_PATH =
@@ -170,6 +174,23 @@ export class GitHubWritebackHandler {
     content: string,
   ): Promise<WritebackResult> {
     try {
+      const mergeTarget = extractMergeTarget(path);
+      if (mergeTarget) {
+        const payload = parseMergePayload(content);
+        const response = await this.mergePullRequest(mergeTarget, payload, workspaceId);
+        if (response.status >= 400) {
+          return {
+            success: false,
+            error: formatProviderError(response, 'GitHub pull request merge failed'),
+          };
+        }
+        const externalId = extractMergeSha(response.data);
+        return {
+          success: true,
+          ...(externalId ? { externalId } : {}),
+        };
+      }
+
       const target = this.extractWritebackTarget(path);
       const reviewId = target.reviewId;
       if (reviewId) {
@@ -236,7 +257,14 @@ export class GitHubWritebackHandler {
     workspaceId: string,
     review: AgentReview,
   ): Promise<string> {
-    const metadataConnectionId = review.metadata?.connectionId?.trim();
+    return this.resolveConnectionIdFromMetadata(workspaceId, review.metadata);
+  }
+
+  private async resolveConnectionIdFromMetadata(
+    workspaceId: string,
+    metadata?: AgentReviewMetadata,
+  ): Promise<string> {
+    const metadataConnectionId = metadata?.connectionId?.trim();
     if (metadataConnectionId) {
       return metadataConnectionId;
     }
@@ -278,6 +306,23 @@ export class GitHubWritebackHandler {
       body: { body: payload.body },
     });
   }
+
+  private async mergePullRequest(
+    target: { owner: string; repo: string; prNumber: number },
+    payload: GitHubMergePullRequestWritebackInput,
+    workspaceId: string,
+  ): Promise<ProxyResponse> {
+    const request = buildMergePullRequest(target, payload);
+    const connectionId = await this.resolveConnectionIdFromMetadata(workspaceId, payload.metadata);
+    return this.provider.proxy({
+      ...request,
+      connectionId,
+      headers: {
+        ...request.headers,
+        'Provider-Config-Key': payload.metadata?.providerConfigKey ?? this.defaultProviderConfigKey,
+      },
+    });
+  }
 }
 
 /**
@@ -311,6 +356,11 @@ export function resolveDeleteRequest(path: string): ProxyRequest {
 }
 
 export function resolveWritebackRequest(path: string, content: string): ProxyRequest {
+  const mergeTarget = extractMergeTarget(path);
+  if (mergeTarget) {
+    return buildMergePullRequest(mergeTarget, parseMergePayload(content));
+  }
+
   const route = classifyWrite(path, resources);
 
   if (route?.resource.name === 'issues') {
@@ -347,8 +397,39 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
   }
 
   throw new Error(
-    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, or pull request review file.`,
+    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request review, or pull request merge file.`,
   );
+}
+
+function extractMergeTarget(path: string): { owner: string; repo: string; prNumber: number } | undefined {
+  const match = path.match(MERGE_WRITEBACK_PATH);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return undefined;
+  }
+  return {
+    owner: decodeGitHubPathSegment(match[1], 'owner'),
+    repo: decodeGitHubPathSegment(match[2], 'repo'),
+    prNumber: Number.parseInt(match[3], 10),
+  };
+}
+
+function buildMergePullRequest(
+  target: { owner: string; repo: string; prNumber: number },
+  payload: GitHubMergePullRequestWritebackInput,
+): ProxyRequest {
+  const body: JsonObject = {};
+  if (payload.method !== undefined) body.merge_method = payload.method;
+  if (payload.commitTitle !== undefined) body.commit_title = payload.commitTitle;
+  if (payload.commitMessage !== undefined) body.commit_message = payload.commitMessage;
+  if (payload.sha !== undefined) body.sha = payload.sha;
+  return {
+    method: 'PUT',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${target.owner}/${target.repo}/pulls/${target.prNumber}/merge`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body,
+  };
 }
 
 function buildIssueCreateRequest(owner: string, repo: string, content: string): ProxyRequest {
@@ -468,6 +549,40 @@ function parseIssueCommentPayload(
   const object = expectObject(parsed, context);
   rejectReadOnlyFields(object);
   return { body: readString(object, 'body', context) };
+}
+
+function parseMergePayload(content: string): GitHubMergePullRequestWritebackInput {
+  let parsed: JsonValue;
+  try {
+    parsed = JSON.parse(content) as JsonValue;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown JSON parse failure';
+    throw new Error(`Invalid pull request merge JSON: ${message}`);
+  }
+
+  const object = expectObject(parsed, 'Pull request merge payload');
+  rejectReadOnlyFields(object);
+  const method = optionalMergeMethod(
+    object.method ?? object.merge_method,
+    'Pull request merge payload.method',
+  );
+  const commitTitle =
+    optionalTrimmedString(object.commitTitle, 'Pull request merge payload.commitTitle') ??
+    optionalTrimmedString(object.commit_title, 'Pull request merge payload.commit_title');
+  const commitMessage =
+    optionalTrimmedString(object.commitMessage, 'Pull request merge payload.commitMessage') ??
+    optionalTrimmedString(object.commit_message, 'Pull request merge payload.commit_message');
+  const sha = optionalTrimmedString(object.sha, 'Pull request merge payload.sha');
+  const metadataValue = object.metadata;
+  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
+
+  return {
+    ...(method ? { method } : {}),
+    ...(commitTitle ? { commitTitle } : {}),
+    ...(commitMessage ? { commitMessage } : {}),
+    ...(sha ? { sha } : {}),
+    ...(metadata ? { metadata } : {}),
+  };
 }
 
 function compactIssuePayload(payload: GitHubIssueWritebackInput): JsonObject {
@@ -657,6 +772,16 @@ function optionalIssueState(value: JsonValue | undefined, fieldName: string): 'o
   throw new Error(`${fieldName} must be either open or closed when provided`);
 }
 
+function optionalMergeMethod(value: JsonValue | undefined, fieldName: string): GitHubMergeMethod | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === 'merge' || value === 'squash' || value === 'rebase') {
+    return value;
+  }
+  throw new Error(`${fieldName} must be one of merge, squash, rebase when provided`);
+}
+
 function readPositiveInteger(source: JsonObject, key: string, context: string): number {
   const value = source[key];
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
@@ -737,26 +862,41 @@ function extractReviewId(value: JsonValue | null): string | undefined {
   return String(typedId);
 }
 
-function formatProviderError(response: ProxyResponse): string {
-  const baseMessage = `GitHub review submission failed with status ${response.status}`;
+function extractMergeSha(value: JsonValue | null): string | undefined {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const responseObject = value as JsonObject;
+  const sha = responseObject.sha;
+  return typeof sha === 'string' && sha.trim().length > 0 ? sha : undefined;
+}
+
+function formatProviderError(
+  response: ProxyResponse,
+  baseMessage = `GitHub review submission failed with status ${response.status}`,
+): string {
+  const failureMessage = baseMessage.includes(String(response.status))
+    ? baseMessage
+    : `${baseMessage} with status ${response.status}`;
   const responseData = response.data;
 
   if (responseData === null) {
-    return baseMessage;
+    return failureMessage;
   }
 
   if (typeof responseData === 'string' && responseData.trim().length > 0) {
-    return `${baseMessage}: ${responseData}`;
+    return `${failureMessage}: ${responseData}`;
   }
 
   if (!Array.isArray(responseData) && typeof responseData === 'object') {
     const message = responseData.message;
     if (typeof message === 'string' && message.trim().length > 0) {
-      return `${baseMessage}: ${message}`;
+      return `${failureMessage}: ${message}`;
     }
   }
 
-  return baseMessage;
+  return failureMessage;
 }
 
 function formatThrownError(error: unknown): string {

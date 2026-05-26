@@ -30,6 +30,9 @@ writebacks:
   review:
     match: /github/repos/*/*/pulls/*/reviews/*.json
     endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+  merge:
+    match: /github/repos/*/*/pulls/*/merge.json
+    endpoint: PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge
   comment:
     match: /github/repos/*/*/pulls/*/comments/*.json
     endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments

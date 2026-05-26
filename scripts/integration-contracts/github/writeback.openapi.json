@@ -18,6 +18,11 @@
       "operationId": "pulls/create-review",
       "summary": "Create a review for a pull request",
       "description": "Submits a GitHub pull request review with optional inline comments."
+    },
+    {
+      "operationId": "pulls/merge",
+      "summary": "Merge a pull request",
+      "description": "Merges a GitHub pull request with an optional method, commit text, and expected head SHA."
     }
   ]
 }

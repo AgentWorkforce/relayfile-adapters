@@ -75,6 +75,16 @@ export interface GitHubIssueCommentWritebackInput {
   body: string;
 }
 
+export type GitHubMergeMethod = 'merge' | 'squash' | 'rebase';
+
+export interface GitHubMergePullRequestWritebackInput {
+  method?: GitHubMergeMethod;
+  commitTitle?: string;
+  commitMessage?: string;
+  sha?: string;
+  metadata?: AgentReviewMetadata;
+}
+
 export type ProxyRequest = SharedProxyRequest;
 export type ProxyResponse<T = JsonValue | null> = SharedProxyResponse<T>;
 

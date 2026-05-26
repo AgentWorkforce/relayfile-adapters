@@ -93,6 +93,10 @@ test("SchemaAdapter matches writebacks and proxies them to the provider", async 
           match: "/github/repos/*/*/pulls/*/reviews/*.json",
           endpoint: "POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews",
         },
+        merge: {
+          match: "/github/repos/*/*/pulls/*/merge.json",
+          endpoint: "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge",
+        },
       },
     },
     defaultConnectionId: "conn_default",
@@ -107,4 +111,13 @@ test("SchemaAdapter matches writebacks and proxies them to the provider", async 
   assert.equal(providerCalls.length, 1);
   assert.equal(providerCalls[0]?.endpoint, "/repos/acme/demo/pulls/42/reviews");
   assert.equal(providerCalls[0]?.connectionId, "conn_default");
+
+  await adapter.writeBack(
+    "ws_123",
+    "/github/repos/acme/demo/pulls/43__finish-feature/merge.json",
+    JSON.stringify({ merge_method: "squash" })
+  );
+
+  assert.equal(providerCalls.length, 2);
+  assert.equal(providerCalls[1]?.endpoint, "/repos/acme/demo/pulls/43/merge");
 });

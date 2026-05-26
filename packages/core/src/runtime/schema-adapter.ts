@@ -501,7 +501,10 @@ export class SchemaAdapter {
       const parsed = parseEndpointDescriptor(mapping.endpoint);
       const placeholders = extractEndpointParams(parsed.path);
       const params = Object.fromEntries(
-        placeholders.map((placeholder, index) => [placeholder, wildcardValues[index] ?? ""])
+        placeholders.map((placeholder, index) => [
+          placeholder,
+          normalizeWritebackParam(this.name, placeholder, wildcardValues[index] ?? ""),
+        ])
       );
 
       return {
@@ -1354,6 +1357,17 @@ function safeJsonParse(value: string): unknown {
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function normalizeWritebackParam(
+  adapterName: string,
+  placeholder: string,
+  value: string
+): string {
+  if (adapterName === "github" && (placeholder === "pull_number" || placeholder === "issue_number")) {
+    return value.split("__", 1)[0] ?? value;
+  }
+  return value;
 }
 
 const SYNC_OPTION_KEYS = new Set([
