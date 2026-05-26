@@ -37,6 +37,7 @@ test("generated trigger catalog is in sync with adapter supportedEvents", async 
 
 test("catalog preserves provider-specific event names verbatim", () => {
   assert.ok(KNOWN_TRIGGER_CATALOG.github.includes("pull_request.opened"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.github.includes("issues.labeled"));
   assert.ok(KNOWN_TRIGGER_CATALOG.gitlab.includes("note.MergeRequest"));
   assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("issue.create"));
   assert.ok(KNOWN_TRIGGER_CATALOG.salesforce.includes("Account.created"));

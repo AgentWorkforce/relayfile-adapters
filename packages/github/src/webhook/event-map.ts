@@ -7,8 +7,10 @@ export interface WebhookAdapter {
   closePullRequest(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestReview(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestReviewComment(payload: Record<string, unknown>): Promise<IngestResult>;
+  ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestIssue(payload: Record<string, unknown>): Promise<IngestResult>;
+  updateIssue(payload: Record<string, unknown>): Promise<IngestResult>;
   closeIssue(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestCheckRun(payload: Record<string, unknown>): Promise<IngestResult>;
 }
@@ -21,12 +23,19 @@ export type WebhookHandler = (
 export const EVENT_MAP: Record<string, WebhookHandler> = {
   'pull_request.opened': (adapter, payload) => adapter.ingestPullRequest(payload),
   'pull_request.synchronize': (adapter, payload) => adapter.updatePullRequest(payload),
+  'pull_request.edited': (adapter, payload) => adapter.updatePullRequest(payload),
+  'pull_request.reopened': (adapter, payload) => adapter.updatePullRequest(payload),
   'pull_request.closed': (adapter, payload) => adapter.closePullRequest(payload),
   'pull_request_review.submitted': (adapter, payload) => adapter.ingestReview(payload),
   'pull_request_review_comment.created': (adapter, payload) =>
     adapter.ingestReviewComment(payload),
+  'issue_comment.created': (adapter, payload) => adapter.ingestIssueComment(payload),
   push: (adapter, payload) => adapter.ingestPushCommits(payload),
   'issues.opened': (adapter, payload) => adapter.ingestIssue(payload),
+  'issues.edited': (adapter, payload) => adapter.updateIssue(payload),
+  'issues.labeled': (adapter, payload) => adapter.updateIssue(payload),
+  'issues.unlabeled': (adapter, payload) => adapter.updateIssue(payload),
+  'issues.reopened': (adapter, payload) => adapter.updateIssue(payload),
   'issues.closed': (adapter, payload) => adapter.closeIssue(payload),
   'check_run.completed': (adapter, payload) => adapter.ingestCheckRun(payload),
 };

@@ -14,10 +14,55 @@ webhooks:
       - pull_request.state
   pull_request_review:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  issue_comment.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - comment.id
   push:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
   issues:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+  pull_request.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/meta.json
+    extract:
+      - action
+      - pull_request.number
+      - pull_request.title
+  pull_request.reopened:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/meta.json
+    extract:
+      - action
+      - pull_request.number
+      - pull_request.title
+  issues.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+  issues.labeled:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - label.name
+  issues.unlabeled:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - label.name
+  issues.reopened:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
 resources:
   pull_request:
     endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}

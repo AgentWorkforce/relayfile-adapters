@@ -49,6 +49,11 @@ class RecordingAdapter extends GitHubAdapter {
     return createResult('/github/repos/acme/widgets/pulls/7/comments/2.json');
   }
 
+  override async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
+    this.calls.push(`ingestIssueComment:${String(payload.action ?? '')}`);
+    return createResult('/github/repos/acme/widgets/issues/9/comments/3.json');
+  }
+
   override async ingestPushCommits(_payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push('ingestPushCommits');
     return createResult('/github/repos/acme/widgets/commits/head.json');
@@ -56,6 +61,11 @@ class RecordingAdapter extends GitHubAdapter {
 
   override async ingestIssue(payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push(`ingestIssue:${String(payload.action ?? '')}`);
+    return createResult('/github/repos/acme/widgets/issues/9/meta.json');
+  }
+
+  override async updateIssue(payload: Record<string, unknown>): Promise<IngestResult> {
+    this.calls.push(`updateIssue:${String(payload.action ?? '')}`);
     return createResult('/github/repos/acme/widgets/issues/9/meta.json');
   }
 
@@ -157,6 +167,60 @@ test('WebhookRouter routes issues.opened to ingestIssue', async () => {
   assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/meta.json']);
 });
 
+test('WebhookRouter routes issue_comment.created to ingestIssueComment', async () => {
+  const adapter = new RecordingAdapter();
+  const router = new WebhookRouter(adapter);
+
+  const result = await router.route(
+    { 'x-github-event': 'issue_comment' },
+    {
+      action: 'created',
+      repository: { full_name: 'acme/widgets' },
+      issue: { number: 9 },
+      comment: { id: 3 },
+    },
+  );
+
+  assert.deepEqual(adapter.calls, ['ingestIssueComment:created']);
+  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/comments/3.json']);
+});
+
+test('WebhookRouter routes issues.labeled to updateIssue', async () => {
+  const adapter = new RecordingAdapter();
+  const router = new WebhookRouter(adapter);
+
+  const result = await router.route(
+    { 'x-github-event': 'issues' },
+    {
+      action: 'labeled',
+      label: { name: 'small' },
+      repository: { full_name: 'acme/widgets' },
+      issue: { number: 9 },
+    },
+  );
+
+  assert.deepEqual(adapter.calls, ['updateIssue:labeled']);
+  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/meta.json']);
+});
+
+test('WebhookRouter routes issues.unlabeled to updateIssue', async () => {
+  const adapter = new RecordingAdapter();
+  const router = new WebhookRouter(adapter);
+
+  const result = await router.route(
+    { 'x-github-event': 'issues' },
+    {
+      action: 'unlabeled',
+      label: { name: 'small' },
+      repository: { full_name: 'acme/widgets' },
+      issue: { number: 9 },
+    },
+  );
+
+  assert.deepEqual(adapter.calls, ['updateIssue:unlabeled']);
+  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/meta.json']);
+});
+
 test('WebhookRouter routes check_run.completed to ingestCheckRun', async () => {
   const adapter = new RecordingAdapter();
   const router = new WebhookRouter(adapter);
@@ -209,15 +273,22 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
   const router = new WebhookRouter(new RecordingAdapter());
   const events = router.getSupportedEvents();
 
-  assert.equal(events.length, 9);
+  assert.equal(events.length, 16);
   assert.deepEqual(events, [
     'pull_request.opened',
     'pull_request.synchronize',
+    'pull_request.edited',
+    'pull_request.reopened',
     'pull_request.closed',
     'pull_request_review.submitted',
     'pull_request_review_comment.created',
+    'issue_comment.created',
     'push',
     'issues.opened',
+    'issues.edited',
+    'issues.labeled',
+    'issues.unlabeled',
+    'issues.reopened',
     'issues.closed',
     'check_run.completed',
   ]);

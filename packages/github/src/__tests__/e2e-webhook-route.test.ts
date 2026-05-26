@@ -64,12 +64,20 @@ class RecordingGitHubAdapter extends GitHubAdapter {
     return this.record('ingestReviewComment', payload);
   }
 
+  override async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
+    return this.record('ingestIssueComment', payload);
+  }
+
   override async ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult> {
     return this.record('ingestPushCommits', payload);
   }
 
   override async ingestIssue(payload: Record<string, unknown>): Promise<IngestResult> {
     return this.record('ingestIssue', payload);
+  }
+
+  override async updateIssue(payload: Record<string, unknown>): Promise<IngestResult> {
+    return this.record('updateIssue', payload);
   }
 
   override async closeIssue(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -185,6 +193,25 @@ const supportedEventCases: readonly EventCase[] = [
     },
   },
   {
+    eventKey: 'issue_comment.created',
+    headers: { 'x-github-event': 'issue_comment' },
+    payload: {
+      action: 'created',
+      repository,
+      issue: { ...mockIssuePayload },
+      comment: {
+        id: 8102,
+        body: 'Issue comment',
+      },
+    },
+    expectedMethod: 'ingestIssueComment',
+    expectedRepoInfo: {
+      owner: mockRepoContext.owner,
+      repo: mockRepoContext.repo,
+      number: mockIssuePayload.number,
+    },
+  },
+  {
     eventKey: 'push',
     headers: { 'x-github-event': 'push' },
     payload: {
@@ -214,6 +241,22 @@ const supportedEventCases: readonly EventCase[] = [
       issue: { ...mockIssuePayload },
     },
     expectedMethod: 'ingestIssue',
+    expectedRepoInfo: {
+      owner: mockRepoContext.owner,
+      repo: mockRepoContext.repo,
+      number: mockIssuePayload.number,
+    },
+  },
+  {
+    eventKey: 'issues.labeled',
+    headers: { 'x-github-event': 'issues' },
+    payload: {
+      action: 'labeled',
+      repository,
+      label: { name: 'small' },
+      issue: { ...mockIssuePayload },
+    },
+    expectedMethod: 'updateIssue',
     expectedRepoInfo: {
       owner: mockRepoContext.owner,
       repo: mockRepoContext.repo,
