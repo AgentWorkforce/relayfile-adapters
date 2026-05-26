@@ -60,7 +60,7 @@
     "directory": "packages/asana"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.19"
+    "@relayfile/adapter-core": "^0.3.20"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
