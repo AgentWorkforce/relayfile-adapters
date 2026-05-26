@@ -276,7 +276,7 @@ async function emitSharedFolders(
       continue;
     }
     const id = readId(idValue);
-    const sharedFolderName = readString(record.shared_folder_name) ?? id;
+    const sharedFolderName = readFieldString(record, 'shared_folder_name') ?? id;
     const canonicalPath = computeDropboxPath('shared-folder', id, {
       name: sharedFolderName,
     });
@@ -344,7 +344,7 @@ async function emitSharedLinks(
       });
       continue;
     }
-    const sharedLinkTitle = readString(record.name) ?? readString(record.url) ?? id;
+    const sharedLinkTitle = readFieldString(record, 'name') ?? readFieldString(record, 'url') ?? id;
     const canonicalPath = computeDropboxPath('shared-link', id, {
       name: sharedLinkTitle,
     });
