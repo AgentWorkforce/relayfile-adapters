@@ -65,6 +65,9 @@
     "space.deleted",
     "space.updated"
   ],
+  "dropbox": [
+    "file.changed"
+  ],
   "github": [
     "check_run.completed",
     "issues.closed",
