@@ -65,7 +65,7 @@
     "directory": "packages/jira"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.18"
+    "@relayfile/adapter-core": "^0.3.19"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
