@@ -124,6 +124,11 @@
     "push",
     "tag_push"
   ],
+  "gmail": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "google-calendar": [
     "calendar.exists",
     "calendar.not_exists",
