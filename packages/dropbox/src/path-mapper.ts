@@ -4,6 +4,9 @@ export const DROPBOX_PATH_ROOT = '/dropbox';
 
 export const RELAYFILE_ROOT = DROPBOX_PATH_ROOT;
 export const OBJECT_RESOURCE_PATH = '/dropbox/files';
+// Deprecated compatibility constant retained for external callers that still
+// rely on account-scoped object roots.
+export const LEGACY_OBJECT_RESOURCE_PATH = '/dropbox/{accountId}/files';
 export const LIFECYCLE_RESOURCE_PATH = '/dropbox/cursors';
 
 export type DropboxPathObjectType = 'file' | 'folder' | 'shared-folder' | 'shared-link';
@@ -174,6 +177,11 @@ export function computeDropboxPath(
 }
 
 export function toObjectRelayfilePath(input: ObjectPathInput): string {
+  const legacyPath = toLegacyAccountScopedPath(input);
+  if (legacyPath) {
+    return legacyPath;
+  }
+
   const objectId = input.id !== undefined ? String(input.id) : null;
   const objectType = normalizeDropboxObjectType(input.objectType ?? input.model ?? 'file');
   const path = input.path ?? null;
@@ -263,4 +271,22 @@ function decodeObjectIdFromLeaf(leaf: string): string {
   }
   const candidate = leaf.slice(separatorIndex + 2);
   return candidate || leaf;
+}
+
+function toLegacyAccountScopedPath(input: ObjectPathInput): string | null {
+  const hasExplicitType =
+    typeof input.objectType === 'string' || typeof input.model === 'string';
+  if (hasExplicitType) {
+    return null;
+  }
+  const accountScope = input.accountId ?? input.account;
+  if (accountScope === undefined || accountScope === null) {
+    return null;
+  }
+  const pathLike = input.path ?? input.key ?? input.name;
+  if (!pathLike || pathLike.trim().length === 0) {
+    return null;
+  }
+  const stripped = pathLike.replace(/^\/+/u, '');
+  return `${DROPBOX_PATH_ROOT}/${encodePathSegment(accountScope)}/${encodedPathOrId(stripped)}.json`;
 }

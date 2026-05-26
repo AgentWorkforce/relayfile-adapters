@@ -28,7 +28,7 @@ export const resources = [
   {
     name: 'shared-folders',
     path: '/dropbox/shared-folders',
-    pathPattern: /^\/dropbox\/shared-folders\/(?:[^/]+|by-id\/[^/]+)\.json$/,
+    pathPattern: /^\/dropbox\/shared-folders\/(?:(?!_index\.json$)[^/]+|by-id\/(?!_index\.json$)[^/]+)\.json$/,
     idPattern: /^[A-Za-z0-9_.:@-]+$/,
     schema: 'discovery/dropbox/shared-folders/.schema.json',
     createExample: 'discovery/dropbox/shared-folders/.create.example.json',
@@ -36,7 +36,7 @@ export const resources = [
   {
     name: 'shared-links',
     path: '/dropbox/shared-links',
-    pathPattern: /^\/dropbox\/shared-links\/(?:[^/]+|by-id\/[^/]+)\.json$/,
+    pathPattern: /^\/dropbox\/shared-links\/(?:(?!_index\.json$)[^/]+|by-id\/(?!_index\.json$)[^/]+)\.json$/,
     idPattern: /^[A-Za-z0-9_.:@-]+$/,
     schema: 'discovery/dropbox/shared-links/.schema.json',
     createExample: 'discovery/dropbox/shared-links/.create.example.json',

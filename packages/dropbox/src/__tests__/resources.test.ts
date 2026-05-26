@@ -23,4 +23,6 @@ test('dropbox shared resources match canonical and by-id alias paths', () => {
     findResourceByPath('/dropbox/shared-links/by-id/url_1234567890abcdef.json')?.name,
     'shared-links',
   );
+  assert.equal(findResourceByPath('/dropbox/shared-folders/_index.json'), undefined);
+  assert.equal(findResourceByPath('/dropbox/shared-links/_index.json'), undefined);
 });

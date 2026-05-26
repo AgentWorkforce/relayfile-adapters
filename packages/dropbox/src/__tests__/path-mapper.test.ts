@@ -42,6 +42,12 @@ test('dropbox path helpers preserve legacy path-like input behavior for compatib
     dropboxFolderPath('/legacy/path/docs'),
     '/dropbox/folders/legacy/path/docs.json',
   );
+
+  const legacyScoped = toObjectRelayfilePath({
+    accountId: 'acct-123',
+    path: '/legacy/path/spec.md',
+  });
+  assert.equal(legacyScoped, '/dropbox/acct-123/legacy/path/spec.md.json');
 });
 
 test('computeDropboxPath keeps canonical path stable across folder moves', () => {
