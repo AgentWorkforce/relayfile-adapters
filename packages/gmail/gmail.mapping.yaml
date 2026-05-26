@@ -1,0 +1,29 @@
+# Gmail trigger-event surface for `adapter-core triggers generate` (issue #115).
+#
+# Gmail is a *storage-bridge* adapter: messages/threads are materialized as
+# files in the Relayfile VFS (`/gmail/{account}/threads/...`), and Gmail API
+# push (users.watch → Pub/Sub) is normalized into storage change events. It is
+# NOT a schema-driven webhook adapter, so this file deliberately contains no
+# `adapter:`/`resources:`/`writebacks:` blocks — only the `webhooks:` keys the
+# catalog generator reads (`Object.keys(parsed.webhooks)`).
+#
+# The event names below are emitted VERBATIM by the runtime as `event.type`
+# (see src/metadata.ts `toIngestEnvelope`, which maps the storage-bridge
+# changeType to these `file.*` names). They must match exactly so a persona's
+# `integrations.gmail.triggers[].on` actually fires at runtime — the catalog
+# never normalizes across providers.
+provider: gmail
+webhooks:
+  # A Gmail message/thread arrived in (or moved into) the watched mailbox —
+  # i.e. new mail. This is the event most digest/triage personas subscribe to.
+  file.created:
+    description: A Gmail message/thread was added to the watched mailbox (new mail).
+  # A watched Gmail message/thread changed — e.g. labels added/removed, read
+  # state, or a thread gained a reply (surfaced via the Nango scheduled-sync
+  # fallback, which emits an `updated` change).
+  file.updated:
+    description: A watched Gmail message/thread changed (labels, read state, new reply).
+  # A Gmail message/thread was removed from the watched mailbox (deleted, or
+  # the history record reported messagesDeleted).
+  file.deleted:
+    description: A Gmail message/thread was removed from the watched mailbox.

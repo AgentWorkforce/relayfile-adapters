@@ -132,6 +132,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "push",
     "tag_push"
   ],
+  "gmail": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "google-calendar": [
     "calendar.exists",
     "calendar.not_exists",
@@ -459,12 +464,6 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "packageName": "@relayfile/gcs",
     "packagePath": "packages/gcs",
     "provider": "gcs",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/gmail",
-    "packagePath": "packages/gmail",
-    "provider": "gmail",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

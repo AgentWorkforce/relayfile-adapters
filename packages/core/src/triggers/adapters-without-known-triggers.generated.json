@@ -36,12 +36,6 @@
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
-    "packageName": "@relayfile/gmail",
-    "packagePath": "packages/gmail",
-    "provider": "gmail",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
     "packageName": "@relayfile/google-drive",
     "packagePath": "packages/google-drive",
     "provider": "google-drive",
