@@ -28,6 +28,11 @@ export interface ObjectPathInput {
   primaryKey?: string | number;
 }
 
+function legacyPathLikeInput(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.includes('/') && !trimmed.toLowerCase().startsWith('id:');
+}
+
 function assertNonEmpty(value: string, label: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -78,12 +83,22 @@ function stableLeafName(
 }
 
 export function dropboxFilePath(id: string, title?: string | null): string {
+  // Backward-compat: legacy callers passed a path-like id and expected nested
+  // path output (`/dropbox/files/<path>.json`). Keep that behavior when no
+  // title hint is provided.
+  if (!title && legacyPathLikeInput(id)) {
+    return `${DROPBOX_PATH_ROOT}/files/${encodedPathOrId(id)}.json`;
+  }
   const normalizedId = assertNonEmpty(id, 'object id');
   const leaf = stableLeafName(normalizedId, title);
   return `${DROPBOX_PATH_ROOT}/files/${encodePathSegment(leaf)}.json`;
 }
 
 export function dropboxFolderPath(id: string, title?: string | null): string {
+  // Backward-compat: preserve legacy nested path output for path-like ids.
+  if (!title && legacyPathLikeInput(id)) {
+    return `${DROPBOX_PATH_ROOT}/folders/${encodedPathOrId(id)}.json`;
+  }
   const normalizedId = assertNonEmpty(id, 'object id');
   const leaf = stableLeafName(normalizedId, title);
   return `${DROPBOX_PATH_ROOT}/folders/${encodePathSegment(leaf)}.json`;
@@ -137,29 +152,21 @@ export function computeDropboxPath(
   objectId: string,
   options?: { path?: string | null; path_lower?: string | null; name?: string | null },
 ): string {
-  const normalizedType = objectType.trim().toLowerCase();
+  const normalizedType = normalizeDropboxObjectType(objectType);
   const id = assertNonEmpty(objectId, 'object id');
   const path = options?.path_lower ?? options?.path ?? null;
   const name = options?.name ?? (path ? basename(path) : null);
 
-  if (normalizedType === 'file' || normalizedType === 'dropboxfile') {
+  if (normalizedType === 'file') {
     return dropboxFilePath(id, name);
   }
-  if (normalizedType === 'folder' || normalizedType === 'dropboxfolder') {
+  if (normalizedType === 'folder') {
     return dropboxFolderPath(id, name);
   }
-  if (
-    normalizedType === 'shared-folder' ||
-    normalizedType === 'sharedfolder' ||
-    normalizedType === 'dropboxsharedfolder'
-  ) {
+  if (normalizedType === 'shared-folder') {
     return dropboxSharedFolderPath(id);
   }
-  if (
-    normalizedType === 'shared-link' ||
-    normalizedType === 'sharedlink' ||
-    normalizedType === 'dropboxsharedlink'
-  ) {
+  if (normalizedType === 'shared-link') {
     return dropboxSharedLinkPath(id);
   }
 
@@ -168,7 +175,7 @@ export function computeDropboxPath(
 
 export function toObjectRelayfilePath(input: ObjectPathInput): string {
   const objectId = input.id !== undefined ? String(input.id) : null;
-  const objectType = input.objectType ?? input.model ?? 'file';
+  const objectType = normalizeDropboxObjectType(input.objectType ?? input.model ?? 'file');
   const path = input.path ?? null;
   const name = input.name ?? (path ? basename(path) : null);
 
@@ -176,16 +183,13 @@ export function toObjectRelayfilePath(input: ObjectPathInput): string {
     throw new Error('Dropbox object path requires an id');
   }
 
-  if (objectType.toLowerCase().includes('folder') && !objectType.toLowerCase().includes('shared')) {
-    return computeDropboxPath('folder', objectId, { path, name });
+  if (objectType === 'folder') {
+    return computeDropboxPath(objectType, objectId, { path, name });
   }
-  if (objectType.toLowerCase().includes('shared-folder')) {
-    return computeDropboxPath('shared-folder', objectId);
+  if (objectType === 'shared-folder' || objectType === 'shared-link') {
+    return computeDropboxPath(objectType, objectId);
   }
-  if (objectType.toLowerCase().includes('shared-link')) {
-    return computeDropboxPath('shared-link', objectId);
-  }
-  return computeDropboxPath('file', objectId, { path, name });
+  return computeDropboxPath(objectType, objectId, { path, name });
 }
 
 export function toLifecycleRelayfilePath(id: string | number): string {
@@ -214,8 +218,49 @@ export function parseRelayfilePath(path: string): {
   }
 
   if (segments[0] === DROPBOX_PATH_ROOT.slice(1)) {
-    return { resource: 'object', id: segments.at(-1) ?? null, segments };
+    const last = segments.at(-1) ?? null;
+    const id =
+      last && segments.length >= 3 && segments[1] !== '_index'
+        ? decodeObjectIdFromLeaf(last)
+        : last;
+    return { resource: 'object', id, segments };
   }
 
   return { resource: 'unknown', id: null, segments };
+}
+
+function normalizeDropboxObjectType(objectType: string): DropboxPathObjectType {
+  const normalized = objectType.trim().toLowerCase().replace(/[_\s]+/gu, '-');
+  if (normalized === 'file' || normalized === 'dropboxfile') {
+    return 'file';
+  }
+  if (normalized === 'folder' || normalized === 'dropboxfolder') {
+    return 'folder';
+  }
+  if (
+    normalized === 'shared-folder' ||
+    normalized === 'sharedfolder' ||
+    normalized === 'dropboxsharedfolder' ||
+    (normalized.includes('shared') && normalized.includes('folder'))
+  ) {
+    return 'shared-folder';
+  }
+  if (
+    normalized === 'shared-link' ||
+    normalized === 'sharedlink' ||
+    normalized === 'dropboxsharedlink' ||
+    (normalized.includes('shared') && normalized.includes('link'))
+  ) {
+    return 'shared-link';
+  }
+  throw new Error(`Unsupported Dropbox object type: ${objectType}`);
+}
+
+function decodeObjectIdFromLeaf(leaf: string): string {
+  const separatorIndex = leaf.lastIndexOf('__');
+  if (separatorIndex === -1) {
+    return leaf;
+  }
+  const candidate = leaf.slice(separatorIndex + 2);
+  return candidate || leaf;
 }

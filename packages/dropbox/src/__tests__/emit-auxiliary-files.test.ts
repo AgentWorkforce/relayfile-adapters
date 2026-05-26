@@ -25,11 +25,13 @@ interface CapturingClient extends AuxiliaryEmitterClient {
   deletes: EmitDeleteInput[];
   files: Map<string, string>;
   failReadPaths: Set<string>;
+  failWritePaths: Set<string>;
 }
 
 function createClient(
   initialFiles: Record<string, string> = {},
   failReadPaths: string[] = [],
+  failWritePaths: string[] = [],
 ): CapturingClient {
   const files = new Map(Object.entries(initialFiles));
   return {
@@ -37,7 +39,11 @@ function createClient(
     deletes: [],
     files,
     failReadPaths: new Set(failReadPaths),
+    failWritePaths: new Set(failWritePaths),
     async writeFile(input) {
+      if (this.failWritePaths.has(input.path)) {
+        throw new Error(`forced write failure: ${input.path}`);
+      }
       this.writes.push(input);
       this.files.set(input.path, input.content);
       return { created: true };
@@ -174,5 +180,61 @@ test('emitDropboxAuxiliaryFiles skips index rewrites when index reads fail', asy
   assert.ok(
     client.writes.some((write) => write.path === dropboxRootIndexPath()),
     'root index should still be emitted',
+  );
+});
+
+test('emitDropboxAuxiliaryFiles reports deterministic by-id alias collisions without unsafe overwrite', async () => {
+  const collidingAliasPath = '/dropbox/files/by-id/id%3Acollision.json';
+  const client = createClient({}, [], [collidingAliasPath]);
+  const result = await emitDropboxAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    files: [
+      {
+        id: '/docs/spec.md',
+        dropbox_id: 'id:collision',
+        name: 'spec.md',
+        path_lower: '/docs/spec.md',
+      },
+    ],
+  });
+
+  assert.ok(
+    result.errors.some(
+      (error) =>
+        error.path === collidingAliasPath &&
+        error.error.includes('forced write failure'),
+    ),
+  );
+  assert.ok(
+    client.writes.every((write) => write.path !== collidingAliasPath),
+    'by-id collision path should not be overwritten on write failure',
+  );
+});
+
+test('emitDropboxAuxiliaryFiles reports deterministic by-path alias collisions without unsafe overwrite', async () => {
+  const collidingAliasPath = '/dropbox/folders/by-path/teams/ops.json';
+  const client = createClient({}, [], [collidingAliasPath]);
+  const result = await emitDropboxAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    folders: [
+      {
+        id: '/teams/ops',
+        dropbox_id: 'id:ops-folder',
+        name: 'ops',
+        path_lower: '/teams/ops',
+      },
+    ],
+  });
+
+  assert.ok(
+    result.errors.some(
+      (error) =>
+        error.path === collidingAliasPath &&
+        error.error.includes('forced write failure'),
+    ),
+  );
+  assert.ok(
+    client.writes.every((write) => write.path !== collidingAliasPath),
+    'by-path collision path should not be overwritten on write failure',
   );
 });
