@@ -179,7 +179,7 @@ integrations:
     display_name: Dropbox
     category: storage
     status: implemented
-    package: "@relayfile/dropbox"
+    package: "@relayfile/adapter-dropbox"
     nango_slug: dropbox
     auth_model: oauth
     scope_status: verified

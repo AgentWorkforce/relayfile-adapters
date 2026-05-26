@@ -120,7 +120,7 @@ These integrations should anchor the large eval effort because they cover the ma
 | Google Drive | `@relayfile/google-drive` | `packages/google-drive` | P0 | Watch notifications, delta fetch, file CRUD. |
 | SharePoint | `@relayfile/sharepoint` | `packages/sharepoint` | P0 | Microsoft Graph subscriptions, document libraries. |
 | OneDrive | `@relayfile/onedrive` | `packages/onedrive` | P0 | Microsoft Graph subscriptions, drive delta. |
-| Dropbox | `@relayfile/dropbox` | `packages/dropbox` | P1 | Dropbox webhooks, cursor delta fetch. |
+| Dropbox | `@relayfile/adapter-dropbox` | `packages/dropbox` | P1 | Dropbox webhooks, cursor delta fetch. |
 | Box | `@relayfile/box` | `packages/box` | P1 | Box webhooks, file/folder events. |
 | Google Cloud Storage | `@relayfile/gcs` | `packages/gcs` | P0 | Pub/Sub object notifications. |
 | Azure Blob Storage | `@relayfile/azure-blob` | `packages/azure-blob` | P1 | Event Grid blob events. |

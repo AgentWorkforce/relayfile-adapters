@@ -1,5 +1,5 @@
 {
-  "name": "@relayfile/dropbox",
+  "name": "@relayfile/adapter-dropbox",
   "version": "0.2.3",
   "description": "Dropbox storage bridge adapter for Relayfile",
   "type": "module",

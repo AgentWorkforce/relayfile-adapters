@@ -449,7 +449,7 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
-    "packageName": "@relayfile/dropbox",
+    "packageName": "@relayfile/adapter-dropbox",
     "packagePath": "packages/dropbox",
     "provider": "dropbox",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
