@@ -417,9 +417,8 @@ function buildMergePullRequest(
   target: { owner: string; repo: string; prNumber: number },
   payload: GitHubMergePullRequestWritebackInput,
 ): ProxyRequest {
-  const body: JsonObject = {
-    merge_method: payload.method ?? 'squash',
-  };
+  const body: JsonObject = {};
+  if (payload.method !== undefined) body.merge_method = payload.method;
   if (payload.commitTitle !== undefined) body.commit_title = payload.commitTitle;
   if (payload.commitMessage !== undefined) body.commit_message = payload.commitMessage;
   return {
