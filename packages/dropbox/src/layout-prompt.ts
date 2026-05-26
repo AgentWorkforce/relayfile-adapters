@@ -16,12 +16,12 @@ export const DROPBOX_LAYOUT_PROMPT = `# Dropbox Mount Layout
 ├── _index.json
 ├── files/
 │   ├── _index.json
-│   ├── <path>.json                    ← canonical file metadata
+│   ├── <slug>__<id>.json              ← canonical file metadata
 │   ├── by-id/<dropbox-id>.json
 │   └── by-path/<path>.json
 ├── folders/
 │   ├── _index.json
-│   ├── <path>.json                    ← canonical folder metadata
+│   ├── <slug>__<id>.json              ← canonical folder metadata
 │   ├── by-id/<dropbox-id>.json
 │   └── by-path/<path>.json
 ├── shared-folders/

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   EMIT_AUXILIARY_JSON_CONTENT_TYPE,
   type AuxiliaryEmitterClient,
@@ -11,6 +13,7 @@ import {
   dropboxFilesIndexPath,
   dropboxFolderByPathAliasPath,
   dropboxFoldersIndexPath,
+  dropboxRootIndexPath,
   dropboxSharedFoldersIndexPath,
   dropboxSharedLinksIndexPath,
 } from './path-mapper.js';
@@ -36,13 +39,13 @@ type DropboxFolderRecord = {
 };
 
 type DropboxSharedFolderRecord = {
-  id: string;
+  id?: string;
   shared_folder_id?: string;
   shared_folder_name?: string;
 };
 
 type DropboxSharedLinkRecord = {
-  id: string;
+  id?: string;
   name?: string;
   url?: string;
 };
@@ -52,6 +55,7 @@ interface IndexRow {
   title: string;
   updated: string;
   canonicalPath: string;
+  pathLower?: string;
 }
 
 export interface EmitDropboxAuxiliaryFilesInput {
@@ -72,7 +76,7 @@ export async function emitDropboxAuxiliaryFiles(
   await safeWrite(
     client,
     input.workspaceId,
-    '/dropbox/_index.json',
+    dropboxRootIndexPath(),
     `${JSON.stringify([
       { id: 'files', title: 'Files', canonicalPath: dropboxFilesIndexPath() },
       { id: 'folders', title: 'Folders', canonicalPath: dropboxFoldersIndexPath() },
@@ -115,12 +119,21 @@ async function emitFiles(
     return;
   }
 
-  const rows = new Map((await readIndex(client, workspaceId, dropboxFilesIndexPath())).map((row) => [row.id, row]));
+  const existingRows = await readIndex(client, workspaceId, dropboxFilesIndexPath(), aggregate);
+  if (existingRows === null) {
+    return;
+  }
+  const rows = new Map(existingRows.map((row) => [row.id, row]));
 
   for (const record of records) {
     const id = readId(record.id);
-    const pathLower = readString(record.path_lower) ?? id;
-    const canonicalPath = computeDropboxPath('file', id, { path_lower: pathLower });
+    const previous = rows.get(id);
+    const previousPathLower = previous?.pathLower;
+    const pathLower = readString(record.path_lower) ?? previousPathLower ?? id;
+    const canonicalPath = computeDropboxPath('file', id, {
+      path_lower: pathLower,
+      name: readFieldString(record, 'name'),
+    });
     const byPath = dropboxFileByPathAliasPath(pathLower);
     const byId = dropboxByIdAliasPath('files', readString(record.dropbox_id) ?? id);
 
@@ -131,6 +144,15 @@ async function emitFiles(
       continue;
     }
 
+    if (previousPathLower && previousPathLower !== pathLower) {
+      await safeDelete(
+        client,
+        workspaceId,
+        dropboxFileByPathAliasPath(previousPathLower),
+        aggregate,
+      );
+    }
+
     rows.set(id, {
       id,
       title: readString(record.name) ?? pathLower,
@@ -139,6 +161,7 @@ async function emitFiles(
         readString(record.client_modified) ??
         new Date().toISOString(),
       canonicalPath,
+      pathLower,
     });
 
     const aliasPayload = buildAliasPayload({
@@ -168,12 +191,21 @@ async function emitFolders(
     return;
   }
 
-  const rows = new Map((await readIndex(client, workspaceId, dropboxFoldersIndexPath())).map((row) => [row.id, row]));
+  const existingRows = await readIndex(client, workspaceId, dropboxFoldersIndexPath(), aggregate);
+  if (existingRows === null) {
+    return;
+  }
+  const rows = new Map(existingRows.map((row) => [row.id, row]));
 
   for (const record of records) {
     const id = readId(record.id);
-    const pathLower = readString(record.path_lower) ?? id;
-    const canonicalPath = computeDropboxPath('folder', id, { path_lower: pathLower });
+    const previous = rows.get(id);
+    const previousPathLower = previous?.pathLower;
+    const pathLower = readString(record.path_lower) ?? previousPathLower ?? id;
+    const canonicalPath = computeDropboxPath('folder', id, {
+      path_lower: pathLower,
+      name: readFieldString(record, 'name'),
+    });
     const byPath = dropboxFolderByPathAliasPath(pathLower);
     const byId = dropboxByIdAliasPath('folders', readString(record.dropbox_id) ?? id);
 
@@ -184,11 +216,21 @@ async function emitFolders(
       continue;
     }
 
+    if (previousPathLower && previousPathLower !== pathLower) {
+      await safeDelete(
+        client,
+        workspaceId,
+        dropboxFolderByPathAliasPath(previousPathLower),
+        aggregate,
+      );
+    }
+
     rows.set(id, {
       id,
       title: readString(record.name) ?? pathLower,
       updated: new Date().toISOString(),
       canonicalPath,
+      pathLower,
     });
 
     const aliasPayload = buildAliasPayload({
@@ -218,12 +260,22 @@ async function emitSharedFolders(
     return;
   }
 
-  const rows = new Map(
-    (await readIndex(client, workspaceId, dropboxSharedFoldersIndexPath())).map((row) => [row.id, row]),
-  );
+  const existingRows = await readIndex(client, workspaceId, dropboxSharedFoldersIndexPath(), aggregate);
+  if (existingRows === null) {
+    return;
+  }
+  const rows = new Map(existingRows.map((row) => [row.id, row]));
 
   for (const record of records) {
-    const id = readId(record.id);
+    const idValue = readString(record.id) ?? readFieldString(record, 'shared_folder_id');
+    if (!idValue) {
+      aggregate.errors.push({
+        path: dropboxSharedFoldersIndexPath(),
+        error: 'Dropbox shared-folder record is missing both id and shared_folder_id',
+      });
+      continue;
+    }
+    const id = readId(idValue);
     const canonicalPath = computeDropboxPath('shared-folder', id);
     const byId = dropboxByIdAliasPath('shared-folders', id);
 
@@ -270,10 +322,25 @@ async function emitSharedLinks(
     return;
   }
 
-  const rows = new Map((await readIndex(client, workspaceId, dropboxSharedLinksIndexPath())).map((row) => [row.id, row]));
+  const existingRows = await readIndex(client, workspaceId, dropboxSharedLinksIndexPath(), aggregate);
+  if (existingRows === null) {
+    return;
+  }
+  const rows = new Map(existingRows.map((row) => [row.id, row]));
 
   for (const record of records) {
-    const id = readId(record.id);
+    const explicitId = readString(record.id);
+    const url = readFieldString(record, 'url');
+    const id = explicitId
+      ? readId(explicitId)
+      : (url ? `url_${createHash('sha256').update(url).digest('hex').slice(0, 24)}` : null);
+    if (!id) {
+      aggregate.errors.push({
+        path: dropboxSharedLinksIndexPath(),
+        error: 'Dropbox shared-link record is missing both id and url',
+      });
+      continue;
+    }
     const canonicalPath = computeDropboxPath('shared-link', id);
     const byId = dropboxByIdAliasPath('shared-links', id);
 
@@ -349,6 +416,13 @@ function readString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readFieldString(record: unknown, field: string): string | undefined {
+  if (!record || typeof record !== 'object') {
+    return undefined;
+  }
+  return readString((record as Record<string, unknown>)[field]);
+}
+
 function isDeleteRecord(record: unknown): record is DeleteRecord {
   return Boolean(
     record &&
@@ -361,7 +435,8 @@ async function readIndex(
   client: AuxiliaryEmitterClient,
   workspaceId: string,
   path: string,
-): Promise<IndexRow[]> {
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<IndexRow[] | null> {
   if (!client.readFile) {
     return [];
   }
@@ -374,7 +449,8 @@ async function readIndex(
     }
     const parsed = JSON.parse(content) as unknown;
     if (!Array.isArray(parsed)) {
-      return [];
+      aggregate.errors.push({ path, error: 'Expected index JSON array' });
+      return null;
     }
     return parsed.filter((row): row is IndexRow => {
       if (!row || typeof row !== 'object') {
@@ -385,11 +461,16 @@ async function readIndex(
         typeof candidate.id === 'string' &&
         typeof candidate.title === 'string' &&
         typeof candidate.updated === 'string' &&
-        typeof candidate.canonicalPath === 'string'
+        typeof candidate.canonicalPath === 'string' &&
+        (candidate.pathLower === undefined || typeof candidate.pathLower === 'string')
       );
     });
-  } catch {
-    return [];
+  } catch (error) {
+    aggregate.errors.push({
+      path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 

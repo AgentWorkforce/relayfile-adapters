@@ -1,3 +1,5 @@
+import { aliasCollisionSuffix, slugifyAlias } from '@relayfile/adapter-core';
+
 export const DROPBOX_PATH_ROOT = '/dropbox';
 
 export const RELAYFILE_ROOT = DROPBOX_PATH_ROOT;
@@ -7,6 +9,8 @@ export const LIFECYCLE_RESOURCE_PATH = '/dropbox/cursors';
 export type DropboxPathObjectType = 'file' | 'folder' | 'shared-folder' | 'shared-link';
 
 export interface ObjectPathInput {
+  objectType?: string;
+  model?: string;
   accountId?: string | number;
   account?: string;
   bucket?: string;
@@ -52,12 +56,37 @@ function encodedPathOrId(value: string): string {
   return encodePathSegment(trimmed);
 }
 
-export function dropboxFilePath(pathOrId: string): string {
-  return `${DROPBOX_PATH_ROOT}/files/${encodedPathOrId(pathOrId)}.json`;
+function basename(pathOrId: string): string {
+  const trimmed = assertNonEmpty(pathOrId, 'path');
+  const parts = trimmed.split('/').map((part) => part.trim()).filter((part) => part.length > 0);
+  return parts.at(-1) ?? trimmed;
 }
 
-export function dropboxFolderPath(pathOrId: string): string {
-  return `${DROPBOX_PATH_ROOT}/folders/${encodedPathOrId(pathOrId)}.json`;
+function stableLeafName(
+  id: string,
+  title?: string | null,
+  opts?: { colliding?: boolean },
+): string {
+  const slugCandidate = title ? slugifyAlias(title) : '';
+  const fallback = slugifyAlias(id);
+  const baseSlug =
+    slugCandidate && slugCandidate !== 'untitled'
+      ? slugCandidate
+      : (fallback && fallback !== 'untitled' ? fallback : 'item');
+  const suffix = opts?.colliding ? `-${aliasCollisionSuffix(id)}` : '';
+  return `${baseSlug}${suffix}__${id}`;
+}
+
+export function dropboxFilePath(id: string, title?: string | null): string {
+  const normalizedId = assertNonEmpty(id, 'object id');
+  const leaf = stableLeafName(normalizedId, title);
+  return `${DROPBOX_PATH_ROOT}/files/${encodePathSegment(leaf)}.json`;
+}
+
+export function dropboxFolderPath(id: string, title?: string | null): string {
+  const normalizedId = assertNonEmpty(id, 'object id');
+  const leaf = stableLeafName(normalizedId, title);
+  return `${DROPBOX_PATH_ROOT}/folders/${encodePathSegment(leaf)}.json`;
 }
 
 export function dropboxSharedFolderPath(sharedFolderId: string): string {
@@ -84,6 +113,10 @@ export function dropboxSharedLinksIndexPath(): string {
   return `${DROPBOX_PATH_ROOT}/shared-links/_index.json`;
 }
 
+export function dropboxRootIndexPath(): string {
+  return `${DROPBOX_PATH_ROOT}/_index.json`;
+}
+
 export function dropboxByIdAliasPath(
   resource: 'files' | 'folders' | 'shared-folders' | 'shared-links',
   id: string,
@@ -102,17 +135,18 @@ export function dropboxFolderByPathAliasPath(pathLower: string): string {
 export function computeDropboxPath(
   objectType: string,
   objectId: string,
-  options?: { path?: string | null; path_lower?: string | null },
+  options?: { path?: string | null; path_lower?: string | null; name?: string | null },
 ): string {
   const normalizedType = objectType.trim().toLowerCase();
   const id = assertNonEmpty(objectId, 'object id');
   const path = options?.path_lower ?? options?.path ?? null;
+  const name = options?.name ?? (path ? basename(path) : null);
 
   if (normalizedType === 'file' || normalizedType === 'dropboxfile') {
-    return dropboxFilePath(path ?? id);
+    return dropboxFilePath(id, name);
   }
   if (normalizedType === 'folder' || normalizedType === 'dropboxfolder') {
-    return dropboxFolderPath(path ?? id);
+    return dropboxFolderPath(id, name);
   }
   if (
     normalizedType === 'shared-folder' ||
@@ -133,11 +167,25 @@ export function computeDropboxPath(
 }
 
 export function toObjectRelayfilePath(input: ObjectPathInput): string {
-  const raw = input.path ?? input.name ?? (input.id !== undefined ? String(input.id) : '');
-  if (!raw) {
-    throw new Error('Dropbox object path requires an id, name, or path');
+  const objectId = input.id !== undefined ? String(input.id) : null;
+  const objectType = input.objectType ?? input.model ?? 'file';
+  const path = input.path ?? null;
+  const name = input.name ?? (path ? basename(path) : null);
+
+  if (!objectId) {
+    throw new Error('Dropbox object path requires an id');
   }
-  return dropboxFilePath(raw);
+
+  if (objectType.toLowerCase().includes('folder') && !objectType.toLowerCase().includes('shared')) {
+    return computeDropboxPath('folder', objectId, { path, name });
+  }
+  if (objectType.toLowerCase().includes('shared-folder')) {
+    return computeDropboxPath('shared-folder', objectId);
+  }
+  if (objectType.toLowerCase().includes('shared-link')) {
+    return computeDropboxPath('shared-link', objectId);
+  }
+  return computeDropboxPath('file', objectId, { path, name });
 }
 
 export function toLifecycleRelayfilePath(id: string | number): string {
@@ -150,13 +198,18 @@ export function parseRelayfilePath(path: string): {
   segments: string[];
 } {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  const segments = normalized
-    .split('/')
-    .filter(Boolean)
-    .map((segment) => decodeURIComponent(segment.replace(/\.json$/u, '')));
+  const rawSegments = normalized.split('/').filter(Boolean);
+  const segments = rawSegments.map((segment, index) =>
+    decodeURIComponent(
+      index === rawSegments.length - 1 ? segment.replace(/\.json$/u, '') : segment,
+    ),
+  );
 
   const lifecycleSegments = LIFECYCLE_RESOURCE_PATH.split('/').filter(Boolean);
-  if (lifecycleSegments.every((segment, index) => segment === segments[index])) {
+  if (
+    segments.length === lifecycleSegments.length + 1 &&
+    lifecycleSegments.every((segment, index) => segment === segments[index])
+  ) {
     return { resource: 'lifecycle', id: segments.at(-1) ?? null, segments };
   }
 
