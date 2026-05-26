@@ -71,3 +71,35 @@ collections:
       body:
         parent:
           database_id: '{database_id}'
+# Notion webhook event types this provider emits at runtime. These are the
+# verbatim event names the notion-relay syncs subscribe to (see cloud
+# nango-integrations/notion-relay/syncs/fetch-pages.ts PAGE_WEBHOOK_EVENTS and
+# fetch-databases.ts DATABASE_WEBHOOK_EVENTS) and are what persona trigger
+# autocomplete and deploy-time lint match against via KNOWN_TRIGGER_CATALOG.
+webhooks:
+  page.created:
+    path: /notion/pages/{page_id}.json
+  page.content_updated:
+    path: /notion/pages/{page_id}.json
+  page.properties_updated:
+    path: /notion/pages/{page_id}.json
+  page.moved:
+    path: /notion/pages/{page_id}.json
+  page.deleted:
+    path: /notion/pages/{page_id}.json
+  page.undeleted:
+    path: /notion/pages/{page_id}.json
+  page.locked:
+    path: /notion/pages/{page_id}.json
+  page.unlocked:
+    path: /notion/pages/{page_id}.json
+  database.created:
+    path: /notion/databases/{database_id}/metadata.json
+  database.schema_updated:
+    path: /notion/databases/{database_id}/metadata.json
+  database.moved:
+    path: /notion/databases/{database_id}/metadata.json
+  database.deleted:
+    path: /notion/databases/{database_id}/metadata.json
+  database.undeleted:
+    path: /notion/databases/{database_id}/metadata.json
