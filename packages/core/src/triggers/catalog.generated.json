@@ -68,6 +68,9 @@
   "dropbox": [
     "file.changed"
   ],
+  "fathom": [
+    "new-meeting-content-ready"
+  ],
   "github": [
     "check_run.completed",
     "issues.closed",
@@ -244,6 +247,21 @@
     "profile.delete",
     "profile.merge",
     "profile.update"
+  ],
+  "notion": [
+    "database.created",
+    "database.deleted",
+    "database.moved",
+    "database.schema_updated",
+    "database.undeleted",
+    "page.content_updated",
+    "page.created",
+    "page.deleted",
+    "page.locked",
+    "page.moved",
+    "page.properties_updated",
+    "page.undeleted",
+    "page.unlocked"
   ],
   "pipedrive": [
     "activity.created",

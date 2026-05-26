@@ -18,12 +18,6 @@
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
-    "packageName": "@relayfile/adapter-fathom",
-    "packagePath": "packages/fathom",
-    "provider": "fathom",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
     "packageName": "@relayfile/gcs",
     "packagePath": "packages/gcs",
     "provider": "gcs",
@@ -39,12 +33,6 @@
     "packageName": "@relayfile/adapter-granola",
     "packagePath": "packages/granola",
     "provider": "granola",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/adapter-notion",
-    "packagePath": "packages/notion",
-    "provider": "notion",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

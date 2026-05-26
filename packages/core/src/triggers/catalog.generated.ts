@@ -76,6 +76,9 @@ export const KNOWN_TRIGGER_CATALOG = {
   "dropbox": [
     "file.changed"
   ],
+  "fathom": [
+    "new-meeting-content-ready"
+  ],
   "github": [
     "check_run.completed",
     "issues.closed",
@@ -252,6 +255,21 @@ export const KNOWN_TRIGGER_CATALOG = {
     "profile.delete",
     "profile.merge",
     "profile.update"
+  ],
+  "notion": [
+    "database.created",
+    "database.deleted",
+    "database.moved",
+    "database.schema_updated",
+    "database.undeleted",
+    "page.content_updated",
+    "page.created",
+    "page.deleted",
+    "page.locked",
+    "page.moved",
+    "page.properties_updated",
+    "page.undeleted",
+    "page.unlocked"
   ],
   "pipedrive": [
     "activity.created",
@@ -453,12 +471,6 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
-    "packageName": "@relayfile/adapter-fathom",
-    "packagePath": "packages/fathom",
-    "provider": "fathom",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
     "packageName": "@relayfile/gcs",
     "packagePath": "packages/gcs",
     "provider": "gcs",
@@ -474,12 +486,6 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "packageName": "@relayfile/adapter-granola",
     "packagePath": "packages/granola",
     "provider": "granola",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/adapter-notion",
-    "packagePath": "packages/notion",
-    "provider": "notion",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

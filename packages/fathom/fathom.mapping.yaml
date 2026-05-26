@@ -1,0 +1,16 @@
+adapter:
+  name: fathom
+  version: "1.0.0"
+  baseUrl: https://api.fathom.ai
+# Fathom delivers a single webhook event when new meeting content (summary,
+# transcript, action items) becomes available. The adapter webhook-normalizer
+# canonicalizes the upstream `new_meeting_content_ready` payload to the runtime
+# event type `new-meeting-content-ready`, which is the name persona triggers and
+# deploy-time lint match against.
+webhooks:
+  new-meeting-content-ready:
+    path: /fathom/meetings/{{recording_id}}.json
+    extract:
+      - recording_id
+      - event
+      - created_at
