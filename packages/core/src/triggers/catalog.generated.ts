@@ -73,6 +73,9 @@ export const KNOWN_TRIGGER_CATALOG = {
     "space.deleted",
     "space.updated"
   ],
+  "dropbox": [
+    "file.changed"
+  ],
   "github": [
     "check_run.completed",
     "issues.closed",
@@ -446,12 +449,6 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "packageName": "@relayfile/adapter-docker-hub",
     "packagePath": "packages/docker-hub",
     "provider": "docker-hub",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/adapter-dropbox",
-    "packagePath": "packages/dropbox",
-    "provider": "dropbox",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

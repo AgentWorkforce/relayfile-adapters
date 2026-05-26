@@ -34,6 +34,12 @@ export class DropboxAdapter {
     return resolveWritebackRequest(path, content, operation);
   }
 
+  supportedEvents(): string[] {
+    // Dropbox user webhooks are account-level invalidation signals.
+    // We expose the normalized trigger used by cloud routing.
+    return ['file.changed'];
+  }
+
   mapNangoSyncRecord(record: NangoSyncRecord): StorageBridgeEvent {
     if (!this.nangoFallbackSyncName) throw new Error('Dropbox does not declare a Nango scheduled-sync fallback');
     const id = String(record.id ?? record.resourceId ?? record.path ?? 'unknown');

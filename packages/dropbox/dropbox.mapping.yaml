@@ -1,0 +1,3 @@
+webhooks:
+  file.changed:
+    description: Dropbox account-level webhook notification that one or more files/folders changed.
