@@ -36,10 +36,16 @@ function createAdapterMocks() {
     ingestReviewComment: mock.method(adapter, 'ingestReviewComment', async () =>
       createResult('/github/repos/acme/widgets/pulls/7/comments/2.json'),
     ),
+    ingestIssueComment: mock.method(adapter, 'ingestIssueComment', async () =>
+      createResult('/github/repos/acme/widgets/issues/9/comments/3.json'),
+    ),
     ingestPushCommits: mock.method(adapter, 'ingestPushCommits', async () =>
       createResult('/github/repos/acme/widgets/commits/head.json'),
     ),
     ingestIssue: mock.method(adapter, 'ingestIssue', async () =>
+      createResult('/github/repos/acme/widgets/issues/9/meta.json'),
+    ),
+    updateIssue: mock.method(adapter, 'updateIssue', async () =>
       createResult('/github/repos/acme/widgets/issues/9/meta.json'),
     ),
     closeIssue: mock.method(adapter, 'closeIssue', async () =>
@@ -139,6 +145,25 @@ describe('WebhookRouter', () => {
     assert.strictEqual(mocks.ingestCheckRun.mock.calls.length, 0);
   });
 
+  it('route calls correct handler for issue labeled', async () => {
+    const mocks = createAdapterMocks();
+    const router = new WebhookRouter(mocks.adapter);
+    const payload = {
+      action: 'labeled',
+      label: { name: 'small' },
+      repository: { full_name: 'acme/widgets' },
+      issue: { number: 9 },
+    };
+
+    const result = await router.route({ 'x-github-event': 'issues' }, payload);
+    assert.deepStrictEqual(result, createResult('/github/repos/acme/widgets/issues/9/meta.json'));
+    assert.strictEqual(mocks.updateIssue.mock.calls.length, 1);
+    assert.deepStrictEqual(mocks.updateIssue.mock.calls[0].arguments, [payload]);
+    assert.strictEqual(mocks.ingestIssue.mock.calls.length, 0);
+    assert.strictEqual(mocks.ingestPullRequest.mock.calls.length, 0);
+    assert.strictEqual(mocks.ingestCheckRun.mock.calls.length, 0);
+  });
+
   it('route calls correct handler for check_run completed', async () => {
     const mocks = createAdapterMocks();
     const router = new WebhookRouter(mocks.adapter);
@@ -189,24 +214,35 @@ describe('WebhookRouter', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.strictEqual(router.isSupported('pull_request.opened'), true);
+    assert.strictEqual(router.isSupported('pull_request.edited'), true);
+    assert.strictEqual(router.isSupported('issue_comment.created'), true);
     assert.strictEqual(router.isSupported('issues.opened'), true);
+    assert.strictEqual(router.isSupported('issues.edited'), true);
+    assert.strictEqual(router.isSupported('issues.labeled'), true);
     assert.strictEqual(router.isSupported('check_run.completed'), true);
   });
 
-  it('getSupportedEvents lists all 9 events', () => {
+  it('getSupportedEvents lists all 16 events', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.deepStrictEqual(router.getSupportedEvents(), [
       'pull_request.opened',
       'pull_request.synchronize',
+      'pull_request.edited',
+      'pull_request.reopened',
       'pull_request.closed',
       'pull_request_review.submitted',
       'pull_request_review_comment.created',
+      'issue_comment.created',
       'push',
       'issues.opened',
+      'issues.edited',
+      'issues.labeled',
+      'issues.unlabeled',
+      'issues.reopened',
       'issues.closed',
       'check_run.completed',
     ]);
-    assert.strictEqual(router.getSupportedEvents().length, 9);
+    assert.strictEqual(router.getSupportedEvents().length, 16);
   });
 });

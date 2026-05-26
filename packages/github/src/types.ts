@@ -11,11 +11,18 @@ export const GITHUB_REVIEW_SIDES = ['LEFT', 'RIGHT'] as const;
 export const DEFAULT_GITHUB_EVENTS = [
   'pull_request.opened',
   'pull_request.synchronize',
+  'pull_request.edited',
+  'pull_request.reopened',
   'pull_request.closed',
   'pull_request_review.submitted',
   'pull_request_review_comment.created',
+  'issue_comment.created',
   'push',
   'issues.opened',
+  'issues.edited',
+  'issues.labeled',
+  'issues.unlabeled',
+  'issues.reopened',
   'issues.closed',
   'check_run.completed',
 ] as const;

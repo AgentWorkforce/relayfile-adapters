@@ -17,11 +17,18 @@ import type { GitHubAdapterConfig } from './types.js';
 const DEFAULT_SUPPORTED_EVENTS = [
   'pull_request.opened', // a PR was opened — the usual entry point for review/CI agents
   'pull_request.synchronize', // new commits were pushed to an open PR (re-review / re-run CI)
+  'pull_request.edited', // PR title/body/base metadata changed
+  'pull_request.reopened', // a closed PR was reopened
   'pull_request.closed', // a PR was closed (check `merged` in the payload to tell merge from abandon)
   'pull_request_review.submitted', // someone (human or bot) submitted a review — has `review.state` (approved / changes_requested / commented)
   'pull_request_review_comment.created', // an inline review comment was added to a PR's diff
+  'issue_comment.created', // a comment was added to an issue conversation
   'push', // commits were pushed to a branch or tag (no action suffix; routed to ingestPushCommits)
   'issues.opened', // an issue was opened
+  'issues.edited', // issue title/body/metadata changed
+  'issues.labeled', // a label was added to an existing issue
+  'issues.unlabeled', // a label was removed from an existing issue
+  'issues.reopened', // a closed issue was reopened
   'issues.closed', // an issue was closed
   'check_run.completed', // a CI check finished — `check_run.conclusion` is success / failure / timed_out / cancelled / …
 ] as const;

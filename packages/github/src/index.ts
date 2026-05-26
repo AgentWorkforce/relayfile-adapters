@@ -145,7 +145,13 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async updatePullRequest(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult('pull_request.synchronize', 'pull_request', payload, 'update');
+    const action = readString(payload.action);
+    return this.createIngestResult(
+      action ? `pull_request.${action}` : 'pull_request.updated',
+      'pull_request',
+      payload,
+      'update',
+    );
   }
 
   async closePullRequest(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -175,12 +181,31 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     );
   }
 
+  async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
+    return this.createIngestResult(
+      'issue_comment.created',
+      'issue_comment',
+      payload,
+      'write',
+    );
+  }
+
   async ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult> {
     return this.createIngestResult('push', 'commit', payload, 'write');
   }
 
   async ingestIssue(payload: Record<string, unknown>): Promise<IngestResult> {
     return this.createIngestResult('issues.opened', 'issue', payload, 'write');
+  }
+
+  async updateIssue(payload: Record<string, unknown>): Promise<IngestResult> {
+    const action = readString(payload.action);
+    return this.createIngestResult(
+      action ? `issues.${action}` : 'issues.updated',
+      'issue',
+      payload,
+      'update',
+    );
   }
 
   async closeIssue(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -255,6 +280,14 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/reviews/${objectId}.json`;
       case 'review_comment':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/comments/${objectId}.json`;
+      case 'issue_comment': {
+        const issue = asRecord(payload.issue);
+        const issueNumber = readNumericLike(issue?.number);
+        if (issueNumber) {
+          return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments/${objectId}.json`;
+        }
+        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${objectId}.json`;
+      }
       case 'check_run':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/checks/${objectId}.json`;
       case 'commit':
@@ -296,6 +329,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       readNumericLike(payload.number),
       readNestedNumericLike(payload, 'pull_request', 'number'),
       readNestedNumericLike(payload, 'issue', 'number'),
+      readNestedNumericLike(payload, 'comment', 'id'),
       readNestedString(payload, 'check_run', 'id'),
       readNestedString(payload, 'pull_request', 'head', 'sha'),
       readString(payload.after),
@@ -318,6 +352,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function readNumericLike(value: unknown): string | undefined {
