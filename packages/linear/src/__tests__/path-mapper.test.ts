@@ -140,7 +140,7 @@ describe('linear path-mapper', () => {
         linearAgentWebhookEventPath('OAuthApp.revoked', 'oauth_client_123'),
         '/linear/oauth-app/oauth_client_123.json',
       );
-      assert.equal(linearAgentWebhookEventPath('OAuthApp.revoked'), '/linear/oauth-app');
+      assert.equal(linearAgentWebhookEventPath('OAuthApp.revoked'), null);
       assert.equal(linearAgentWebhookEventPath('AgentSessionEvent.unknown', 'session_123'), null);
     });
   });

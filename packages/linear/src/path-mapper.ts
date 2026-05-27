@@ -265,7 +265,7 @@ export function linearAgentWebhookEventPath(eventType: string, objectId?: string
   }
   const root = LINEAR_AGENT_WEBHOOK_PATH_ROOTS[category];
   const id = objectId?.trim();
-  return id ? `${root}/${encodeLinearPathSegment(id)}.json` : root;
+  return id ? `${root}/${encodeLinearPathSegment(id)}.json` : null;
 }
 
 export function linearIssuePath(
