@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto';
 import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+import { LINEAR_AGENT_WEBHOOK_EVENTS } from './types.js';
 
 export const LINEAR_PATH_ROOT = '/linear';
 export const LINEAR_CANONICAL_STATES = ['Todo', 'In Progress', 'Done', 'Backlog', 'Canceled'] as const;
+export const LINEAR_AGENT_WEBHOOK_PATH_ROOTS = {
+  AgentSessionEvent: `${LINEAR_PATH_ROOT}/agent-sessions`,
+  AppUserNotification: `${LINEAR_PATH_ROOT}/app-user-notifications`,
+  PermissionChange: `${LINEAR_PATH_ROOT}/permission-changes`,
+  OAuthApp: `${LINEAR_PATH_ROOT}/oauth-app`,
+} as const;
 
 export const LINEAR_OBJECT_TYPES = [
   'comment',
@@ -16,6 +23,7 @@ export const LINEAR_OBJECT_TYPES = [
 ] as const;
 
 export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
+export type LinearAgentWebhookCategory = keyof typeof LINEAR_AGENT_WEBHOOK_PATH_ROOTS;
 
 export interface NameWithIdOptions {
   existingNames?: Set<string>;
@@ -230,6 +238,34 @@ export function normalizeNangoLinearModel(model: string): LinearPathObjectType {
   const direct = NANGO_MODEL_MAP[model];
   if (direct) return direct;
   return normalizeLinearObjectType(model);
+}
+
+export function linearAgentWebhookCategory(eventType: string): LinearAgentWebhookCategory | null {
+  const category = eventType.trim().split('.')[0] ?? '';
+  return category in LINEAR_AGENT_WEBHOOK_PATH_ROOTS
+    ? category as LinearAgentWebhookCategory
+    : null;
+}
+
+export function linearAgentWebhookTriggerGlob(eventType: string): string | null {
+  if (!LINEAR_AGENT_WEBHOOK_EVENTS.includes(eventType as (typeof LINEAR_AGENT_WEBHOOK_EVENTS)[number])) {
+    return null;
+  }
+  const category = linearAgentWebhookCategory(eventType);
+  return category ? `${LINEAR_AGENT_WEBHOOK_PATH_ROOTS[category]}/**` : null;
+}
+
+export function linearAgentWebhookEventPath(eventType: string, objectId?: string | null): string | null {
+  if (!LINEAR_AGENT_WEBHOOK_EVENTS.includes(eventType as (typeof LINEAR_AGENT_WEBHOOK_EVENTS)[number])) {
+    return null;
+  }
+  const category = linearAgentWebhookCategory(eventType);
+  if (!category) {
+    return null;
+  }
+  const root = LINEAR_AGENT_WEBHOOK_PATH_ROOTS[category];
+  const id = objectId?.trim();
+  return id ? `${root}/${encodeLinearPathSegment(id)}.json` : root;
 }
 
 export function linearIssuePath(

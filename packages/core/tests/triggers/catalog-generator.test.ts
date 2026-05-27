@@ -40,6 +40,10 @@ test("catalog preserves provider-specific event names verbatim", () => {
   assert.ok(KNOWN_TRIGGER_CATALOG.github.includes("issues.labeled"));
   assert.ok(KNOWN_TRIGGER_CATALOG.gitlab.includes("note.MergeRequest"));
   assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("issue.create"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("AgentSessionEvent.created"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("AppUserNotification.issueAssignedToYou"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("PermissionChange.teamAccessChanged"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("OAuthApp.revoked"));
   assert.ok(KNOWN_TRIGGER_CATALOG.salesforce.includes("Account.created"));
   assert.ok(KNOWN_TRIGGER_CATALOG.slack.includes("message.created"));
   assert.ok(KNOWN_TRIGGER_CATALOG.stripe.includes("invoice.paid"));

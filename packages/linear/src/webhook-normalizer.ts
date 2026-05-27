@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import type { NormalizedWebhook } from './linear-adapter.js';
+import { LINEAR_AGENT_WEBHOOK_EVENTS } from './types.js';
 
 export const LINEAR_PROVIDER = 'linear';
 export const LINEAR_SIGNATURE_HEADER = 'linear-signature';
@@ -31,6 +32,12 @@ const PROVIDER_CONFIG_KEY_HEADER_KEYS = [
 const REQUEST_ID_HEADER_KEYS = ['x-request-id', 'x-correlation-id', 'x-relay-request-id'] as const;
 
 const OBJECT_TYPE_ALIASES: Readonly<Record<string, string>> = {
+  agent_session: 'agent_session',
+  agent_session_event: 'agent_session',
+  agentsession: 'agent_session',
+  agentsessionevent: 'agent_session',
+  app_user_notification: 'app_user_notification',
+  appusernotification: 'app_user_notification',
   comment: 'comment',
   comments: 'comment',
   cycle: 'cycle',
@@ -47,6 +54,10 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, string>> = {
   labels: 'label',
   milestone: 'milestone',
   milestones: 'milestone',
+  oauth_app: 'oauth_app',
+  oauthapp: 'oauth_app',
+  permission_change: 'permission_change',
+  permissionchange: 'permission_change',
   project: 'project',
   projectmilestone: 'milestone',
   projectmilestones: 'milestone',
@@ -100,10 +111,11 @@ export function normalizeLinearWebhook(
 ): NormalizedWebhook {
   const payload = parseLinearWebhookPayload(rawPayload);
   const normalizedHeaders = normalizeHeaders(headers);
-  const action = extractLinearAction(payload, rawPayload).toLowerCase();
+  const rawAction = extractLinearAction(payload, rawPayload);
+  const action = rawAction.toLowerCase();
   const objectType = extractLinearObjectType(payload, normalizedHeaders);
   const objectId = extractLinearObjectId(payload);
-  const eventType = extractLinearEventType(payload, normalizedHeaders, objectType, action);
+  const eventType = extractLinearEventType(payload, normalizedHeaders, objectType, rawAction);
   const connection = extractLinearConnectionMetadata(payload, normalizedHeaders);
 
   const normalized: NormalizedWebhook = {
@@ -250,7 +262,8 @@ export function extractLinearEventType(
   const metadata = getRecord(record.metadata);
   const webhook = getRecord(record._webhook);
   const resolvedObjectType = objectType ?? extractLinearObjectType(record, normalizedHeaders);
-  const resolvedAction = action ?? extractLinearAction(record, payload).toLowerCase();
+  const rawAction = action ?? extractLinearAction(record, payload);
+  const resolvedAction = rawAction.toLowerCase();
 
   const explicitEventType =
     readOptionalString(record.eventType) ??
@@ -261,6 +274,14 @@ export function extractLinearEventType(
     readOptionalString(webhook?.event_type);
   if (explicitEventType) {
     return canonicalizeEventType(explicitEventType, resolvedObjectType, resolvedAction);
+  }
+
+  const providerEventType = providerVerbatimAgentEventType(
+    readLinearRawType(record, normalizedHeaders),
+    rawAction,
+  );
+  if (providerEventType) {
+    return providerEventType;
   }
 
   return `${resolvedObjectType}.${resolvedAction}`;
@@ -296,19 +317,40 @@ export function extractLinearObjectId(payload: unknown): string {
   const record = parseLinearWebhookPayload(payload);
   const data = getRecord(record.data);
   const issueData = getRecord(record.issueData);
+  const agentSession = getRecord(record.agentSession);
+  const agentActivity = getRecord(record.agentActivity);
+  const notification = getRecord(record.notification);
   const metadata = getRecord(record.metadata);
   const webhook = getRecord(record._webhook);
+  const objectType = readOptionalString(record.type)
+    ? canonicalizeObjectType(readOptionalString(record.type)!)
+    : null;
+  const webhookId =
+    readOptionalString(record.webhookId) ??
+    readOptionalString(record.webhook_id);
+  const oauthClientId =
+    readOptionalString(record.oauthClientId) ??
+    readOptionalString(record.oauth_client_id);
 
   const objectId =
     readOptionalString(data?.id) ??
     readOptionalString(issueData?.id) ??
+    readOptionalString(agentSession?.id) ??
+    readOptionalString(agentActivity?.agentSessionId) ??
+    readOptionalString(agentActivity?.agent_session_id) ??
+    readOptionalString(agentActivity?.id) ??
+    readOptionalString(notification?.id) ??
     readOptionalString(record.objectId) ??
     readOptionalString(record.object_id) ??
     readOptionalString(metadata?.objectId) ??
     readOptionalString(metadata?.object_id) ??
     readOptionalString(webhook?.objectId) ??
     readOptionalString(webhook?.object_id) ??
-    readOptionalString(record.oauthClientId) ??
+    (objectType === 'oauth_app' ? oauthClientId : undefined) ??
+    webhookId ??
+    readOptionalString(record.appUserId) ??
+    readOptionalString(record.app_user_id) ??
+    oauthClientId ??
     readOptionalString(record.id);
 
   if (!objectId) {
@@ -456,6 +498,11 @@ function buildNormalizedPayload(
   normalizedPayload._webhook = compactObject({
     ...existingWebhook,
     action: normalized.action,
+    appUserId:
+      readOptionalString(payload.appUserId) ??
+      readOptionalString(payload.app_user_id) ??
+      readOptionalString(existingWebhook?.appUserId) ??
+      readOptionalString(existingWebhook?.app_user_id),
     actor: getRecord(payload.actor) ?? existingWebhook?.actor,
     createdAt: readOptionalString(payload.createdAt) ?? readOptionalString(existingWebhook?.createdAt),
     deliveryId: connection.deliveryId ?? readOptionalString(existingWebhook?.deliveryId),
@@ -582,11 +629,59 @@ function extractLinearAction(record: LinearRecord, context: unknown): string {
   return action;
 }
 
+function normalizeAgentEventToken(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function providerVerbatimAgentEventType(
+  rawType: string | undefined,
+  rawAction: string | undefined,
+): string | null {
+  if (!rawType || !rawAction) {
+    return null;
+  }
+  const normalizedType = normalizeAgentEventToken(rawType);
+  const normalizedAction = normalizeAgentEventToken(rawAction);
+  return LINEAR_AGENT_WEBHOOK_EVENTS.find((eventType) => {
+    const [category, action] = eventType.split('.');
+    return (
+      normalizeAgentEventToken(category ?? '') === normalizedType &&
+      normalizeAgentEventToken(action ?? '') === normalizedAction
+    );
+  }) ?? null;
+}
+
+function readLinearRawType(
+  record: LinearRecord,
+  normalizedHeaders: Record<string, HeaderValue>,
+): string | undefined {
+  const metadata = getRecord(record.metadata);
+  const webhook = getRecord(record._webhook);
+  return (
+    readOptionalString(record.type) ??
+    readOptionalString(record.objectType) ??
+    readOptionalString(record.object_type) ??
+    readOptionalString(normalizedHeaders[LINEAR_EVENT_HEADER]) ??
+    readOptionalString(metadata?.type) ??
+    readOptionalString(metadata?.objectType) ??
+    readOptionalString(metadata?.object_type) ??
+    readOptionalString(webhook?.objectType) ??
+    readOptionalString(webhook?.object_type)
+  );
+}
+
 function canonicalizeEventType(
   value: string,
   objectType: string,
   action: string,
 ): string {
+  const providerEventType = LINEAR_AGENT_WEBHOOK_EVENTS.find(
+    (eventType) => normalizeAgentEventToken(eventType) === normalizeAgentEventToken(value),
+  );
+  if (providerEventType) {
+    return providerEventType;
+  }
+
   const normalized = value.trim().toLowerCase();
   if (!normalized) {
     return `${objectType}.${action}`;

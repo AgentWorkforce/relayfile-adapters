@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  LINEAR_AGENT_WEBHOOK_EVENTS,
   LINEAR_WEBHOOK_ACTIONS,
   LINEAR_WEBHOOK_OBJECT_TYPES,
   type LinearAdapterConfig,
@@ -20,6 +21,23 @@ test('exports supported Linear webhook object types', () => {
 
 test('exports supported Linear webhook actions', () => {
   assert.deepEqual(LINEAR_WEBHOOK_ACTIONS, ['create', 'remove', 'update']);
+});
+
+test('exports supported Linear agent webhook events for trigger autocomplete', () => {
+  assert.deepEqual(LINEAR_AGENT_WEBHOOK_EVENTS, [
+    'AgentSessionEvent.created',
+    'AgentSessionEvent.prompted',
+    'AppUserNotification.issueMention',
+    'AppUserNotification.issueEmojiReaction',
+    'AppUserNotification.issueCommentMention',
+    'AppUserNotification.issueCommentReaction',
+    'AppUserNotification.issueAssignedToYou',
+    'AppUserNotification.issueUnassignedFromYou',
+    'AppUserNotification.issueNewComment',
+    'AppUserNotification.issueStatusChanged',
+    'PermissionChange.teamAccessChanged',
+    'OAuthApp.revoked',
+  ]);
 });
 
 test('LinearAdapterConfig remains usable as a typed contract', () => {

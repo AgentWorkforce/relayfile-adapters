@@ -213,6 +213,18 @@ export const KNOWN_TRIGGER_CATALOG = {
     "sprint.updated"
   ],
   "linear": [
+    "AgentSessionEvent.created",
+    "AgentSessionEvent.prompted",
+    "AppUserNotification.issueAssignedToYou",
+    "AppUserNotification.issueCommentMention",
+    "AppUserNotification.issueCommentReaction",
+    "AppUserNotification.issueEmojiReaction",
+    "AppUserNotification.issueMention",
+    "AppUserNotification.issueNewComment",
+    "AppUserNotification.issueStatusChanged",
+    "AppUserNotification.issueUnassignedFromYou",
+    "OAuthApp.revoked",
+    "PermissionChange.teamAccessChanged",
     "comment.create",
     "comment.remove",
     "comment.update",

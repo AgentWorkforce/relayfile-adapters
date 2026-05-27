@@ -135,6 +135,18 @@ test('LinearAdapter exposes the provider name and supported Linear webhook event
     'roadmap.create',
     'roadmap.update',
     'roadmap.remove',
+    'AgentSessionEvent.created',
+    'AgentSessionEvent.prompted',
+    'AppUserNotification.issueMention',
+    'AppUserNotification.issueEmojiReaction',
+    'AppUserNotification.issueCommentMention',
+    'AppUserNotification.issueCommentReaction',
+    'AppUserNotification.issueAssignedToYou',
+    'AppUserNotification.issueUnassignedFromYou',
+    'AppUserNotification.issueNewComment',
+    'AppUserNotification.issueStatusChanged',
+    'PermissionChange.teamAccessChanged',
+    'OAuthApp.revoked',
   ]);
 });
 
@@ -192,6 +204,31 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
       state: 'In Progress',
     },
   ]);
+});
+
+test('ingestWebhook writes Linear agent webhook events to synthetic trigger paths', async () => {
+  const client = createRecordingClient();
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'AgentSessionEvent.created',
+    objectType: 'agent_session',
+    objectId: 'session_linear_123',
+    payload: {
+      type: 'AgentSessionEvent',
+      action: 'created',
+      agentSession: { id: 'session_linear_123' },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, ['/linear/agent-sessions/session_linear_123.json']);
+  assert.equal(result.filesWritten, 1);
+  assert.match(
+    client.files.get('/linear/agent-sessions/session_linear_123.json') ?? '',
+    /AgentSessionEvent/,
+  );
 });
 
 test('ingestWebhook removes deleted issues from the best-effort linear issue index when reads are available', async () => {
