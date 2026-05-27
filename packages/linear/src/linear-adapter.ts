@@ -5,6 +5,7 @@ export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile
 import {
   computeLinearPath,
   LINEAR_PATH_ROOT,
+  linearAgentWebhookEventPath,
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearCyclePath,
@@ -33,7 +34,7 @@ import {
   linearTeamIndexRow,
   linearUserIndexRow,
 } from './queries.js';
-import { LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
+import { LINEAR_AGENT_WEBHOOK_EVENTS, LINEAR_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   LinearAdapterConfig,
   LinearComment,
@@ -49,6 +50,7 @@ import type {
   LinearUser,
   LinearWebhookPayload,
 } from './types.js';
+import { normalizeLinearWebhook } from './webhook-normalizer.js';
 
 export interface FileSemantics {
   properties?: Record<string, string>;
@@ -170,11 +172,12 @@ export class LinearAdapter extends IntegrationAdapter {
   }
 
   override supportedEvents(): string[] {
-    return SUPPORTED_EVENTS.flatMap((objectType) => [
+    const recordEvents = SUPPORTED_EVENTS.flatMap((objectType) => [
       `${objectType}.create`,
       `${objectType}.update`,
       `${objectType}.remove`,
     ]);
+    return [...recordEvents, ...LINEAR_AGENT_WEBHOOK_EVENTS];
   }
 
   override async ingestWebhook(
@@ -182,6 +185,11 @@ export class LinearAdapter extends IntegrationAdapter {
     event: NormalizedWebhook | LinearWebhookPayload
   ): Promise<IngestResult> {
     try {
+      const agentWebhook = this.normalizeAgentWebhookEvent(event);
+      if (agentWebhook) {
+        return await this.ingestAgentWebhook(workspaceId, agentWebhook);
+      }
+
       const normalized = this.normalizeEvent(event);
       const path = computeLinearPath(
         normalized.objectType,
@@ -349,6 +357,63 @@ export class LinearAdapter extends IntegrationAdapter {
 
   override computePath(objectType: string, objectId: string, title?: string): string {
     return computeLinearPath(objectType, objectId, title);
+  }
+
+  private async ingestAgentWebhook(
+    workspaceId: string,
+    normalized: NormalizedWebhook,
+  ): Promise<IngestResult> {
+    const path = linearAgentWebhookEventPath(normalized.eventType, normalized.objectId);
+    if (!path) {
+      throw new Error(`Unsupported Linear agent webhook event: ${normalized.eventType}`);
+    }
+    const content = `${JSON.stringify(normalized.payload, null, 2)}\n`;
+    const writeResult = await this.client.writeFile({
+      workspaceId,
+      path,
+      content,
+      contentType: JSON_CONTENT_TYPE,
+      semantics: {
+        properties: {
+          provider: LINEAR_PROVIDER_NAME,
+          'provider.object_id': normalized.objectId,
+          'provider.object_type': normalized.objectType,
+          'linear.webhook.event_type': normalized.eventType,
+        },
+      },
+    });
+    const counts = inferWriteCounts(normalized, writeResult, false);
+    return {
+      filesWritten: counts.filesWritten,
+      filesUpdated: counts.filesUpdated,
+      filesDeleted: 0,
+      paths: [path],
+      errors: [],
+    };
+  }
+
+  private normalizeAgentWebhookEvent(
+    event: NormalizedWebhook | LinearWebhookPayload,
+  ): NormalizedWebhook | null {
+    try {
+      const normalized = isNormalizedWebhook(event)
+        ? {
+            provider: event.provider || this.config.provider || LINEAR_PROVIDER_NAME,
+            eventType: event.eventType,
+            objectType: event.objectType,
+            objectId: event.objectId.trim(),
+            payload: event.payload,
+            ...(event.connectionId || this.config.connectionId
+              ? { connectionId: event.connectionId || this.config.connectionId }
+              : {}),
+          }
+        : normalizeLinearWebhook(event);
+      return linearAgentWebhookEventPath(normalized.eventType, normalized.objectId)
+        ? normalized
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   override computeSemantics(

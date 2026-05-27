@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   computeLinearPath,
+  linearAgentWebhookEventPath,
+  linearAgentWebhookTriggerGlob,
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
@@ -97,6 +99,49 @@ describe('linear path-mapper', () => {
       );
       const leaf = linearIssueByEditedPath('2026-05-12', 'issue/123').split('/').pop()!.replace(/\.json$/u, '');
       assert.equal(decodeURIComponent(leaf), 'issue/123');
+    });
+  });
+
+  describe('linear agent webhook paths', () => {
+    it('maps provider-verbatim trigger names to synthetic event roots', () => {
+      assert.equal(
+        linearAgentWebhookTriggerGlob('AgentSessionEvent.created'),
+        '/linear/agent-sessions/**',
+      );
+      assert.equal(
+        linearAgentWebhookTriggerGlob('AppUserNotification.issueAssignedToYou'),
+        '/linear/app-user-notifications/**',
+      );
+      assert.equal(
+        linearAgentWebhookTriggerGlob('PermissionChange.teamAccessChanged'),
+        '/linear/permission-changes/**',
+      );
+      assert.equal(
+        linearAgentWebhookTriggerGlob('OAuthApp.revoked'),
+        '/linear/oauth-app/**',
+      );
+      assert.equal(linearAgentWebhookTriggerGlob('AgentSessionEvent.unknown'), null);
+    });
+
+    it('maps runtime event payload ids to concrete synthetic event paths', () => {
+      assert.equal(
+        linearAgentWebhookEventPath('AgentSessionEvent.created', 'session/id with spaces'),
+        '/linear/agent-sessions/session%2Fid%20with%20spaces.json',
+      );
+      assert.equal(
+        linearAgentWebhookEventPath('AppUserNotification.issueAssignedToYou', 'notification_123'),
+        '/linear/app-user-notifications/notification_123.json',
+      );
+      assert.equal(
+        linearAgentWebhookEventPath('PermissionChange.teamAccessChanged', 'webhook_123'),
+        '/linear/permission-changes/webhook_123.json',
+      );
+      assert.equal(
+        linearAgentWebhookEventPath('OAuthApp.revoked', 'oauth_client_123'),
+        '/linear/oauth-app/oauth_client_123.json',
+      );
+      assert.equal(linearAgentWebhookEventPath('OAuthApp.revoked'), null);
+      assert.equal(linearAgentWebhookEventPath('AgentSessionEvent.unknown', 'session_123'), null);
     });
   });
 

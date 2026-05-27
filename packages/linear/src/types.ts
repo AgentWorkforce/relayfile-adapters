@@ -7,9 +7,24 @@ export const LINEAR_WEBHOOK_OBJECT_TYPES = [
   'roadmap',
 ] as const;
 export const LINEAR_WEBHOOK_ACTIONS = ['create', 'remove', 'update'] as const;
+export const LINEAR_AGENT_WEBHOOK_EVENTS = [
+  'AgentSessionEvent.created',
+  'AgentSessionEvent.prompted',
+  'AppUserNotification.issueMention',
+  'AppUserNotification.issueEmojiReaction',
+  'AppUserNotification.issueCommentMention',
+  'AppUserNotification.issueCommentReaction',
+  'AppUserNotification.issueAssignedToYou',
+  'AppUserNotification.issueUnassignedFromYou',
+  'AppUserNotification.issueNewComment',
+  'AppUserNotification.issueStatusChanged',
+  'PermissionChange.teamAccessChanged',
+  'OAuthApp.revoked',
+] as const;
 
 export type LinearWebhookObjectType = (typeof LINEAR_WEBHOOK_OBJECT_TYPES)[number];
 export type LinearWebhookAction = (typeof LINEAR_WEBHOOK_ACTIONS)[number];
+export type LinearAgentWebhookEvent = (typeof LINEAR_AGENT_WEBHOOK_EVENTS)[number];
 
 export type JsonPrimitive = boolean | number | null | string;
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
