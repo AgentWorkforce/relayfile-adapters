@@ -93,8 +93,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "pull_request.opened",
     "pull_request.reopened",
     "pull_request.synchronize",
+    "pull_request_review.dismissed",
+    "pull_request_review.edited",
     "pull_request_review.submitted",
     "pull_request_review_comment.created",
+    "pull_request_review_thread.resolved",
     "push"
   ],
   "gitlab": [

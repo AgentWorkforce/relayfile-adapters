@@ -49,6 +49,11 @@ class RecordingAdapter extends GitHubAdapter {
     return createResult('/github/repos/acme/widgets/pulls/7/comments/2.json');
   }
 
+  override async ingestReviewThread(payload: Record<string, unknown>): Promise<IngestResult> {
+    this.calls.push(`ingestReviewThread:${String(payload.action ?? '')}`);
+    return createResult('/github/repos/acme/widgets/pulls/7/review-threads/5.json');
+  }
+
   override async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push(`ingestIssueComment:${String(payload.action ?? '')}`);
     return createResult('/github/repos/acme/widgets/issues/9/comments/3.json');
@@ -273,7 +278,7 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
   const router = new WebhookRouter(new RecordingAdapter());
   const events = router.getSupportedEvents();
 
-  assert.equal(events.length, 16);
+  assert.equal(events.length, 19);
   assert.deepEqual(events, [
     'pull_request.opened',
     'pull_request.synchronize',
@@ -281,7 +286,10 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
     'pull_request.reopened',
     'pull_request.closed',
     'pull_request_review.submitted',
+    'pull_request_review.edited',
+    'pull_request_review.dismissed',
     'pull_request_review_comment.created',
+    'pull_request_review_thread.resolved',
     'issue_comment.created',
     'push',
     'issues.opened',

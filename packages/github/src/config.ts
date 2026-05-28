@@ -21,7 +21,10 @@ const DEFAULT_SUPPORTED_EVENTS = [
   'pull_request.reopened', // a closed PR was reopened
   'pull_request.closed', // a PR was closed (check `merged` in the payload to tell merge from abandon)
   'pull_request_review.submitted', // someone (human or bot) submitted a review — has `review.state` (approved / changes_requested / commented)
+  'pull_request_review.edited', // review body or metadata changed
+  'pull_request_review.dismissed', // a submitted review was dismissed
   'pull_request_review_comment.created', // an inline review comment was added to a PR's diff
+  'pull_request_review_thread.resolved', // a PR review thread was resolved
   'issue_comment.created', // a comment was added to an issue conversation
   'push', // commits were pushed to a branch or tag (no action suffix; routed to ingestPushCommits)
   'issues.opened', // an issue was opened
