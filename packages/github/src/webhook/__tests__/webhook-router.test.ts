@@ -36,6 +36,9 @@ function createAdapterMocks() {
     ingestReviewComment: mock.method(adapter, 'ingestReviewComment', async () =>
       createResult('/github/repos/acme/widgets/pulls/7/comments/2.json'),
     ),
+    ingestReviewThread: mock.method(adapter, 'ingestReviewThread', async () =>
+      createResult('/github/repos/acme/widgets/pulls/7/review-threads/5.json'),
+    ),
     ingestIssueComment: mock.method(adapter, 'ingestIssueComment', async () =>
       createResult('/github/repos/acme/widgets/issues/9/comments/3.json'),
     ),
@@ -222,7 +225,7 @@ describe('WebhookRouter', () => {
     assert.strictEqual(router.isSupported('check_run.completed'), true);
   });
 
-  it('getSupportedEvents lists all 16 events', () => {
+  it('getSupportedEvents lists all 19 events', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.deepStrictEqual(router.getSupportedEvents(), [
@@ -232,7 +235,10 @@ describe('WebhookRouter', () => {
       'pull_request.reopened',
       'pull_request.closed',
       'pull_request_review.submitted',
+      'pull_request_review.edited',
+      'pull_request_review.dismissed',
       'pull_request_review_comment.created',
+      'pull_request_review_thread.resolved',
       'issue_comment.created',
       'push',
       'issues.opened',
@@ -243,6 +249,6 @@ describe('WebhookRouter', () => {
       'issues.closed',
       'check_run.completed',
     ]);
-    assert.strictEqual(router.getSupportedEvents().length, 16);
+    assert.strictEqual(router.getSupportedEvents().length, 19);
   });
 });

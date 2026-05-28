@@ -98,6 +98,8 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         return `${repoPrefix}/issues/${objectId}/meta.json`;
       case 'review':
         return `${repoPrefix}/reviews/${objectId}.json`;
+      case 'review_thread':
+        return `${repoPrefix}/review-threads/${objectId}.json`;
       case 'check_run':
         return `${repoPrefix}/checks/${objectId}.json`;
       case 'commit':
@@ -164,11 +166,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestReview(payload: Record<string, unknown>): Promise<IngestResult> {
+    const action = readString(payload.action);
     return this.createIngestResult(
-      'pull_request_review.submitted',
+      action ? `pull_request_review.${action}` : 'pull_request_review.submitted',
       'review',
       payload,
-      'write',
+      action === 'submitted' || !action ? 'write' : 'update',
     );
   }
 
@@ -178,6 +181,16 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       'review_comment',
       payload,
       'write',
+    );
+  }
+
+  async ingestReviewThread(payload: Record<string, unknown>): Promise<IngestResult> {
+    const action = readString(payload.action);
+    return this.createIngestResult(
+      action ? `pull_request_review_thread.${action}` : 'pull_request_review_thread.resolved',
+      'review_thread',
+      payload,
+      'update',
     );
   }
 
@@ -280,6 +293,14 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/reviews/${objectId}.json`;
       case 'review_comment':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/comments/${objectId}.json`;
+      case 'review_thread': {
+        const pullRequest = asRecord(payload.pull_request);
+        const pullNumber = readNumericLike(pullRequest?.number);
+        if (pullNumber) {
+          return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}/review-threads/${objectId}.json`;
+        }
+        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/review-threads/${objectId}.json`;
+      }
       case 'issue_comment': {
         const issue = asRecord(payload.issue);
         const issueNumber = readNumericLike(issue?.number);
@@ -325,6 +346,9 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
   private resolveObjectId(objectType: string, payload: Record<string, unknown>): string {
     const candidates = [
+      objectType === 'review' ? readNestedNumericLike(payload, 'review', 'id') : undefined,
+      objectType === 'review_comment' ? readNestedNumericLike(payload, 'comment', 'id') : undefined,
+      objectType === 'review_thread' ? readNestedNumericLike(payload, 'thread', 'id') : undefined,
       readNumericLike(payload.id),
       readNumericLike(payload.number),
       readNestedNumericLike(payload, 'pull_request', 'number'),

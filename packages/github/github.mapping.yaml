@@ -14,6 +14,16 @@ webhooks:
       - pull_request.state
   pull_request_review:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.submitted:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.dismissed:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review_comment.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/comments/{{comment.id}}.json
+  pull_request_review_thread.resolved:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/review-threads/{{thread.id}}.json
   issue_comment.created:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}.json
     extract:
