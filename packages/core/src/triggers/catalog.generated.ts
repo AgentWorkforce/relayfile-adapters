@@ -390,8 +390,26 @@ export const KNOWN_TRIGGER_CATALOG = {
     "product.update"
   ],
   "slack": [
+    "channel.archived",
+    "channel.created",
+    "channel.deleted",
+    "channel.member_joined",
+    "channel.member_left",
+    "channel.renamed",
+    "channel.unarchived",
+    "group.archived",
+    "group.deleted",
+    "group.renamed",
+    "group.unarchived",
     "message",
-    "reaction_added"
+    "message.created",
+    "message.deleted",
+    "message.updated",
+    "reaction.added",
+    "reaction.removed",
+    "reaction_added",
+    "user.changed",
+    "user.joined"
   ],
   "stripe": [
     "charge.failed",
