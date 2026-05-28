@@ -56,6 +56,24 @@ export async function generateTriggerCatalog(repoRoot?: string): Promise<Trigger
   const adaptersWithoutKnownTriggers: AdapterWithoutKnownTriggers[] = [];
 
   for (const adapterPackage of packages) {
+    const mappingEvents = await readMappingWebhookEvents(repoRoot, adapterPackage);
+    if (mappingEvents.events.length > 0 && mappingEvents.source === "core.mapping.webhooks") {
+      // Storage-bridge adapters can keep their webhook contract only in
+      // packages/core/mappings. Those keys are the runtime event names and
+      // intentionally override adapter supportedEvents() fallbacks.
+      entries.push({
+        provider: adapterPackage.provider,
+        events: mappingEvents.events,
+      });
+      sources.push({
+        packageName: adapterPackage.packageName,
+        packagePath: adapterPackage.relativePath,
+        provider: adapterPackage.provider,
+        source: "mapping.webhooks",
+      });
+      continue;
+    }
+
     const supportedEvents = await readSupportedEvents(adapterPackage);
     if (supportedEvents.events.length > 0) {
       entries.push({
@@ -71,11 +89,10 @@ export async function generateTriggerCatalog(repoRoot?: string): Promise<Trigger
       continue;
     }
 
-    const mappingEvents = await readMappingWebhookEvents(adapterPackage.dir);
-    if (mappingEvents.length > 0) {
+    if (mappingEvents.events.length > 0) {
       entries.push({
         provider: adapterPackage.provider,
-        events: mappingEvents,
+        events: mappingEvents.events,
       });
       sources.push({
         packageName: adapterPackage.packageName,
@@ -292,12 +309,45 @@ async function firstExistingPath(paths: string[]): Promise<string | undefined> {
   return undefined;
 }
 
-async function readMappingWebhookEvents(packageDir: string): Promise<string[]> {
+type MappingWebhookEvents = {
+  events: string[];
+  source?: "package.mapping.webhooks" | "core.mapping.webhooks";
+};
+
+async function readMappingWebhookEvents(
+  repoRoot: string,
+  adapterPackage: AdapterPackage
+): Promise<MappingWebhookEvents> {
+  const packageEvents = await readMappingWebhookEventsFromDir(adapterPackage.dir);
+  if (packageEvents.length > 0) {
+    return { events: packageEvents, source: "package.mapping.webhooks" };
+  }
+
+  const coreMappingDir = join(repoRoot, "packages", "core", "mappings");
+  const coreEvents = await readMappingWebhookEventsFromFiles([
+    join(coreMappingDir, `${adapterPackage.provider}.mapping.yaml`),
+  ]);
+  return {
+    events: coreEvents,
+    ...(coreEvents.length > 0 ? { source: "core.mapping.webhooks" as const } : {}),
+  };
+}
+
+async function readMappingWebhookEventsFromDir(packageDir: string): Promise<string[]> {
   const filenames = (await readdir(packageDir)).filter((name) => name.endsWith(".mapping.yaml")).sort();
+  return readMappingWebhookEventsFromFiles(filenames.map((filename) => join(packageDir, filename)));
+}
+
+async function readMappingWebhookEventsFromFiles(paths: string[]): Promise<string[]> {
   const events = new Set<string>();
 
-  for (const filename of filenames) {
-    const contents = await readFile(join(packageDir, filename), "utf8");
+  for (const path of paths) {
+    let contents: string;
+    try {
+      contents = await readFile(path, "utf8");
+    } catch {
+      continue;
+    }
     const parsed = YAML.parse(contents) as { webhooks?: unknown } | null;
     if (!parsed || !isRecord(parsed.webhooks)) {
       continue;
