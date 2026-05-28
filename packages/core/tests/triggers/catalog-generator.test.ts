@@ -45,7 +45,9 @@ test("catalog preserves provider-specific event names verbatim", () => {
   assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("PermissionChange.teamAccessChanged"));
   assert.ok(KNOWN_TRIGGER_CATALOG.linear.includes("OAuthApp.revoked"));
   assert.ok(KNOWN_TRIGGER_CATALOG.salesforce.includes("Account.created"));
-  assert.ok(KNOWN_TRIGGER_CATALOG.slack.includes("message.created"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.slack.includes("message"));
+  assert.ok(KNOWN_TRIGGER_CATALOG.slack.includes("reaction_added"));
+  assert.equal((KNOWN_TRIGGER_CATALOG.slack as readonly string[]).includes("message.created"), false);
   assert.ok(KNOWN_TRIGGER_CATALOG.stripe.includes("invoice.paid"));
   assert.ok(KNOWN_TRIGGER_CATALOG.fathom.includes("new-meeting-content-ready"));
   assert.ok(KNOWN_TRIGGER_CATALOG.notion.includes("page.created"));
