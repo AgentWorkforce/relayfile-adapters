@@ -57,24 +57,9 @@ export async function generateTriggerCatalog(repoRoot?: string): Promise<Trigger
 
   for (const adapterPackage of packages) {
     const mappingEvents = await readMappingWebhookEvents(repoRoot, adapterPackage);
-    if (mappingEvents.events.length > 0 && mappingEvents.source === "core.mapping.webhooks") {
-      // Storage-bridge adapters can keep their webhook contract only in
-      // packages/core/mappings. Those keys are the runtime event names and
-      // intentionally override adapter supportedEvents() fallbacks.
-      entries.push({
-        provider: adapterPackage.provider,
-        events: mappingEvents.events,
-      });
-      sources.push({
-        packageName: adapterPackage.packageName,
-        packagePath: adapterPackage.relativePath,
-        provider: adapterPackage.provider,
-        source: "mapping.webhooks",
-      });
-      continue;
-    }
-
     const supportedEvents = await readSupportedEvents(adapterPackage);
+    let hasKnownTriggers = false;
+
     if (supportedEvents.events.length > 0) {
       entries.push({
         provider: supportedEvents.provider,
@@ -86,6 +71,28 @@ export async function generateTriggerCatalog(repoRoot?: string): Promise<Trigger
         provider: supportedEvents.provider,
         source: "supportedEvents",
       });
+      hasKnownTriggers = true;
+    }
+
+    if (mappingEvents.events.length > 0 && mappingEvents.source === "core.mapping.webhooks") {
+      // Storage-bridge adapters can keep runtime-only webhook names in
+      // mapping.yaml. Merge those keys with supportedEvents() rather than
+      // replacing either source; personas may use names from both contracts.
+      const provider = supportedEvents.events.length > 0 ? supportedEvents.provider : adapterPackage.provider;
+      entries.push({
+        provider,
+        events: mappingEvents.events,
+      });
+      sources.push({
+        packageName: adapterPackage.packageName,
+        packagePath: adapterPackage.relativePath,
+        provider,
+        source: "mapping.webhooks",
+      });
+      hasKnownTriggers = true;
+    }
+
+    if (hasKnownTriggers) {
       continue;
     }
 
