@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-granola",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Granola adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -55,7 +55,7 @@
     "directory": "packages/granola"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.24"
+    "@relayfile/adapter-core": "^0.3.25"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
