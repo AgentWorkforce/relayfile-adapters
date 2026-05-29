@@ -525,6 +525,12 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
+    "packageName": "@relayfile/adapter-reddit",
+    "packagePath": "packages/reddit",
+    "provider": "reddit",
+    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
+  },
+  {
     "packageName": "@relayfile/redis",
     "packagePath": "packages/redis",
     "provider": "redis",
