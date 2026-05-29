@@ -1,0 +1,13 @@
+adapter:
+  name: granola
+  version: "1.0.0"
+  baseUrl: https://api.granola.ai
+webhooks:
+  recording.created:
+    path: /granola/notes/{{id}}.json
+    extract:
+      - id
+      - title
+      - created_at
+      - updated_at
+      - web_url

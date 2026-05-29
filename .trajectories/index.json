@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-20T08:35:35.464Z",
+  "lastUpdated": "2026-05-27T12:31:51.909Z",
   "trajectories": {
     "traj_xasxdv23opdv": {
       "title": "review-loop-mpb8lp2z-2-workflow",
@@ -484,6 +484,19 @@
       "startedAt": "2026-05-20T08:32:18.094Z",
       "completedAt": "2026-05-20T08:35:35.353Z",
       "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters-issue-780/.trajectories/completed/2026-05/traj_byowegp53lxj.json"
+    },
+    "traj_wvijp7pego7b": {
+      "title": "Address PR 99 review comments and conflicts",
+      "status": "active",
+      "startedAt": "2026-05-18T18:35:26.723Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/active/traj_wvijp7pego7b.json"
+    },
+    "traj_cq7dr26mnlmu": {
+      "title": "Review and harden X adapter and Cloud integration PRs",
+      "status": "completed",
+      "startedAt": "2026-05-18T14:41:00.158Z",
+      "completedAt": "2026-05-18T15:09:16.606Z",
+      "path": "/Users/khaliqgant/Projects/AgentWorkforce/relayfile-adapters/.trajectories/completed/2026-05/traj_cq7dr26mnlmu.json"
     }
   }
 }
