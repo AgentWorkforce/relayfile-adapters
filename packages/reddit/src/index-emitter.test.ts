@@ -17,3 +17,12 @@ test('redditSubredditIndexRow uses deterministic timestamp from created_utc when
   });
   assert.equal(row.updated, '2023-11-14T22:13:20.000Z');
 });
+
+test('redditSubredditIndexRow falls back when created_utc is not finite', () => {
+  const row = redditSubredditIndexRow({
+    id: 'agentrelay',
+    name: 'agentrelay',
+    created_utc: Number.POSITIVE_INFINITY,
+  });
+  assert.match(row.updated, /^\d{4}-\d{2}-\d{2}T/);
+});

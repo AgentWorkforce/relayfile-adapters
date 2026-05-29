@@ -40,6 +40,8 @@ export type RedditDeletedRecord = {
   id: string;
   _deleted: true;
   objectType: 'subreddit' | 'post';
+  subreddit?: string;
+  post_id?: string;
 };
 
 export type RedditSubredditEmitRecord = RedditSubreddit | RedditDeletedRecord;
@@ -174,11 +176,19 @@ async function planPostRecord(
   connectionId: string | undefined,
 ): Promise<EmitPlan> {
   if (isDeleted(record)) {
-    const scoped = parseRedditPostScopedId(record.id);
+    const scoped = await resolveDeletedPostScope(client, workspaceId, record);
+    if (!scoped) {
+      index.remove(record.id);
+      return { deletes: [] };
+    }
+
+    const scopedId = `${scoped.subreddit}/${scoped.postId}`;
     const byIdAliasPath = redditPostByIdAliasPath(scoped.subreddit, scoped.postId);
     const canonicalPath = await canonicalPathFromAlias(client, workspaceId, byIdAliasPath);
     index.remove(record.id);
+    index.remove(scopedId);
     subredditIndex(scoped.subreddit).remove(record.id);
+    subredditIndex(scoped.subreddit).remove(scopedId);
     return {
       deletes: staleDeletes([
         canonicalPath ?? redditPostPath(scoped.subreddit, scoped.postId),
@@ -224,6 +234,73 @@ async function planPostRecord(
       ...(status === 'deleted' ? [] : [redditPostByStatusAliasPath('deleted', normalizedSubreddit, record.post_id)]),
     ]),
   };
+}
+
+async function resolveDeletedPostScope(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  record: RedditDeletedRecord,
+): Promise<{ subreddit: string; postId: string } | undefined> {
+  const rawId = record.id.trim();
+  if (!rawId) {
+    return undefined;
+  }
+
+  try {
+    return parseRedditPostScopedId(rawId);
+  } catch {
+    // fall through: some tombstones only carry an unscoped post id.
+  }
+
+  if (record.subreddit) {
+    return {
+      subreddit: normalizeSubreddit(record.subreddit),
+      postId: typeof record.post_id === 'string' && record.post_id.trim() ? record.post_id.trim() : rawId,
+    };
+  }
+
+  if (!client.readFile) {
+    return undefined;
+  }
+
+  try {
+    const read = await client.readFile({ workspaceId, path: redditPostsIndexPath() });
+    if (!read?.content) {
+      return undefined;
+    }
+    const parsed = JSON.parse(read.content) as unknown;
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    for (const row of parsed) {
+      if (!row || typeof row !== 'object') continue;
+      const entry = row as { id?: unknown; subreddit?: unknown };
+      if (typeof entry.id !== 'string') continue;
+
+      const id = entry.id.trim();
+      if (!id) continue;
+
+      if (id === rawId && typeof entry.subreddit === 'string' && entry.subreddit.trim()) {
+        return {
+          subreddit: normalizeSubreddit(entry.subreddit),
+          postId: rawId,
+        };
+      }
+
+      if (id === rawId || id.endsWith(`/${rawId}`)) {
+        try {
+          return parseRedditPostScopedId(id);
+        } catch {
+          // keep looking through the index for another compatible row.
+        }
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
 }
 
 function classifyRecords(records: readonly (RedditSubreddit | RedditPost | RedditDeletedRecord)[]): {

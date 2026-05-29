@@ -99,6 +99,23 @@ test('post tombstones delete canonical file path resolved from by-id alias paylo
   assert.ok(client.deletes.some((entry) => entry.path === byIdAlias));
 });
 
+test('post tombstones accept unscoped ids when subreddit context is provided', async () => {
+  const byIdAlias = redditPostByIdAliasPath('agentrelay', 'abc123');
+  const canonical = '/reddit/subreddits/agentrelay/posts/hello-world__abc123.json';
+  const client = createClient({
+    [byIdAlias]: JSON.stringify({ canonicalPath: canonical }),
+  });
+
+  const result = await emitRedditAuxiliaryFiles(client, {
+    workspaceId: 'ws-1',
+    posts: [{ id: 'abc123', subreddit: 'r/AgentRelay', _deleted: true, objectType: 'post' }],
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.ok(client.deletes.some((entry) => entry.path === canonical));
+  assert.ok(client.deletes.some((entry) => entry.path === byIdAlias));
+});
+
 test('post upserts do not require scoped id format', async () => {
   const client = createClient();
   const result = await emitRedditAuxiliaryFiles(client, {

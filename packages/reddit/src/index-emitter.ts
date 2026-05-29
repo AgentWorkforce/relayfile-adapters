@@ -56,24 +56,30 @@ export function buildRedditSubredditPostsIndexFile(subreddit: string, rows: read
 }
 
 export function redditSubredditIndexRow(record: RedditSubreddit): RedditSubredditIndexRow {
+  const createdUtc = typeof record.created_utc === 'number' && Number.isFinite(record.created_utc)
+    ? record.created_utc
+    : undefined;
   return {
     id: record.name,
     title: record.title ?? record.display_name_prefixed ?? record.name,
     updated:
-      typeof record.created_utc === 'number'
-        ? new Date(record.created_utc * 1000).toISOString()
+      createdUtc !== undefined
+        ? new Date(createdUtc * 1000).toISOString()
         : new Date().toISOString(),
     ...(typeof record.subscribers === 'number' ? { subscribers: record.subscribers } : {}),
   };
 }
 
 export function redditPostIndexRow(record: RedditPost): RedditPostIndexRow {
+  const createdUtc = typeof record.created_utc === 'number' && Number.isFinite(record.created_utc)
+    ? record.created_utc
+    : undefined;
   return {
     id: record.id,
     title: record.title,
     updated:
-      typeof record.created_utc === 'number'
-        ? new Date(record.created_utc * 1000).toISOString()
+      createdUtc !== undefined
+        ? new Date(createdUtc * 1000).toISOString()
         : new Date().toISOString(),
     subreddit: record.subreddit,
     ...(typeof record.score === 'number' ? { score: record.score } : {}),
