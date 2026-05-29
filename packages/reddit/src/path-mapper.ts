@@ -15,7 +15,7 @@ function encodeSegment(value: string): string {
   return encodeURIComponent(trimmed);
 }
 
-function normalizeSubreddit(value: string): string {
+export function normalizeSubreddit(value: string): string {
   const trimmed = value.trim().replace(/^r\//i, '').toLowerCase();
   if (!trimmed) {
     throw new Error('Reddit subreddit must be non-empty');
@@ -47,8 +47,38 @@ function parseScopedPostId(id: string): { subreddit: string; postId: string } {
   throw new Error('Expected reddit post id in "subreddit/post_id" format');
 }
 
+function parsePostIdWithOptionalScope(
+  id: string,
+  fallbackSubreddit?: string,
+): { subreddit: string; postId: string } {
+  const trimmed = id.trim();
+  if (!trimmed) {
+    throw new Error('Reddit post id must be non-empty');
+  }
+  const divider = trimmed.indexOf('/');
+  if (divider > 0) {
+    return {
+      subreddit: normalizeSubreddit(trimmed.slice(0, divider)),
+      postId: trimmed.slice(divider + 1).trim(),
+    };
+  }
+
+  if (fallbackSubreddit) {
+    return {
+      subreddit: normalizeSubreddit(fallbackSubreddit),
+      postId: trimmed,
+    };
+  }
+
+  throw new Error('Expected reddit post id in "subreddit/post_id" format when subreddit is not provided');
+}
+
 export function redditLayoutPath(): string {
   return `${REDDIT_PATH_ROOT}/LAYOUT.md`;
+}
+
+export function redditRootIndexPath(): string {
+  return `${REDDIT_PATH_ROOT}/_index.json`;
 }
 
 export function redditSubredditsIndexPath(): string {
@@ -104,9 +134,8 @@ export function computeRedditPath(
     return redditSubredditPath(id);
   }
 
-  const scoped = parseScopedPostId(id);
-  const subreddit = input.subreddit ? normalizeSubreddit(input.subreddit) : scoped.subreddit;
-  return redditPostPath(subreddit, scoped.postId, input.title);
+  const scoped = parsePostIdWithOptionalScope(id, input.subreddit);
+  return redditPostPath(scoped.subreddit, scoped.postId, input.title);
 }
 
 export function computeRedditPathFromModel(

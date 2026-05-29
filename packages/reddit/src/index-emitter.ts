@@ -1,5 +1,6 @@
 import {
   redditPostsIndexPath,
+  redditRootIndexPath,
   redditSubredditPostsIndexPath,
   redditSubredditsIndexPath,
 } from './path-mapper.js';
@@ -21,7 +22,7 @@ function sortRows<T extends { updated?: string; id: string }>(rows: readonly T[]
 
 export function buildRedditRootIndexFile() {
   return {
-    path: `${'/reddit'}/_index.json`,
+    path: redditRootIndexPath(),
     contentType: 'application/json; charset=utf-8',
     content: json([
       { id: 'subreddits', path: '/reddit/subreddits' },
@@ -58,7 +59,10 @@ export function redditSubredditIndexRow(record: RedditSubreddit): RedditSubreddi
   return {
     id: record.name,
     title: record.title ?? record.display_name_prefixed ?? record.name,
-    updated: new Date().toISOString(),
+    updated:
+      typeof record.created_utc === 'number'
+        ? new Date(record.created_utc * 1000).toISOString()
+        : new Date().toISOString(),
     ...(typeof record.subscribers === 'number' ? { subscribers: record.subscribers } : {}),
   };
 }

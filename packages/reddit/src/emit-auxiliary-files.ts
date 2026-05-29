@@ -20,6 +20,7 @@ import {
 } from './index-emitter.js';
 import { redditLayoutPromptFile } from './layout-prompt.js';
 import {
+  normalizeSubreddit,
   parseRedditPostScopedId,
   redditPostByIdAliasPath,
   redditPostByStatusAliasPath,
@@ -81,8 +82,8 @@ export async function emitRedditAuxiliaryFiles(
   accumulate(aggregate, await runEmitBatch(client, workspaceId, subreddits, (record) =>
     planSubredditRecord(record, subredditIndex, input.connectionId),
   ));
-  accumulate(aggregate, await runEmitBatch(client, workspaceId, posts, (record) =>
-    planPostRecord(record, postIndex, getSubredditPostIndex, input.connectionId),
+  accumulate(aggregate, await runEmitBatch(client, workspaceId, posts, async (record) =>
+    planPostRecord(client, workspaceId, record, postIndex, getSubredditPostIndex, input.connectionId),
   ));
 
   for (const reconciler of [subredditIndex, postIndex, ...subredditPostIndexes.values()]) {
@@ -94,15 +95,16 @@ export async function emitRedditAuxiliaryFiles(
   return aggregate;
 
   function getSubredditPostIndex(subreddit: string): IndexFileReconciler<RedditPostIndexRow> {
-    let reconciler = subredditPostIndexes.get(subreddit);
+    const normalizedSubreddit = normalizeSubreddit(subreddit);
+    let reconciler = subredditPostIndexes.get(normalizedSubreddit);
     if (!reconciler) {
       reconciler = new IndexFileReconciler<RedditPostIndexRow>({
         client,
         workspaceId,
-        path: redditSubredditPostsIndexPath(subreddit),
-        builder: (rows) => buildRedditSubredditPostsIndexFile(subreddit, rows),
+        path: redditSubredditPostsIndexPath(normalizedSubreddit),
+        builder: (rows) => buildRedditSubredditPostsIndexFile(normalizedSubreddit, rows),
       });
-      subredditPostIndexes.set(subreddit, reconciler);
+      subredditPostIndexes.set(normalizedSubreddit, reconciler);
     }
     return reconciler;
   }
@@ -133,8 +135,7 @@ function planSubredditRecord(
   index: IndexFileReconciler<RedditSubredditIndexRow>,
   connectionId: string | undefined,
 ): EmitPlan {
-  const id = record.id;
-  const subreddit = id.trim().toLowerCase();
+  const subreddit = normalizeSubreddit(isDeleted(record) ? record.id : record.name);
   if (isDeleted(record)) {
     index.remove(subreddit);
     return {
@@ -145,39 +146,43 @@ function planSubredditRecord(
     };
   }
 
-  const row = redditSubredditIndexRow(record);
+  const row = { ...redditSubredditIndexRow(record), id: subreddit };
   index.upsert(row);
-  const canonicalPath = redditSubredditPath(record.name);
-  const content = json(recordEnvelope('subreddit', record.id, canonicalPath, redditSubredditTitle(record), record, connectionId));
+  const canonicalPath = redditSubredditPath(subreddit);
+  const content = json(recordEnvelope('subreddit', subreddit, canonicalPath, redditSubredditTitle(record), record, connectionId));
   const semantics = {
     properties: {
       provider: REDDIT_PROVIDER_NAME,
       'reddit.object_type': 'subreddit',
-      'reddit.subreddit': record.name,
+      'reddit.subreddit': subreddit,
     },
   };
   return {
     writes: [
       mirrorWrite(canonicalPath, content, semantics),
-      mirrorWrite(redditSubredditByIdAliasPath(record.name), content, semantics),
+      mirrorWrite(redditSubredditByIdAliasPath(subreddit), content, semantics),
     ],
   };
 }
 
-function planPostRecord(
+async function planPostRecord(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
   record: RedditPostEmitRecord,
   index: IndexFileReconciler<RedditPostIndexRow>,
   subredditIndex: (subreddit: string) => IndexFileReconciler<RedditPostIndexRow>,
   connectionId: string | undefined,
-): EmitPlan {
-  const scoped = parseRedditPostScopedId(record.id);
+): Promise<EmitPlan> {
   if (isDeleted(record)) {
+    const scoped = parseRedditPostScopedId(record.id);
+    const byIdAliasPath = redditPostByIdAliasPath(scoped.subreddit, scoped.postId);
+    const canonicalPath = await canonicalPathFromAlias(client, workspaceId, byIdAliasPath);
     index.remove(record.id);
     subredditIndex(scoped.subreddit).remove(record.id);
     return {
       deletes: staleDeletes([
-        redditPostPath(scoped.subreddit, scoped.postId),
-        redditPostByIdAliasPath(scoped.subreddit, scoped.postId),
+        canonicalPath ?? redditPostPath(scoped.subreddit, scoped.postId),
+        byIdAliasPath,
         redditPostByStatusAliasPath('active', scoped.subreddit, scoped.postId),
         redditPostByStatusAliasPath('locked', scoped.subreddit, scoped.postId),
         redditPostByStatusAliasPath('archived', scoped.subreddit, scoped.postId),
@@ -187,18 +192,19 @@ function planPostRecord(
     };
   }
 
+  const normalizedSubreddit = normalizeSubreddit(record.subreddit);
   const row = redditPostIndexRow(record);
   index.upsert(row);
-  subredditIndex(record.subreddit).upsert(row);
+  subredditIndex(normalizedSubreddit).upsert(row);
 
-  const canonicalPath = redditPostPath(record.subreddit, record.post_id, redditPostTitle(record));
+  const canonicalPath = redditPostPath(normalizedSubreddit, record.post_id, redditPostTitle(record));
   const content = json(recordEnvelope('post', record.id, canonicalPath, redditPostTitle(record), record, connectionId));
   const status = (record.status ?? 'active').toLowerCase();
   const semantics = {
     properties: {
       provider: REDDIT_PROVIDER_NAME,
       'reddit.object_type': 'post',
-      'reddit.subreddit': record.subreddit,
+      'reddit.subreddit': normalizedSubreddit,
       'reddit.post_id': record.post_id,
       'reddit.status': status,
     },
@@ -207,15 +213,15 @@ function planPostRecord(
   return {
     writes: [
       mirrorWrite(canonicalPath, content, semantics),
-      mirrorWrite(redditPostByIdAliasPath(record.subreddit, record.post_id), content, semantics),
-      mirrorWrite(redditPostByStatusAliasPath(status, record.subreddit, record.post_id), content, semantics),
+      mirrorWrite(redditPostByIdAliasPath(normalizedSubreddit, record.post_id), content, semantics),
+      mirrorWrite(redditPostByStatusAliasPath(status, normalizedSubreddit, record.post_id), content, semantics),
     ],
     deletes: staleDeletes([
-      ...(status === 'active' ? [] : [redditPostByStatusAliasPath('active', record.subreddit, record.post_id)]),
-      ...(status === 'locked' ? [] : [redditPostByStatusAliasPath('locked', record.subreddit, record.post_id)]),
-      ...(status === 'archived' ? [] : [redditPostByStatusAliasPath('archived', record.subreddit, record.post_id)]),
-      ...(status === 'removed' ? [] : [redditPostByStatusAliasPath('removed', record.subreddit, record.post_id)]),
-      ...(status === 'deleted' ? [] : [redditPostByStatusAliasPath('deleted', record.subreddit, record.post_id)]),
+      ...(status === 'active' ? [] : [redditPostByStatusAliasPath('active', normalizedSubreddit, record.post_id)]),
+      ...(status === 'locked' ? [] : [redditPostByStatusAliasPath('locked', normalizedSubreddit, record.post_id)]),
+      ...(status === 'archived' ? [] : [redditPostByStatusAliasPath('archived', normalizedSubreddit, record.post_id)]),
+      ...(status === 'removed' ? [] : [redditPostByStatusAliasPath('removed', normalizedSubreddit, record.post_id)]),
+      ...(status === 'deleted' ? [] : [redditPostByStatusAliasPath('deleted', normalizedSubreddit, record.post_id)]),
     ]),
   };
 }
@@ -285,6 +291,32 @@ function staleDeletes(paths: Array<string | null | undefined>) {
   return paths
     .filter((path): path is string => Boolean(path))
     .map((path) => ({ path }));
+}
+
+async function canonicalPathFromAlias(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aliasPath: string,
+): Promise<string | undefined> {
+  if (!client.readFile) {
+    return undefined;
+  }
+  try {
+    const read = await client.readFile({ workspaceId, path: aliasPath });
+    if (!read?.content) {
+      return undefined;
+    }
+    const parsed = JSON.parse(read.content) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      return undefined;
+    }
+    const canonicalPath = (parsed as { canonicalPath?: unknown }).canonicalPath;
+    return typeof canonicalPath === 'string' && canonicalPath.length > 0
+      ? canonicalPath
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function isDeleted(record: RedditSubredditEmitRecord | RedditPostEmitRecord): record is RedditDeletedRecord {
