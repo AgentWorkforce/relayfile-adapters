@@ -30,6 +30,11 @@
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",
       "default": "./dist/writeback.js"
+    },
+    "./proactive-review": {
+      "types": "./dist/proactive/review-adapter.github.d.ts",
+      "import": "./dist/proactive/review-adapter.github.js",
+      "default": "./dist/proactive/review-adapter.github.js"
     }
   },
   "files": [
