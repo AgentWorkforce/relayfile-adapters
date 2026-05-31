@@ -117,7 +117,7 @@ describe('GithubProactiveReviewAdapter', () => {
     assert.strictEqual(adapter.classifyMergeState({ mergeable_state: 'unknown' }), 'unknown');
   });
 
-  it('exposes GitHub scope globs and self-trigger identities', () => {
+  it('exposes GitHub scope globs and caller-supplied self-trigger identities', () => {
     const { adapter } = createAdapter();
 
     assert.deepStrictEqual(adapter.scopePaths(), {
@@ -126,13 +126,18 @@ describe('GithubProactiveReviewAdapter', () => {
     });
     assert.deepStrictEqual(
       adapter.selfBotIdentity('review', {
-        metadata: { app: { slug: 'agent-relay-bot' } },
+        selfBotIdentities: { review: { login: 'reviewer-app[bot]' } },
       }),
-      { login: 'agent-relay-bot[bot]' },
+      { login: 'reviewer-app[bot]' },
     );
-    assert.deepStrictEqual(adapter.selfBotIdentity('autofix', {}), {
-      login: 'relay-conflict-autofix[bot]',
-    });
+    assert.deepStrictEqual(
+      adapter.selfBotIdentity('autofix', {
+        selfBotIdentities: { autofix: 'autofix-app[bot]' },
+      }),
+      { login: 'autofix-app[bot]' },
+    );
+    assert.strictEqual(adapter.selfBotIdentity('review', {}), null);
+    assert.strictEqual(adapter.selfBotIdentity('autofix', {}), null);
     assert.deepStrictEqual(adapter.selfTriggerEvents('review'), [
       'pull_request.synchronize',
       'pull_request_review.submitted',

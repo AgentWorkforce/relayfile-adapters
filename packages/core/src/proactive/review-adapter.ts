@@ -11,10 +11,21 @@ export type PathOrPayload =
 
 export type ChangeRequestMergeState = "clean" | "dirty" | "unknown" | "blocked";
 
+export type SelfBotKind = "review" | "autofix";
+
+export interface SelfBotIdentity {
+  login: string;
+}
+
 export interface IntegrationMeta {
   connectionId?: string;
   providerConfigKey?: string;
   sourceName?: string;
+  /**
+   * Caller-owned bot identities used for self-trigger suppression. Provider
+   * adapters must not bake in product-specific bot names.
+   */
+  selfBotIdentities?: Partial<Record<SelfBotKind, SelfBotIdentity | string>>;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -100,10 +111,10 @@ export interface ProactiveReviewAdapter {
   classifyChangeRequest(payload: unknown): ChangeRequestContext | null;
   classifyMergeState(detail: unknown): ChangeRequestMergeState;
   selfBotIdentity(
-    kind: "review" | "autofix",
+    kind: SelfBotKind,
     integration: IntegrationMeta,
-  ): { login: string } | null;
-  selfTriggerEvents(kind: "review" | "autofix"): string[];
+  ): SelfBotIdentity | null;
+  selfTriggerEvents(kind: SelfBotKind): string[];
   postClaimComment(req: ClaimCommentReq): Promise<WriteResult>;
   openChangeRequest(req: OpenChangeRequestReq): Promise<WriteResult>;
   rebaseChangeRequest(req: RebaseReq): Promise<WriteResult>;
