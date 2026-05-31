@@ -144,7 +144,7 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
     }
   }
 
-  selfBotIdentity(kind: SelfBotKind, integration: IntegrationMeta): SelfBotIdentity | null {
+  selfBotIdentity(kind: SelfBotKind, integration?: IntegrationMeta): SelfBotIdentity | null {
     return selfBotIdentityFromIntegration(kind, integration);
   }
 
@@ -399,9 +399,9 @@ function firstString(...values: unknown[]): string | null {
 
 function selfBotIdentityFromIntegration(
   kind: SelfBotKind,
-  integration: IntegrationMeta,
+  integration?: IntegrationMeta,
 ): SelfBotIdentity | null {
-  const identities = asRecord(integration.selfBotIdentities);
+  const identities = asRecord(integration?.selfBotIdentities);
   const configured = identities?.[kind];
   const login =
     typeof configured === 'string'

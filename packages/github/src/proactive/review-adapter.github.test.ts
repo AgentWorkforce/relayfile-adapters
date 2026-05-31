@@ -138,6 +138,8 @@ describe('GithubProactiveReviewAdapter', () => {
     );
     assert.strictEqual(adapter.selfBotIdentity('review', {}), null);
     assert.strictEqual(adapter.selfBotIdentity('autofix', {}), null);
+    assert.strictEqual(adapter.selfBotIdentity('review'), null);
+    assert.strictEqual(adapter.selfBotIdentity('autofix'), null);
     assert.deepStrictEqual(adapter.selfTriggerEvents('review'), [
       'pull_request.synchronize',
       'pull_request_review.submitted',

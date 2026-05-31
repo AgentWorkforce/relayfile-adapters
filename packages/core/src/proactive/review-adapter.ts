@@ -112,7 +112,7 @@ export interface ProactiveReviewAdapter {
   classifyMergeState(detail: unknown): ChangeRequestMergeState;
   selfBotIdentity(
     kind: SelfBotKind,
-    integration: IntegrationMeta,
+    integration?: IntegrationMeta,
   ): SelfBotIdentity | null;
   selfTriggerEvents(kind: SelfBotKind): string[];
   postClaimComment(req: ClaimCommentReq): Promise<WriteResult>;
