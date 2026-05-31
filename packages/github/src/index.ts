@@ -26,6 +26,7 @@ export * from './layout.js';
 export * from './layout-prompt.js';
 export * from './summary.js';
 export * from './thread.js';
+export * from './proactive/review-adapter.github.js';
 
 const EMPTY_RESULT: IngestResult = {
   filesWritten: 0,
