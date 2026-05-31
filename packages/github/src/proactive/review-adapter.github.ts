@@ -92,7 +92,7 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
   classifyChangeRequest(payload: unknown): ChangeRequestContext | null {
     const record = asRecord(payload);
     if (!record) return null;
-    const pr = asRecord(record.pull_request) ?? asRecord(payload);
+    const pr = asRecord(record.pull_request) ?? (isBarePullRequestRecord(record) ? record : null);
     if (!pr) return null;
     const number = numberValue(pr?.number);
     if (number === null) return null;
@@ -186,18 +186,20 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
   }
 
   async postClaimComment(req: ClaimCommentReq): Promise<WriteResult> {
-    const response = await this.proxy({
-      integration: req.integration,
-      request: {
-        method: 'POST',
-        baseUrl: GITHUB_API_BASE_URL,
-        endpoint: `/repos/${req.owner}/${req.repo}/issues/${req.workItemNumber}/comments`,
-        connectionId: '',
-        headers: this.githubJsonHeaders(req.integration),
-        body: { body: req.body },
+    return this.writeThroughProxy(
+      {
+        integration: req.integration,
+        request: {
+          method: 'POST',
+          baseUrl: GITHUB_API_BASE_URL,
+          endpoint: `/repos/${req.owner}/${req.repo}/issues/${req.workItemNumber}/comments`,
+          connectionId: '',
+          headers: this.githubJsonHeaders(req.integration),
+          body: { body: req.body },
+        },
       },
-    });
-    return writeResultFromProxy(response, 'GitHub issue claim comment failed');
+      'GitHub issue claim comment failed',
+    );
   }
 
   async openChangeRequest(req: OpenChangeRequestReq): Promise<WriteResult> {
@@ -212,18 +214,20 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
       body.maintainer_can_modify = req.maintainerCanModify;
     }
 
-    const response = await this.proxy({
-      integration: req.integration,
-      request: {
-        method: 'POST',
-        baseUrl: GITHUB_API_BASE_URL,
-        endpoint: `/repos/${req.owner}/${req.repo}/pulls`,
-        connectionId: '',
-        headers: this.githubJsonHeaders(req.integration),
-        body,
+    return this.writeThroughProxy(
+      {
+        integration: req.integration,
+        request: {
+          method: 'POST',
+          baseUrl: GITHUB_API_BASE_URL,
+          endpoint: `/repos/${req.owner}/${req.repo}/pulls`,
+          connectionId: '',
+          headers: this.githubJsonHeaders(req.integration),
+          body,
+        },
       },
-    });
-    return writeResultFromProxy(response, 'GitHub pull request creation failed');
+      'GitHub pull request creation failed',
+    );
   }
 
   async rebaseChangeRequest(req: RebaseReq): Promise<WriteResult> {
@@ -231,18 +235,20 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
     if (req.expectedHeadSha !== undefined) {
       body.expected_head_sha = req.expectedHeadSha;
     }
-    const response = await this.proxy({
-      integration: req.integration,
-      request: {
-        method: 'PUT',
-        baseUrl: GITHUB_API_BASE_URL,
-        endpoint: `/repos/${req.owner}/${req.repo}/pulls/${req.number}/update-branch`,
-        connectionId: '',
-        headers: this.githubJsonHeaders(req.integration),
-        body,
+    return this.writeThroughProxy(
+      {
+        integration: req.integration,
+        request: {
+          method: 'PUT',
+          baseUrl: GITHUB_API_BASE_URL,
+          endpoint: `/repos/${req.owner}/${req.repo}/pulls/${req.number}/update-branch`,
+          connectionId: '',
+          headers: this.githubJsonHeaders(req.integration),
+          body,
+        },
       },
-    });
-    return writeResultFromProxy(response, 'GitHub pull request update branch failed');
+      'GitHub pull request update branch failed',
+    );
   }
 
   async submitReview(req: ProactiveAgentReview, ctx: ReviewContext): Promise<ReviewResult> {
@@ -308,6 +314,21 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
       ...input.request,
       connectionId: await this.connectionId(input.integration),
     });
+  }
+
+  private async writeThroughProxy(
+    input: { integration?: IntegrationMeta; request: ProxyRequest },
+    context: string,
+  ): Promise<WriteResult> {
+    try {
+      const response = await this.proxy(input);
+      return writeResultFromProxy(response, context);
+    } catch (error) {
+      return {
+        success: false,
+        error: formatThrownError(error, context),
+      };
+    }
   }
 
   private async connectionId(integration?: IntegrationMeta): Promise<string> {
@@ -403,6 +424,10 @@ function numberValue(value: unknown): number | null {
   return null;
 }
 
+function isBarePullRequestRecord(value: Record<string, unknown>): boolean {
+  return Boolean(asRecord(value.head) && asRecord(value.base));
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -469,6 +494,11 @@ function formatProviderError(response: ProxyResponse, fallback: string): string 
   return typeof message === 'string' && message.trim()
     ? `${fallback}: ${message.trim()}`
     : `${fallback}: HTTP ${response.status}`;
+}
+
+function formatThrownError(error: unknown, context: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.trim() ? `${context}: ${message}` : context;
 }
 
 export const githubProactiveReviewAdapterPathHelpers = {

@@ -66,6 +66,19 @@ describe('GithubProactiveReviewAdapter', () => {
     );
   });
 
+  it('does not classify bare issue records as pull requests', () => {
+    const { adapter } = createAdapter();
+
+    const issue = {
+      number: 13,
+      title: 'Crash on login',
+      repository: { full_name: 'acme/widgets' },
+    };
+
+    assert.strictEqual(adapter.classifyChangeRequest(issue), null);
+    assert.strictEqual(adapter.deriveWorkItemKey({ payload: issue }), 'github:acme/widgets#13');
+  });
+
   it('classifies GitHub pull request payloads as change request contexts', () => {
     const { adapter } = createAdapter();
 
@@ -235,6 +248,26 @@ describe('GithubProactiveReviewAdapter', () => {
         ['POST', '/repos/acme/widgets/pulls', 'conn-pr'],
         ['PUT', '/repos/acme/widgets/pulls/7/update-branch', 'conn-rebase'],
       ],
+    );
+  });
+
+  it('returns write failures instead of throwing provider errors', async () => {
+    const { adapter } = createAdapter(() => {
+      throw new Error('proxy unavailable');
+    });
+
+    assert.deepStrictEqual(
+      await adapter.postClaimComment({
+        owner: 'acme',
+        repo: 'widgets',
+        workItemNumber: 42,
+        body: 'Claiming this issue.',
+        integration: { connectionId: 'conn-claim' },
+      }),
+      {
+        success: false,
+        error: 'GitHub issue claim comment failed: proxy unavailable',
+      },
     );
   });
 });
