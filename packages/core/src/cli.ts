@@ -29,6 +29,7 @@ import {
 } from "./spec/parser.js";
 import type { MappingSpec } from "./spec/types.js";
 import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
+import { writeScopeCatalog } from "./scopes/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
@@ -58,6 +59,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "triggers":
       await handleTriggers(args);
+      return;
+    case "scopes":
+      await handleScopes(args);
       return;
     case "help":
     case undefined:
@@ -412,6 +416,8 @@ Commands:
   docs-check --spec <openapi.yaml>
   triggers generate [--repo-root <path>]
   triggers check [--repo-root <path>]
+  scopes generate [--repo-root <path>]
+  scopes check [--repo-root <path>]
 `);
 }
 
@@ -421,6 +427,51 @@ function printTriggersHelp(): void {
 Commands:
   triggers generate [--repo-root <path>]
   triggers check [--repo-root <path>]
+`);
+}
+
+async function handleScopes(args: string[]): Promise<void> {
+  const [subcommand, ...rest] = args;
+  const flags = parseFlags(rest);
+  const repoRoot = readOptionalString(flags["repo-root"]);
+
+  switch (subcommand) {
+    case "generate": {
+      const generation = await writeScopeCatalog({ repoRoot });
+      process.stdout.write(`${JSON.stringify(renderScopeSummary("generate", generation), null, 2)}\n`);
+      return;
+    }
+    case "check": {
+      const generation = await writeScopeCatalog({ check: true, repoRoot });
+      process.stdout.write(`${JSON.stringify(renderScopeSummary("check", generation), null, 2)}\n`);
+      return;
+    }
+    case "help":
+    case undefined:
+      printScopesHelp();
+      return;
+    default:
+      throw new Error(`Unknown scopes command "${subcommand}"`);
+  }
+}
+
+function renderScopeSummary(
+  command: "check" | "generate",
+  generation: Awaited<ReturnType<typeof writeScopeCatalog>>
+): Record<string, unknown> {
+  return {
+    command: `scopes ${command}`,
+    providers: Object.keys(generation.catalog).length,
+    adaptersWithoutKnownScopes: generation.adaptersWithoutKnownScopes,
+  };
+}
+
+function printScopesHelp(): void {
+  process.stdout.write(`adapter-core scopes
+
+Commands:
+  scopes generate [--repo-root <path>]
+  scopes check [--repo-root <path>]
 `);
 }
 

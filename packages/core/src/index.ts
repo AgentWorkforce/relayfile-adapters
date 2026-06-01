@@ -26,3 +26,4 @@ export * from "./digest/index.js";
 export * from "./alias-slug.js";
 export * from "./layout-contract.js";
 export * from "./triggers/catalog.generated.js";
+export * from "./scopes/catalog.generated.js";
