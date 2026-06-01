@@ -71,6 +71,12 @@ export async function generateScopeKeyCatalog(repoRoot?: string): Promise<ScopeK
     let hasKnownScopeKeys = false;
 
     if (supportedScopeKeys.keys.length > 0) {
+      // `supportedScopeKeys()` is authoritative. Unlike triggers (where mapping
+      // webhooks are a legitimate second delivery contract), scope keys have
+      // one source of truth, so the mapping block is a FALLBACK only — never
+      // merged. Merging would let a stale `scopeKeys:` YAML entry outlive an
+      // adapter that renamed/removed a scope, and persona tooling would then
+      // autocomplete/lint a key the adapter no longer supports.
       entries.push({ provider: supportedScopeKeys.provider, keys: supportedScopeKeys.keys });
       sources.push({
         packageName: adapterPackage.packageName,
@@ -79,15 +85,12 @@ export async function generateScopeKeyCatalog(repoRoot?: string): Promise<ScopeK
         source: "supportedScopeKeys",
       });
       hasKnownScopeKeys = true;
-    }
-
-    if (mappingScopeKeys.length > 0) {
-      const provider = supportedScopeKeys.keys.length > 0 ? supportedScopeKeys.provider : adapterPackage.provider;
-      entries.push({ provider, keys: mappingScopeKeys });
+    } else if (mappingScopeKeys.length > 0) {
+      entries.push({ provider: adapterPackage.provider, keys: mappingScopeKeys });
       sources.push({
         packageName: adapterPackage.packageName,
         packagePath: adapterPackage.relativePath,
-        provider,
+        provider: adapterPackage.provider,
         source: "mapping.scopeKeys",
       });
       hasKnownScopeKeys = true;
@@ -222,15 +225,24 @@ async function readSupportedScopeKeys(
     join(adapterPackage.dir, "dist", "src", "index.js"),
   ]);
 
+  let importError: string | undefined;
   if (builtEntryPoint) {
     const supportedScopeKeys = await readSupportedScopeKeysFromModule(adapterPackage, builtEntryPoint);
     if (supportedScopeKeys.keys.length > 0) {
       return supportedScopeKeys;
     }
+    // Remember an import failure so it surfaces as the adapter's "no scope
+    // keys" reason instead of the generic "no implementation" message — a
+    // swallowed import error otherwise hides a real build/runtime problem.
+    importError = supportedScopeKeys.error;
   }
 
   if (sourceScopes.length > 0) {
     return { keys: sourceScopes, provider: adapterPackage.provider };
+  }
+
+  if (importError) {
+    return { keys: [], provider: adapterPackage.provider, error: importError };
   }
 
   if (!builtEntryPoint && !(await pathExists(sourceEntryPoint))) {
@@ -247,12 +259,16 @@ async function readSupportedScopeKeys(
 async function readSupportedScopeKeysFromModule(
   adapterPackage: AdapterPackage,
   entryPoint: string
-): Promise<{ keys: string[]; provider: string }> {
+): Promise<{ keys: string[]; provider: string; error?: string }> {
   let moduleExports: Record<string, unknown>;
   try {
     moduleExports = (await import(pathToFileURL(entryPoint).href)) as Record<string, unknown>;
-  } catch {
-    return { keys: [], provider: adapterPackage.provider };
+  } catch (error) {
+    return {
+      keys: [],
+      provider: adapterPackage.provider,
+      error: `Could not import built adapter entrypoint: ${errorMessage(error)}`,
+    };
   }
 
   const candidates = Object.entries(moduleExports)
@@ -474,4 +490,8 @@ function renderInlineJson(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

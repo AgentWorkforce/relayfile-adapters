@@ -460,7 +460,7 @@ function renderScopeKeySummary(
   generation: Awaited<ReturnType<typeof writeScopeKeyCatalog>>
 ): Record<string, unknown> {
   return {
-    command: `scope-keys `,
+    command: `scope-keys ${command}`,
     providers: Object.keys(generation.catalog).length,
     adaptersWithoutKnownScopeKeys: generation.adaptersWithoutKnownScopeKeys,
   };
