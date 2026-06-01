@@ -27,3 +27,4 @@ export * from "./alias-slug.js";
 export * from "./layout-contract.js";
 export * from "./proactive/review-adapter.js";
 export * from "./triggers/catalog.generated.js";
+export * from "./scope-keys/catalog.generated.js";

@@ -63,6 +63,18 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     return [...this.config.supportedEvents];
   }
 
+  /**
+   * Connection-level scope keys a persona may set under
+   * `integrations.github.scope` to filter what this adapter syncs/writes
+   * (e.g. `{ owner: 'acme', repo: 'web' }`). These are the user-facing filter
+   * params on {@link GitHubAdapterConfig} — not infra fields like
+   * `connectionId`. Emitted into `@relayfile/adapter-core/scope-keys` so persona
+   * authoring can autocomplete/lint scope keys per provider.
+   */
+  supportedScopeKeys(): string[] {
+    return ['owner', 'repo'];
+  }
+
   async ingestWebhook(_workspaceId: string, event: NormalizedWebhook): Promise<IngestResult> {
     return this.routeWebhook(event.payload, event.eventType);
   }

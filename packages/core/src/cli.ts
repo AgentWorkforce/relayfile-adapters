@@ -29,6 +29,7 @@ import {
 } from "./spec/parser.js";
 import type { MappingSpec } from "./spec/types.js";
 import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
+import { writeScopeKeyCatalog } from "./scope-keys/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
@@ -58,6 +59,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "triggers":
       await handleTriggers(args);
+      return;
+    case "scope-keys":
+      await handleScopeKeys(args);
       return;
     case "help":
     case undefined:
@@ -412,6 +416,8 @@ Commands:
   docs-check --spec <openapi.yaml>
   triggers generate [--repo-root <path>]
   triggers check [--repo-root <path>]
+  scope-keys generate [--repo-root <path>]
+  scope-keys check [--repo-root <path>]
 `);
 }
 
@@ -421,6 +427,51 @@ function printTriggersHelp(): void {
 Commands:
   triggers generate [--repo-root <path>]
   triggers check [--repo-root <path>]
+`);
+}
+
+async function handleScopeKeys(args: string[]): Promise<void> {
+  const [subcommand, ...rest] = args;
+  const flags = parseFlags(rest);
+  const repoRoot = readOptionalString(flags["repo-root"]);
+
+  switch (subcommand) {
+    case "generate": {
+      const generation = await writeScopeKeyCatalog({ repoRoot });
+      process.stdout.write(`${JSON.stringify(renderScopeKeySummary("generate", generation), null, 2)}\n`);
+      return;
+    }
+    case "check": {
+      const generation = await writeScopeKeyCatalog({ check: true, repoRoot });
+      process.stdout.write(`${JSON.stringify(renderScopeKeySummary("check", generation), null, 2)}\n`);
+      return;
+    }
+    case "help":
+    case undefined:
+      printScopeKeysHelp();
+      return;
+    default:
+      throw new Error(`Unknown scope-keys command "${subcommand}"`);
+  }
+}
+
+function renderScopeKeySummary(
+  command: "check" | "generate",
+  generation: Awaited<ReturnType<typeof writeScopeKeyCatalog>>
+): Record<string, unknown> {
+  return {
+    command: `scope-keys ${command}`,
+    providers: Object.keys(generation.catalog).length,
+    adaptersWithoutKnownScopeKeys: generation.adaptersWithoutKnownScopeKeys,
+  };
+}
+
+function printScopeKeysHelp(): void {
+  process.stdout.write(`adapter-core scope-keys
+
+Commands:
+  scope-keys generate [--repo-root <path>]
+  scope-keys check [--repo-root <path>]
 `);
 }
 

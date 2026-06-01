@@ -228,6 +228,11 @@ export class MyAdapter implements IntegrationAdapter {
 }
 ```
 
+Declare the adapter's `supportedEvents()` (trigger names) and
+`supportedScopeKeys()` (connection-scope filter keys, e.g. github `owner`/`repo`),
+then regenerate the catalogs so persona authoring stays typed against them — see
+[AGENTS.md → Declared catalogs](./AGENTS.md#declared-catalogs-triggers-and-scope-keys).
+
 ## Development
 
 ```bash
