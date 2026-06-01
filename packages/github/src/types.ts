@@ -272,7 +272,7 @@ export abstract class IntegrationAdapter {
   sync?(workspaceId: string, options?: SyncOptions): Promise<SyncResult>;
   writeBack?(workspaceId: string, path: string, content: string): Promise<WritebackResult | void>;
   supportedEvents?(): string[];
-  supportedScopes?(): string[];
+  supportedScopeKeys?(): string[];
 }
 
 export interface WritebackPathTarget {

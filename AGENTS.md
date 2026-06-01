@@ -10,6 +10,49 @@ Every adapter under `packages/<name>` MUST:
 - Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path must resolve to the same record as the canonical path. Alias content may be either a minimal pointer `{ id, canonicalPath, ...minimal pointer fields }` or a materialized canonical mirror, but the choice must be consistent within a resource and covered by tests.
 - Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
+### Declared catalogs: triggers and scope keys
+
+An adapter declares part of its contract as **data** so downstream consumers
+(notably `@agentworkforce/persona-kit`, which types persona authoring) can
+autocomplete and lint against it. When you add an adapter or change what it
+supports, keep these current:
+
+- **`supportedEvents(): string[]`** (adapter class, or a `webhooks:` block in
+  `<provider>.mapping.yaml`) — the trigger event names the adapter emits
+  (`pull_request.opened`). Feeds `@relayfile/adapter-core/triggers`
+  (`KNOWN_TRIGGER_CATALOG`).
+- **`supportedScopeKeys(): string[]`** (adapter class, or a `scopeKeys:` block in
+  `<provider>.mapping.yaml`) — the connection-scope **filter** keys a persona may
+  set under `integrations.<provider>.scope` (github → `owner`/`repo`). These are
+  the user-facing filter params on the adapter config, NOT infra fields
+  (`connectionId`, tokens). Feeds `@relayfile/adapter-core/scope-keys`
+  (`KNOWN_SCOPE_KEY_CATALOG`). Declare only keys a persona should actually set;
+  the set isn't derivable, which is why it's an explicit method.
+
+> "scope" is overloaded here: `docs/integration-scopes.yaml` tracks **OAuth
+> permission scopes** (`data.records:read`) for app registration — a different
+> thing from `supportedScopeKeys()` (connection filter keys). Don't conflate them.
+
+The catalogs are generated, committed artifacts. After changing any of the above,
+regenerate (adapters must be built first — the generators import them):
+
+```bash
+npx turbo build
+npx adapter-core triggers generate
+npx adapter-core scope-keys generate
+```
+
+This is **CI-enforced**: `npm test` (→ `turbo test`) runs an in-sync test per
+catalog that regenerates and diffs the committed files, so changing a declaration
+without regenerating fails the build. Ad-hoc check form:
+`npx adapter-core triggers check` / `npx adapter-core scope-keys check`.
+
+Cross-repo: a catalog change reaches `persona-kit` only on its next
+`@relayfile/adapter-core` dep bump (release coordination — see
+[Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers` or
+`/scope-keys` export hard-fails the consumer's build; a *stale* catalog merely
+lags until the bump.
+
 ### Generated adapter path templates are not authoritative
 
 Older mapping specs and generated workflow prompts may still contain the legacy

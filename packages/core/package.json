@@ -14,9 +14,9 @@
       "types": "./dist/src/triggers/catalog.generated.d.ts",
       "default": "./dist/src/triggers/catalog.generated.js"
     },
-    "./scopes": {
-      "types": "./dist/src/scopes/catalog.generated.d.ts",
-      "default": "./dist/src/scopes/catalog.generated.js"
+    "./scope-keys": {
+      "types": "./dist/src/scope-keys/catalog.generated.d.ts",
+      "default": "./dist/src/scope-keys/catalog.generated.js"
     },
     "./package.json": "./package.json"
   },
