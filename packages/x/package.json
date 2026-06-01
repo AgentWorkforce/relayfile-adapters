@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-x",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "X social search adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -61,7 +61,7 @@
     "directory": "packages/x"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.25"
+    "@relayfile/adapter-core": "^0.3.26"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
