@@ -10,6 +10,8 @@ import type {
   RebaseReq,
   ReviewContext,
   ReviewResult,
+  SelfBotIdentity,
+  SelfBotKind,
   WriteResult,
 } from '@relayfile/adapter-core';
 
@@ -26,8 +28,6 @@ import type {
 import { GitHubWritebackHandler } from '../writeback.js';
 
 const DEFAULT_PROVIDER_CONFIG_KEY = 'github-app-oauth';
-const DEFAULT_REVIEW_BOT_LOGIN = 'agent-relay-bot[bot]';
-const CONFLICT_AUTOFIX_BOT_LOGIN = 'relay-conflict-autofix[bot]';
 const REVIEW_SELF_TRIGGER_EVENTS = [
   'pull_request.synchronize',
   'pull_request_review.submitted',
@@ -144,42 +144,11 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
     }
   }
 
-  selfBotIdentity(
-    kind: 'review' | 'autofix',
-    integration: IntegrationMeta,
-  ): { login: string } | null {
-    if (kind === 'autofix') {
-      return { login: CONFLICT_AUTOFIX_BOT_LOGIN };
-    }
-
-    const metadata = asRecord(integration.metadata);
-    const app = asRecord(metadata?.app) ?? asRecord(metadata?.githubApp) ?? asRecord(metadata?.github_app);
-    const bot = asRecord(metadata?.bot) ?? asRecord(metadata?.githubBot) ?? asRecord(metadata?.github_bot);
-    const login =
-      firstString(
-        integration.botLogin,
-        integration.bot_login,
-        integration.githubBotLogin,
-        integration.github_bot_login,
-        integration.githubAppBotLogin,
-        integration.github_app_bot_login,
-        metadata?.botLogin,
-        metadata?.bot_login,
-        metadata?.githubBotLogin,
-        metadata?.github_bot_login,
-        metadata?.githubAppBotLogin,
-        metadata?.github_app_bot_login,
-        app?.botLogin,
-        app?.bot_login,
-        app?.bot_login_name,
-        bot?.login,
-        bot?.name,
-      ) ?? botLoginFromAppSlug(firstString(integration.sourceName, metadata?.appSlug, metadata?.app_slug, app?.slug));
-
-    return { login: login ?? DEFAULT_REVIEW_BOT_LOGIN };
+  selfBotIdentity(kind: SelfBotKind, integration?: IntegrationMeta): SelfBotIdentity | null {
+    return selfBotIdentityFromIntegration(kind, integration);
   }
 
-  selfTriggerEvents(kind: 'review' | 'autofix'): string[] {
+  selfTriggerEvents(kind: SelfBotKind): string[] {
     return kind === 'review'
       ? [...REVIEW_SELF_TRIGGER_EVENTS]
       : [...AUTOFIX_SELF_TRIGGER_EVENTS];
@@ -428,10 +397,17 @@ function firstString(...values: unknown[]): string | null {
   return null;
 }
 
-function botLoginFromAppSlug(value: unknown): string | null {
-  const slug = firstString(value);
-  if (!slug) return null;
-  return slug.endsWith('[bot]') ? slug : `${slug}[bot]`;
+function selfBotIdentityFromIntegration(
+  kind: SelfBotKind,
+  integration?: IntegrationMeta,
+): SelfBotIdentity | null {
+  const identities = asRecord(integration?.selfBotIdentities);
+  const configured = identities?.[kind];
+  const login =
+    typeof configured === 'string'
+      ? firstString(configured)
+      : firstString(asRecord(configured)?.login);
+  return login ? { login } : null;
 }
 
 async function maybeProviderConnectionId(provider: GitHubRequestProvider): Promise<string | null> {
