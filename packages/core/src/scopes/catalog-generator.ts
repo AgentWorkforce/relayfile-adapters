@@ -215,27 +215,44 @@ async function listAdapterPackages(repoRoot: string): Promise<AdapterPackage[]> 
 async function readSupportedScopes(
   adapterPackage: AdapterPackage
 ): Promise<{ keys: string[]; provider: string; error?: string }> {
-  const entryPoint = await firstExistingPath([
+  const sourceEntryPoint = join(adapterPackage.dir, "src", "index.ts");
+  const sourceScopes = await readSupportedScopesFromSource(sourceEntryPoint);
+  const builtEntryPoint = await firstExistingPath([
+    join(adapterPackage.dir, "dist", "index.js"),
     join(adapterPackage.dir, "dist", "src", "index.js"),
-    join(adapterPackage.dir, "src", "index.ts"),
   ]);
-  if (!entryPoint) {
+
+  if (builtEntryPoint) {
+    const supportedScopes = await readSupportedScopesFromModule(adapterPackage, builtEntryPoint);
+    if (supportedScopes.keys.length > 0) {
+      return supportedScopes;
+    }
+  }
+
+  if (sourceScopes.length > 0) {
+    return { keys: sourceScopes, provider: adapterPackage.provider };
+  }
+
+  if (!builtEntryPoint && !(await pathExists(sourceEntryPoint))) {
     return {
       keys: [],
       provider: adapterPackage.provider,
-      error: "No adapter entrypoint at dist/src/index.js or src/index.ts",
+      error: "No adapter entrypoint at dist/index.js, dist/src/index.js, or src/index.ts",
     };
   }
 
+  return { keys: [], provider: adapterPackage.provider };
+}
+
+async function readSupportedScopesFromModule(
+  adapterPackage: AdapterPackage,
+  entryPoint: string
+): Promise<{ keys: string[]; provider: string }> {
   let moduleExports: Record<string, unknown>;
   try {
     moduleExports = (await import(pathToFileURL(entryPoint).href)) as Record<string, unknown>;
-  } catch (error) {
-    return {
-      keys: [],
-      provider: adapterPackage.provider,
-      error: `Could not import built adapter entrypoint: ${errorMessage(error)}`,
-    };
+  } catch {
+    return { keys: [], provider: adapterPackage.provider };
   }
 
   const candidates = Object.entries(moduleExports)
@@ -265,6 +282,29 @@ async function readSupportedScopes(
   }
 
   return { keys: [], provider: adapterPackage.provider };
+}
+
+async function readSupportedScopesFromSource(entryPoint: string): Promise<string[]> {
+  let contents: string;
+  try {
+    contents = await readFile(entryPoint, "utf8");
+  } catch {
+    return [];
+  }
+
+  const supportedScopesMethod =
+    /\bsupportedScopes\s*\([^)]*\)\s*(?::[^{]+)?\{\s*return\s*\[([\s\S]*?)\]\s*;?\s*\}/u.exec(contents);
+  if (!supportedScopesMethod) {
+    return [];
+  }
+
+  const keys = new Set<string>();
+  const stringLiteral = /["']([^"']+)["']/gu;
+  let match: RegExpExecArray | null;
+  while ((match = stringLiteral.exec(supportedScopesMethod[1] ?? "")) !== null) {
+    keys.add(match[1]);
+  }
+  return [...keys].sort();
 }
 
 async function readMappingScopeKeys(repoRoot: string, adapterPackage: AdapterPackage): Promise<string[]> {
@@ -304,14 +344,20 @@ async function readMappingScopeKeysFromFiles(paths: string[]): Promise<string[]>
 
 async function firstExistingPath(paths: string[]): Promise<string | undefined> {
   for (const path of paths) {
-    try {
-      await access(path);
+    if (await pathExists(path)) {
       return path;
-    } catch {
-      // Try the next path.
     }
   }
   return undefined;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function instantiateAdapter(
@@ -428,8 +474,4 @@ function renderInlineJson(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

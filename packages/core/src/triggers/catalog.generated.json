@@ -151,6 +151,9 @@
     "calendar.not_exists",
     "calendar.sync"
   ],
+  "granola": [
+    "recording.created"
+  ],
   "hubspot": [
     "company.associationChange",
     "company.created",

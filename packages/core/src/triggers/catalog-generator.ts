@@ -253,6 +253,7 @@ async function readSupportedEvents(
   adapterPackage: AdapterPackage
 ): Promise<{ events: string[]; provider: string; error?: string }> {
   const entryPoint = await firstExistingPath([
+    join(adapterPackage.dir, "dist", "index.js"),
     join(adapterPackage.dir, "dist", "src", "index.js"),
     join(adapterPackage.dir, "src", "index.ts"),
   ]);
@@ -260,7 +261,7 @@ async function readSupportedEvents(
     return {
       events: [],
       provider: adapterPackage.provider,
-      error: "No adapter entrypoint at dist/src/index.js or src/index.ts",
+      error: "No adapter entrypoint at dist/index.js, dist/src/index.js, or src/index.ts",
     };
   }
 

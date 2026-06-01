@@ -159,6 +159,9 @@ export const KNOWN_TRIGGER_CATALOG = {
     "calendar.not_exists",
     "calendar.sync"
   ],
+  "granola": [
+    "recording.created"
+  ],
   "hubspot": [
     "company.associationChange",
     "company.created",
@@ -504,12 +507,6 @@ export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
     "packageName": "@relayfile/google-drive",
     "packagePath": "packages/google-drive",
     "provider": "google-drive",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/adapter-granola",
-    "packagePath": "packages/granola",
-    "provider": "granola",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

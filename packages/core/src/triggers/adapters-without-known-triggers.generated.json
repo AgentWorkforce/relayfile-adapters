@@ -30,12 +30,6 @@
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {
-    "packageName": "@relayfile/adapter-granola",
-    "packagePath": "packages/granola",
-    "provider": "granola",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
     "packageName": "@relayfile/onedrive",
     "packagePath": "packages/onedrive",
     "provider": "onedrive",
