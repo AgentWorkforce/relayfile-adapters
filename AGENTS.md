@@ -31,12 +31,15 @@ these current:
   the set isn't derivable, which is why it's an explicit method.
 - **`resources.ts`** (`{ name, path }[]`, generated from the `writebacks:`/
   `resources:` mapping blocks) — the canonical mount **path templates** a draft
-  is written to in order to trigger a mutation (`/linear/issues/{issueId}/
-  comments`). This is the same data the writeback worker's `classifyWrite`
-  routes against. Feeds `@relayfile/adapter-core/writeback-paths`
-  (`WRITEBACK_PATH_CATALOG` + the `writebackPath(provider, resource, params)`
-  resolver). Read-only adapters with no writeback resources are listed in
-  `ADAPTERS_WITHOUT_WRITEBACK_PATHS`, not silently dropped.
+  is written to in order to trigger a mutation. Each template is a path like
+  `/linear/issues/{issueId}/comments`. This is the same data the writeback
+  worker's `classifyWrite` routes against. Feeds
+  `@relayfile/adapter-core/writeback-paths` (`WRITEBACK_PATH_CATALOG` + the
+  `writebackPath(provider, resource, params)` resolver). A resource `name` can
+  hold several templates (the same entity mounted at different roots); the
+  resolver disambiguates by the exact param set. Read-only adapters with no
+  writeback resources are listed in `ADAPTERS_WITHOUT_WRITEBACK_PATHS`, not
+  silently dropped.
 
 > "scope" is overloaded here: `docs/integration-scopes.yaml` tracks **OAuth
 > permission scopes** (`data.records:read`) for app registration — a different

@@ -20,18 +20,31 @@ test("generated writeback-path catalog is in sync with adapter resources", async
 
   assert.deepEqual(catalogJson, generation.catalog);
   assert.deepEqual(withoutJson, generation.adaptersWithoutWritebackPaths);
-  assert.equal(catalogTs, renderWritebackPathCatalogModule(generation));
+  assert.equal(
+    catalogTs.replace(/\r\n/g, "\n"),
+    renderWritebackPathCatalogModule(generation).replace(/\r\n/g, "\n")
+  );
 
   assert.deepEqual(WRITEBACK_PATH_CATALOG, generation.catalog);
 });
 
 test("linear/github/slack writeback templates match the canonical mount paths", () => {
-  assert.equal(WRITEBACK_PATH_CATALOG.linear.comments.path, "/linear/issues/{issueId}/comments");
+  assert.equal(WRITEBACK_PATH_CATALOG.linear.comments[0].path, "/linear/issues/{issueId}/comments");
   assert.equal(
-    WRITEBACK_PATH_CATALOG.github["issue-comments"].path,
+    WRITEBACK_PATH_CATALOG.github["issue-comments"][0].path,
     "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments"
   );
-  assert.equal(WRITEBACK_PATH_CATALOG.slack.messages.path, "/slack/channels/{channelId}/messages");
+  assert.equal(WRITEBACK_PATH_CATALOG.slack.messages[0].path, "/slack/channels/{channelId}/messages");
+});
+
+test("a resource name with multiple mount paths keeps every distinct template", () => {
+  // notion `pages` is mounted at three distinct roots — none may be dropped.
+  const paths = WRITEBACK_PATH_CATALOG.notion.pages.map((variant) => variant.path).sort();
+  assert.deepEqual(paths, [
+    "/notion/databases/{databaseId}/pages",
+    "/notion/databases/{databaseId}/pages/{pageId}.json",
+    "/notion/pages/{pageId}.json",
+  ]);
 });
 
 test("writebackPath substitutes and url-encodes params in template order", () => {
@@ -44,9 +57,24 @@ test("writebackPath substitutes and url-encodes params in template order", () =>
   assert.equal(writebackPath("slack", "messages", { channelId: "C/1" }), "/slack/channels/C%2F1/messages");
 });
 
+test("writebackPath disambiguates multi-template resources by exact param set", () => {
+  assert.equal(writebackPath("notion", "pages", { databaseId: "db1" }), "/notion/databases/db1/pages");
+  assert.equal(
+    writebackPath("notion", "pages", { databaseId: "db1", pageId: "p9" }),
+    "/notion/databases/db1/pages/p9.json"
+  );
+  assert.equal(writebackPath("notion", "pages", { pageId: "p9" }), "/notion/pages/p9.json");
+  // A param set matching no template must throw, never silently pick one.
+  assert.throws(() => writebackPath("notion", "pages", { teamId: "t1" }), WritebackPathError);
+});
+
 test("writebackPath throws loudly rather than guessing", () => {
   assert.throws(() => writebackPath("nope" as never, "x" as never), WritebackPathError);
   assert.throws(() => writebackPath("linear", "nope" as never), WritebackPathError);
   // Missing a required param must fail, not emit a path with a literal `{issueId}`.
   assert.throws(() => writebackPath("linear", "comments", {}), WritebackPathError);
+  // Prototype keys must not bypass the guard via Object.prototype.
+  assert.throws(() => writebackPath("constructor", "x"), WritebackPathError);
+  assert.throws(() => writebackPath("toString", "x"), WritebackPathError);
+  assert.throws(() => writebackPath("linear", "hasOwnProperty"), WritebackPathError);
 });
