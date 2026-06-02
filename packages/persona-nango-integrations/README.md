@@ -27,11 +27,27 @@ The CLI copies `personas/nango-integrations.json` into the consumer's
 The whole spec — including the operations manual on `agentsMdContent` — lives in
 `personas/nango-integrations.json`. There are no external markdown sidecars.
 
+## Programmatic usage
+
+Existing consumers can still import the persona object directly:
+
+```ts
+import persona from '@agentworkforce/persona-nango-integrations';
+
+console.log(persona.id); // nango-integrations
+```
+
+The legacy JSON subpath also resolves to the moved pack file:
+
+```ts
+import persona from '@agentworkforce/persona-nango-integrations/persona.json' with { type: 'json' };
+```
+
 ## Source of truth
 
 `personas/nango-integrations.json` is the single source of truth. To change the
-persona, edit that file and bump the package version, then republish; consumers
-re-run `agentworkforce install … --overwrite` to pick up the new version.
+persona, edit that file and republish; consumers re-run
+`agentworkforce install … --overwrite` to pick up the new version.
 
 ## Publishing
 

@@ -4,13 +4,23 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import persona, { nangoIntegrationsPersona } from '../index.js';
+
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const personaPath = join(pkgRoot, 'personas', 'nango-integrations.json');
-const persona = JSON.parse(readFileSync(personaPath, 'utf8'));
+const personaJson = JSON.parse(readFileSync(personaPath, 'utf8'));
 
 test('persona pack points at the personas dir', () => {
   const pkg = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf8'));
   assert.equal(pkg.agentworkforce?.personas, 'personas');
+});
+
+test('default export and named export are the same object', () => {
+  assert.equal(persona, nangoIntegrationsPersona);
+});
+
+test('compatibility export reads the persona pack JSON', () => {
+  assert.deepEqual(persona, personaJson);
 });
 
 test('persona JSON has an id (required by `agentworkforce install`)', () => {
