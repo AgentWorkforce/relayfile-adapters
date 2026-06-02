@@ -1,0 +1,153 @@
+name: Publish Persona Package
+
+# Separate from publish.yml because persona packages are published under the
+# @agentworkforce scope (not @relayfile) and therefore need their own npm
+# credentials. publish.yml's `all`/`missing`/group selectors are scoped to
+# @relayfile/* (see scripts/resolve-publish-targets.mjs) and will never sweep
+# a persona package; publish them here instead.
+#
+# Auth: set the AGENTWORKFORCE_NPM_TOKEN repo secret to an npm automation token
+# with publish rights to the @agentworkforce scope. (If you configure npm
+# trusted publishing for this repo against the @agentworkforce package, you can
+# drop the token and rely on OIDC + --provenance alone.)
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: |
+          Persona package dir name under packages/ to publish.
+          Must be an @agentworkforce/persona-* package.
+        required: true
+        type: string
+        default: "persona-nango-integrations"
+      version:
+        description: |
+          Version bump or exact version.
+            • patch / minor / major / prerelease (npm version semantics)
+            • none (publish current package.json version as-is)
+            • an exact semver like 0.2.0 or 0.2.0-beta.1
+        required: true
+        type: string
+        default: "patch"
+      tag:
+        description: "NPM dist-tag"
+        required: false
+        type: choice
+        options:
+          - latest
+          - next
+          - beta
+        default: "latest"
+      dry_run:
+        description: "Dry run (do not actually publish)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-persona
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish persona
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.14.0"
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+          scope: "@agentworkforce"
+
+      - run: npm ci
+
+      - name: Upgrade npm to latest
+        run: npm install -g npm@latest
+
+      - name: Validate persona package selection
+        id: validate
+        env:
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+        run: |
+          set -euo pipefail
+          pkg="$INPUT_PACKAGE"
+          case "$pkg" in
+            *[!a-zA-Z0-9_-]*)
+              echo "Invalid package slug: $pkg" >&2
+              exit 1
+              ;;
+          esac
+          if [ ! -f "packages/$pkg/package.json" ]; then
+            echo "No package.json at packages/$pkg" >&2
+            exit 1
+          fi
+          name=$(node -p "require('./packages/$pkg/package.json').name")
+          case "$name" in
+            @agentworkforce/persona-*) ;;
+            *)
+              echo "Refusing to publish '$name' via the persona workflow (expected @agentworkforce/persona-*)." >&2
+              exit 1
+              ;;
+          esac
+          echo "package=$pkg" >> "$GITHUB_OUTPUT"
+
+      - name: Build persona package
+        env:
+          PKG: ${{ steps.validate.outputs.package }}
+        run: |
+          name=$(node -p "require('./packages/$PKG/package.json').name")
+          npx turbo build --filter="$name"
+
+      - name: Version package
+        env:
+          PKG: ${{ steps.validate.outputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$INPUT_VERSION" != "none" ]; then
+            cd "packages/$PKG"
+            npm version "$INPUT_VERSION" --no-git-tag-version --allow-same-version
+          fi
+
+      - name: Publish package
+        env:
+          PKG: ${{ steps.validate.outputs.package }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          NODE_AUTH_TOKEN: ${{ secrets.AGENTWORKFORCE_NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd "packages/$PKG"
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
+            echo "DRY RUN: $name@$version"
+            npm publish --dry-run --access public --tag "$INPUT_TAG" --ignore-scripts
+          else
+            npm publish --access public --provenance --tag "$INPUT_TAG" --ignore-scripts
+            echo "Published $name@$version"
+          fi
+
+      - name: Commit version bump
+        if: github.event.inputs.dry_run != 'true' && github.event.inputs.version != 'none'
+        env:
+          PKG: ${{ steps.validate.outputs.package }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add "packages/$PKG/package.json"
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(release): bump ${PKG} (${INPUT_VERSION})"
+            git push
+          fi

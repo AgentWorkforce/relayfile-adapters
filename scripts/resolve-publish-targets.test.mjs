@@ -61,6 +61,25 @@ test('publish all orders internal dependencies before dependents', async () => {
   }
 });
 
+test('non-@relayfile scopes (persona packages) are excluded from "all"', async () => {
+  const list = await resolveTargets('all');
+
+  assert.ok(
+    !list.includes('persona-nango-integrations'),
+    `persona package must not be swept by the adapter workflow, got ${list.join(' ')}`,
+  );
+});
+
+test('persona packages are rejected as explicit targets here', async () => {
+  await assert.rejects(
+    () => resolveTargetsRaw('persona-nango-integrations'),
+    (err) => {
+      assert.match(String(err.stderr ?? err.message), /unknown package or group/i);
+      return true;
+    },
+  );
+});
+
 test('explicit mixed package input is topologically sorted', async () => {
   const list = await resolveTargets('github,core');
 

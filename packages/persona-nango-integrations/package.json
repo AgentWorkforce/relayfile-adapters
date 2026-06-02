@@ -1,0 +1,55 @@
+{
+  "name": "@agentworkforce/persona-nango-integrations",
+  "version": "0.1.0",
+  "description": "AgentWorkforce nango-integrations persona spec — builds & maintains Nango TypeScript integrations and their Cloud-side Relayfile wiring.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./persona.base.json": "./persona.base.json",
+    "./AGENTS.md": "./AGENTS.md",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "AGENTS.md",
+    "persona.base.json"
+  ],
+  "scripts": {
+    "assemble": "node scripts/assemble.mjs",
+    "build": "node scripts/assemble.mjs && tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "test": "node scripts/assemble.mjs --check && node --import tsx --test 'src/**/*.test.ts'",
+    "typecheck": "node scripts/assemble.mjs && tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [
+    "agentworkforce",
+    "persona",
+    "nango",
+    "relayfile",
+    "integrations"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/persona-nango-integrations"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
