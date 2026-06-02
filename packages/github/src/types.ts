@@ -28,6 +28,7 @@ export const DEFAULT_GITHUB_EVENTS = [
   'issues.reopened',
   'issues.closed',
   'check_run.completed',
+  'deployment_status.created',
 ] as const;
 
 export type GitHubReviewEvent = (typeof GITHUB_REVIEW_EVENTS)[number];
