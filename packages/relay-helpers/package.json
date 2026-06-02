@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Ergonomic, catalog-backed provider clients for Relayfile integration handlers",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/relay-helpers"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
