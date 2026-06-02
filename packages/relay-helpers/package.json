@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/relay-helpers",
-  "version": "0.1.0",
+  "version": "0.3.29",
   "description": "Ergonomic, catalog-backed provider clients for Relayfile integration handlers",
   "license": "MIT",
   "repository": {
@@ -31,6 +31,6 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.27"
+    "@relayfile/adapter-core": "^0.3.29"
   }
 }
