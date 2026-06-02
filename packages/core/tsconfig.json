@@ -24,7 +24,8 @@
     "tests/atomic-index/**/*.test.ts",
     "tests/emit-auxiliary/**/*.test.ts",
     "tests/triggers/**/*.test.ts",
-    "tests/scope-keys/**/*.test.ts"
+    "tests/scope-keys/**/*.test.ts",
+    "tests/writeback-paths/**/*.test.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }

@@ -10,12 +10,13 @@ Every adapter under `packages/<name>` MUST:
 - Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path must resolve to the same record as the canonical path. Alias content may be either a minimal pointer `{ id, canonicalPath, ...minimal pointer fields }` or a materialized canonical mirror, but the choice must be consistent within a resource and covered by tests.
 - Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
-### Declared catalogs: triggers and scope keys
+### Declared catalogs: triggers, scope keys, and writeback paths
 
 An adapter declares part of its contract as **data** so downstream consumers
-(notably `@agentworkforce/persona-kit`, which types persona authoring) can
-autocomplete and lint against it. When you add an adapter or change what it
-supports, keep these current:
+(notably `@agentworkforce/persona-kit`, which types persona authoring, and
+`@agentworkforce/relay-helpers`, which resolves draft paths) can autocomplete
+and lint against it. When you add an adapter or change what it supports, keep
+these current:
 
 - **`supportedEvents(): string[]`** (adapter class, or a `webhooks:` block in
   `<provider>.mapping.yaml`) — the trigger event names the adapter emits
@@ -28,6 +29,14 @@ supports, keep these current:
   (`connectionId`, tokens). Feeds `@relayfile/adapter-core/scope-keys`
   (`KNOWN_SCOPE_KEY_CATALOG`). Declare only keys a persona should actually set;
   the set isn't derivable, which is why it's an explicit method.
+- **`resources.ts`** (`{ name, path }[]`, generated from the `writebacks:`/
+  `resources:` mapping blocks) — the canonical mount **path templates** a draft
+  is written to in order to trigger a mutation (`/linear/issues/{issueId}/
+  comments`). This is the same data the writeback worker's `classifyWrite`
+  routes against. Feeds `@relayfile/adapter-core/writeback-paths`
+  (`WRITEBACK_PATH_CATALOG` + the `writebackPath(provider, resource, params)`
+  resolver). Read-only adapters with no writeback resources are listed in
+  `ADAPTERS_WITHOUT_WRITEBACK_PATHS`, not silently dropped.
 
 > "scope" is overloaded here: `docs/integration-scopes.yaml` tracks **OAuth
 > permission scopes** (`data.records:read`) for app registration — a different
@@ -40,18 +49,20 @@ regenerate (adapters must be built first — the generators import them):
 npx turbo build
 npx adapter-core triggers generate
 npx adapter-core scope-keys generate
+npx adapter-core writeback-paths generate
 ```
 
 This is **CI-enforced**: `npm test` (→ `turbo test`) runs an in-sync test per
 catalog that regenerates and diffs the committed files, so changing a declaration
 without regenerating fails the build. Ad-hoc check form:
-`npx adapter-core triggers check` / `npx adapter-core scope-keys check`.
+`npx adapter-core triggers check` / `npx adapter-core scope-keys check` /
+`npx adapter-core writeback-paths check`.
 
-Cross-repo: a catalog change reaches `persona-kit` only on its next
-`@relayfile/adapter-core` dep bump (release coordination — see
-[Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers` or
-`/scope-keys` export hard-fails the consumer's build; a *stale* catalog merely
-lags until the bump.
+Cross-repo: a catalog change reaches `persona-kit` / `relay-helpers` only on its
+next `@relayfile/adapter-core` dep bump (release coordination — see
+[Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers`,
+`/scope-keys`, or `/writeback-paths` export hard-fails the consumer's build; a
+*stale* catalog merely lags until the bump.
 
 ### Generated adapter path templates are not authoritative
 
