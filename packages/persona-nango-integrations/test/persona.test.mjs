@@ -50,7 +50,7 @@ test('nango docs MCP server is preserved', () => {
 test('skills are remotely sourced (no repo-local path that hard-fails launch)', () => {
   for (const skill of persona.skills) {
     assert.ok(
-      !/\.(md)$/i.test(skill.source) || /^https?:\/\//.test(skill.source),
+      /^https?:\/\//.test(skill.source) || /^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._/-]*(?:#[a-z0-9._-]+)?$/i.test(skill.source),
       `skill "${skill.id}" source must be remote (prpm/url), got "${skill.source}"`,
     );
   }
