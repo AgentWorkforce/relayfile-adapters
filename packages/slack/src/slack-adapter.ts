@@ -102,7 +102,7 @@ interface MaterializedSlackObject {
   payload: Record<string, unknown>;
 }
 
-const SUPPORTED_EVENTS = [
+export const SLACK_SUPPORTED_EVENTS = [
   'channel.archived',
   'channel.created',
   'channel.deleted',
@@ -142,7 +142,7 @@ export class SlackAdapter extends IntegrationAdapter {
   }
 
   override supportedEvents(): string[] {
-    return [...SUPPORTED_EVENTS];
+    return [...SLACK_SUPPORTED_EVENTS];
   }
 
   override computePath(objectType: string, objectId: string): string {

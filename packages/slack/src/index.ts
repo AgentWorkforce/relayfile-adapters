@@ -68,6 +68,7 @@ export type {
 export {
   IntegrationAdapter,
   SlackAdapter,
+  SLACK_SUPPORTED_EVENTS,
 } from './slack-adapter.js';
 export * from './digest.js';
 export * from './summary.js';
