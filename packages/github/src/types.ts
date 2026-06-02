@@ -180,6 +180,17 @@ export interface GitHubCheckRun {
   headSha?: string;
 }
 
+export interface GitHubDeploymentStatus {
+  id: number | string;
+  state: string;
+  deploymentId?: number | string;
+  environment?: string;
+  description?: null | string;
+  targetUrl?: null | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface GitHubWebhookEnvelope {
   eventType: string;
   deliveryId?: string;

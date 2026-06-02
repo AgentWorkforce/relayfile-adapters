@@ -181,6 +181,8 @@ export interface IngestResult {
     reviews/{review_id}.json
     comments/{comment_id}.json
     checks/{check_id}.json
+  deployments/{deployment_id}/
+    statuses/{status_id}.json
   issues/{number}/
     meta.json
     comments/{comment_id}.json
@@ -195,6 +197,7 @@ export interface IngestResult {
 - `push`
 - `issues.opened` / `issues.closed`
 - `check_run.completed`
+- `deployment_status.created`
 
 ### File Content Fetching
 ```typescript

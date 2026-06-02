@@ -31,6 +31,17 @@ webhooks:
       - issue.number
       - issue.title
       - comment.id
+  deployment_status.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/deployments/{{deployment.id}}/statuses/{{deployment_status.id}}.json
+    extract:
+      - action
+      - deployment.id
+      - deployment.ref
+      - deployment.sha
+      - deployment.environment
+      - deployment_status.id
+      - deployment_status.state
+      - deployment_status.environment
   push:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
   issues:

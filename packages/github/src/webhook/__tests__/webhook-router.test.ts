@@ -57,6 +57,9 @@ function createAdapterMocks() {
     ingestCheckRun: mock.method(adapter, 'ingestCheckRun', async () =>
       createResult('/github/repos/acme/widgets/pulls/7/checks/4.json'),
     ),
+    ingestDeploymentStatus: mock.method(adapter, 'ingestDeploymentStatus', async () =>
+      createResult('/github/repos/acme/widgets/deployments/11/statuses/12.json'),
+    ),
   };
 }
 
@@ -184,6 +187,47 @@ describe('WebhookRouter', () => {
     assert.strictEqual(mocks.ingestIssue.mock.calls.length, 0);
   });
 
+  it('route calls correct handler for deployment_status created', async () => {
+    const mocks = createAdapterMocks();
+    const router = new WebhookRouter(mocks.adapter);
+    const payload = {
+      action: 'created',
+      repository: { full_name: 'acme/widgets' },
+      deployment: { id: 11 },
+      deployment_status: { id: 12, state: 'success' },
+    };
+
+    const result = await router.route({ 'x-github-event': 'deployment_status' }, payload);
+    assert.deepStrictEqual(
+      result,
+      createResult('/github/repos/acme/widgets/deployments/11/statuses/12.json'),
+    );
+    assert.strictEqual(mocks.ingestDeploymentStatus.mock.calls.length, 1);
+    assert.deepStrictEqual(mocks.ingestDeploymentStatus.mock.calls[0].arguments, [payload]);
+    assert.strictEqual(mocks.ingestPullRequest.mock.calls.length, 0);
+    assert.strictEqual(mocks.ingestIssue.mock.calls.length, 0);
+  });
+
+  it('adapter routeWebhook maps deployment_status.created to a scoped path', async () => {
+    const adapter = new GitHubAdapter();
+
+    const result = await adapter.routeWebhook(
+      {
+        id: 'delivery-level-id',
+        action: 'created',
+        repository: { full_name: 'acme/widgets' },
+        deployment: { id: 11 },
+        deployment_status: { id: 12, state: 'success' },
+      },
+      'deployment_status.created',
+    );
+
+    assert.deepStrictEqual(result.paths, [
+      '/github/repos/acme/widgets/deployments/11/statuses/12.json',
+    ]);
+    assert.deepStrictEqual(result.errors, []);
+  });
+
   it('route returns error for unsupported event', async () => {
     const mocks = createAdapterMocks();
     const router = new WebhookRouter(mocks.adapter);
@@ -223,9 +267,10 @@ describe('WebhookRouter', () => {
     assert.strictEqual(router.isSupported('issues.edited'), true);
     assert.strictEqual(router.isSupported('issues.labeled'), true);
     assert.strictEqual(router.isSupported('check_run.completed'), true);
+    assert.strictEqual(router.isSupported('deployment_status.created'), true);
   });
 
-  it('getSupportedEvents lists all 19 events', () => {
+  it('getSupportedEvents lists all 20 events', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.deepStrictEqual(router.getSupportedEvents(), [
@@ -248,7 +293,8 @@ describe('WebhookRouter', () => {
       'issues.reopened',
       'issues.closed',
       'check_run.completed',
+      'deployment_status.created',
     ]);
-    assert.strictEqual(router.getSupportedEvents().length, 19);
+    assert.strictEqual(router.getSupportedEvents().length, 20);
   });
 });

@@ -14,6 +14,7 @@ import {
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
+  githubDeploymentStatusPath,
   githubIssuePath,
   githubLegacyByTitleAliasPath,
   githubNumberedByTitleAliasPath,
@@ -87,6 +88,7 @@ describe('path-mapper', () => {
       assert.equal(normalizeNangoGitHubModel('Review'), 'review');
       assert.equal(normalizeNangoGitHubModel('ReviewComment'), 'review_comment');
       assert.equal(normalizeNangoGitHubModel('CheckRun'), 'check_run');
+      assert.equal(normalizeNangoGitHubModel('DeploymentStatus'), 'deployment_status');
       assert.equal(normalizeNangoGitHubModel('Commit'), 'commit');
     });
 
@@ -165,6 +167,17 @@ describe('path-mapper', () => {
       assert.equal(
         githubCheckRunPath('octocat', 'hello-world', '1/2'),
         '/github/repos/octocat/hello-world/checks/1%2F2.json',
+      );
+    });
+
+    it('githubDeploymentStatusPath', () => {
+      assert.equal(
+        githubDeploymentStatusPath('octocat', 'hello-world', '42', '789'),
+        '/github/repos/octocat/hello-world/deployments/42/statuses/789.json',
+      );
+      assert.equal(
+        githubDeploymentStatusPath('octocat', 'hello-world', 'deploy/1', 'status/2'),
+        '/github/repos/octocat/hello-world/deployments/deploy%2F1/statuses/status%2F2.json',
       );
     });
 
@@ -276,6 +289,13 @@ describe('path-mapper', () => {
       );
     });
 
+    it('computes deployment_status path with context', () => {
+      assert.equal(
+        computeGitHubPath('deployment_status', '555', { owner: 'octocat', repo: 'hello-world' }),
+        '/github/repos/octocat/hello-world/deployments/deployment-unknown/statuses/555.json',
+      );
+    });
+
     it('computes commit path with context', () => {
       assert.equal(
         computeGitHubPath('commit', 'deadbeef', { owner: 'octocat', repo: 'hello-world' }),
@@ -346,6 +366,7 @@ describe('path-mapper', () => {
       assert.equal(tryNormalizeGitHubObjectType('pull_request'), 'pull_request');
       assert.equal(tryNormalizeGitHubObjectType('pr'), 'pull_request');
       assert.equal(tryNormalizeGitHubObjectType('issue'), 'issue');
+      assert.equal(tryNormalizeGitHubObjectType('deployment_status'), 'deployment_status');
     });
 
     it('returns undefined for unknown types', () => {
