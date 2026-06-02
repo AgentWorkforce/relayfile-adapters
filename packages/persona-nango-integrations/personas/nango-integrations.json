@@ -14,8 +14,8 @@
       "description": "Canonical local workflow for Nango action and sync authoring, including sync checkpoint strategy, dryrun validation, test generation, and handoff evidence."
     },
     {
-      "id": "local/trigger-autocomplete-catalog",
-      "source": ".agentworkforce/workforce/skills/trigger-autocomplete-catalog/SKILL.md",
+      "id": "trigger-autocomplete-catalog",
+      "source": "@agent-relay/trigger-autocomplete-catalog",
       "description": "Enforces webhook/event trigger autocomplete coverage through adapter-core trigger catalog generation (`KNOWN_TRIGGER_CATALOG`) and check-mode drift validation before shipping provider integrations."
     }
   ],

@@ -46,3 +46,15 @@ test('nango docs MCP server is preserved', () => {
   assert.equal(persona.mcpServers.nango.type, 'http');
   assert.equal(persona.mcpServers.nango.url, 'https://nango.dev/docs/mcp');
 });
+
+test('skills are remotely sourced (no repo-local path that hard-fails launch)', () => {
+  for (const skill of persona.skills) {
+    assert.ok(
+      !/\.(md)$/i.test(skill.source) || /^https?:\/\//.test(skill.source),
+      `skill "${skill.id}" source must be remote (prpm/url), got "${skill.source}"`,
+    );
+  }
+  const trigger = persona.skills.find((s) => s.id === 'trigger-autocomplete-catalog');
+  assert.ok(trigger, 'trigger-autocomplete-catalog skill present');
+  assert.equal(trigger.source, '@agent-relay/trigger-autocomplete-catalog');
+});
