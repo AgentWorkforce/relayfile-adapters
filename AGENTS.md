@@ -67,6 +67,15 @@ next `@relayfile/adapter-core` dep bump (release coordination — see
 `/scope-keys`, or `/writeback-paths` export hard-fails the consumer's build; a
 *stale* catalog merely lags until the bump.
 
+> **Adding a new writeback-capable adapter** (one with `resources.ts` writeback
+> paths) puts a new provider in `WRITEBACK_PATH_CATALOG`. Downstream,
+> `@agentworkforce/relay-helpers` (workforce) must add a named `<provider>Client`
+> for it — its test *"every catalog provider has a named client export"* goes red
+> on the next adapter-core bump until someone does. So when you add an adapter,
+> leave a note on the release/bump PR so the workforce side gets its client (see
+> `packages/relay-helpers/AGENTS.md` there). The build enforces it; this is the
+> heads-up so it isn't a surprise.
+
 ### Generated adapter path templates are not authoritative
 
 Older mapping specs and generated workflow prompts may still contain the legacy
