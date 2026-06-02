@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-reddit",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Reddit adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -54,7 +54,7 @@
     "directory": "packages/reddit"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.29"
+    "@relayfile/adapter-core": "^0.3.30"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
