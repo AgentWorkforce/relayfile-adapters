@@ -99,6 +99,18 @@ jobs:
           esac
           echo "package=$pkg" >> "$GITHUB_OUTPUT"
 
+      - name: Test selected persona package
+        env:
+          PKG: ${{ steps.validate.outputs.package }}
+        run: |
+          set -euo pipefail
+          cd "packages/$PKG"
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            npm test
+          else
+            echo "No package-level test script for $PKG"
+          fi
+
       - name: Version package
         env:
           PKG: ${{ steps.validate.outputs.package }}
