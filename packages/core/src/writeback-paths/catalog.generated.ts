@@ -9,453 +9,666 @@
 
 export const WRITEBACK_PATH_CATALOG = {
   "asana": {
-    "projects": {
-      "path": "/asana/projects",
-      "params": []
-    },
-    "sections": {
-      "path": "/asana/sections",
-      "params": []
-    },
-    "tasks": {
-      "path": "/asana/tasks",
-      "params": []
-    }
+    "projects": [
+      {
+        "path": "/asana/projects",
+        "params": []
+      }
+    ],
+    "sections": [
+      {
+        "path": "/asana/projects/{projectId}/sections",
+        "params": [
+          "projectId"
+        ]
+      },
+      {
+        "path": "/asana/sections",
+        "params": []
+      }
+    ],
+    "tasks": [
+      {
+        "path": "/asana/tasks",
+        "params": []
+      }
+    ]
   },
   "azure-blob": {
-    "blobs": {
-      "path": "/azure-blob/blobs",
-      "params": []
-    },
-    "event-subscriptions": {
-      "path": "/azure-blob/event-subscriptions",
-      "params": []
-    }
+    "blobs": [
+      {
+        "path": "/azure-blob/blobs",
+        "params": []
+      }
+    ],
+    "event-subscriptions": [
+      {
+        "path": "/azure-blob/event-subscriptions",
+        "params": []
+      }
+    ]
   },
   "box": {
-    "files": {
-      "path": "/box/files",
-      "params": []
-    },
-    "webhooks": {
-      "path": "/box/webhooks",
-      "params": []
-    }
+    "files": [
+      {
+        "path": "/box/files",
+        "params": []
+      }
+    ],
+    "webhooks": [
+      {
+        "path": "/box/webhooks",
+        "params": []
+      }
+    ]
   },
   "clickup": {
-    "comments": {
-      "path": "/clickup/tasks/{taskId}/comments",
-      "params": [
-        "taskId"
-      ]
-    },
-    "folders": {
-      "path": "/clickup/spaces/{spaceId}/folders",
-      "params": [
-        "spaceId"
-      ]
-    },
-    "lists": {
-      "path": "/clickup/folders/{folderId}/lists",
-      "params": [
-        "folderId"
-      ]
-    },
-    "tasks": {
-      "path": "/clickup/lists/{listId}/tasks",
-      "params": [
-        "listId"
-      ]
-    }
+    "comments": [
+      {
+        "path": "/clickup/tasks/{taskId}/comments",
+        "params": [
+          "taskId"
+        ]
+      }
+    ],
+    "folders": [
+      {
+        "path": "/clickup/spaces/{spaceId}/folders",
+        "params": [
+          "spaceId"
+        ]
+      }
+    ],
+    "lists": [
+      {
+        "path": "/clickup/folders/{folderId}/lists",
+        "params": [
+          "folderId"
+        ]
+      },
+      {
+        "path": "/clickup/spaces/{spaceId}/lists",
+        "params": [
+          "spaceId"
+        ]
+      }
+    ],
+    "tasks": [
+      {
+        "path": "/clickup/lists/{listId}/tasks",
+        "params": [
+          "listId"
+        ]
+      }
+    ]
   },
   "confluence": {
-    "pages": {
-      "path": "/confluence/pages",
-      "params": []
-    }
+    "pages": [
+      {
+        "path": "/confluence/pages",
+        "params": []
+      },
+      {
+        "path": "/confluence/spaces/{spaceIdOrKey}/pages",
+        "params": [
+          "spaceIdOrKey"
+        ]
+      }
+    ]
   },
   "dropbox": {
-    "files": {
-      "path": "/dropbox/files",
-      "params": []
-    },
-    "folders": {
-      "path": "/dropbox/folders",
-      "params": []
-    },
-    "shared-folders": {
-      "path": "/dropbox/shared-folders",
-      "params": []
-    },
-    "shared-links": {
-      "path": "/dropbox/shared-links",
-      "params": []
-    }
+    "files": [
+      {
+        "path": "/dropbox/files",
+        "params": []
+      }
+    ],
+    "folders": [
+      {
+        "path": "/dropbox/folders",
+        "params": []
+      }
+    ],
+    "shared-folders": [
+      {
+        "path": "/dropbox/shared-folders",
+        "params": []
+      }
+    ],
+    "shared-links": [
+      {
+        "path": "/dropbox/shared-links",
+        "params": []
+      }
+    ]
   },
   "gcs": {
-    "notifications": {
-      "path": "/gcs/notifications",
-      "params": []
-    },
-    "objects": {
-      "path": "/gcs/objects",
-      "params": []
-    }
+    "notifications": [
+      {
+        "path": "/gcs/notifications",
+        "params": []
+      }
+    ],
+    "objects": [
+      {
+        "path": "/gcs/objects",
+        "params": []
+      }
+    ]
   },
   "github": {
-    "issue-comments": {
-      "path": "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
-      "params": [
-        "owner",
-        "repo",
-        "issueNumber"
-      ]
-    },
-    "issues": {
-      "path": "/github/repos/{owner}/{repo}/issues",
-      "params": [
-        "owner",
-        "repo"
-      ]
-    },
-    "merge": {
-      "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json",
-      "params": [
-        "owner",
-        "repo",
-        "pullNumber"
-      ]
-    },
-    "reviews": {
-      "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews",
-      "params": [
-        "owner",
-        "repo",
-        "pullNumber"
-      ]
-    }
+    "issue-comments": [
+      {
+        "path": "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
+        "params": [
+          "owner",
+          "repo",
+          "issueNumber"
+        ]
+      }
+    ],
+    "issues": [
+      {
+        "path": "/github/repos/{owner}/{repo}/issues",
+        "params": [
+          "owner",
+          "repo"
+        ]
+      }
+    ],
+    "merge": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber"
+        ]
+      }
+    ],
+    "reviews": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber"
+        ]
+      }
+    ]
   },
   "gitlab": {
-    "comments": {
-      "path": "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments",
-      "params": [
-        "projectPath",
-        "issueIid",
-        "slug"
-      ]
-    },
-    "discussions": {
-      "path": "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions",
-      "params": [
-        "projectPath",
-        "mergeRequestIid",
-        "slug"
-      ]
-    }
+    "comments": [
+      {
+        "path": "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments",
+        "params": [
+          "projectPath",
+          "issueIid",
+          "slug"
+        ]
+      }
+    ],
+    "discussions": [
+      {
+        "path": "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions",
+        "params": [
+          "projectPath",
+          "mergeRequestIid",
+          "slug"
+        ]
+      }
+    ]
   },
   "gmail": {
-    "drafts": {
-      "path": "/gmail/drafts",
-      "params": []
-    },
-    "threads": {
-      "path": "/gmail/threads",
-      "params": []
-    },
-    "watches": {
-      "path": "/gmail/watches",
-      "params": []
-    }
+    "drafts": [
+      {
+        "path": "/gmail/drafts",
+        "params": []
+      }
+    ],
+    "threads": [
+      {
+        "path": "/gmail/threads",
+        "params": []
+      }
+    ],
+    "watches": [
+      {
+        "path": "/gmail/watches",
+        "params": []
+      }
+    ]
   },
   "google-calendar": {
-    "events": {
-      "path": "/google-calendar/calendars/{calendarId}/events",
-      "params": [
-        "calendarId"
-      ]
-    }
+    "events": [
+      {
+        "path": "/google-calendar/calendars/{calendarId}/events",
+        "params": [
+          "calendarId"
+        ]
+      }
+    ]
   },
   "google-drive": {
-    "channels": {
-      "path": "/google-drive/channels",
-      "params": []
-    },
-    "files": {
-      "path": "/google-drive/files",
-      "params": []
-    }
+    "channels": [
+      {
+        "path": "/google-drive/channels",
+        "params": []
+      }
+    ],
+    "files": [
+      {
+        "path": "/google-drive/files",
+        "params": []
+      }
+    ]
   },
   "granola": {
-    "folders": {
-      "path": "/granola/folders",
-      "params": []
-    },
-    "notes": {
-      "path": "/granola/notes",
-      "params": []
-    }
+    "folders": [
+      {
+        "path": "/granola/folders",
+        "params": []
+      }
+    ],
+    "notes": [
+      {
+        "path": "/granola/notes",
+        "params": []
+      }
+    ]
   },
   "hubspot": {
-    "companies": {
-      "path": "/hubspot/companies",
-      "params": []
-    },
-    "contacts": {
-      "path": "/hubspot/contacts",
-      "params": []
-    },
-    "deals": {
-      "path": "/hubspot/deals",
-      "params": []
-    },
-    "tickets": {
-      "path": "/hubspot/tickets",
-      "params": []
-    }
+    "companies": [
+      {
+        "path": "/hubspot/companies",
+        "params": []
+      }
+    ],
+    "contacts": [
+      {
+        "path": "/hubspot/contacts",
+        "params": []
+      }
+    ],
+    "deals": [
+      {
+        "path": "/hubspot/deals",
+        "params": []
+      }
+    ],
+    "tickets": [
+      {
+        "path": "/hubspot/tickets",
+        "params": []
+      }
+    ]
   },
   "intercom": {
-    "companies": {
-      "path": "/intercom/companies",
-      "params": []
-    },
-    "contacts": {
-      "path": "/intercom/contacts",
-      "params": []
-    },
-    "conversations": {
-      "path": "/intercom/conversations",
-      "params": []
-    }
+    "companies": [
+      {
+        "path": "/intercom/companies",
+        "params": []
+      }
+    ],
+    "contacts": [
+      {
+        "path": "/intercom/contacts",
+        "params": []
+      }
+    ],
+    "conversations": [
+      {
+        "path": "/intercom/conversations",
+        "params": []
+      }
+    ]
   },
   "jira": {
-    "comments": {
-      "path": "/jira/issues/{issueIdOrKey}/comments",
-      "params": [
-        "issueIdOrKey"
-      ]
-    },
-    "issues": {
-      "path": "/jira/issues",
-      "params": []
-    },
-    "projects": {
-      "path": "/jira/projects",
-      "params": []
-    },
-    "transitions": {
-      "path": "/jira/issues/{issueIdOrKey}/transitions",
-      "params": [
-        "issueIdOrKey"
-      ]
-    }
+    "comments": [
+      {
+        "path": "/jira/issues/{issueIdOrKey}/comments",
+        "params": [
+          "issueIdOrKey"
+        ]
+      }
+    ],
+    "issues": [
+      {
+        "path": "/jira/issues",
+        "params": []
+      }
+    ],
+    "projects": [
+      {
+        "path": "/jira/projects",
+        "params": []
+      }
+    ],
+    "transitions": [
+      {
+        "path": "/jira/issues/{issueIdOrKey}/transitions",
+        "params": [
+          "issueIdOrKey"
+        ]
+      }
+    ]
   },
   "linear": {
-    "comments": {
-      "path": "/linear/issues/{issueId}/comments",
-      "params": [
-        "issueId"
-      ]
-    },
-    "issues": {
-      "path": "/linear/issues",
-      "params": []
-    }
+    "comments": [
+      {
+        "path": "/linear/issues/{issueId}/comments",
+        "params": [
+          "issueId"
+        ]
+      }
+    ],
+    "issues": [
+      {
+        "path": "/linear/issues",
+        "params": []
+      }
+    ]
   },
   "notion": {
-    "comments": {
-      "path": "/notion/databases/{databaseId}/pages/{pageId}/comments.json",
-      "params": [
-        "databaseId",
-        "pageId"
-      ]
-    },
-    "content": {
-      "path": "/notion/databases/{databaseId}/pages/{pageId}/content.md",
-      "params": [
-        "databaseId",
-        "pageId"
-      ]
-    },
-    "pages": {
-      "path": "/notion/databases/{databaseId}/pages",
-      "params": [
-        "databaseId"
-      ]
-    },
-    "properties": {
-      "path": "/notion/databases/{databaseId}/pages/{pageId}/properties.json",
-      "params": [
-        "databaseId",
-        "pageId"
-      ]
-    }
+    "comments": [
+      {
+        "path": "/notion/databases/{databaseId}/pages/{pageId}/comments.json",
+        "params": [
+          "databaseId",
+          "pageId"
+        ]
+      },
+      {
+        "path": "/notion/pages/{pageId}/comments.json",
+        "params": [
+          "pageId"
+        ]
+      }
+    ],
+    "content": [
+      {
+        "path": "/notion/databases/{databaseId}/pages/{pageId}/content.md",
+        "params": [
+          "databaseId",
+          "pageId"
+        ]
+      },
+      {
+        "path": "/notion/pages/{pageId}/content.md",
+        "params": [
+          "pageId"
+        ]
+      }
+    ],
+    "pages": [
+      {
+        "path": "/notion/databases/{databaseId}/pages",
+        "params": [
+          "databaseId"
+        ]
+      },
+      {
+        "path": "/notion/databases/{databaseId}/pages/{pageId}.json",
+        "params": [
+          "databaseId",
+          "pageId"
+        ]
+      },
+      {
+        "path": "/notion/pages/{pageId}.json",
+        "params": [
+          "pageId"
+        ]
+      }
+    ],
+    "properties": [
+      {
+        "path": "/notion/databases/{databaseId}/pages/{pageId}/properties.json",
+        "params": [
+          "databaseId",
+          "pageId"
+        ]
+      },
+      {
+        "path": "/notion/pages/{pageId}/properties.json",
+        "params": [
+          "pageId"
+        ]
+      }
+    ]
   },
   "onedrive": {
-    "items": {
-      "path": "/onedrive/items",
-      "params": []
-    },
-    "subscriptions": {
-      "path": "/onedrive/subscriptions",
-      "params": []
-    }
+    "items": [
+      {
+        "path": "/onedrive/items",
+        "params": []
+      }
+    ],
+    "subscriptions": [
+      {
+        "path": "/onedrive/subscriptions",
+        "params": []
+      }
+    ]
   },
   "pipedrive": {
-    "activities": {
-      "path": "/pipedrive/activities",
-      "params": []
-    },
-    "deals": {
-      "path": "/pipedrive/deals",
-      "params": []
-    },
-    "organizations": {
-      "path": "/pipedrive/organizations",
-      "params": []
-    },
-    "persons": {
-      "path": "/pipedrive/persons",
-      "params": []
-    }
+    "activities": [
+      {
+        "path": "/pipedrive/activities",
+        "params": []
+      }
+    ],
+    "deals": [
+      {
+        "path": "/pipedrive/deals",
+        "params": []
+      }
+    ],
+    "organizations": [
+      {
+        "path": "/pipedrive/organizations",
+        "params": []
+      }
+    ],
+    "persons": [
+      {
+        "path": "/pipedrive/persons",
+        "params": []
+      }
+    ]
   },
   "postgres": {
-    "listeners": {
-      "path": "/postgres/listeners",
-      "params": []
-    },
-    "rows": {
-      "path": "/postgres/rows",
-      "params": []
-    }
+    "listeners": [
+      {
+        "path": "/postgres/listeners",
+        "params": []
+      }
+    ],
+    "rows": [
+      {
+        "path": "/postgres/rows",
+        "params": []
+      }
+    ]
   },
   "reddit": {
-    "posts": {
-      "path": "/reddit/subreddits/{subreddit}/posts",
-      "params": [
-        "subreddit"
-      ]
-    },
-    "subreddits": {
-      "path": "/reddit/subreddits",
-      "params": []
-    }
+    "posts": [
+      {
+        "path": "/reddit/subreddits/{subreddit}/posts",
+        "params": [
+          "subreddit"
+        ]
+      }
+    ],
+    "subreddits": [
+      {
+        "path": "/reddit/subreddits",
+        "params": []
+      }
+    ]
   },
   "redis": {
-    "keys": {
-      "path": "/redis/keys",
-      "params": []
-    },
-    "listeners": {
-      "path": "/redis/listeners",
-      "params": []
-    }
+    "keys": [
+      {
+        "path": "/redis/keys",
+        "params": []
+      }
+    ],
+    "listeners": [
+      {
+        "path": "/redis/listeners",
+        "params": []
+      }
+    ]
   },
   "s3": {
-    "objects": {
-      "path": "/s3/objects",
-      "params": []
-    },
-    "queues": {
-      "path": "/s3/queues",
-      "params": []
-    }
+    "objects": [
+      {
+        "path": "/s3/objects",
+        "params": []
+      }
+    ],
+    "queues": [
+      {
+        "path": "/s3/queues",
+        "params": []
+      }
+    ]
   },
   "salesforce": {
-    "accounts": {
-      "path": "/salesforce/accounts",
-      "params": []
-    },
-    "cases": {
-      "path": "/salesforce/cases",
-      "params": []
-    },
-    "contacts": {
-      "path": "/salesforce/contacts",
-      "params": []
-    },
-    "leads": {
-      "path": "/salesforce/leads",
-      "params": []
-    },
-    "opportunities": {
-      "path": "/salesforce/opportunities",
-      "params": []
-    }
+    "accounts": [
+      {
+        "path": "/salesforce/accounts",
+        "params": []
+      }
+    ],
+    "cases": [
+      {
+        "path": "/salesforce/cases",
+        "params": []
+      }
+    ],
+    "contacts": [
+      {
+        "path": "/salesforce/contacts",
+        "params": []
+      }
+    ],
+    "leads": [
+      {
+        "path": "/salesforce/leads",
+        "params": []
+      }
+    ],
+    "opportunities": [
+      {
+        "path": "/salesforce/opportunities",
+        "params": []
+      }
+    ]
   },
   "sharepoint": {
-    "items": {
-      "path": "/sharepoint/items",
-      "params": []
-    },
-    "subscriptions": {
-      "path": "/sharepoint/subscriptions",
-      "params": []
-    }
+    "items": [
+      {
+        "path": "/sharepoint/items",
+        "params": []
+      }
+    ],
+    "subscriptions": [
+      {
+        "path": "/sharepoint/subscriptions",
+        "params": []
+      }
+    ]
   },
   "slack": {
-    "direct-messages": {
-      "path": "/slack/users/{userId}/messages",
-      "params": [
-        "userId"
-      ]
-    },
-    "messages": {
-      "path": "/slack/channels/{channelId}/messages",
-      "params": [
-        "channelId"
-      ]
-    },
-    "reactions": {
-      "path": "/slack/channels/{channelId}/messages/{messageTs}/reactions",
-      "params": [
-        "channelId",
-        "messageTs"
-      ]
-    },
-    "replies": {
-      "path": "/slack/channels/{channelId}/messages/{messageTs}/replies",
-      "params": [
-        "channelId",
-        "messageTs"
-      ]
-    }
+    "direct-messages": [
+      {
+        "path": "/slack/users/{userId}/messages",
+        "params": [
+          "userId"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "path": "/slack/channels/{channelId}/messages",
+        "params": [
+          "channelId"
+        ]
+      }
+    ],
+    "reactions": [
+      {
+        "path": "/slack/channels/{channelId}/messages/{messageTs}/reactions",
+        "params": [
+          "channelId",
+          "messageTs"
+        ]
+      }
+    ],
+    "replies": [
+      {
+        "path": "/slack/channels/{channelId}/messages/{messageTs}/replies",
+        "params": [
+          "channelId",
+          "messageTs"
+        ]
+      }
+    ]
   },
   "teams": {
-    "messages": {
-      "path": "/teams/{teamId}/channels/{channelId}/messages",
-      "params": [
-        "teamId",
-        "channelId"
-      ]
-    },
-    "replies": {
-      "path": "/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies",
-      "params": [
-        "teamId",
-        "channelId",
-        "messageId"
-      ]
-    }
+    "messages": [
+      {
+        "path": "/teams/{teamId}/channels/{channelId}/messages",
+        "params": [
+          "teamId",
+          "channelId"
+        ]
+      },
+      {
+        "path": "/teams/chats/{chatId}/messages",
+        "params": [
+          "chatId"
+        ]
+      }
+    ],
+    "replies": [
+      {
+        "path": "/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies",
+        "params": [
+          "teamId",
+          "channelId",
+          "messageId"
+        ]
+      }
+    ]
   },
   "zendesk": {
-    "comments": {
-      "path": "/zendesk/tickets/{ticketId}/comments",
-      "params": [
-        "ticketId"
-      ]
-    },
-    "tickets": {
-      "path": "/zendesk/tickets",
-      "params": []
-    },
-    "users": {
-      "path": "/zendesk/users",
-      "params": []
-    }
+    "comments": [
+      {
+        "path": "/zendesk/tickets/{ticketId}/comments",
+        "params": [
+          "ticketId"
+        ]
+      }
+    ],
+    "tickets": [
+      {
+        "path": "/zendesk/tickets",
+        "params": []
+      }
+    ],
+    "users": [
+      {
+        "path": "/zendesk/users",
+        "params": []
+      }
+    ]
   }
 } as const satisfies Record<
   string,
-  Record<string, { path: string; params: readonly string[] }>
+  Record<string, readonly { path: string; params: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [

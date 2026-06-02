@@ -22,8 +22,17 @@ export interface WritebackResourcePath {
   params: string[];
 }
 
-/** provider → resource name → path template. */
-export type WritebackPathCatalog = Record<string, Record<string, WritebackResourcePath>>;
+/**
+ * provider → resource name → path template variants.
+ *
+ * A resource `name` is NOT unique within an adapter: the same entity is mounted
+ * at several paths (e.g. notion `pages` →
+ * `/notion/databases/{databaseId}/pages`, `/notion/pages/{pageId}.json`, …).
+ * Every distinct template is kept; the resolver disambiguates by the exact set
+ * of params supplied. Collapsing to one path per name would silently drop valid
+ * writeback targets.
+ */
+export type WritebackPathCatalog = Record<string, Record<string, WritebackResourcePath[]>>;
 
 export interface AdapterWithoutWritebackPaths {
   packageName: string;
@@ -116,7 +125,9 @@ export async function writeWritebackPathCatalog(
         mismatches.push(relative(repoRoot, filePath));
         continue;
       }
-      if (actual !== expected) {
+      // Normalize line endings: a CRLF checkout (Windows, no enforced
+      // `.gitattributes`) must not read as a false out-of-sync mismatch.
+      if (normalizeEol(actual) !== normalizeEol(expected)) {
         mismatches.push(relative(repoRoot, filePath));
       }
     }
@@ -153,7 +164,7 @@ export function renderWritebackPathCatalogModule(generation: WritebackPathCatalo
   return `${GENERATED_HEADER}
 export const WRITEBACK_PATH_CATALOG = ${renderInlineJson(generation.catalog)} as const satisfies Record<
   string,
-  Record<string, { path: string; params: readonly string[] }>
+  Record<string, readonly { path: string; params: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = ${renderInlineJson(generation.adaptersWithoutWritebackPaths)} as const;
@@ -242,25 +253,40 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
 function sortCatalog(
   entries: Array<{ provider: string; resources: AdapterResource[] }>
 ): WritebackPathCatalog {
-  const catalog = new Map<string, Map<string, WritebackResourcePath>>();
+  // provider → name → (path → variant). The inner map dedupes by path so an
+  // exact (name, path) repeat collapses, while genuinely distinct templates
+  // sharing a name are all retained (notion `pages`, asana `sections`, …).
+  const catalog = new Map<string, Map<string, Map<string, WritebackResourcePath>>>();
   for (const entry of entries) {
-    const existing = catalog.get(entry.provider) ?? new Map<string, WritebackResourcePath>();
+    const byName = catalog.get(entry.provider) ?? new Map<string, Map<string, WritebackResourcePath>>();
     for (const resource of entry.resources) {
-      // First declaration wins; resource names are unique per adapter.
-      if (!existing.has(resource.name)) {
-        existing.set(resource.name, { path: resource.path, params: extractParams(resource.path) });
+      const byPath = byName.get(resource.name) ?? new Map<string, WritebackResourcePath>();
+      if (!byPath.has(resource.path)) {
+        byPath.set(resource.path, { path: resource.path, params: extractParams(resource.path) });
       }
+      byName.set(resource.name, byPath);
     }
-    catalog.set(entry.provider, existing);
+    catalog.set(entry.provider, byName);
   }
   return Object.fromEntries(
     [...catalog.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([provider, resources]) => [
+      .map(([provider, byName]) => [
         provider,
-        Object.fromEntries([...resources.entries()].sort(([left], [right]) => left.localeCompare(right))),
+        Object.fromEntries(
+          [...byName.entries()]
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([name, byPath]) => [
+              name,
+              [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path)),
+            ])
+        ),
       ])
   );
+}
+
+function normalizeEol(value: string): string {
+  return value.replace(/\r\n/gu, "\n");
 }
 
 /** Placeholder names in template order, e.g. `/x/{a}/y/{b}` → `["a","b"]`. */

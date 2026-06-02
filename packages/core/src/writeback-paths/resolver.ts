@@ -32,25 +32,63 @@ export function writebackPath<P extends WritebackProvider>(
 ): string;
 export function writebackPath(provider: string, resource: string, params?: WritebackPathParams): string;
 export function writebackPath(provider: string, resource: string, params: WritebackPathParams = {}): string {
-  const providerEntry = (WRITEBACK_PATH_CATALOG as Record<string, Record<string, { path: string; params: readonly string[] }>>)[provider];
-  if (!providerEntry) {
+  const catalog = WRITEBACK_PATH_CATALOG as Record<
+    string,
+    Record<string, readonly { path: string; params: readonly string[] }[]>
+  >;
+  // `Object.hasOwn` (not `catalog[provider]`) so prototype keys like
+  // "constructor"/"toString" resolve to the loud error, not a stray function
+  // off Object.prototype.
+  if (!Object.hasOwn(catalog, provider)) {
     throw new WritebackPathError(
-      `Unknown writeback provider "${provider}". Known providers: ${Object.keys(WRITEBACK_PATH_CATALOG).join(", ")}`
+      `Unknown writeback provider "${provider}". Known providers: ${Object.keys(catalog).join(", ")}`
     );
   }
-  const resourceEntry = providerEntry[resource];
-  if (!resourceEntry) {
+  const providerEntry = catalog[provider];
+  if (!Object.hasOwn(providerEntry, resource)) {
     throw new WritebackPathError(
       `Unknown writeback resource "${resource}" for provider "${provider}". Known resources: ${Object.keys(providerEntry).join(", ")}`
     );
   }
-  return resourceEntry.path.replace(/\{([^}]+)\}/gu, (_match, name: string) => {
+  const variant = selectVariant(provider, resource, providerEntry[resource], params);
+  return variant.path.replace(/\{([^}]+)\}/gu, (_match, name: string) => {
     const value = params[name];
     if (value === undefined || value === null || value === "") {
       throw new WritebackPathError(
-        `Missing path parameter "${name}" for ${provider}/${resource} (template "${resourceEntry.path}")`
+        `Missing path parameter "${name}" for ${provider}/${resource} (template "${variant.path}")`
       );
     }
     return encodeURIComponent(String(value));
   });
+}
+
+/**
+ * A resource name can map to several path templates (the same entity mounted at
+ * different roots). With a single template there's nothing to choose. With
+ * several, the supplied param keys must exactly match one template's params —
+ * `{databaseId}` vs `{databaseId, pageId}` vs `{pageId}` are distinct — so the
+ * choice is deterministic. Anything else throws rather than guessing.
+ */
+function selectVariant(
+  provider: string,
+  resource: string,
+  variants: readonly { path: string; params: readonly string[] }[],
+  params: WritebackPathParams
+): { path: string; params: readonly string[] } {
+  if (variants.length === 1) {
+    return variants[0];
+  }
+  const providedKeys = new Set(Object.keys(params));
+  const matches = variants.filter(
+    (variant) =>
+      variant.params.length === providedKeys.size && variant.params.every((name) => providedKeys.has(name))
+  );
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  const templates = variants.map((variant) => `"${variant.path}" (params: ${variant.params.join(", ") || "none"})`).join("; ");
+  throw new WritebackPathError(
+    `Ambiguous writeback resource "${resource}" for provider "${provider}": ` +
+      `params {${[...providedKeys].join(", ") || "none"}} ${matches.length === 0 ? "match no" : "match multiple"} of its ${variants.length} templates. Candidates: ${templates}`
+  );
 }
