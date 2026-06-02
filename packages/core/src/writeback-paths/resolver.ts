@@ -52,7 +52,10 @@ export function writebackPath(provider: string, resource: string, params: Writeb
   }
   const variant = selectVariant(provider, resource, providerEntry[resource], params);
   return variant.path.replace(/\{([^}]+)\}/gu, (_match, name: string) => {
-    const value = params[name];
+    // `Object.hasOwn`, not `params[name]`: a template param named like
+    // "toString"/"constructor" would otherwise resolve to an Object.prototype
+    // member and bypass the missing-param check, baking garbage into the path.
+    const value = Object.hasOwn(params, name) ? params[name] : undefined;
     if (value === undefined || value === null || value === "") {
       throw new WritebackPathError(
         `Missing path parameter "${name}" for ${provider}/${resource} (template "${variant.path}")`
