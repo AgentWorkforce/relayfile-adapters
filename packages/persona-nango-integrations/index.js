@@ -6,14 +6,11 @@ const require = createRequire(import.meta.url);
  * The nango-integrations persona spec. The persona builds and maintains Nango
  * TypeScript integrations and their Cloud-side Relayfile wiring.
  *
- * Source of truth: `persona.json` in this package. Consumers (cloud, nightcto)
- * serialize this object to their on-disk persona.json via a checked-in generate
- * script with a drift check.
- *
- * Loaded via createRequire so it works on every supported Node version without
- * relying on JSON import attributes.
+ * Source of truth: `personas/nango-integrations.json`. This compatibility
+ * export keeps existing programmatic consumers working while the package also
+ * acts as an AgentWorkforce installable persona pack.
  */
-const persona = require('./persona.json');
+const persona = require('./personas/nango-integrations.json');
 
 export const nangoIntegrationsPersona = persona;
 
