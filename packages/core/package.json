@@ -22,6 +22,10 @@
       "types": "./dist/src/writeback-paths/index.d.ts",
       "default": "./dist/src/writeback-paths/index.js"
     },
+    "./vfs-client": {
+      "types": "./dist/src/vfs-client/index.d.ts",
+      "default": "./dist/src/vfs-client/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {

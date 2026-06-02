@@ -12,11 +12,11 @@ Every adapter under `packages/<name>` MUST:
 
 ### Declared catalogs: triggers, scope keys, and writeback paths
 
-An adapter declares part of its contract as **data** so downstream consumers
-(notably `@agentworkforce/persona-kit`, which types persona authoring, and
-`@agentworkforce/relay-helpers`, which resolves draft paths) can autocomplete
-and lint against it. When you add an adapter or change what it supports, keep
-these current:
+An adapter declares part of its contract as **data** so consumers
+(`@agentworkforce/persona-kit`, which types persona authoring, and the in-repo
+`@relayfile/relay-helpers`, which resolves draft paths into ergonomic clients)
+can autocomplete and lint against it. When you add an adapter or change what it
+supports, keep these current:
 
 - **`supportedEvents(): string[]`** (adapter class, or a `webhooks:` block in
   `<provider>.mapping.yaml`) — the trigger event names the adapter emits
@@ -61,11 +61,19 @@ without regenerating fails the build. Ad-hoc check form:
 `npx adapter-core triggers check` / `npx adapter-core scope-keys check` /
 `npx adapter-core writeback-paths check`.
 
-Cross-repo: a catalog change reaches `persona-kit` / `relay-helpers` only on its
+Cross-repo: a catalog change reaches `@agentworkforce/persona-kit` only on its
 next `@relayfile/adapter-core` dep bump (release coordination — see
 [Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers`,
 `/scope-keys`, or `/writeback-paths` export hard-fails the consumer's build; a
 *stale* catalog merely lags until the bump.
+
+In-repo: `@relayfile/relay-helpers` (`packages/relay-helpers`) consumes
+`/writeback-paths` directly as a workspace dep, so a new writeback-capable
+adapter (a new provider in `WRITEBACK_PATH_CATALOG`) makes its
+*"every catalog provider has a named client export"* / generated-clients-in-sync
+tests go red in the **same** `turbo test`. Fix by regenerating its clients:
+`npm run gen -w @relayfile/relay-helpers`. No cross-repo lag — the build here
+enforces it.
 
 ### Generated adapter path templates are not authoritative
 

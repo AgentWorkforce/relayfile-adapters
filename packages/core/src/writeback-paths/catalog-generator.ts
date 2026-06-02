@@ -73,7 +73,11 @@ const GENERATED_HEADER = `/**
  */
 `;
 
-const NON_ADAPTER_PACKAGES = new Set(["@relayfile/adapter-core", "@relayfile/webhook-server"]);
+const NON_ADAPTER_PACKAGES = new Set([
+  "@relayfile/adapter-core",
+  "@relayfile/webhook-server",
+  "@relayfile/relay-helpers"
+]);
 
 export async function generateWritebackPathCatalog(
   repoRoot?: string

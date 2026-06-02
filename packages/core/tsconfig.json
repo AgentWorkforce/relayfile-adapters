@@ -25,7 +25,8 @@
     "tests/emit-auxiliary/**/*.test.ts",
     "tests/triggers/**/*.test.ts",
     "tests/scope-keys/**/*.test.ts",
-    "tests/writeback-paths/**/*.test.ts"
+    "tests/writeback-paths/**/*.test.ts",
+    "tests/vfs-client/**/*.test.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }
