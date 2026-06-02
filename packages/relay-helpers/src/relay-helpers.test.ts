@@ -114,6 +114,14 @@ test('a named resource-keyed client resolves and writes catalog paths', async ()
   assert.deepEqual(draft.body, { title: 'P' });
 });
 
+test('read() rejects (not throws synchronously) on a collection resource', async () => {
+  const { opts } = await mount();
+  // `comments` is a collection path, so read is invalid — but calling it must
+  // not throw synchronously; the returned promise rejects so `.catch()` works.
+  const promise = relayClient('linear', opts).read('comments', { issueId: 'ISS-1' });
+  await assert.rejects(promise, /resolves to collection/);
+});
+
 test('providerClient throws a clear error for an unknown provider', () => {
   assert.throws(
     () => providerClient('not-a-provider' as never),

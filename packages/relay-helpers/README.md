@@ -16,7 +16,7 @@ const linear = linearClient();             // binds the mount root once (RELAYFI
 const issue = await linear.getIssue(issueId);
 await linear.comment(issueId, ':rocket: done');
 
-await githubClient().merge({ owner, repo, number });
+await githubClient().mergePullRequest({ owner, repo, number });
 await slackClient().post('#eng', 'shipped');
 ```
 

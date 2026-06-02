@@ -2,6 +2,7 @@
   "name": "@relayfile/relay-helpers",
   "version": "0.1.0",
   "description": "Ergonomic, catalog-backed provider clients for Relayfile integration handlers",
+  "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

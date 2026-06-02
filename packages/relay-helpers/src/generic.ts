@@ -66,7 +66,10 @@ export function relayClient<P extends WritebackProvider>(
       const target = isItemPath(base) ? base : `${base}/${draftFile(String(resource))}`;
       return writeJsonFile(opts, provider, `write.${String(resource)}`, target, body);
     },
-    read<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T> {
+    async read<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T> {
+      // `async` so a validation/path error rejects the promise rather than
+      // throwing synchronously — keeps `read` consistent with `write`/`list`
+      // for callers using `.catch()`.
       const path = writebackPath(provider, resource, params);
       if (!isItemPath(path)) {
         throw new Error(
