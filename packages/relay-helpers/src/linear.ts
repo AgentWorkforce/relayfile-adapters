@@ -6,6 +6,7 @@ import {
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
+import type { LinearAgentActivity } from '@relayfile/adapter-linear/types';
 
 export interface LinearCreateIssueArgs {
   teamId: string;
@@ -18,6 +19,12 @@ export interface LinearCreateIssueArgs {
 }
 
 export interface LinearClient extends ProviderClient<'linear'> {
+  /** Post an activity to a Linear Agent Session. */
+  agentActivity(sessionId: string, activity: LinearAgentActivity): Promise<{ id: string; url: string }>;
+  /** Send a response activity to a Linear Agent Session. */
+  respond(sessionId: string, body: string): Promise<{ id: string; url: string }>;
+  /** Send a quick thought activity so Linear knows the agent is working. */
+  acknowledge(sessionId: string): Promise<{ id: string; url: string }>;
   /** Comment on an issue. */
   comment(issueId: string, body: string): Promise<{ id: string; url: string }>;
   /** Create an issue. */
@@ -41,7 +48,16 @@ export interface LinearClient extends ProviderClient<'linear'> {
 export function linearClient(opts: IntegrationClientOptions = {}): LinearClient {
   const base = providerClient('linear', opts);
   const issuePath = (issueId: string) => `${base.issues.path()}/${encodeSegment(issueId)}.json`;
+  const agentActivity = async (sessionId: string, activity: LinearAgentActivity) =>
+    created(await base['agent-activities'].write({ sessionId }, activity));
   return Object.assign(base, {
+    agentActivity,
+    async respond(sessionId: string, body: string) {
+      return agentActivity(sessionId, { type: 'response', body });
+    },
+    async acknowledge(sessionId: string) {
+      return agentActivity(sessionId, { type: 'thought', body: 'Acknowledged.' });
+    },
     async comment(issueId: string, body: string) {
       return created(await base.comments.write({ issueId }, { body }));
     },

@@ -55,7 +55,7 @@
     "directory": "packages/docker-hub"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.30"
+    "@relayfile/adapter-core": "^0.3.31"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

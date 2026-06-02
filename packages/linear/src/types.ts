@@ -37,13 +37,28 @@ export type JsonObject = { [key: string]: JsonValue };
  * `/graphql` with `{ query, variables }`.
  */
 export interface LinearWritebackRequest {
-  action: 'create_comment' | 'create_issue' | 'delete_issue' | 'update_issue';
+  action: 'create_agent_activity' | 'create_comment' | 'create_issue' | 'delete_issue' | 'update_issue';
   method: 'POST';
   endpoint: '/graphql';
   body: {
     query: string;
     variables: Record<string, unknown>;
   };
+}
+
+export type LinearAgentActivityType =
+  | 'action'
+  | 'elicitation'
+  | 'error'
+  | 'response'
+  | 'thought';
+
+export interface LinearAgentActivity {
+  type: LinearAgentActivityType;
+  body?: string;
+  action?: string;
+  parameter?: string;
+  result?: string;
 }
 
 export interface LinearAdapterConfig {
