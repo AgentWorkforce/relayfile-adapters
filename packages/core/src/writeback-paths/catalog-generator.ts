@@ -312,7 +312,14 @@ async function listAdapterPackages(repoRoot: string): Promise<AdapterPackage[]> 
     } catch {
       continue;
     }
-    if (!packageJson.name || NON_ADAPTER_PACKAGES.has(packageJson.name)) {
+    // Only @relayfile/* packages are adapters. Skip other scopes (e.g.
+    // @agentworkforce/persona-* data packages) so they are not scanned as
+    // adapters and listed in the adapters-without-known-* catalogs.
+    if (
+      !packageJson.name ||
+      !packageJson.name.startsWith("@relayfile/") ||
+      NON_ADAPTER_PACKAGES.has(packageJson.name)
+    ) {
       continue;
     }
     packages.push({
