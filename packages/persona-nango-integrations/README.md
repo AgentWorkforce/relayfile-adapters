@@ -13,32 +13,28 @@ mapping, and digest tests) — an integration is not done until both sides land.
 ```ts
 import persona from '@agentworkforce/persona-nango-integrations';
 
-// `persona` is the fully-assembled spec object, with the operations manual
-// inlined as `persona.agentsMdContent`. Serialize it to your on-disk
-// persona.json (see the generate scripts in cloud / nightcto).
+// `persona` is the full spec object (the operations manual is on
+// `persona.agentsMdContent`). Serialize it to your on-disk persona.json — see
+// the generate scripts in cloud / nightcto.
 import { writeFileSync } from 'node:fs';
 writeFileSync('persona.json', JSON.stringify(persona, null, 2) + '\n');
 ```
 
-## Sources of truth
+The raw spec is also available directly:
 
-This package is assembled from two human-editable files:
+```ts
+import persona from '@agentworkforce/persona-nango-integrations/persona.json' with { type: 'json' };
+```
 
-- `persona.base.json` — the persona metadata (id, intent, harness, model,
-  skills, mcpServers, harnessSettings, …) — **everything except the manual**.
-- `AGENTS.md` — the operations manual, inlined into the spec as
-  `agentsMdContent`.
+## Source of truth
 
-`npm run build` runs `scripts/assemble.mjs`, which regenerates the committed
-`src/persona.generated.ts` from those two files, then compiles with `tsc`.
-`npm test` runs `assemble.mjs --check`, which fails on drift — so the generated
-artifact can never silently diverge from its sources.
-
-Edit `persona.base.json` / `AGENTS.md`, never `src/persona.generated.ts`.
+`persona.json` is the single source of truth — a plain-data spec, no build step.
+`index.js` just loads and re-exports it. To change the persona, edit
+`persona.json` and bump the version.
 
 ## Publishing
 
 Published under the `@agentworkforce` scope via the dedicated
-`.github/workflows/publish-persona.yml` workflow (not the `@relayfile/*`
-`publish.yml`). It needs an `AGENTWORKFORCE_NPM_TOKEN` repo secret with publish
-rights to the `@agentworkforce` scope.
+`.github/workflows/publish-persona.yml` workflow (separate from the
+`@relayfile/*` `publish.yml`), using npm `--provenance` (OIDC trusted
+publishing) — same structure as `publish.yml`.

@@ -1,15 +1,12 @@
 name: Publish Persona Package
 
 # Separate from publish.yml because persona packages are published under the
-# @agentworkforce scope (not @relayfile) and therefore need their own npm
-# credentials. publish.yml's `all`/`missing`/group selectors are scoped to
-# @relayfile/* (see scripts/resolve-publish-targets.mjs) and will never sweep
-# a persona package; publish them here instead.
+# @agentworkforce scope (not @relayfile). publish.yml's all/missing/group
+# selectors are scoped to @relayfile/* (see scripts/resolve-publish-targets.mjs)
+# and will never sweep a persona package; publish them here instead.
 #
-# Auth: set the AGENTWORKFORCE_NPM_TOKEN repo secret to an npm automation token
-# with publish rights to the @agentworkforce scope. (If you configure npm
-# trusted publishing for this repo against the @agentworkforce package, you can
-# drop the token and rely on OIDC + --provenance alone.)
+# Structure mirrors publish.yml: it publishes with `--provenance` (npm OIDC
+# trusted publishing via id-token: write), so no npm auth token is needed.
 
 on:
   workflow_dispatch:
@@ -67,12 +64,14 @@ jobs:
           node-version: "22.14.0"
           cache: npm
           registry-url: "https://registry.npmjs.org"
-          scope: "@agentworkforce"
 
       - run: npm ci
 
       - name: Upgrade npm to latest
         run: npm install -g npm@latest
+
+      - name: Build all packages
+        run: npx turbo build
 
       - name: Validate persona package selection
         id: validate
@@ -101,13 +100,6 @@ jobs:
           esac
           echo "package=$pkg" >> "$GITHUB_OUTPUT"
 
-      - name: Build persona package
-        env:
-          PKG: ${{ steps.validate.outputs.package }}
-        run: |
-          name=$(node -p "require('./packages/$PKG/package.json').name")
-          npx turbo build --filter="$name"
-
       - name: Version package
         env:
           PKG: ${{ steps.validate.outputs.package }}
@@ -124,7 +116,6 @@ jobs:
           PKG: ${{ steps.validate.outputs.package }}
           INPUT_TAG: ${{ github.event.inputs.tag }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
-          NODE_AUTH_TOKEN: ${{ secrets.AGENTWORKFORCE_NPM_TOKEN }}
         run: |
           set -euo pipefail
           cd "packages/$PKG"
