@@ -291,6 +291,17 @@ describe('path-mapper', () => {
 
     it('computes deployment_status path with context', () => {
       assert.equal(
+        computeGitHubPath('deployment_status', '555', {
+          owner: 'octocat',
+          repo: 'hello-world',
+          deploymentId: '42',
+        }),
+        '/github/repos/octocat/hello-world/deployments/42/statuses/555.json',
+      );
+    });
+
+    it('falls back to a placeholder deployment root without deployment context', () => {
+      assert.equal(
         computeGitHubPath('deployment_status', '555', { owner: 'octocat', repo: 'hello-world' }),
         '/github/repos/octocat/hello-world/deployments/deployment-unknown/statuses/555.json',
       );

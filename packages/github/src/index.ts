@@ -116,7 +116,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       case 'check_run':
         return `${repoPrefix}/checks/${objectId}.json`;
       case 'deployment_status':
-        return `${repoPrefix}/deployments/deployment-unknown/statuses/${objectId}.json`;
+        return githubDeploymentStatusPath(
+          this.config.owner ?? '_owner',
+          this.config.repo ?? '_repo',
+          'deployment-unknown',
+          objectId,
+        );
       case 'commit':
         return `${repoPrefix}/commits/${objectId}/metadata.json`;
       default:

@@ -383,6 +383,7 @@ export function normalizeNangoGitHubModel(model: string): string {
 export interface GitHubPathContext {
   owner?: string;
   repo?: string;
+  deploymentId?: number | string;
 }
 
 export function computeGitHubPath(
@@ -417,7 +418,12 @@ export function computeGitHubPath(
     case 'check_run':
       return githubCheckRunPath(owner, repo, objectId);
     case 'deployment_status':
-      return githubDeploymentStatusPath(owner, repo, 'deployment-unknown', objectId);
+      return githubDeploymentStatusPath(
+        owner,
+        repo,
+        context?.deploymentId ?? 'deployment-unknown',
+        objectId,
+      );
     case 'commit':
       return githubCommitPath(owner, repo, objectId);
     default:

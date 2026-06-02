@@ -5,6 +5,7 @@ import { GitHubAdapter } from '../../index.js';
 import type { IngestResult } from '../event-map.js';
 import { extractEventKey, extractRepoInfo } from '../event-map.js';
 import { WebhookRouter } from '../router.js';
+import { createMockProvider } from '../../__tests__/fixtures/mock-provider.ts';
 
 function createResult(path: string): IngestResult {
   return {
@@ -17,7 +18,7 @@ function createResult(path: string): IngestResult {
 }
 
 function createAdapterMocks() {
-  const adapter = new GitHubAdapter();
+  const adapter = new GitHubAdapter(createMockProvider());
 
   return {
     adapter,
@@ -209,7 +210,7 @@ describe('WebhookRouter', () => {
   });
 
   it('adapter routeWebhook maps deployment_status.created to a scoped path', async () => {
-    const adapter = new GitHubAdapter();
+    const adapter = new GitHubAdapter(createMockProvider());
 
     const result = await adapter.routeWebhook(
       {
