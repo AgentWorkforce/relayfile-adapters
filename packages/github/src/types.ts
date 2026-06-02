@@ -28,6 +28,7 @@ export const DEFAULT_GITHUB_EVENTS = [
   'issues.reopened',
   'issues.closed',
   'check_run.completed',
+  'deployment_status.created',
 ] as const;
 
 export type GitHubReviewEvent = (typeof GITHUB_REVIEW_EVENTS)[number];
@@ -177,6 +178,17 @@ export interface GitHubCheckRun {
   url?: string;
   detailsUrl?: string;
   headSha?: string;
+}
+
+export interface GitHubDeploymentStatus {
+  id: number | string;
+  state: string;
+  deploymentId?: number | string;
+  environment?: string;
+  description?: null | string;
+  targetUrl?: null | string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface GitHubWebhookEnvelope {

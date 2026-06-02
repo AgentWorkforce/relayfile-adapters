@@ -189,6 +189,17 @@ export function githubCheckRunPath(owner: string, repo: string, checkRunId: numb
   return `${githubRepoPrefix(owner, repo)}/checks/${encodeGitHubPathSegment(String(checkRunId))}.json`;
 }
 
+export function githubDeploymentStatusPath(
+  owner: string,
+  repo: string,
+  deploymentId: number | string,
+  deploymentStatusId: number | string,
+): string {
+  return `${githubRepoPrefix(owner, repo)}/deployments/${encodeGitHubPathSegment(
+    String(deploymentId),
+  )}/statuses/${encodeGitHubPathSegment(String(deploymentStatusId))}.json`;
+}
+
 export function githubCommitPath(owner: string, repo: string, sha: string): string {
   return `${githubRepoPrefix(owner, repo)}/commits/${encodeGitHubPathSegment(sha)}/metadata.json`;
 }
@@ -329,6 +340,8 @@ const OBJECT_TYPE_ALIASES: Record<string, string> = {
   review_comment: 'review_comment',
   check_run: 'check_run',
   checkrun: 'check_run',
+  deployment_status: 'deployment_status',
+  deploymentstatus: 'deployment_status',
   commit: 'commit',
 };
 
@@ -357,6 +370,7 @@ const NANGO_MODEL_MAP: Record<string, string> = {
   Review: 'review',
   ReviewComment: 'review_comment',
   CheckRun: 'check_run',
+  DeploymentStatus: 'deployment_status',
   Commit: 'commit',
 };
 
@@ -369,6 +383,7 @@ export function normalizeNangoGitHubModel(model: string): string {
 export interface GitHubPathContext {
   owner?: string;
   repo?: string;
+  deploymentId?: number | string;
 }
 
 export function computeGitHubPath(
@@ -402,6 +417,13 @@ export function computeGitHubPath(
       return githubReviewCommentPath(owner, repo, objectId);
     case 'check_run':
       return githubCheckRunPath(owner, repo, objectId);
+    case 'deployment_status':
+      return githubDeploymentStatusPath(
+        owner,
+        repo,
+        context?.deploymentId ?? 'deployment-unknown',
+        objectId,
+      );
     case 'commit':
       return githubCommitPath(owner, repo, objectId);
     default:

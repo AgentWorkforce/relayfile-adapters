@@ -81,6 +81,7 @@ export const KNOWN_TRIGGER_CATALOG = {
   ],
   "github": [
     "check_run.completed",
+    "deployment_status.created",
     "issue_comment.created",
     "issues.closed",
     "issues.edited",

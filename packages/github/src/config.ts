@@ -34,6 +34,7 @@ const DEFAULT_SUPPORTED_EVENTS = [
   'issues.reopened', // a closed issue was reopened
   'issues.closed', // an issue was closed
   'check_run.completed', // a CI check finished — `check_run.conclusion` is success / failure / timed_out / cancelled / …
+  'deployment_status.created', // a deployment's status changed — `deployment_status.state` is success / failure / error / pending / in_progress / … (powers deploy-watch agents)
 ] as const;
 
 export const DEFAULT_CONFIG: GitHubAdapterConfig = {

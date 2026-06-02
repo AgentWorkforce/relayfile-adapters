@@ -88,6 +88,10 @@ class RecordingGitHubAdapter extends GitHubAdapter {
     return this.record('ingestCheckRun', payload);
   }
 
+  override async ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult> {
+    return this.record('ingestDeploymentStatus', payload);
+  }
+
   private async record(method: string, payload: Record<string, unknown>): Promise<IngestResult> {
     const repoInfo = extractRepoInfo(payload);
     this.calls.push({ method, ...repoInfo });
@@ -292,6 +296,30 @@ const supportedEventCases: readonly EventCase[] = [
       },
     },
     expectedMethod: 'ingestCheckRun',
+    expectedRepoInfo: {
+      owner: mockRepoContext.owner,
+      repo: mockRepoContext.repo,
+    },
+  },
+  {
+    eventKey: 'deployment_status.created',
+    headers: { 'x-github-event': 'deployment_status' },
+    payload: {
+      action: 'created',
+      repository,
+      deployment: {
+        id: 1101,
+        ref: 'main',
+        sha: mockRepoContext.headSha,
+        environment: 'production',
+      },
+      deployment_status: {
+        id: 1102,
+        state: 'success',
+        environment: 'production',
+      },
+    },
+    expectedMethod: 'ingestDeploymentStatus',
     expectedRepoInfo: {
       owner: mockRepoContext.owner,
       repo: mockRepoContext.repo,

@@ -4,7 +4,7 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from './lazy.js';
-import { githubIssuePath, githubPullRequestPath } from './path-mapper.js';
+import { githubDeploymentStatusPath, githubIssuePath, githubPullRequestPath } from './path-mapper.js';
 import {
   type FileSemantics,
   type GitHubAdapterConfig,
@@ -115,6 +115,13 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         return `${repoPrefix}/review-threads/${objectId}.json`;
       case 'check_run':
         return `${repoPrefix}/checks/${objectId}.json`;
+      case 'deployment_status':
+        return githubDeploymentStatusPath(
+          this.config.owner ?? '_owner',
+          this.config.repo ?? '_repo',
+          'deployment-unknown',
+          objectId,
+        );
       case 'commit':
         return `${repoPrefix}/commits/${objectId}/metadata.json`;
       default:
@@ -242,6 +249,15 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     return this.createIngestResult('check_run.completed', 'check_run', payload, 'write');
   }
 
+  async ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult> {
+    return this.createIngestResult(
+      'deployment_status.created',
+      'deployment_status',
+      payload,
+      'write',
+    );
+  }
+
   async sync(_workspaceId: string, options: SyncOptions = {}): Promise<SyncResult> {
     return syncGitHubWorkspace(_workspaceId, this.provider as never, this.config, this.inFlightMaterializations, options);
   }
@@ -324,6 +340,11 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       }
       case 'check_run':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/checks/${objectId}.json`;
+      case 'deployment_status': {
+        const deploymentId =
+          readNestedNumericLike(payload, 'deployment', 'id') ?? 'deployment-unknown';
+        return githubDeploymentStatusPath(owner, repo, deploymentId, objectId);
+      }
       case 'commit':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${objectId}/metadata.json`;
       default:
@@ -362,6 +383,9 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       objectType === 'review' ? readNestedNumericLike(payload, 'review', 'id') : undefined,
       objectType === 'review_comment' ? readNestedNumericLike(payload, 'comment', 'id') : undefined,
       objectType === 'review_thread' ? readNestedNumericLike(payload, 'thread', 'id') : undefined,
+      objectType === 'deployment_status'
+        ? readNestedNumericLike(payload, 'deployment_status', 'id')
+        : undefined,
       readNumericLike(payload.id),
       readNumericLike(payload.number),
       readNestedNumericLike(payload, 'pull_request', 'number'),

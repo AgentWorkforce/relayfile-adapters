@@ -14,6 +14,7 @@ export interface WebhookAdapter {
   updateIssue(payload: Record<string, unknown>): Promise<IngestResult>;
   closeIssue(payload: Record<string, unknown>): Promise<IngestResult>;
   ingestCheckRun(payload: Record<string, unknown>): Promise<IngestResult>;
+  ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult>;
 }
 
 export type WebhookHandler = (
@@ -43,6 +44,7 @@ export const EVENT_MAP: Record<string, WebhookHandler> = {
   'issues.reopened': (adapter, payload) => adapter.updateIssue(payload),
   'issues.closed': (adapter, payload) => adapter.closeIssue(payload),
   'check_run.completed': (adapter, payload) => adapter.ingestCheckRun(payload),
+  'deployment_status.created': (adapter, payload) => adapter.ingestDeploymentStatus(payload),
 };
 
 export function extractEventKey(

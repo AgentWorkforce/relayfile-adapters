@@ -83,6 +83,11 @@ class RecordingAdapter extends GitHubAdapter {
     this.calls.push(`ingestCheckRun:${String(payload.action ?? '')}`);
     return createResult('/github/repos/acme/widgets/pulls/7/checks/4.json');
   }
+
+  override async ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult> {
+    this.calls.push(`ingestDeploymentStatus:${String(payload.action ?? '')}`);
+    return createResult('/github/repos/acme/widgets/deployments/11/statuses/12.json');
+  }
 }
 
 const unusedProvider: ConnectionProvider = {
@@ -243,6 +248,45 @@ test('WebhookRouter routes check_run.completed to ingestCheckRun', async () => {
   assert.deepEqual(result.paths, ['/github/repos/acme/widgets/pulls/7/checks/4.json']);
 });
 
+test('WebhookRouter routes deployment_status.created to ingestDeploymentStatus', async () => {
+  const adapter = new RecordingAdapter();
+  const router = new WebhookRouter(adapter);
+
+  const result = await router.route(
+    { 'x-github-event': 'deployment_status' },
+    {
+      id: 'delivery-level-id',
+      action: 'created',
+      repository: { full_name: 'acme/widgets' },
+      deployment: { id: 11 },
+      deployment_status: { id: 12, state: 'success' },
+    },
+  );
+
+  assert.deepEqual(adapter.calls, ['ingestDeploymentStatus:created']);
+  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/deployments/11/statuses/12.json']);
+});
+
+test('GitHubAdapter routes deployment_status.created to the deployment status path', async () => {
+  const adapter = new GitHubAdapter(unusedProvider, { connectionId: 'conn-fixture' });
+
+  const result = await adapter.routeWebhook(
+    {
+      action: 'created',
+      repository: { full_name: 'acme/widgets' },
+      deployment: { id: 11 },
+      deployment_status: { id: 12, state: 'success' },
+    },
+    'deployment_status.created',
+  );
+
+  assert.equal(result.filesWritten, 1);
+  assert.deepEqual(result.paths, [
+    '/github/repos/acme/widgets/deployments/11/statuses/12.json',
+  ]);
+  assert.deepEqual(result.errors, []);
+});
+
 test('WebhookRouter returns a typed error for unsupported events', async () => {
   const adapter = new RecordingAdapter();
   const router = new WebhookRouter(adapter);
@@ -278,7 +322,7 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
   const router = new WebhookRouter(new RecordingAdapter());
   const events = router.getSupportedEvents();
 
-  assert.equal(events.length, 19);
+  assert.equal(events.length, 20);
   assert.deepEqual(events, [
     'pull_request.opened',
     'pull_request.synchronize',
@@ -299,6 +343,7 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
     'issues.reopened',
     'issues.closed',
     'check_run.completed',
+    'deployment_status.created',
   ]);
 });
 
