@@ -7,6 +7,10 @@ name: Publish Persona Package
 #
 # Structure mirrors publish.yml: it publishes with `--provenance` (npm OIDC
 # trusted publishing via id-token: write), so no npm auth token is needed.
+#
+# Unlike publish.yml there is no `turbo build` step: persona packages have no
+# build script and ship their index.js/index.d.ts committed to the repo, so a
+# workspace build would only rebuild unrelated @relayfile/* packages.
 
 on:
   workflow_dispatch:
@@ -67,9 +71,6 @@ jobs:
 
       - name: Upgrade npm to latest
         run: npm install -g npm@latest
-
-      - name: Build all packages
-        run: npx turbo build
 
       - name: Validate persona package selection
         id: validate
