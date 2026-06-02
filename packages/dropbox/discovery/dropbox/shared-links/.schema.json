@@ -9,7 +9,8 @@
     "url": {
       "type": "string",
       "format": "uri",
-      "description": "Dropbox shared URL."
+      "description": "Provider URL for the record.",
+      "readOnly": true
     },
     "name": {
       "type": "string",
@@ -20,7 +21,6 @@
       "description": "Underlying file/folder normalized path."
     },
     "type": {
-      "type": "string",
       "enum": [
         "file",
         "folder"
@@ -31,8 +31,67 @@
       "type": "string",
       "format": "date-time",
       "description": "Expiration timestamp when applicable."
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
     }
   },
-  "additionalProperties": true,
-  "description": "Full Dropbox shared-link metadata schema for Relayfile discovery."
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

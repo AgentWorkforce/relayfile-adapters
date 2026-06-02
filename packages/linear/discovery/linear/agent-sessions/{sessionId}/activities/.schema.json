@@ -1,26 +1,40 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Dropbox folder",
+  "title": "Linear agent activity",
   "type": "object",
   "required": [
-    "path_display"
+    "type"
   ],
   "properties": {
-    "path_display": {
-      "type": "string",
-      "description": "Dropbox display path for the folder."
+    "type": {
+      "enum": [
+        "action",
+        "elicitation",
+        "error",
+        "response",
+        "thought"
+      ],
+      "description": "Linear agent activity event type."
     },
-    "name": {
+    "body": {
       "type": "string",
-      "description": "Folder name."
+      "description": "Human-readable message body for response, thought, elicitation, or error activities.",
+      "minLength": 1
     },
-    "path_lower": {
+    "action": {
       "type": "string",
-      "description": "Normalized lower-case folder path."
+      "description": "Action name for action activities.",
+      "minLength": 1
     },
-    "parent_shared_folder_id": {
+    "parameter": {
       "type": "string",
-      "description": "Parent shared-folder id when this folder is in a shared mount."
+      "description": "Action parameter or request context.",
+      "minLength": 1
+    },
+    "result": {
+      "type": "string",
+      "description": "Action result, status, or error detail.",
+      "minLength": 1
     },
     "id": {
       "type": "string",

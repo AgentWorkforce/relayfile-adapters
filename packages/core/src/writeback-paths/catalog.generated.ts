@@ -117,6 +117,12 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "dropbox": {
+    "cursors": [
+      {
+        "path": "/dropbox/cursors",
+        "params": []
+      }
+    ],
     "files": [
       {
         "path": "/dropbox/files",

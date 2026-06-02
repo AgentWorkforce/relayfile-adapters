@@ -281,12 +281,13 @@ export const adapters = [
     slug: 'linear',
     title: 'Linear adapter',
     overview:
-      'The Linear adapter exposes teams, issues, users, comments, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments.',
+      'The Linear adapter exposes teams, issues, users, comments, projects, cycles, milestones, roadmaps, and agent sessions under `/linear`, with writeback routes for creating issues, comments, and agent-session activities.',
     readPaths: [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
       ['/linear/users/<userId>.json', 'User records.'],
       ['/linear/comments/<commentId>.json', 'Comment records.'],
+      ['/linear/agent-sessions/<sessionId>/activities/<activityId>.json', 'Agent session activity records.'],
     ],
     endpoints: [
       endpoint('/linear/issues/new.json', 'Create Linear issue', 'Creates a Linear issue.', ['teamId', 'title'], {
@@ -308,6 +309,13 @@ export const adapters = [
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
       }, { body: 'Replace example comment body.' }),
+      endpoint('/linear/agent-sessions/{sessionId}/activities/new.json', 'Create Linear agent activity', 'Posts an activity event to a Linear Agent Session.', ['type'], {
+        type: en(['action', 'elicitation', 'error', 'response', 'thought'], 'Linear agent activity event type.'),
+        body: str('Human-readable message body for response, thought, elicitation, or error activities.', undefined, { minLength: 1 }),
+        action: str('Action name for action activities.', undefined, { minLength: 1 }),
+        parameter: str('Action parameter or request context.', undefined, { minLength: 1 }),
+        result: str('Action result, status, or error detail.', undefined, { minLength: 1 }),
+      }, { type: 'response', body: 'Replace example response body.' }),
     ],
   },
   {
@@ -474,10 +482,19 @@ export const adapters = [
   {
     slug: 'dropbox',
     title: 'Dropbox adapter',
-    overview: 'The Dropbox adapter exposes file entries and list_folder cursors with file-native writeback discovery.',
-    readPaths: [['/dropbox/<account>/<path>', 'Dropbox file content.']],
+    overview: 'The Dropbox adapter exposes file, folder, shared-folder, shared-link, and list_folder cursor metadata with file-native writeback discovery.',
+    readPaths: [
+      ['/dropbox/files/<fileId>.json', 'Dropbox file metadata.'],
+      ['/dropbox/folders/<folderId>.json', 'Dropbox folder metadata.'],
+      ['/dropbox/shared-folders/<sharedFolderId>.json', 'Dropbox shared-folder metadata.'],
+      ['/dropbox/shared-links/<sharedLinkId>.json', 'Dropbox shared-link metadata.'],
+      ['/dropbox/cursors/<cursorId>.json', 'Dropbox list_folder cursors.'],
+    ],
     endpoints: [
       endpoint('/dropbox/files/new.json', 'Create Dropbox file', 'Uploads a Dropbox file.', ['path_display'], { path_display: str('Dropbox display path.'), contentBase64: str('Base64 content.'), mode: str('Upload mode.') }, { path_display: '/Team/Notes.md' }),
+      endpoint('/dropbox/folders/new.json', 'Create Dropbox folder', 'Creates a Dropbox folder metadata record.', ['path_display'], { path_display: str('Dropbox display path for the folder.'), name: str('Folder name.'), path_lower: str('Normalized lower-case folder path.'), parent_shared_folder_id: str('Parent shared-folder id when this folder is in a shared mount.') }, { path_display: '/Team/Docs', name: 'Docs' }),
+      endpoint('/dropbox/shared-folders/new.json', 'Create Dropbox shared folder', 'Creates a Dropbox shared-folder metadata record.', ['shared_folder_id'], { shared_folder_id: str('Dropbox shared-folder id.'), shared_folder_name: str('Human-readable shared folder name.'), is_team_folder: bool('Whether this is a team folder.'), parent_shared_folder_id: str('Parent shared-folder id when nested.') }, { shared_folder_id: '845281924', shared_folder_name: 'Finance Shared' }),
+      endpoint('/dropbox/shared-links/new.json', 'Create Dropbox shared link', 'Creates a Dropbox shared-link metadata record.', ['url'], { url: str('Dropbox shared URL.', 'uri'), name: str('Shared link display name.'), path_lower: str('Underlying file/folder normalized path.'), type: en(['file', 'folder'], 'Shared link target object type.'), expires: str('Expiration timestamp when applicable.', 'date-time') }, { url: 'https://www.dropbox.com/scl/fi/example/q2-plan.md', name: 'Q2 Plan Link' }),
       endpoint('/dropbox/cursors/new.json', 'Create Dropbox cursor', 'Stores a list_folder cursor.', ['cursor'], { cursor: str('Dropbox cursor.'), accountId: str('Account id.') }, { cursor: 'cursor-2' }),
     ],
   },

@@ -204,6 +204,9 @@ function readOnlyString(description, format) {
 }
 
 function resourceNameFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'linear' && resourcePath === '/linear/agent-sessions/{sessionId}/activities') {
+    return 'agent-activities';
+  }
   if (adapterSlug === 'github' && resourcePath.includes('/issues/') && resourcePath.endsWith('/comments')) {
     return 'issue-comments';
   }
@@ -219,6 +222,19 @@ function resourceNameFor(adapterSlug, resourcePath) {
 }
 
 function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'dropbox') {
+    if (resourcePath === '/dropbox/files' || resourcePath === '/dropbox/folders') {
+      const resource = resourcePath.split('/').at(-1);
+      return `^/dropbox/${resource}/(?!_index\\.json$)(?!by-(?:id|path)/)[^/]+\\.json$`;
+    }
+    if (resourcePath === '/dropbox/shared-folders' || resourcePath === '/dropbox/shared-links') {
+      const resource = resourcePath.split('/').at(-1);
+      return `^/dropbox/${resource}/(?:(?!_index\\.json$)[^/]+\\.json|by-id/[^/]+\\.json)$`;
+    }
+    if (resourcePath === '/dropbox/cursors') {
+      return '^/dropbox/cursors(?:/(?!_index\\.json$)[^/]+\\.json)?$';
+    }
+  }
   if (adapterSlug === 'slack' && resourcePath === '/slack/channels/{channelId}/messages') {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
@@ -252,6 +268,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
 
 function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'linear') {
+    if (resourcePath === '/linear/agent-sessions/{sessionId}/activities') {
+      return pattern('^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+    }
     return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'notion') {
@@ -281,7 +300,10 @@ function idPatternFor(adapterSlug, resourcePath) {
     }
     return pattern('^\\d+$');
   }
-  if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
+  if (adapterSlug === 'hubspot') {
+    return pattern('^\\d+$');
+  }
+  if (adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
   }
   if (adapterSlug === 'jira') {

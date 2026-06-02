@@ -6,7 +6,21 @@ import {
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
-import type { LinearAgentActivity } from '@relayfile/adapter-linear/types';
+
+export type LinearAgentActivityType =
+  | 'action'
+  | 'elicitation'
+  | 'error'
+  | 'response'
+  | 'thought';
+
+export interface LinearAgentActivity {
+  type: LinearAgentActivityType;
+  body?: string;
+  action?: string;
+  parameter?: string;
+  result?: string;
+}
 
 export interface LinearCreateIssueArgs {
   teamId: string;
