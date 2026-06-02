@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  SLACK_SUPPORTED_EVENTS,
   SlackAdapter,
   SlackWebhookSignatureError,
   assertSlackWebhookSignature,
@@ -19,27 +20,6 @@ import {
   type ProxyResponse,
   type RelayFileClientLike,
 } from '../index.js';
-
-const SUPPORTED_EVENTS = [
-  'channel.archived',
-  'channel.created',
-  'channel.deleted',
-  'channel.member_joined',
-  'channel.member_left',
-  'channel.renamed',
-  'channel.unarchived',
-  'group.archived',
-  'group.deleted',
-  'group.renamed',
-  'group.unarchived',
-  'message.created',
-  'message.deleted',
-  'message.updated',
-  'reaction.added',
-  'reaction.removed',
-  'user.changed',
-  'user.joined',
-];
 
 function createProvider(): ConnectionProvider {
   return {
@@ -75,7 +55,27 @@ test('SlackAdapter.name and supported events are stable', () => {
   const adapter = createAdapter();
 
   assert.equal(adapter.name, 'slack');
-  assert.deepEqual(adapter.supportedEvents(), SUPPORTED_EVENTS);
+  assert.deepEqual(SLACK_SUPPORTED_EVENTS, [
+    'channel.archived',
+    'channel.created',
+    'channel.deleted',
+    'channel.member_joined',
+    'channel.member_left',
+    'channel.renamed',
+    'channel.unarchived',
+    'group.archived',
+    'group.deleted',
+    'group.renamed',
+    'group.unarchived',
+    'message.created',
+    'message.deleted',
+    'message.updated',
+    'reaction.added',
+    'reaction.removed',
+    'user.changed',
+    'user.joined',
+  ]);
+  assert.deepEqual(adapter.supportedEvents(), [...SLACK_SUPPORTED_EVENTS]);
 });
 
 test('normalizeSlackWebhook normalizes message and reaction envelopes', () => {
