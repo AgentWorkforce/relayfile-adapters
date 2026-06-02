@@ -147,7 +147,9 @@ function toAbsolutePath(client: IntegrationClientOptions, relayPath: string): st
   const normalized = relayPath.startsWith("/") ? relayPath.slice(1) : relayPath;
   const absolute = path.resolve(root, normalized);
   const relative = path.relative(root, absolute);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+  // `startsWith("..")` alone would also reject a legit in-mount name like
+  // `..foo.json`; only an exact `..` or a `../`-prefixed segment escapes.
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
     throw new Error(`Relayfile path escapes mount root: ${relayPath}`);
   }
   return absolute;
@@ -248,7 +250,7 @@ export async function writeJsonFile(
     const tempPath = `${absolutePath}.tmp-${randomUUID()}`;
     await writeFile(tempPath, `${JSON.stringify(body, null, 2)}\n`, "utf8");
     await rename(tempPath, absolutePath);
-    const receipt = await waitForReceipt(absolutePath, client);
+    const receipt = await waitForReceipt(absolutePath, client, body);
     return { path: relayPath, absolutePath, ...(receipt ? { receipt } : {}) };
   } catch (cause) {
     throw new RelayfileWritebackError({ provider, operation, cause, retryable: false });
@@ -257,18 +259,23 @@ export async function writeJsonFile(
 
 async function waitForReceipt(
   absolutePath: string,
-  client: IntegrationClientOptions
+  client: IntegrationClientOptions,
+  draft: unknown
 ): Promise<WritebackReceipt | undefined> {
   const timeoutMs = client.writebackTimeoutMs ?? DEFAULT_WRITEBACK_TIMEOUT_MS;
-  // Fire-and-forget: never reinterpret the just-written draft as a receipt. The
-  // draft payload may legitimately carry top-level `id` / `path` / `created`
-  // fields (e.g. an upsert update writing back the canonical issue), and
-  // treating that as a receipt would surface a bogus identifier to callers.
   if (timeoutMs <= 0) return undefined;
+  // Never reinterpret the just-written draft as a receipt. The draft payload may
+  // legitimately carry top-level `id` / `path` / `created` fields (e.g. an
+  // upsert update writing back the canonical issue), so the first poll could
+  // otherwise return the draft itself and surface a bogus identifier. Only
+  // accept a file whose content has changed from the draft we wrote.
+  const draftJson = JSON.stringify(draft);
   const deadline = Date.now() + timeoutMs;
   do {
     const parsed = await readCurrentJson(absolutePath);
     if (
+      parsed !== undefined &&
+      JSON.stringify(parsed) !== draftJson &&
       isRecord(parsed) &&
       (typeof parsed.created === "string" ||
         typeof parsed.path === "string" ||

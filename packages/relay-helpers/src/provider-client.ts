@@ -45,7 +45,15 @@ export function providerClient<P extends WritebackProvider>(
 ): ProviderClient<P> {
   const relay = relayClient(provider, opts);
   const out: Record<string, ResourceClient> = {};
-  for (const resource of Object.keys(WRITEBACK_PATH_CATALOG[provider])) {
+  // Typed callers can't reach this, but a runtime/JS caller passing an unknown
+  // provider would otherwise hit a cryptic `Object.keys(undefined)` TypeError.
+  const resources = WRITEBACK_PATH_CATALOG[provider];
+  if (!resources) {
+    throw new Error(
+      `Unknown writeback provider "${provider}". Known providers: ${Object.keys(WRITEBACK_PATH_CATALOG).join(", ")}`
+    );
+  }
+  for (const resource of Object.keys(resources)) {
     const r = resource as WritebackResource<P> & string;
     out[resource] = {
       path: (params) => relay.path(r, params),

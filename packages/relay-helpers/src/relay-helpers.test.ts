@@ -6,7 +6,7 @@ import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths';
 import * as helpers from './index.js';
-import { githubClient, linearClient, notionClient, relayClient, slackClient } from './index.js';
+import { githubClient, linearClient, notionClient, providerClient, relayClient, slackClient } from './index.js';
 
 const clientExportName = (provider: string): string =>
   `${provider.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase())}Client`;
@@ -112,6 +112,13 @@ test('a named resource-keyed client resolves and writes catalog paths', async ()
   await notion.pages.write({ databaseId: 'db1' }, { title: 'P' });
   const draft = await onlyJsonIn(path.join(root, 'notion/databases/db1/pages'));
   assert.deepEqual(draft.body, { title: 'P' });
+});
+
+test('providerClient throws a clear error for an unknown provider', () => {
+  assert.throws(
+    () => providerClient('not-a-provider' as never),
+    /Unknown writeback provider "not-a-provider"/
+  );
 });
 
 test('relayClient (dynamic) still resolves paths for every provider', () => {

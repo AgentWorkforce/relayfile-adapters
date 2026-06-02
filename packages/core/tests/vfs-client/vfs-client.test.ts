@@ -49,3 +49,24 @@ test("a path escaping the mount root throws RelayfileWritebackError", async () =
 test("resolveMountRoot honors the explicit option over env/cwd", async () => {
   assert.equal(resolveMountRoot({ relayfileMountRoot: "/tmp/x" }), path.resolve("/tmp/x"));
 });
+
+test("a draft carrying a monitored field is not mistaken for a receipt", async () => {
+  const { opts } = await mount();
+  // No writeback worker runs, so the file never changes from the draft. Even
+  // though the draft has a top-level `id`, the poll must time out (no receipt)
+  // rather than return the draft itself.
+  const result = await writeJsonFile(
+    { ...opts, writebackTimeoutMs: 40, writebackPollMs: 10 },
+    "linear",
+    "updateIssue",
+    "/linear/issues/ISS-1.json",
+    { id: "ISS-1", title: "still a draft" }
+  );
+  assert.equal(result.receipt, undefined);
+});
+
+test("an in-mount name starting with '..' is allowed (not a traversal escape)", async () => {
+  const { root, opts } = await mount();
+  await writeJsonFile(opts, "x", "write", "/..foo/bar.json", { ok: true });
+  assert.deepEqual(JSON.parse(await readFile(path.join(root, "..foo/bar.json"), "utf8")), { ok: true });
+});
