@@ -30,6 +30,7 @@ import {
 import type { MappingSpec } from "./spec/types.js";
 import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
 import { writeScopeKeyCatalog } from "./scope-keys/catalog-generator.js";
+import { writeWritebackPathCatalog } from "./writeback-paths/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
@@ -62,6 +63,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "scope-keys":
       await handleScopeKeys(args);
+      return;
+    case "writeback-paths":
+      await handleWritebackPaths(args);
       return;
     case "help":
     case undefined:
@@ -418,6 +422,8 @@ Commands:
   triggers check [--repo-root <path>]
   scope-keys generate [--repo-root <path>]
   scope-keys check [--repo-root <path>]
+  writeback-paths generate [--repo-root <path>]
+  writeback-paths check [--repo-root <path>]
 `);
 }
 
@@ -472,6 +478,51 @@ function printScopeKeysHelp(): void {
 Commands:
   scope-keys generate [--repo-root <path>]
   scope-keys check [--repo-root <path>]
+`);
+}
+
+async function handleWritebackPaths(args: string[]): Promise<void> {
+  const [subcommand, ...rest] = args;
+  const flags = parseFlags(rest);
+  const repoRoot = readOptionalString(flags["repo-root"]);
+
+  switch (subcommand) {
+    case "generate": {
+      const generation = await writeWritebackPathCatalog({ repoRoot });
+      process.stdout.write(`${JSON.stringify(renderWritebackPathSummary("generate", generation), null, 2)}\n`);
+      return;
+    }
+    case "check": {
+      const generation = await writeWritebackPathCatalog({ check: true, repoRoot });
+      process.stdout.write(`${JSON.stringify(renderWritebackPathSummary("check", generation), null, 2)}\n`);
+      return;
+    }
+    case "help":
+    case undefined:
+      printWritebackPathsHelp();
+      return;
+    default:
+      throw new Error(`Unknown writeback-paths command "${subcommand}"`);
+  }
+}
+
+function renderWritebackPathSummary(
+  command: "check" | "generate",
+  generation: Awaited<ReturnType<typeof writeWritebackPathCatalog>>
+): Record<string, unknown> {
+  return {
+    command: `writeback-paths ${command}`,
+    providers: Object.keys(generation.catalog).length,
+    adaptersWithoutWritebackPaths: generation.adaptersWithoutWritebackPaths,
+  };
+}
+
+function printWritebackPathsHelp(): void {
+  process.stdout.write(`adapter-core writeback-paths
+
+Commands:
+  writeback-paths generate [--repo-root <path>]
+  writeback-paths check [--repo-root <path>]
 `);
 }
 

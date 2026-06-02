@@ -1,0 +1,68 @@
+[
+  {
+    "packageName": "@relayfile/adapter-airtable",
+    "packagePath": "packages/airtable",
+    "provider": "airtable",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-calendly",
+    "packagePath": "packages/calendly",
+    "provider": "calendly",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-docker-hub",
+    "packagePath": "packages/docker-hub",
+    "provider": "docker-hub",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-fathom",
+    "packagePath": "packages/fathom",
+    "provider": "fathom",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-mailgun",
+    "packagePath": "packages/mailgun",
+    "provider": "mailgun",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-mixpanel",
+    "packagePath": "packages/mixpanel",
+    "provider": "mixpanel",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-segment",
+    "packagePath": "packages/segment",
+    "provider": "segment",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-sendgrid",
+    "packagePath": "packages/sendgrid",
+    "provider": "sendgrid",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-shopify",
+    "packagePath": "packages/shopify",
+    "provider": "shopify",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-stripe",
+    "packagePath": "packages/stripe",
+    "provider": "stripe",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-x",
+    "packagePath": "packages/x",
+    "provider": "x",
+    "reason": "No resources.ts with writeback path templates"
+  }
+]

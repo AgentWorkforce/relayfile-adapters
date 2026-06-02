@@ -18,6 +18,10 @@
       "types": "./dist/src/scope-keys/catalog.generated.d.ts",
       "default": "./dist/src/scope-keys/catalog.generated.js"
     },
+    "./writeback-paths": {
+      "types": "./dist/src/writeback-paths/index.d.ts",
+      "default": "./dist/src/writeback-paths/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
