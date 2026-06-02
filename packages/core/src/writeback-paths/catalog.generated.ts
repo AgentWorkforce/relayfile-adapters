@@ -354,6 +354,14 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "linear": {
+    "agent-activities": [
+      {
+        "path": "/linear/agent-sessions/{sessionId}/activities",
+        "params": [
+          "sessionId"
+        ]
+      }
+    ],
     "comments": [
       {
         "path": "/linear/issues/{issueId}/comments",

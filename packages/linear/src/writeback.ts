@@ -1,6 +1,6 @@
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { resources } from './resources.js';
-import type { JsonValue, LinearWritebackRequest } from './types.js';
+import type { JsonValue, LinearAgentActivity, LinearAgentActivityType, LinearWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -9,6 +9,7 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
  *
  * Supported routes (today):
  *   POST /linear/issues/<slug>--<uuid>/comments/<draft>.json → commentCreate
+ *   POST /linear/agent-sessions/<id>/activities/<draft>.json  → agentActivityCreate
  *   POST /linear/issues/<draft>.json                         → issueCreate
  *   PATCH/PUT /linear/issues/<slug>--<uuid>.json             → issueUpdate
  *
@@ -23,6 +24,17 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
   const newCommentMatch = path.match(/^\/linear\/issues\/([^/]+)\/comments\/([^/]+)\.json$/);
   if (newCommentMatch?.[1] && newCommentMatch[2] && route?.resource.name === 'comments' && route.kind === 'create') {
     return buildCommentCreate(extractLinearId(newCommentMatch[1]), content);
+  }
+
+  // Agent Activity on an existing Linear agent session.
+  const newAgentActivityMatch = path.match(/^\/linear\/agent-sessions\/([^/]+)\/activities\/([^/]+)\.json$/);
+  if (
+    newAgentActivityMatch?.[1] &&
+    newAgentActivityMatch[2] &&
+    route?.resource.name === 'agent-activities' &&
+    route.kind === 'create'
+  ) {
+    return buildAgentActivityCreate(decodeURIComponent(newAgentActivityMatch[1]), content);
   }
 
   // Create a brand-new issue from any non-canonical filename.
@@ -124,6 +136,12 @@ const COMMENT_CREATE_MUTATION = `mutation RelayfileCommentCreate($input: Comment
   }
 }`;
 
+const AGENT_ACTIVITY_CREATE_MUTATION = `mutation RelayfileAgentActivityCreate($input: AgentActivityCreateInput!) {
+  agentActivityCreate(input: $input) {
+    success
+  }
+}`;
+
 const ISSUE_CREATE_MUTATION = `mutation RelayfileIssueCreate($input: IssueCreateInput!) {
   issueCreate(input: $input) {
     success
@@ -193,6 +211,65 @@ function buildCommentCreate(issueId: string, content: string): LinearWritebackRe
     endpoint: '/graphql',
     body: { query: COMMENT_CREATE_MUTATION, variables: { input } },
   };
+}
+
+function buildAgentActivityCreate(agentSessionId: string, content: string): LinearWritebackRequest {
+  const payload = parseJsonObject(content);
+  const activity = readAgentActivity(payload);
+  return {
+    action: 'create_agent_activity',
+    method: 'POST',
+    endpoint: '/graphql',
+    body: {
+      query: AGENT_ACTIVITY_CREATE_MUTATION,
+      variables: {
+        input: {
+          agentSessionId,
+          content: activity,
+        },
+      },
+    },
+  };
+}
+
+function readAgentActivity(payload: Record<string, unknown>): LinearAgentActivity {
+  const type = readAgentActivityType(payload);
+  const activity: LinearAgentActivity = { type };
+  const body = readString(payload, 'body');
+  if (body) activity.body = body;
+  const action = readString(payload, 'action');
+  if (action) activity.action = action;
+  const parameter = readString(payload, 'parameter');
+  if (parameter) activity.parameter = parameter;
+  const result = readString(payload, 'result');
+  if (result) activity.result = result;
+
+  if (!activity.body && !activity.action && !activity.parameter && !activity.result) {
+    throw new Error(
+      'agent-sessions/<sessionId>/activities/<draft>.json writeback requires `body`, `action`, `parameter`, or `result`',
+    );
+  }
+
+  return activity;
+}
+
+function readAgentActivityType(payload: Record<string, unknown>): LinearAgentActivityType {
+  const type = readString(payload, 'type');
+  if (!type) {
+    throw new Error('agent-sessions/<sessionId>/activities/<draft>.json writeback requires a `type`');
+  }
+  if (
+    type !== 'action' &&
+    type !== 'elicitation' &&
+    type !== 'error' &&
+    type !== 'response' &&
+    type !== 'thought'
+  ) {
+    throw new Error(
+      'agent-sessions/<sessionId>/activities/<draft>.json writeback `type` must be one of action, elicitation, error, response, thought',
+    );
+  }
+  return type;
 }
 
 /**

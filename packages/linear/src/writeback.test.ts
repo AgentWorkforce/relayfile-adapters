@@ -74,6 +74,64 @@ describe('linear writeback', () => {
     });
   });
 
+  describe('agent activity create', () => {
+    it('creates an agent activity on a Linear agent session', () => {
+      const req = resolveWritebackRequest(
+        '/linear/agent-sessions/session_linear_123/activities/agent-activities-reply.json',
+        JSON.stringify({ type: 'response', body: 'I can help with that.' }),
+      );
+
+      assert.strictEqual(req.action, 'create_agent_activity');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.match(req.body.query, /agentActivityCreate/);
+      assert.deepStrictEqual(req.body.variables, {
+        input: {
+          agentSessionId: 'session_linear_123',
+          content: {
+            type: 'response',
+            body: 'I can help with that.',
+          },
+        },
+      });
+    });
+
+    it('accepts the full Linear agent activity shape', () => {
+      const req = resolveWritebackRequest(
+        '/linear/agent-sessions/session%2Fencoded/activities/agent-activities-action.json',
+        JSON.stringify({
+          type: 'action',
+          action: 'create_pr',
+          parameter: 'AgentWorkforce/cloud',
+          result: 'queued',
+        }),
+      );
+
+      assert.deepStrictEqual(req.body.variables, {
+        input: {
+          agentSessionId: 'session/encoded',
+          content: {
+            type: 'action',
+            action: 'create_pr',
+            parameter: 'AgentWorkforce/cloud',
+            result: 'queued',
+          },
+        },
+      });
+    });
+
+    it('rejects invalid activity types', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/linear/agent-sessions/session_linear_123/activities/agent-activities-reply.json',
+            JSON.stringify({ type: 'message', body: 'hi' }),
+          ),
+        /type` must be one of/,
+      );
+    });
+  });
+
   describe('issue create', () => {
     it('creates an issue from a JSON payload', () => {
       const req = resolveWritebackRequest(

@@ -71,6 +71,25 @@ test('linearClient recovers comment / createIssue / getIssue ergonomics', async 
   assert.deepEqual(created.body, { teamId: 'T', title: 'New' });
 });
 
+test('linearClient posts agent activities, responses, and acknowledgements', async () => {
+  const { root, opts } = await mount();
+  const linear = linearClient(opts);
+
+  await linear.agentActivity('session_linear_123', { type: 'elicitation', body: 'Which repo?' });
+  const activity = await onlyJsonIn(path.join(root, 'linear/agent-sessions/session_linear_123/activities'));
+  assert.deepEqual(activity.body, { type: 'elicitation', body: 'Which repo?' });
+
+  const responseMount = await mount();
+  await linearClient(responseMount.opts).respond('session_linear_456', 'Done.');
+  const response = await onlyJsonIn(path.join(responseMount.root, 'linear/agent-sessions/session_linear_456/activities'));
+  assert.deepEqual(response.body, { type: 'response', body: 'Done.' });
+
+  const ackMount = await mount();
+  await linearClient(ackMount.opts).acknowledge('session_linear_789');
+  const ack = await onlyJsonIn(path.join(ackMount.root, 'linear/agent-sessions/session_linear_789/activities'));
+  assert.deepEqual(ack.body, { type: 'thought', body: 'Acknowledged.' });
+});
+
 test('githubClient.comment and slackClient.post target the canonical paths', async () => {
   const { root, opts } = await mount();
   await githubClient(opts).comment({ owner: 'AgentWorkforce', repo: 'cloud', number: 1643 }, 'hello');
