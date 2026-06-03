@@ -22,6 +22,7 @@ type DaytonaUsageRecord = Record<string, unknown> & {
   organizationName?: string;
   updatedAt?: string;
   updated_at?: string;
+  capturedAt?: string;
   _deleted?: true;
 };
 
@@ -87,6 +88,7 @@ async function emitUsage(
     const updated =
       readString(record.updatedAt) ??
       readString(record.updated_at) ??
+      readString(record.capturedAt) ??
       new Date().toISOString();
 
     if (record._deleted === true) {
