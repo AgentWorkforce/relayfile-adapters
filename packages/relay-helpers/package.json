@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/relay-helpers",
-  "version": "0.3.31",
+  "version": "0.3.32",
   "description": "Ergonomic, catalog-backed provider clients for Relayfile integration handlers",
   "license": "MIT",
   "repository": {

@@ -3,6 +3,7 @@ import {
   writeJsonFile,
   type IntegrationClientOptions
 } from '@relayfile/adapter-core/vfs-client';
+import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
@@ -48,6 +49,9 @@ export interface LinearClient extends ProviderClient<'linear'> {
 export function linearClient(opts: IntegrationClientOptions = {}): LinearClient {
   const base = providerClient('linear', opts);
   const issuePath = (issueId: string) => `${base.issues.path()}/${encodeSegment(issueId)}.json`;
+  // Read lookup follows the adapter's stable UUID alias. Writeback keeps the
+  // canonical issue item path until its contract is separately proven.
+  const issueUuidPath = (issueId: string) => linearByUuidAliasPath(base.issues.path(), issueId);
   const agentActivity = async (sessionId: string, activity: LinearAgentActivity) =>
     created(await base['agent-activities'].write({ sessionId }, activity));
   return Object.assign(base, {
@@ -68,7 +72,7 @@ export function linearClient(opts: IntegrationClientOptions = {}): LinearClient 
       await writeJsonFile(opts, 'linear', 'updateIssue', issuePath(issueId), args);
     },
     getIssue<T = Record<string, unknown>>(issueId: string): Promise<T> {
-      return readJsonFile<T>(opts, 'linear', 'getIssue', issuePath(issueId));
+      return readJsonFile<T>(opts, 'linear', 'getIssue', issueUuidPath(issueId));
     },
     listIssues<T = Record<string, unknown>>(): Promise<T[]> {
       return base.issues.list<T>();
