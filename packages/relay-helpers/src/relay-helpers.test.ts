@@ -54,14 +54,17 @@ test('relayClient.read / list operate over the catalog paths', async () => {
 test('linearClient recovers comment / createIssue / getIssue ergonomics', async () => {
   const { root, opts } = await mount();
   await mkdir(path.join(root, 'linear/issues'), { recursive: true });
-  await writeFile(path.join(root, 'linear/issues/ISS-1.json'), JSON.stringify({ id: 'ISS-1', title: 'Fix' }));
+  const issueId = '5d6f2e15-0f1d-45ed-826b-183265809202';
+  await mkdir(path.join(root, 'linear/issues/by-uuid'), { recursive: true });
+  await writeFile(path.join(root, 'linear/issues/by-uuid', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Fix' }));
+  await writeFile(path.join(root, 'linear/issues', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Wrong path should not win' }));
 
   const linear = linearClient(opts);
-  const issue = await linear.getIssue<{ title: string }>('ISS-1');
+  const issue = await linear.getIssue<{ title: string }>(issueId);
   assert.equal(issue.title, 'Fix');
 
-  await linear.comment('ISS-1', ':rocket: done');
-  const comment = await onlyJsonIn(path.join(root, 'linear/issues/ISS-1/comments'));
+  await linear.comment(issueId, ':rocket: done');
+  const comment = await onlyJsonIn(path.join(root, 'linear/issues', issueId, 'comments'));
   assert.deepEqual(comment.body, { body: ':rocket: done' });
 
   // Fresh mount so the create draft is the only file in /linear/issues.
