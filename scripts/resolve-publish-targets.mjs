@@ -38,8 +38,7 @@ const GROUPS = {
 function listPublishablePackages() {
   // This workflow only publishes the @relayfile/* adapter scope. Packages under
   // other scopes (e.g. @agentworkforce/persona-*) need different npm
-  // credentials and have their own workflow (.github/workflows/publish-persona.yml),
-  // so they are excluded from `all`, `missing`, group aliases, and the set of
+  // publishing controls, so they are excluded from `all`, `missing`, group aliases, and the set of
   // valid explicit names here.
   return readdirSync(pkgsDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())

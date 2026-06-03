@@ -14,6 +14,7 @@ import {
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
+  githubDeploymentStatusByStatusAliasPath,
   githubDeploymentStatusPath,
   githubIssuePath,
   githubLegacyByTitleAliasPath,
@@ -178,6 +179,13 @@ describe('path-mapper', () => {
       assert.equal(
         githubDeploymentStatusPath('octocat', 'hello-world', 'deploy/1', 'status/2'),
         '/github/repos/octocat/hello-world/deployments/deploy%2F1/statuses/status%2F2.json',
+      );
+    });
+
+    it('githubDeploymentStatusByStatusAliasPath', () => {
+      assert.equal(
+        githubDeploymentStatusByStatusAliasPath('octocat', 'hello-world', 'in_progress', '789'),
+        '/github/repos/octocat__hello-world/deployments/by-status/in-progress/789.json',
       );
     });
 

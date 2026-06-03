@@ -10,6 +10,7 @@ const CANONICAL_ALIAS_SEGMENTS = new Set([
   'by-id',
   'by-priority',
   'by-state',
+  'by-status',
   'by-title',
 ]);
 
@@ -24,6 +25,7 @@ test('layoutManifest exposes GitHub resources with canonical aliases and writeba
     'by-id',
     'by-priority',
     'by-state',
+    'by-status',
     'by-title',
   ]);
   assert.ok(manifest.resources.length > 0);

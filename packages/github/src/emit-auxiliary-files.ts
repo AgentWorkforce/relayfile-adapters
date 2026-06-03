@@ -26,8 +26,8 @@
  * 4. Aliases live under `/github/repos/<owner>__<repo>/{pulls|issues}/by-*`
  *    per the helpers in `path-mapper.ts`. Issue-family aliases include id,
  *    title, state, assignee, creator, and priority when those fields are
- *    present. Only pulls + issues have aliases —
- *    reviews, review_comments, check_runs, commits are flat per-repo paths
+ *    present. Deployment statuses additionally expose `by-status`.
+ *    Reviews, review_comments, check_runs, commits are flat per-repo paths
  *    with no by-* views and no per-repo index entry (matches cloud's
  *    `writeGitHubAuxiliaryFiles`, which only iterates the three indexed
  *    types).
@@ -77,6 +77,8 @@ import {
   githubByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
+  githubDeploymentStatusByStatusAliasPath,
+  githubDeploymentStatusPath,
   githubIssuePath,
   githubLegacyByTitleAliasPath,
   githubNumberedByTitleAliasPath,
@@ -158,6 +160,18 @@ export interface GitHubCheckRunEmitRecord extends GitHubRepoContext {
   id: number | string;
 }
 
+export interface GitHubDeploymentStatusEmitRecord extends GitHubRepoContext {
+  id: number | string;
+  deploymentId?: number | string;
+  deployment_id?: number | string;
+  deployment?: {
+    id?: number | string;
+    [key: string]: unknown;
+  };
+  state?: string;
+  status?: string;
+}
+
 export interface GitHubCommitEmitRecord extends GitHubRepoContext {
   sha: string;
 }
@@ -170,6 +184,7 @@ export type GitHubRepositoryEmitInput = GitHubRepositoryEmitRecord | DeleteTombs
 export type GitHubReviewEmitInput = GitHubReviewEmitRecord | DeleteTombstone;
 export type GitHubReviewCommentEmitInput = GitHubReviewCommentEmitRecord | DeleteTombstone;
 export type GitHubCheckRunEmitInput = GitHubCheckRunEmitRecord | DeleteTombstone;
+export type GitHubDeploymentStatusEmitInput = GitHubDeploymentStatusEmitRecord | DeleteTombstone;
 export type GitHubCommitEmitInput = GitHubCommitEmitRecord | DeleteTombstone;
 
 /** A delete tombstone carrying owner/repo context so the emitter can target
@@ -190,6 +205,7 @@ export interface GitHubEmitAuxiliaryFilesInput {
   reviews?: readonly (GitHubReviewEmitRecord | ScopedDeleteTombstone)[];
   reviewComments?: readonly (GitHubReviewCommentEmitRecord | ScopedDeleteTombstone)[];
   checkRuns?: readonly (GitHubCheckRunEmitRecord | ScopedDeleteTombstone)[];
+  deploymentStatuses?: readonly (GitHubDeploymentStatusEmitRecord | ScopedDeleteTombstone)[];
   commits?: readonly (GitHubCommitEmitRecord | ScopedDeleteTombstone)[];
   /** Optional connection id stamped into the rendered payload wrapper. */
   connectionId?: string;
@@ -212,6 +228,7 @@ export async function emitGitHubAuxiliaryFiles(
   const reviews = input.reviews ?? [];
   const reviewComments = input.reviewComments ?? [];
   const checkRuns = input.checkRuns ?? [];
+  const deploymentStatuses = input.deploymentStatuses ?? [];
   const commits = input.commits ?? [];
 
   // Always emit the root index, even for empty / single-bucket batches, so
@@ -226,6 +243,7 @@ export async function emitGitHubAuxiliaryFiles(
     reviews.length === 0 &&
     reviewComments.length === 0 &&
     checkRuns.length === 0 &&
+    deploymentStatuses.length === 0 &&
     commits.length === 0
   ) {
     return aggregate;
@@ -382,6 +400,14 @@ export async function emitGitHubAuxiliaryFiles(
   if (checkRuns.length > 0) {
     const fan = await runEmitBatch(client, workspaceId, checkRuns, async (record) =>
       planFlatRecord(record, 'check_run', input.connectionId),
+    );
+    accumulate(aggregate, fan);
+  }
+
+  // --- deployment statuses ------------------------------------------------
+  if (deploymentStatuses.length > 0) {
+    const fan = await runEmitBatch(client, workspaceId, deploymentStatuses, async (record) =>
+      planDeploymentStatusRecord(client, workspaceId, record, input.connectionId),
     );
     accumulate(aggregate, fan);
   }
@@ -898,6 +924,114 @@ function flatCanonicalPath(
 }
 
 // ---------------------------------------------------------------------------
+// Deployment status planners
+// ---------------------------------------------------------------------------
+
+async function planDeploymentStatusRecord(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  record: GitHubDeploymentStatusEmitRecord | ScopedDeleteTombstone,
+  connectionId: string | undefined,
+): Promise<EmitPlan> {
+  const repoInfo = extractRepoInfo(record);
+  if (!repoInfo) {
+    return {};
+  }
+  const id =
+    readGitHubNumericId((record as { id?: unknown }).id) ??
+    readGitHubNumericId((record as DeleteTombstone).id);
+  if (!id) {
+    return {};
+  }
+  const deploymentId = readDeploymentId(record as Record<string, unknown>);
+  if (!deploymentId) {
+    return {};
+  }
+
+  const canonicalPath = githubDeploymentStatusPath(repoInfo.owner, repoInfo.repo, deploymentId, id);
+  const prior = await readPriorDeploymentStatus(client, workspaceId, canonicalPath);
+  const priorStatus = readDeploymentStatus(prior);
+  const nextStatus = isDeleteRecord(record) ? undefined : readDeploymentStatus(record as Record<string, unknown>);
+
+  const deletes: EmitDelete[] = [];
+  const writes: EmitWrite[] = [];
+  const aliasStatuses = new Set<string>();
+
+  if (priorStatus && priorStatus !== nextStatus) {
+    deletes.push({
+      path: githubDeploymentStatusByStatusAliasPath(repoInfo.owner, repoInfo.repo, priorStatus, id),
+    });
+  }
+
+  if (isDeleteRecord(record)) {
+    deletes.push({ path: canonicalPath });
+    const tombstoneStatus = readDeploymentStatus(record as unknown as Record<string, unknown>);
+    if (tombstoneStatus) {
+      aliasStatuses.add(tombstoneStatus);
+    }
+    for (const status of aliasStatuses) {
+      deletes.push({
+        path: githubDeploymentStatusByStatusAliasPath(repoInfo.owner, repoInfo.repo, status, id),
+      });
+    }
+    return { deletes: uniqueDeletes(deletes) };
+  }
+
+  const content = renderContent('deployment_status', record, connectionId, false);
+  writes.push({ path: canonicalPath, content, contentType: JSON_CONTENT_TYPE });
+  if (nextStatus && slugifies(nextStatus)) {
+    writes.push({
+      path: githubDeploymentStatusByStatusAliasPath(repoInfo.owner, repoInfo.repo, nextStatus, id),
+      content,
+      contentType: JSON_CONTENT_TYPE,
+    });
+  }
+
+  return { writes, deletes: uniqueDeletes(deletes) };
+}
+
+async function readPriorDeploymentStatus(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const raw = await client.readFile?.({ workspaceId, path });
+    if (!raw || typeof raw.content !== 'string') {
+      return null;
+    }
+    const parsed = JSON.parse(raw.content) as unknown;
+    return isRecord(parsed) ? pickPayload(parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDeploymentId(record: Record<string, unknown>): string | undefined {
+  return (
+    readGitHubNumericId(record.deploymentId) ??
+    readGitHubNumericId(record.deployment_id) ??
+    (isRecord(record.deployment) ? readGitHubNumericId(record.deployment.id) : undefined)
+  );
+}
+
+function readDeploymentStatus(record: Record<string, unknown> | null): string | undefined {
+  if (!record) {
+    return undefined;
+  }
+  return readNonEmptyString(record.state) ?? readNonEmptyString(record.status);
+}
+
+function uniqueDeletes(deletes: EmitDelete[]): EmitDelete[] {
+  const seen = new Set<string>();
+  return deletes.filter((entry) => {
+    if (seen.has(entry.path)) return false;
+    seen.add(entry.path);
+    return true;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Shared utilities
 // ---------------------------------------------------------------------------
 
@@ -1040,7 +1174,7 @@ function pickPayload(parsed: Record<string, unknown>): Record<string, unknown> |
 }
 
 function renderContent(
-  objectType: 'pull_request' | 'issue' | 'repository' | 'review' | 'review_comment' | 'check_run' | 'commit',
+  objectType: 'pull_request' | 'issue' | 'repository' | 'review' | 'review_comment' | 'check_run' | 'deployment_status' | 'commit',
   record: Record<string, unknown>,
   connectionId: string | undefined,
   deleted: boolean,
@@ -1061,7 +1195,7 @@ function renderContent(
 }
 
 function pickObjectId(
-  objectType: 'pull_request' | 'issue' | 'repository' | 'review' | 'review_comment' | 'check_run' | 'commit',
+  objectType: 'pull_request' | 'issue' | 'repository' | 'review' | 'review_comment' | 'check_run' | 'deployment_status' | 'commit',
   record: Record<string, unknown>,
 ): string {
   if (objectType === 'commit') {

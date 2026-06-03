@@ -14,7 +14,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   // Top-level aliasSegments is the union of every resource's alias segments
   // so consumers that inspect only the manifest root can discover all
   // lookup keys.
-  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-priority', 'by-state', 'by-title'],
+  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-priority', 'by-state', 'by-status', 'by-title'],
   resources: [
     {
       path: 'github/repos',
@@ -42,6 +42,13 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
         { path: 'github/repos/*/*/pulls/reviews', schemaId: 'github/pull-request-review' },
         { path: 'github/repos/*/*/pulls/*/merge.json', schemaId: 'github/pull-request-merge' },
       ],
+    },
+    {
+      path: 'github/repos/*/*/deployments',
+      title: 'Deployments',
+      materialization: 'eager',
+      aliasSegments: ['by-status'],
+      writebackResources: [],
     },
   ],
 });

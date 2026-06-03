@@ -38,7 +38,7 @@ These category rules are enforced by `scripts/digest-layout-contracts.mjs`.
 | --- | --- | --- | --- |
 | issue-tracking | GitHub issues and pull requests, GitLab issues and merge requests, Jira issues, Linear issues | `by-state/<state>/<id>.json`, `by-assignee/<assignee>/<id>.json`, `by-creator/<creator>/<id>.json`, `by-priority/<priority>/<id>.json` | Agents often ask for open, closed, merged, completed, canceled, assigned, created-by, or priority-scoped work without already knowing an id. |
 | task-management | Asana tasks, ClickUp tasks | `by-state/<state>/<id>.json`, `by-assignee/<assignee>/<id>.json`, `by-creator/<creator>/<id>.json`, `by-priority/<priority>/<id>.json` | Task systems expose the same operational questions as issue trackers: what is open or completed, who owns it, who created it, and what priority bucket it sits in. |
-| ci-deploy | GitLab pipelines and deployments | `by-status/<status>/<id>.json` | Status is the primary lifecycle bucket for build and deploy resources. |
+| ci-deploy | GitHub deployments, GitLab pipelines and deployments | `by-status/<status>/<id>.json` | Status is the primary lifecycle bucket for build and deploy resources. |
 | knowledge | Confluence pages | `by-state/<state>/<id>.json` | Pages can be current, archived, trashed, restored, or deleted and must remain discoverable by lifecycle bucket. |
 
 Resources outside this matrix only need a `by-state`, `by-status`,

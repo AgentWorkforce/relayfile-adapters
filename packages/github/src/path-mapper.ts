@@ -200,6 +200,17 @@ export function githubDeploymentStatusPath(
   )}/statuses/${encodeGitHubPathSegment(String(deploymentStatusId))}.json`;
 }
 
+export function githubDeploymentStatusByStatusAliasPath(
+  owner: string,
+  repo: string,
+  status: string,
+  deploymentStatusId: number | string,
+): string {
+  return `${githubAliasRepoPrefix(owner, repo)}/deployments/by-status/${encodeGitHubPathSegment(
+    slugifyAlias(status),
+  )}/${encodeGitHubPathSegment(String(deploymentStatusId))}.json`;
+}
+
 export function githubCommitPath(owner: string, repo: string, sha: string): string {
   return `${githubRepoPrefix(owner, repo)}/commits/${encodeGitHubPathSegment(sha)}/metadata.json`;
 }

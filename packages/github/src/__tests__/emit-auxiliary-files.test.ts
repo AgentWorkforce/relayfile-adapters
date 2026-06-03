@@ -20,6 +20,8 @@ import {
   githubNumberedByTitleAliasPath,
   githubCheckRunPath,
   githubCommitPath,
+  githubDeploymentStatusByStatusAliasPath,
+  githubDeploymentStatusPath,
   githubIssuePath,
   githubLegacyByTitleAliasPath,
   githubPullRequestPath,
@@ -505,6 +507,74 @@ describe('emitGitHubAuxiliaryFiles', () => {
     // Commit canonical is the dir-form `<sha>/metadata.json`.
     const commitPath = githubCommitPath('acme', 'widgets', sha);
     assert.ok(commitPath.endsWith('/metadata.json'));
+  });
+
+  it('writes deployment status canonical records and materialized by-status aliases', async () => {
+    const client = createClient();
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      deploymentStatuses: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          id: 12345,
+          deploymentId: 9001,
+          state: 'in_progress',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    const canonical = githubDeploymentStatusPath('acme', 'widgets', 9001, 12345);
+    const byStatus = githubDeploymentStatusByStatusAliasPath('acme', 'widgets', 'in_progress', 12345);
+    const writtenPaths = client.writes.map((w) => w.path);
+    assert.ok(writtenPaths.includes(canonical));
+    assert.ok(writtenPaths.includes(byStatus));
+    assert.equal(client.files.get(byStatus), client.files.get(canonical));
+    assert.ok(client.files.get(byStatus)?.includes('"objectType": "deployment_status"'));
+  });
+
+  it('moves deployment status by-status aliases on status transitions', async () => {
+    const canonical = githubDeploymentStatusPath('acme', 'widgets', 9001, 12345);
+    const prior = JSON.stringify({
+      provider: 'github',
+      objectType: 'deployment_status',
+      objectId: '12345',
+      deleted: false,
+      payload: {
+        owner: 'acme',
+        repo: 'widgets',
+        id: 12345,
+        deploymentId: 9001,
+        state: 'pending',
+      },
+    });
+    const pendingAlias = githubDeploymentStatusByStatusAliasPath('acme', 'widgets', 'pending', 12345);
+    const successAlias = githubDeploymentStatusByStatusAliasPath('acme', 'widgets', 'success', 12345);
+    const client = createClient({
+      initialFiles: {
+        [canonical]: prior,
+        [pendingAlias]: prior,
+      },
+    });
+
+    const result = await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      deploymentStatuses: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          id: 12345,
+          deploymentId: 9001,
+          state: 'success',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.deletes.some((d) => d.path === pendingAlias));
+    assert.ok(client.writes.some((w) => w.path === successAlias));
+    assert.equal(client.files.get(successAlias), client.files.get(canonical));
   });
 
   it('rejects malformed flat-record ids before emitting paths', async () => {

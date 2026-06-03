@@ -58,6 +58,12 @@ const categoryResourceContracts = [
   },
   {
     category: 'ci-deploy',
+    provider: 'github',
+    resource: 'github/repos/*/*/deployments',
+    aliases: ['by-status'],
+  },
+  {
+    category: 'ci-deploy',
     provider: 'gitlab',
     resource: 'gitlab/projects/**/pipelines',
     aliases: ['by-status'],
@@ -169,6 +175,12 @@ const executableRegressionContracts = [
     file: 'src/__tests__/emit-auxiliary-files.test.ts',
     needles: ['index-only bare PR tombstone', 'githubByAssigneeAliasPath', 'githubByPriorityAliasPath'],
     label: 'bare tombstone recovery must delete aliases even when the by-id alias is missing',
+  },
+  {
+    provider: 'github',
+    file: 'src/__tests__/emit-auxiliary-files.test.ts',
+    needles: ['moves deployment status by-status aliases on status transitions', 'githubDeploymentStatusByStatusAliasPath', 'successAlias'],
+    label: 'ci/deploy by-status aliases must be materially emitted and reconciled',
   },
   {
     provider: 'linear',
