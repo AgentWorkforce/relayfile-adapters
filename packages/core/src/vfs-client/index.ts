@@ -112,6 +112,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function mountRootCandidate(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 /** Percent-encode a path segment so identifiers safely round-trip. */
 export function encodeSegment(value: string | number): string {
   return encodeURIComponent(String(value));
@@ -132,15 +137,15 @@ export function draftFile(prefix: string): string {
  */
 export function resolveMountRoot(client: IntegrationClientOptions): string {
   return path.resolve(
-    client.relayfileMountRoot ??
-      client.relayfileRoot ??
-      client.mountRoot ??
-      process.env.RELAYFILE_MOUNT_PATH ??
-      process.env.WORKSPACE_ROOT ??
-      process.env.WORKFORCE_SANDBOX_ROOT ??
-      process.env.RELAYFILE_MOUNT_ROOT ??
-      process.env.RELAYFILE_ROOT ??
-      client.workspaceCwd ??
+    mountRootCandidate(client.relayfileMountRoot) ??
+      mountRootCandidate(client.relayfileRoot) ??
+      mountRootCandidate(client.mountRoot) ??
+      mountRootCandidate(process.env.RELAYFILE_MOUNT_PATH) ??
+      mountRootCandidate(process.env.WORKSPACE_ROOT) ??
+      mountRootCandidate(process.env.WORKFORCE_SANDBOX_ROOT) ??
+      mountRootCandidate(process.env.RELAYFILE_MOUNT_ROOT) ??
+      mountRootCandidate(process.env.RELAYFILE_ROOT) ??
+      mountRootCandidate(client.workspaceCwd) ??
       process.cwd()
   );
 }

@@ -94,6 +94,35 @@ test("resolveMountRoot honors sandbox mount root env vars before cwd fallback", 
   }
 });
 
+test("resolveMountRoot skips blank mount root env vars", async () => {
+  const oldRelayfileMountPath = process.env.RELAYFILE_MOUNT_PATH;
+  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldWorkforceSandboxRoot = process.env.WORKFORCE_SANDBOX_ROOT;
+  const oldRelayfileMountRoot = process.env.RELAYFILE_MOUNT_ROOT;
+  const oldRelayfileRoot = process.env.RELAYFILE_ROOT;
+  try {
+    process.env.RELAYFILE_MOUNT_PATH = "";
+    process.env.WORKSPACE_ROOT = "   ";
+    process.env.WORKFORCE_SANDBOX_ROOT = "/tmp/workforce-sandbox-root";
+    process.env.RELAYFILE_MOUNT_ROOT = "/tmp/legacy-mount-root";
+    process.env.RELAYFILE_ROOT = "/tmp/legacy-root";
+
+    assert.equal(resolveMountRoot({ workspaceCwd: "/tmp/runtime-cwd" }), path.resolve("/tmp/workforce-sandbox-root"));
+    assert.equal(resolveMountRoot({ relayfileMountRoot: " ", mountRoot: "/tmp/explicit-fallback" }), path.resolve("/tmp/explicit-fallback"));
+  } finally {
+    if (oldRelayfileMountPath === undefined) delete process.env.RELAYFILE_MOUNT_PATH;
+    else process.env.RELAYFILE_MOUNT_PATH = oldRelayfileMountPath;
+    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldWorkforceSandboxRoot === undefined) delete process.env.WORKFORCE_SANDBOX_ROOT;
+    else process.env.WORKFORCE_SANDBOX_ROOT = oldWorkforceSandboxRoot;
+    if (oldRelayfileMountRoot === undefined) delete process.env.RELAYFILE_MOUNT_ROOT;
+    else process.env.RELAYFILE_MOUNT_ROOT = oldRelayfileMountRoot;
+    if (oldRelayfileRoot === undefined) delete process.env.RELAYFILE_ROOT;
+    else process.env.RELAYFILE_ROOT = oldRelayfileRoot;
+  }
+});
+
 test("a draft carrying a monitored field is not mistaken for a receipt", async () => {
   const { opts } = await mount();
   // No writeback worker runs, so the file never changes from the draft. Even
