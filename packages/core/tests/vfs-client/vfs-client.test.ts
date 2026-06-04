@@ -47,7 +47,51 @@ test("a path escaping the mount root throws RelayfileWritebackError", async () =
 });
 
 test("resolveMountRoot honors the explicit option over env/cwd", async () => {
-  assert.equal(resolveMountRoot({ relayfileMountRoot: "/tmp/x" }), path.resolve("/tmp/x"));
+  const oldRelayfileMountPath = process.env.RELAYFILE_MOUNT_PATH;
+  try {
+    process.env.RELAYFILE_MOUNT_PATH = "/tmp/env-root";
+    assert.equal(resolveMountRoot({ relayfileMountRoot: "/tmp/x" }), path.resolve("/tmp/x"));
+  } finally {
+    if (oldRelayfileMountPath === undefined) delete process.env.RELAYFILE_MOUNT_PATH;
+    else process.env.RELAYFILE_MOUNT_PATH = oldRelayfileMountPath;
+  }
+});
+
+test("resolveMountRoot honors sandbox mount root env vars before cwd fallback", async () => {
+  const oldRelayfileMountPath = process.env.RELAYFILE_MOUNT_PATH;
+  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldWorkforceSandboxRoot = process.env.WORKFORCE_SANDBOX_ROOT;
+  const oldRelayfileMountRoot = process.env.RELAYFILE_MOUNT_ROOT;
+  const oldRelayfileRoot = process.env.RELAYFILE_ROOT;
+  try {
+    delete process.env.RELAYFILE_MOUNT_PATH;
+    delete process.env.WORKSPACE_ROOT;
+    delete process.env.WORKFORCE_SANDBOX_ROOT;
+    delete process.env.RELAYFILE_MOUNT_ROOT;
+    delete process.env.RELAYFILE_ROOT;
+
+    process.env.WORKSPACE_ROOT = "/tmp/workspace-root";
+    assert.equal(resolveMountRoot({ workspaceCwd: "/tmp/runtime-cwd" }), path.resolve("/tmp/workspace-root"));
+
+    process.env.RELAYFILE_MOUNT_PATH = "/tmp/relayfile-mount-path";
+    assert.equal(resolveMountRoot({ workspaceCwd: "/tmp/runtime-cwd" }), path.resolve("/tmp/relayfile-mount-path"));
+
+    delete process.env.RELAYFILE_MOUNT_PATH;
+    delete process.env.WORKSPACE_ROOT;
+    process.env.WORKFORCE_SANDBOX_ROOT = "/tmp/workforce-sandbox-root";
+    assert.equal(resolveMountRoot({ workspaceCwd: "/tmp/runtime-cwd" }), path.resolve("/tmp/workforce-sandbox-root"));
+  } finally {
+    if (oldRelayfileMountPath === undefined) delete process.env.RELAYFILE_MOUNT_PATH;
+    else process.env.RELAYFILE_MOUNT_PATH = oldRelayfileMountPath;
+    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldWorkforceSandboxRoot === undefined) delete process.env.WORKFORCE_SANDBOX_ROOT;
+    else process.env.WORKFORCE_SANDBOX_ROOT = oldWorkforceSandboxRoot;
+    if (oldRelayfileMountRoot === undefined) delete process.env.RELAYFILE_MOUNT_ROOT;
+    else process.env.RELAYFILE_MOUNT_ROOT = oldRelayfileMountRoot;
+    if (oldRelayfileRoot === undefined) delete process.env.RELAYFILE_ROOT;
+    else process.env.RELAYFILE_ROOT = oldRelayfileRoot;
+  }
 });
 
 test("a draft carrying a monitored field is not mistaken for a receipt", async () => {

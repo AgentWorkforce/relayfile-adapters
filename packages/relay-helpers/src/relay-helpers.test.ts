@@ -74,6 +74,46 @@ test('linearClient recovers comment / createIssue / getIssue ergonomics', async 
   assert.deepEqual(created.body, { teamId: 'T', title: 'New' });
 });
 
+test('linearClient defaults reads to WORKSPACE_ROOT when cwd is the runtime directory', async () => {
+  const mountRoot = await mkdtemp(path.join(tmpdir(), 'relay-helpers-mount-'));
+  const runtimeRoot = await mkdtemp(path.join(tmpdir(), 'relay-helpers-runtime-'));
+  const issueId = '5d6f2e15-0f1d-45ed-826b-183265809203';
+  await mkdir(path.join(mountRoot, 'linear/issues/by-uuid'), { recursive: true });
+  await mkdir(path.join(runtimeRoot, 'linear/issues/by-uuid'), { recursive: true });
+  await writeFile(path.join(mountRoot, 'linear/issues/by-uuid', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Mounted' }));
+  await writeFile(path.join(runtimeRoot, 'linear/issues/by-uuid', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Runtime cwd' }));
+
+  const oldCwd = process.cwd();
+  const oldRelayfileMountPath = process.env.RELAYFILE_MOUNT_PATH;
+  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldWorkforceSandboxRoot = process.env.WORKFORCE_SANDBOX_ROOT;
+  const oldRelayfileMountRoot = process.env.RELAYFILE_MOUNT_ROOT;
+  const oldRelayfileRoot = process.env.RELAYFILE_ROOT;
+  try {
+    delete process.env.RELAYFILE_MOUNT_PATH;
+    process.env.WORKSPACE_ROOT = mountRoot;
+    delete process.env.WORKFORCE_SANDBOX_ROOT;
+    delete process.env.RELAYFILE_MOUNT_ROOT;
+    delete process.env.RELAYFILE_ROOT;
+    process.chdir(runtimeRoot);
+
+    const issue = await linearClient().getIssue<{ title: string }>(issueId);
+    assert.equal(issue.title, 'Mounted');
+  } finally {
+    process.chdir(oldCwd);
+    if (oldRelayfileMountPath === undefined) delete process.env.RELAYFILE_MOUNT_PATH;
+    else process.env.RELAYFILE_MOUNT_PATH = oldRelayfileMountPath;
+    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldWorkforceSandboxRoot === undefined) delete process.env.WORKFORCE_SANDBOX_ROOT;
+    else process.env.WORKFORCE_SANDBOX_ROOT = oldWorkforceSandboxRoot;
+    if (oldRelayfileMountRoot === undefined) delete process.env.RELAYFILE_MOUNT_ROOT;
+    else process.env.RELAYFILE_MOUNT_ROOT = oldRelayfileMountRoot;
+    if (oldRelayfileRoot === undefined) delete process.env.RELAYFILE_ROOT;
+    else process.env.RELAYFILE_ROOT = oldRelayfileRoot;
+  }
+});
+
 test('linearClient posts agent activities, responses, and acknowledgements', async () => {
   const { root, opts } = await mount();
   const linear = linearClient(opts);

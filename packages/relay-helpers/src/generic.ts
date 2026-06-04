@@ -48,8 +48,8 @@ function isItemPath(path: string): boolean {
 /**
  * Build a {@link RelayClient} for `provider`. `opts` (mount root, writeback
  * timeout, …) is bound once and reused by every method; it defaults to the
- * ambient `RELAYFILE_MOUNT_ROOT` env, so `relayClient('linear')` is enough
- * inside a sandbox handler.
+ * ambient sandbox mount-root env, so `relayClient('linear')` is enough inside
+ * a sandbox handler.
  */
 export function relayClient<P extends WritebackProvider>(
   provider: P,

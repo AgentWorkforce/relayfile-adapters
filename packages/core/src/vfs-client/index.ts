@@ -127,14 +127,17 @@ export function draftFile(prefix: string): string {
 
 /**
  * Resolve the absolute Relayfile mount root, honoring (in order) the
- * client-supplied option, the `RELAYFILE_MOUNT_ROOT` / `RELAYFILE_ROOT` env
- * vars, and finally `workspaceCwd` / `process.cwd()`.
+ * client-supplied option, deployed sandbox mount-root env vars, legacy
+ * Relayfile root env vars, and finally `workspaceCwd` / `process.cwd()`.
  */
 export function resolveMountRoot(client: IntegrationClientOptions): string {
   return path.resolve(
     client.relayfileMountRoot ??
       client.relayfileRoot ??
       client.mountRoot ??
+      process.env.RELAYFILE_MOUNT_PATH ??
+      process.env.WORKSPACE_ROOT ??
+      process.env.WORKFORCE_SANDBOX_ROOT ??
       process.env.RELAYFILE_MOUNT_ROOT ??
       process.env.RELAYFILE_ROOT ??
       client.workspaceCwd ??
