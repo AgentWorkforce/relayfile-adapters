@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths';
+import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import * as helpers from './index.js';
 import { githubClient, linearClient, notionClient, providerClient, relayClient, slackClient } from './index.js';
 
@@ -78,10 +79,11 @@ test('linearClient defaults reads to WORKSPACE_ROOT when cwd is the runtime dire
   const mountRoot = await mkdtemp(path.join(tmpdir(), 'relay-helpers-mount-'));
   const runtimeRoot = await mkdtemp(path.join(tmpdir(), 'relay-helpers-runtime-'));
   const issueId = '5d6f2e15-0f1d-45ed-826b-183265809203';
-  await mkdir(path.join(mountRoot, 'linear/issues/by-uuid'), { recursive: true });
-  await mkdir(path.join(runtimeRoot, 'linear/issues/by-uuid'), { recursive: true });
-  await writeFile(path.join(mountRoot, 'linear/issues/by-uuid', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Mounted' }));
-  await writeFile(path.join(runtimeRoot, 'linear/issues/by-uuid', `${issueId}.json`), JSON.stringify({ id: issueId, title: 'Runtime cwd' }));
+  const issueAliasPath = linearByUuidAliasPath(relayClient('linear').path('issues'), issueId).replace(/^\/+/, '');
+  await mkdir(path.join(mountRoot, path.dirname(issueAliasPath)), { recursive: true });
+  await mkdir(path.join(runtimeRoot, path.dirname(issueAliasPath)), { recursive: true });
+  await writeFile(path.join(mountRoot, issueAliasPath), JSON.stringify({ id: issueId, title: 'Mounted' }));
+  await writeFile(path.join(runtimeRoot, issueAliasPath), JSON.stringify({ id: issueId, title: 'Runtime cwd' }));
 
   const oldCwd = process.cwd();
   const oldRelayfileMountPath = process.env.RELAYFILE_MOUNT_PATH;

@@ -71,6 +71,8 @@ test("resolveMountRoot honors sandbox mount root env vars before cwd fallback", 
     delete process.env.RELAYFILE_ROOT;
 
     process.env.WORKSPACE_ROOT = "/tmp/workspace-root";
+    process.env.RELAYFILE_MOUNT_ROOT = "/tmp/legacy-mount-root";
+    process.env.RELAYFILE_ROOT = "/tmp/legacy-root";
     assert.equal(resolveMountRoot({ workspaceCwd: "/tmp/runtime-cwd" }), path.resolve("/tmp/workspace-root"));
 
     process.env.RELAYFILE_MOUNT_PATH = "/tmp/relayfile-mount-path";
