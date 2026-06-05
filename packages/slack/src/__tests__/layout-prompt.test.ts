@@ -17,6 +17,9 @@ test('SLACK_LAYOUT_PROMPT documents v2 directory conventions', () => {
   assert.match(SLACK_LAYOUT_PROMPT, /by-name/);
   assert.match(SLACK_LAYOUT_PROMPT, /bots/);
   assert.match(SLACK_LAYOUT_PROMPT, /is_bot/);
+  assert.match(SLACK_LAYOUT_PROMPT, /\/discovery\/slack\/channels\/_index\.json/);
+  assert.match(SLACK_LAYOUT_PROMPT, /\/discovery\/slack\/users\/_index\.json/);
+  assert.match(SLACK_LAYOUT_PROMPT, /history-independent lookup indexes/);
   // back-compat migration callout is required so consumers know to fall back.
   assert.match(SLACK_LAYOUT_PROMPT, /message\.json/);
   assert.match(SLACK_LAYOUT_PROMPT, /meta\.json/);
