@@ -15,7 +15,7 @@ Always run \`ls\` before constructing a path. v2 standardizes resource directory
 \`/slack/users/<userId>__<userName>/meta.json\` — canonical user record.
 \`/slack/users/by-name/<slug>.json\` and \`/slack/channels/by-name/<slug>.json\` — name-keyed alias files pointing to canonical records. Collisions are disambiguated with a short id-derived hash suffix (e.g. \`sam-3b1a9f7c.json\`).
 \`/slack/users/bots/<userId>__<userName>.json\` — alias subtree of bot users only, for \`ls\`-style discovery.
-\`/discovery/slack/channels/_index.json\` and \`/discovery/slack/users/_index.json\` are history-independent lookup indexes for writeback context. They are populated from Slack channel/user discovery syncs and can be mounted even when historical records under \`/slack/channels/**\` or \`/slack/users/**\` are not mounted.
+\`/discovery/slack/channels/_index.json\` and \`/discovery/slack/users/_index.json\` are history-independent lookup indexes for writeback context. They are populated from Slack channel/user discovery syncs and can be mounted even when historical message records under \`/slack/channels/**\` or \`/slack/users/**\` are not mounted.
 
 When either the channel name or the user/file name is missing, the directory segment falls back to the bare id (\`<channelId>\`, \`<userId>\`) — the slug suffix is only appended when a non-empty name is available.
 
@@ -56,9 +56,8 @@ When historical data is disabled, read \`/discovery/slack/channels/_index.json\`
   "id": "C0ADE9B71CN",
   "name": "general",
   "title": "general",
-  "updated": "2026-06-05T00:00:00.000Z",
-  "path": "/slack/channels/C0ADE9B71CN__general",
-  "messagesPath": "/slack/channels/C0ADE9B71CN__general/messages"
+  "path": "/slack/channels/C0ADE9B71CN",
+  "messagesPath": "/slack/channels/C0ADE9B71CN/messages"
 }
 \`\`\`
 
@@ -69,9 +68,8 @@ When historical data is disabled, read \`/discovery/slack/channels/_index.json\`
   "id": "U0123ABCDEF",
   "name": "sam",
   "title": "Sam Carter",
-  "updated": "2026-06-05T00:00:00.000Z",
-  "path": "/slack/users/U0123ABCDEF__sam",
-  "messagesPath": "/slack/users/U0123ABCDEF__sam/messages",
+  "path": "/slack/users/U0123ABCDEF",
+  "messagesPath": "/slack/users/U0123ABCDEF/messages",
   "is_bot": false
 }
 \`\`\`

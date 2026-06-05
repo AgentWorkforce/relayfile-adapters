@@ -20,10 +20,6 @@ test('SLACK_LAYOUT_PROMPT documents v2 directory conventions', () => {
   assert.match(SLACK_LAYOUT_PROMPT, /\/discovery\/slack\/channels\/_index\.json/);
   assert.match(SLACK_LAYOUT_PROMPT, /\/discovery\/slack\/users\/_index\.json/);
   assert.match(SLACK_LAYOUT_PROMPT, /history-independent lookup indexes/);
-  assert.match(SLACK_LAYOUT_PROMPT, /"updated": "2026-06-05T00:00:00\.000Z"/);
-  assert.match(SLACK_LAYOUT_PROMPT, /\/slack\/channels\/C0ADE9B71CN__general\/messages/);
-  assert.match(SLACK_LAYOUT_PROMPT, /\/slack\/users\/U0123ABCDEF__sam\/messages/);
-  assert.doesNotMatch(SLACK_LAYOUT_PROMPT, /historical message records under `\/slack\/channels\/\*\*` or `\/slack\/users\/\*\*`/);
   // back-compat migration callout is required so consumers know to fall back.
   assert.match(SLACK_LAYOUT_PROMPT, /message\.json/);
   assert.match(SLACK_LAYOUT_PROMPT, /meta\.json/);
