@@ -397,10 +397,10 @@ export const adapters = [
     overview:
       'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions. It also advertises history-independent discovery lookup indexes for Slack channel and user ids under `/discovery/slack`.',
     readPaths: [
-      ['/slack/channels/<channelId>__<channelName>/meta.json', 'Channel records.'],
-      ['/slack/channels/<channelId>__<channelName>/messages/<messageTs>/meta.json', 'Message records.'],
-      ['/slack/channels/<channelId>__<channelName>/messages/<messageTs>/replies/<replyTs>.json', 'Thread reply records.'],
-      ['/slack/users/<userId>__<userName>/meta.json', 'User records.'],
+      ['/slack/channels/<channelId>.json', 'Channel records.'],
+      ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
+      ['/slack/channels/<channelId>/messages/<messageTs>/replies/<replyTs>.json', 'Thread reply records.'],
+      ['/slack/users/<userId>.json', 'User records.'],
       ['/discovery/slack/channels/_index.json', 'History-independent channel id/name lookup rows for writeback context, materialized from Slack channel discovery syncs.'],
       ['/discovery/slack/users/_index.json', 'History-independent user id/name lookup rows for direct-message writeback context, materialized from Slack user discovery syncs.'],
     ],
