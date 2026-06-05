@@ -117,15 +117,27 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "dropbox": {
-    "cursors": [
-      {
-        "path": "/dropbox/cursors",
-        "params": []
-      }
-    ],
     "files": [
       {
         "path": "/dropbox/files",
+        "params": []
+      }
+    ],
+    "folders": [
+      {
+        "path": "/dropbox/folders",
+        "params": []
+      }
+    ],
+    "shared-folders": [
+      {
+        "path": "/dropbox/shared-folders",
+        "params": []
+      }
+    ],
+    "shared-links": [
+      {
+        "path": "/dropbox/shared-links",
         "params": []
       }
     ]
@@ -342,6 +354,14 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "linear": {
+    "agent-activities": [
+      {
+        "path": "/linear/agent-sessions/{sessionId}/activities",
+        "params": [
+          "sessionId"
+        ]
+      }
+    ],
     "comments": [
       {
         "path": "/linear/issues/{issueId}/comments",
