@@ -281,7 +281,10 @@ function idPatternFor(adapterSlug, resourcePath) {
     }
     return pattern('^\\d+$');
   }
-  if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
+  if (adapterSlug === 'hubspot') {
+    return pattern('^\\d+$');
+  }
+  if (adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
   }
   if (adapterSlug === 'jira') {

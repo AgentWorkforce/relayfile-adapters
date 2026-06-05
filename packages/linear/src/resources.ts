@@ -24,14 +24,6 @@ export const resources = [
     schema: "discovery/linear/issues/{issueId}/comments/.schema.json",
     createExample: "discovery/linear/issues/{issueId}/comments/.create.example.json",
   },
-  {
-    name: "agent-activities",
-    path: "/linear/agent-sessions/{sessionId}/activities",
-    pathPattern: /^\/linear\/agent-sessions\/[^\/]+\/activities(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
-    schema: "discovery/linear/agent-sessions/{sessionId}/activities/.schema.json",
-    createExample: "discovery/linear/agent-sessions/{sessionId}/activities/.create.example.json",
-  },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {

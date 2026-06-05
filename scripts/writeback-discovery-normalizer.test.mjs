@@ -185,6 +185,17 @@ test('normalizes GitLab slugged nested writeback paths to runtime matchers', () 
   );
 });
 
+test('normalizes HubSpot writeback ids as numeric-only records', () => {
+  const hubspot = adapters.find((adapter) => adapter.slug === 'hubspot');
+  assert.ok(hubspot);
+
+  const normalized = normalizeWritebackDiscoveryAdapter(hubspot);
+  for (const resource of normalized.resources) {
+    assert.equal(resource.idPatternSource, '^\\d+$');
+    assert.equal(resource.idPatternLiteral, '/^\\d+$/');
+  }
+});
+
 test('attaches optional layoutManifest-style writeback metadata by static path segments', () => {
   const github = adapters.find((adapter) => adapter.slug === 'github');
   assert.ok(github);
