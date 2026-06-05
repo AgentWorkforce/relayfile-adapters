@@ -15,6 +15,7 @@ Always run \`ls\` before constructing a path. v2 standardizes resource directory
 \`/slack/users/<userId>__<userName>/meta.json\` — canonical user record.
 \`/slack/users/by-name/<slug>.json\` and \`/slack/channels/by-name/<slug>.json\` — name-keyed alias files pointing to canonical records. Collisions are disambiguated with a short id-derived hash suffix (e.g. \`sam-3b1a9f7c.json\`).
 \`/slack/users/bots/<userId>__<userName>.json\` — alias subtree of bot users only, for \`ls\`-style discovery.
+\`/discovery/slack/channels/_index.json\` and \`/discovery/slack/users/_index.json\` are history-independent lookup indexes for writeback context. They are populated from Slack channel/user discovery syncs and can be mounted even when historical message records under \`/slack/channels/**\` or \`/slack/users/**\` are not mounted.
 
 When either the channel name or the user/file name is missing, the directory segment falls back to the bare id (\`<channelId>\`, \`<userId>\`) — the slug suffix is only appended when a non-empty name is available.
 
@@ -43,6 +44,35 @@ When either the channel name or the user/file name is missing, the directory seg
 
 The \`is_bot\` flag lets you list humans without opening every user record:
 \`jq '.[] | select(.is_bot | not)' /slack/users/_index.json\`.
+
+## Discovery Lookup Indexes
+
+When historical data is disabled, read \`/discovery/slack/channels/_index.json\` before posting a channel message and \`/discovery/slack/users/_index.json\` before posting a direct message. These files contain the same id/name lookup context as the historical indexes, but they live under \`discovery/\` so agents can resolve Slack ids without mounting message history.
+
+\`/discovery/slack/channels/_index.json\` rows:
+
+\`\`\`json
+{
+  "id": "C0ADE9B71CN",
+  "name": "general",
+  "title": "general",
+  "path": "/slack/channels/C0ADE9B71CN",
+  "messagesPath": "/slack/channels/C0ADE9B71CN/messages"
+}
+\`\`\`
+
+\`/discovery/slack/users/_index.json\` rows:
+
+\`\`\`json
+{
+  "id": "U0123ABCDEF",
+  "name": "sam",
+  "title": "Sam Carter",
+  "path": "/slack/users/U0123ABCDEF",
+  "messagesPath": "/slack/users/U0123ABCDEF/messages",
+  "is_bot": false
+}
+\`\`\`
 
 ## Back-compat: \`message.json\` → \`meta.json\`
 
