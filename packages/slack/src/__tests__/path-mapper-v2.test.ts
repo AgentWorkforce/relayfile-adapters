@@ -27,6 +27,22 @@ test('slackNameWithId falls back to bare id when name is empty', () => {
   assert.equal(slackNameWithId('', 'C0ADE9B71CN'), 'C0ADE9B71CN');
 });
 
+test('slackNameWithId returns bare id when the name is just the id fallback', () => {
+  // Regression: upstream channel-name resolution sometimes falls back to the
+  // channel id itself; that must not mint a duplicate `<ID>__<lowercased-id>`
+  // tree (observed live as C0AD7UU0J1G__c0ad7uu0j1g).
+  assert.equal(slackNameWithId('c0ad7uu0j1g', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+  assert.equal(slackNameWithId('C0AD7UU0J1G', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+  assert.equal(slackNameWithId(' C0AD7UU0J1G ', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+});
+
+test('channelMetadataPath ignores an id-fallback channel name', () => {
+  assert.equal(
+    channelMetadataPath('C0AD7UU0J1G', 'c0ad7uu0j1g'),
+    '/slack/channels/C0AD7UU0J1G/meta.json',
+  );
+});
+
 test('channelMetadataPath uses <id>__<slug> with channel name', () => {
   assert.equal(
     channelMetadataPath('C0ADE9B71CN', 'general'),

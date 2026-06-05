@@ -61,11 +61,25 @@ function slugify(value: string): string {
  * Compose an `<id>__<slug>` segment, mirroring `github`'s `nameWithId` and the
  * convention used across v2 adapters. When `humanReadable` slugifies to empty
  * (no name available, emoji-only, etc.) returns the bare normalized id.
+ *
+ * A `humanReadable` value that is just the id itself (any case — upstream
+ * name resolution sometimes falls back to the id) also returns the bare
+ * normalized id, so `slackNameWithId('c0ad7uu0j1g', 'C0AD7UU0J1G')` yields
+ * `C0AD7UU0J1G`, not the duplicate tree `C0AD7UU0J1G__c0ad7uu0j1g`.
  */
 export function slackNameWithId(humanReadable: string | undefined, id: string): string {
   const normalizedId = normalizeSegment(id);
-  const slug = humanReadable ? slugify(humanReadable) : '';
+  const trimmedName = humanReadable?.trim();
+  const slug =
+    trimmedName && !isSlackIdFallbackName(trimmedName, id) ? slugify(trimmedName) : '';
   return slug ? `${normalizedId}__${slug}` : normalizedId;
+}
+
+function isSlackIdFallbackName(value: string, id: string): boolean {
+  return (
+    value.localeCompare(id, undefined, { sensitivity: 'accent' }) === 0 ||
+    slugify(value) === slugify(id)
+  );
 }
 
 /**
