@@ -17,6 +17,15 @@ export interface SlackMessageReference {
   messageTs: string;
 }
 
+export interface SlackDirectMessageReference {
+  userId: string;
+  messageTs: string;
+}
+
+export interface SlackDirectMessageThreadReplyReference extends SlackDirectMessageReference {
+  replyTs: string;
+}
+
 export interface SlackThreadReference {
   channelId: string;
   threadTs: string;
@@ -330,6 +339,58 @@ export function slackMessageReadCandidatePaths(
   ];
 }
 
+export function directMessageDirectory(userId: string): string {
+  return joinPath(SLACK_ROOT, 'users', normalizeSegment(userId), 'messages');
+}
+
+export function directMessagePath(userId: string, messageTs: string): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(messageTs),
+    'meta.json',
+  );
+}
+
+export function directMessageThreadReplyPath(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(threadTs),
+    'replies',
+    `${messageSegmentV2(replyTs)}.json`,
+  );
+}
+
+export function parseSlackDirectMessagePath(path: string): SlackDirectMessageReference | null {
+  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/meta\.json$/.exec(path);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  return {
+    userId: decodeURIComponent(match[1]),
+    messageTs: pathTokenToSlackTimestamp(match[2]),
+  };
+}
+
+export function parseSlackDirectMessageThreadReplyPath(
+  path: string,
+): SlackDirectMessageThreadReplyReference | null {
+  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/.exec(path);
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+
+  return {
+    userId: decodeURIComponent(match[1]),
+    messageTs: pathTokenToSlackTimestamp(match[2]),
+    replyTs: pathTokenToSlackTimestamp(match[3]),
+  };
+}
+
 export function channelThreadsDirectory(channelId: string, channelName?: string): string {
   return joinPath(SLACK_ROOT, 'channels', channelSegmentV2(channelName, channelId), 'threads');
 }
@@ -434,6 +495,15 @@ export function slackUsersIndexPath(): string {
 function aliasFilename(name: string, id: string, colliding: boolean): string {
   const slug = slugifyAlias(name);
   return colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+}
+
+function pathTokenToSlackTimestamp(token: string): string {
+  const decoded = decodeURIComponent(token);
+  const lastUnderscore = decoded.lastIndexOf('_');
+  if (lastUnderscore < 0) {
+    return decoded;
+  }
+  return `${decoded.slice(0, lastUnderscore)}.${decoded.slice(lastUnderscore + 1)}`;
 }
 
 /**

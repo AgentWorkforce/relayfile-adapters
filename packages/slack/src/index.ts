@@ -7,10 +7,15 @@ export {
   createSlackReactionObjectId,
   createSlackThreadObjectId,
   createSlackThreadReplyObjectId,
+  directMessageDirectory,
+  directMessagePath,
+  directMessageThreadReplyPath,
   fileCommentPath,
   fileMetadataPath,
   messageLegacyPath,
   messagePath,
+  parseSlackDirectMessagePath,
+  parseSlackDirectMessageThreadReplyPath,
   parseSlackMessageObjectId,
   parseSlackReactionObjectId,
   parseSlackThreadObjectId,
@@ -32,6 +37,8 @@ export {
 } from './path-mapper.js';
 
 export type {
+  SlackDirectMessageThreadReplyReference,
+  SlackDirectMessageReference,
   SlackMessageReference,
   SlackPathObjectType,
   SlackReactionObjectIdParts,
