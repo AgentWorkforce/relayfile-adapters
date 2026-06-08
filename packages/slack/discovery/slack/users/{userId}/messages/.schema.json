@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Post Slack direct message",
+  "title": "Slack direct message",
   "type": "object",
   "required": [],
   "anyOf": [
@@ -135,5 +135,5 @@
     }
   },
   "additionalProperties": false,
-  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+  "description": "Full direct message resource record schema. Synced records are read under /slack/users/{userId}/messages/<messageTs>/meta.json; create drafts in the same directory post a Slack DM. Fields marked readOnly are synced from the provider and cannot be written by agents."
 }

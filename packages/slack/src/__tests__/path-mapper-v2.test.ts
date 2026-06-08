@@ -4,8 +4,13 @@ import test from 'node:test';
 import {
   channelMetadataPath,
   channelMessagesDirectory,
+  directMessageDirectory,
+  directMessagePath,
+  directMessageThreadReplyPath,
   messageLegacyPath,
   messagePath,
+  parseSlackDirectMessagePath,
+  parseSlackDirectMessageThreadReplyPath,
   slackBotsAliasPath,
   slackByNameChannelAliasPath,
   slackByNameUserAliasPath,
@@ -97,6 +102,36 @@ test('channelMessagesDirectory uses the v2 channel segment', () => {
     channelMessagesDirectory('C0ADE9B71CN', 'general'),
     '/slack/channels/C0ADE9B71CN__general/messages',
   );
+});
+
+test('direct message paths use bare user id message roots', () => {
+  assert.equal(directMessageDirectory('U0123ABCDEF'), '/slack/users/U0123ABCDEF/messages');
+  assert.equal(
+    directMessagePath('U0123ABCDEF', '1711111111.000100'),
+    '/slack/users/U0123ABCDEF/messages/1711111111_000100/meta.json',
+  );
+  assert.equal(
+    directMessageThreadReplyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200.json',
+  );
+  assert.deepEqual(
+    parseSlackDirectMessagePath(directMessagePath('U0123ABCDEF', '1711111111.000100')),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+    },
+  );
+  assert.deepEqual(
+    parseSlackDirectMessageThreadReplyPath(
+      directMessageThreadReplyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    ),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+      replyTs: '1711111222.000200',
+    },
+  );
+  assert.equal(parseSlackDirectMessagePath('/slack/channels/D123/messages/1711111111_000100/meta.json'), null);
 });
 
 test('messageLegacyPath continues to emit `<slug>--<id>` and `message.json`', () => {

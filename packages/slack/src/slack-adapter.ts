@@ -1,4 +1,4 @@
-import type { ConnectionProvider } from '@relayfile/sdk';
+import type { ConnectionProvider, ProxyResponse } from '@relayfile/sdk';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 import type { NormalizedWebhook } from './webhook-normalizer.js';
@@ -10,6 +10,8 @@ import {
   createSlackReactionObjectId,
   createSlackThreadObjectId,
   createSlackThreadReplyObjectId,
+  directMessagePath,
+  directMessageThreadReplyPath,
   fileCommentPath,
   fileMetadataPath,
   messagePath,
@@ -100,6 +102,18 @@ interface MaterializedSlackObject {
   objectId: string;
   path: string;
   payload: Record<string, unknown>;
+  directMessageUserId?: string;
+}
+
+interface SlackConversationInfoResponse {
+  ok?: boolean;
+  channel?: {
+    id?: string;
+    is_im?: boolean;
+    user?: string;
+    [key: string]: unknown;
+  };
+  error?: string;
 }
 
 export const SLACK_SUPPORTED_EVENTS = [
@@ -128,6 +142,7 @@ const CHANNEL_MENTION_PATTERN = /<#([A-Z0-9]+)(?:\|[^>]+)?>/g;
 const SPECIAL_MENTION_PATTERN = /<!([^>]+)>/g;
 const SLACK_LINK_PATTERN = /<((?:https?:\/\/|mailto:)[^>|]+)(?:\|[^>]+)?>/g;
 const RAW_LINK_PATTERN = /\bhttps?:\/\/[^\s<>()]+/g;
+const SLACK_API_BASE_URL = 'https://slack.com';
 
 export class SlackAdapter extends IntegrationAdapter {
   readonly name = 'slack';
@@ -140,6 +155,8 @@ export class SlackAdapter extends IntegrationAdapter {
   ) {
     super(client, provider);
   }
+
+  private readonly directMessageUserCache = new Map<string, string>();
 
   override supportedEvents(): string[] {
     return [...SLACK_SUPPORTED_EVENTS];
@@ -266,8 +283,19 @@ export class SlackAdapter extends IntegrationAdapter {
   }
 
   override async ingestWebhook(workspaceId: string, event: NormalizedWebhook): Promise<IngestResult> {
-    const canonical = this.materializeEvent(event);
+    const canonical = await this.materializeEvent(event);
     const semantics = this.computeSemantics(canonical.objectType, canonical.objectId, canonical.payload);
+    if (canonical.directMessageUserId) {
+      semantics.properties = {
+        ...(semantics.properties ?? {}),
+        dm_user_id: canonical.directMessageUserId,
+        source_channel_id: readString(canonical.payload.channel) ?? '',
+      };
+      semantics.relations = [
+        ...(semantics.relations ?? []),
+        `dm:user:${canonical.directMessageUserId}`,
+      ];
+    }
     const content = stableStringify({
       provider: 'slack',
       connectionId: event.connectionId ?? this.config.connectionId ?? '',
@@ -309,17 +337,19 @@ export class SlackAdapter extends IntegrationAdapter {
     return result;
   }
 
-  private materializeEvent(event: NormalizedWebhook): MaterializedSlackObject {
+  private async materializeEvent(event: NormalizedWebhook): Promise<MaterializedSlackObject> {
     const payload = event.payload ?? {};
     const inferredType = inferCanonicalObjectType(event, payload);
     const objectType = inferredType ?? normalizeObjectType(event.objectType);
     const objectId = this.resolveObjectId(objectType, event, payload);
+    const directMessageUserId = await this.resolveDirectMessageUserId(event, payload);
 
     return {
       objectType,
       objectId,
-      path: this.resolvePath(objectType, objectId, payload),
+      path: this.resolvePath(objectType, objectId, payload, directMessageUserId ?? undefined),
       payload,
+      ...(directMessageUserId ? { directMessageUserId } : {}),
     };
   }
 
@@ -375,7 +405,25 @@ export class SlackAdapter extends IntegrationAdapter {
     objectType: CanonicalSlackObjectType,
     objectId: string,
     payload: Record<string, unknown>,
+    directMessageUserId?: string,
   ): string {
+    if (directMessageUserId) {
+      if (objectType === 'message' || objectType === 'thread') {
+        const messageTs = readString(payload.ts);
+        if (messageTs) {
+          return directMessagePath(directMessageUserId, messageTs);
+        }
+      }
+
+      if (objectType === 'thread_reply') {
+        const threadTs = readString(payload.thread_ts);
+        const replyTs = readString(payload.ts);
+        if (threadTs && replyTs) {
+          return directMessageThreadReplyPath(directMessageUserId, threadTs, replyTs);
+        }
+      }
+    }
+
     if (objectType === 'message') {
       const channelId = readString(payload.channel);
       const messageTs = readString(payload.ts);
@@ -440,6 +488,55 @@ export class SlackAdapter extends IntegrationAdapter {
     }
 
     return this.computePath(objectType, objectId);
+  }
+
+  private async resolveDirectMessageUserId(
+    event: NormalizedWebhook,
+    payload: Record<string, unknown>,
+  ): Promise<string | null> {
+    if (readString(payload.channel_type) !== 'im') {
+      return null;
+    }
+
+    const channelId = readString(payload.channel);
+    if (!channelId?.startsWith('D')) {
+      return null;
+    }
+
+    return this.lookupDirectMessageUserId(event, channelId);
+  }
+
+  private async lookupDirectMessageUserId(
+    event: NormalizedWebhook,
+    channelId: string,
+  ): Promise<string | null> {
+    const connectionId = event.connectionId ?? this.config.connectionId;
+    if (!connectionId) {
+      return null;
+    }
+
+    const cacheKey = `${connectionId}:${channelId}`;
+    const cached = this.directMessageUserCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    try {
+      const response = await this.provider.proxy<SlackConversationInfoResponse>({
+        method: 'GET',
+        baseUrl: this.config.apiBaseUrl ?? SLACK_API_BASE_URL,
+        endpoint: '/api/conversations.info',
+        connectionId,
+        query: { channel: channelId },
+      });
+      const userId = extractDirectMessageUserFromConversationInfo(response);
+      if (userId) {
+        this.directMessageUserCache.set(cacheKey, userId);
+      }
+      return userId;
+    } catch {
+      return null;
+    }
   }
 
   private resolveReactionObjectId(payload: Record<string, unknown>): string | null {
@@ -740,6 +837,27 @@ function readFileName(payload: Record<string, unknown>): string | undefined {
 
 function readUserId(payload: Record<string, unknown>): string | null {
   return readString(payload.user) ?? readString(asRecord(payload.user)?.id);
+}
+
+function readSlackUserId(value: unknown): string | null {
+  const userId = readString(value) ?? readString(asRecord(value)?.id);
+  return userId && /^[UW][A-Z0-9]+$/.test(userId) ? userId : null;
+}
+
+function extractDirectMessageUserFromConversationInfo(
+  response: ProxyResponse<SlackConversationInfoResponse>,
+): string | null {
+  const data = asRecord(response.data);
+  if (response.status < 200 || response.status >= 300 || data?.ok === false) {
+    return null;
+  }
+
+  const channel = asRecord(data?.channel);
+  if (channel?.is_im !== true) {
+    return null;
+  }
+
+  return readSlackUserId(channel.user);
 }
 
 function readUserName(payload: Record<string, unknown>): string | undefined {
