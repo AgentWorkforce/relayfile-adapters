@@ -724,6 +724,46 @@ test('ingestWebhook preserves raw D-channel path when DM user resolution is unav
   assert.ok(writes[0]?.semantics?.permissions?.includes('scope:dm'));
 });
 
+test('ingestWebhook caches unresolved DM user resolution per Slack connection', async () => {
+  const writes: Parameters<RelayFileClientLike['writeFile']>[0][] = [];
+  const provider = createProvider(() => ({
+    status: 200,
+    headers: {},
+    data: {
+      ok: false,
+      error: 'channel_not_found',
+    },
+  }));
+  const adapter = createAdapterWithProvider(provider, {
+    async writeFile(input) {
+      writes.push(input);
+      return {};
+    },
+  });
+
+  for (const ts of ['1711111111.000100', '1711111222.000200'] as const) {
+    await adapter.ingestWebhook('workspace-id', {
+      provider: 'slack',
+      connectionId: 'conn-slack',
+      eventType: 'message.created',
+      objectType: 'message',
+      objectId: `D123:${ts}`,
+      payload: {
+        type: 'message',
+        channel: 'D123',
+        channel_type: 'im',
+        user: 'U234',
+        text: ts,
+        ts,
+      },
+    });
+  }
+
+  assert.equal(writes[0]?.path, '/slack/channels/D123/messages/1711111111_000100/meta.json');
+  assert.equal(writes[1]?.path, '/slack/channels/D123/messages/1711111222_000200/meta.json');
+  assert.equal(provider.requests.length, 1);
+});
+
 test('ingestWebhook caches DM user resolution per Slack connection', async () => {
   const writes: Parameters<RelayFileClientLike['writeFile']>[0][] = [];
   const provider = createProvider((request) => ({
@@ -766,6 +806,47 @@ test('ingestWebhook caches DM user resolution per Slack connection', async () =>
   assert.equal(writes[0]?.path, directMessagePath('U111', '1711111111.000100'));
   assert.equal(writes[1]?.path, directMessagePath('U222', '1711111222.000200'));
   assert.equal(provider.requests.length, 2);
+});
+
+test('ingestWebhook uses thread_ts fallback for root 1:1 DM thread paths', async () => {
+  const writes: Parameters<RelayFileClientLike['writeFile']>[0][] = [];
+  const provider = createProvider(() => ({
+    status: 200,
+    headers: {},
+    data: {
+      ok: true,
+      channel: {
+        id: 'D123',
+        is_im: true,
+        user: 'U999',
+      },
+    },
+  }));
+  const adapter = createAdapterWithProvider(provider, {
+    async writeFile(input) {
+      writes.push(input);
+      return {};
+    },
+  });
+
+  const result = await adapter.ingestWebhook('workspace-id', {
+    provider: 'slack',
+    connectionId: 'conn-slack',
+    eventType: 'message.created',
+    objectType: 'thread',
+    objectId: 'D123:1711111111.000100',
+    payload: {
+      type: 'message',
+      channel: 'D123',
+      channel_type: 'im',
+      user: 'U234',
+      text: 'thread root in dm',
+      thread_ts: '1711111111.000100',
+    },
+  });
+
+  assert.deepEqual(result.paths, [directMessagePath('U999', '1711111111.000100')]);
+  assert.equal(writes[0]?.path, directMessagePath('U999', '1711111111.000100'));
 });
 
 test('barrel exports compile and import cleanly', async () => {

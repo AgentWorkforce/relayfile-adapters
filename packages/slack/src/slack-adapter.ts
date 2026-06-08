@@ -156,7 +156,7 @@ export class SlackAdapter extends IntegrationAdapter {
     super(client, provider);
   }
 
-  private readonly directMessageUserCache = new Map<string, string>();
+  private readonly directMessageUserCache = new Map<string, string | null>();
 
   override supportedEvents(): string[] {
     return [...SLACK_SUPPORTED_EVENTS];
@@ -409,7 +409,8 @@ export class SlackAdapter extends IntegrationAdapter {
   ): string {
     if (directMessageUserId) {
       if (objectType === 'message' || objectType === 'thread') {
-        const messageTs = readString(payload.ts);
+        const messageTs =
+          readString(payload.ts) ?? readString(payload.thread_ts) ?? readString(payload.event_ts);
         if (messageTs) {
           return directMessagePath(directMessageUserId, messageTs);
         }
@@ -530,9 +531,7 @@ export class SlackAdapter extends IntegrationAdapter {
         query: { channel: channelId },
       });
       const userId = extractDirectMessageUserFromConversationInfo(response);
-      if (userId) {
-        this.directMessageUserCache.set(cacheKey, userId);
-      }
+      this.directMessageUserCache.set(cacheKey, userId);
       return userId;
     } catch {
       return null;
