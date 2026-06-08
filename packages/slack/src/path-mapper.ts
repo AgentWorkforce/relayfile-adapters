@@ -351,7 +351,34 @@ export function directMessagePath(userId: string, messageTs: string): string {
   );
 }
 
+/**
+ * Canonical 1:1 direct-message thread-reply record path. Like
+ * {@link threadReplyPath}, the reply is a directory record
+ * (`replies/<ts>/meta.json`) so its stem is a directory and can carry children
+ * without the file/dir name collision that wedges a POSIX mount. Pre-0.8.x
+ * emitted a flat `replies/<ts>.json` leaf — read it back via
+ * {@link slackDirectMessageThreadReplyReadCandidatePaths}.
+ */
 export function directMessageThreadReplyPath(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(threadTs),
+    'replies',
+    messageSegmentV2(replyTs),
+    'meta.json',
+  );
+}
+
+/**
+ * @deprecated Pre-0.8.x emitted a flat `.../replies/<ts>.json` leaf. Use
+ * {@link directMessageThreadReplyPath}. Retained for back-compat reads only —
+ * see {@link slackDirectMessageThreadReplyReadCandidatePaths}.
+ */
+export function directMessageThreadReplyLegacyPath(
   userId: string,
   threadTs: string,
   replyTs: string,
@@ -362,6 +389,22 @@ export function directMessageThreadReplyPath(
     'replies',
     `${messageSegmentV2(replyTs)}.json`,
   );
+}
+
+/**
+ * Reader hint: candidate paths for a DM thread-reply canonical record, current
+ * (`<ts>/meta.json`) then legacy (`<ts>.json`), so a reply mirrored by either
+ * the current or a pre-0.8.x adapter still reads.
+ */
+export function slackDirectMessageThreadReplyReadCandidatePaths(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string[] {
+  return [
+    directMessageThreadReplyPath(userId, threadTs, replyTs),
+    directMessageThreadReplyLegacyPath(userId, threadTs, replyTs),
+  ];
 }
 
 export function parseSlackDirectMessagePath(path: string): SlackDirectMessageReference | null {
@@ -379,7 +422,11 @@ export function parseSlackDirectMessagePath(path: string): SlackDirectMessageRef
 export function parseSlackDirectMessageThreadReplyPath(
   path: string,
 ): SlackDirectMessageThreadReplyReference | null {
-  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/.exec(path);
+  // Accept both the current reply record (`replies/<ts>/meta.json`) and the
+  // legacy flat leaf (`replies/<ts>.json`) so routing works mid-migration.
+  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+?)(?:\/meta)?\.json$/.exec(
+    path,
+  );
   if (!match?.[1] || !match[2] || !match[3]) {
     return null;
   }

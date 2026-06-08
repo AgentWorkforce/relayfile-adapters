@@ -6,6 +6,7 @@ import {
   channelMessagesDirectory,
   directMessageDirectory,
   directMessagePath,
+  directMessageThreadReplyLegacyPath,
   directMessageThreadReplyPath,
   messageLegacyPath,
   messagePath,
@@ -13,6 +14,7 @@ import {
   parseSlackDirectMessageThreadReplyPath,
   reactionPath,
   slackBotsAliasPath,
+  slackDirectMessageThreadReplyReadCandidatePaths,
   slackThreadReplyReadCandidatePaths,
   threadReplyLegacyPath,
   threadReplyPath,
@@ -116,7 +118,7 @@ test('direct message paths use bare user id message roots', () => {
   );
   assert.equal(
     directMessageThreadReplyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
-    '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200.json',
+    '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200/meta.json',
   );
   assert.deepEqual(
     parseSlackDirectMessagePath(directMessagePath('U0123ABCDEF', '1711111111.000100')),
@@ -134,6 +136,28 @@ test('direct message paths use bare user id message roots', () => {
       messageTs: '1711111111.000100',
       replyTs: '1711111222.000200',
     },
+  );
+  // Legacy flat reply paths must still parse so routing works mid-migration.
+  assert.deepEqual(
+    parseSlackDirectMessageThreadReplyPath(
+      directMessageThreadReplyLegacyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    ),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+      replyTs: '1711111222.000200',
+    },
+  );
+  assert.deepEqual(
+    slackDirectMessageThreadReplyReadCandidatePaths(
+      'U0123ABCDEF',
+      '1711111111.000100',
+      '1711111222.000200',
+    ),
+    [
+      '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200/meta.json',
+      '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200.json',
+    ],
   );
   assert.equal(parseSlackDirectMessagePath('/slack/channels/D123/messages/1711111111_000100/meta.json'), null);
 });

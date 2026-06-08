@@ -14,7 +14,7 @@ Always run \`ls\` before constructing a path. v2 standardizes resource directory
   - \`messages/<ts>/reactions/<emoji>--<userId>.json\` — reaction records.
 \`/slack/users/<userId>__<userName>/meta.json\` — canonical user record.
 \`/slack/users/<userId>/messages/<ts>/meta.json\` — canonical 1:1 direct message records addressed by bare user id. Slack's internal \`D…\` IM channel id stays inside the JSON payload as source metadata; do not mount or write raw \`D…\` paths as the product contract.
-\`/slack/users/<userId>/messages/<ts>/replies/<ts>.json\` — threaded replies in a 1:1 direct message.
+\`/slack/users/<userId>/messages/<ts>/replies/<ts>/meta.json\` — threaded replies in a 1:1 direct message (directory record).
 \`/slack/users/by-name/<slug>.json\` and \`/slack/channels/by-name/<slug>.json\` — name-keyed alias files pointing to canonical records. Collisions are disambiguated with a short id-derived hash suffix (e.g. \`sam-3b1a9f7c.json\`).
 \`/slack/users/bots/<userId>__<userName>.json\` — alias subtree of bot users only, for \`ls\`-style discovery.
 \`/discovery/slack/channels/_index.json\` and \`/discovery/slack/users/_index.json\` are history-independent lookup indexes for writeback context. They are populated from Slack channel/user discovery syncs and can be mounted even when historical message records under \`/slack/channels/**\` or \`/slack/users/**\` are not mounted.
