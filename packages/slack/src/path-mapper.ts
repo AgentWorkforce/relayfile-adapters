@@ -403,7 +403,40 @@ export function threadPath(channelId: string, threadTs: string, channelName?: st
   );
 }
 
+/**
+ * Canonical thread-reply record path. The reply is a **directory record**
+ * (`replies/<ts>/meta.json`) — matching `messagePath`, `directMessagePath`, and
+ * `threadPath`, all of which use `<ts>/meta.json`. This is deliberate: a reply
+ * can carry children (reactions live at `replies/<ts>/reactions/...`, see
+ * {@link reactionPath}), so its stem MUST be a directory. The pre-0.8.x adapter
+ * wrote a flat leaf file `replies/<ts>.json`, which collided with that same
+ * `<ts>` directory — one name as both a file and a directory — and could not be
+ * materialized on a POSIX mount (`mkdir ... : not a directory`), wedging the
+ * whole mirror. Readers should fall back to the legacy filename via
+ * {@link slackThreadReplyReadCandidatePaths}.
+ */
 export function threadReplyPath(
+  channelId: string,
+  threadTs: string,
+  replyTs: string,
+  channelName?: string,
+): string {
+  return joinPath(
+    channelThreadsDirectory(channelId, channelName),
+    slackTimestampToPathToken(threadTs),
+    'replies',
+    slackTimestampToPathToken(replyTs),
+    'meta.json',
+  );
+}
+
+/**
+ * @deprecated Pre-0.8.x emitted a flat `.../replies/<ts>.json` leaf file, which
+ * collided with the `<ts>` reaction directory. Use {@link threadReplyPath}.
+ * Retained for back-compat reads only — see
+ * {@link slackThreadReplyReadCandidatePaths}.
+ */
+export function threadReplyLegacyPath(
   channelId: string,
   threadTs: string,
   replyTs: string,
@@ -415,6 +448,23 @@ export function threadReplyPath(
     'replies',
     `${slackTimestampToPathToken(replyTs)}.json`,
   );
+}
+
+/**
+ * Reader hint: candidate paths for a Slack thread-reply canonical record, in
+ * order of preference — current (`<ts>/meta.json`) then legacy (`<ts>.json`) —
+ * so a reply mirrored by either the current or a pre-0.8.x adapter still reads.
+ */
+export function slackThreadReplyReadCandidatePaths(
+  channelId: string,
+  threadTs: string,
+  replyTs: string,
+  channelName?: string,
+): string[] {
+  return [
+    threadReplyPath(channelId, threadTs, replyTs, channelName),
+    threadReplyLegacyPath(channelId, threadTs, replyTs, channelName),
+  ];
 }
 
 export function userMetadataPath(userId: string, userName?: string): string {
