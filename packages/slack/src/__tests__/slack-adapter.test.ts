@@ -386,11 +386,11 @@ test('message and thread path mapping is deterministic', () => {
 
   assert.equal(
     adapter.computePath('thread_reply', replyId),
-    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200.json',
+    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200/meta.json',
   );
   assert.equal(
     computeSlackPath('thread_reply', replyId),
-    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200.json',
+    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200/meta.json',
   );
 });
 
