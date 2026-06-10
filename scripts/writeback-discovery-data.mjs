@@ -309,6 +309,13 @@ export const adapters = [
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
       }, { body: 'Replace example comment body.' }),
+      endpoint('/linear/agent-sessions/{sessionId}/activities/new.json', 'Create Linear agent activity', 'Creates an activity on a Linear agent session.', ['type'], {
+        type: en(['action', 'elicitation', 'error', 'response', 'thought'], 'Linear agent activity content type.'),
+        body: str('Response, thought, elicitation, or error body.'),
+        action: str('Action name for action-type activities.'),
+        parameter: str('Action parameter or target.'),
+        result: str('Action result summary.'),
+      }, { type: 'response', body: 'Replace example agent activity body.' }),
     ],
   },
   {
@@ -479,6 +486,9 @@ export const adapters = [
     readPaths: [['/dropbox/<account>/<path>', 'Dropbox file content.']],
     endpoints: [
       endpoint('/dropbox/files/new.json', 'Create Dropbox file', 'Uploads a Dropbox file.', ['path_display'], { path_display: str('Dropbox display path.'), contentBase64: str('Base64 content.'), mode: str('Upload mode.') }, { path_display: '/Team/Notes.md' }),
+      endpoint('/dropbox/folders/new.json', 'Create Dropbox folder', 'Creates or updates Dropbox folder metadata.', ['path_display'], { path_display: str('Dropbox display path.'), name: str('Folder name.') }, { path_display: '/Team' }),
+      endpoint('/dropbox/shared-folders/new.json', 'Create Dropbox shared folder marker', 'Creates or updates Dropbox shared folder metadata.', ['id'], { id: str('Dropbox shared folder id.'), name: str('Shared folder name.') }, { id: '845281924' }),
+      endpoint('/dropbox/shared-links/new.json', 'Create Dropbox shared link marker', 'Creates or updates Dropbox shared link metadata.', ['url'], { url: str('Dropbox shared link URL.'), name: str('Shared link name.') }, { url: 'https://www.dropbox.com/scl/fi/example/report.pdf?dl=0' }),
       endpoint('/dropbox/cursors/new.json', 'Create Dropbox cursor', 'Stores a list_folder cursor.', ['cursor'], { cursor: str('Dropbox cursor.'), accountId: str('Account id.') }, { cursor: 'cursor-2' }),
     ],
   },

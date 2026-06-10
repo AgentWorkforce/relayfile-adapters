@@ -157,8 +157,17 @@ test('normalizes existing writeback discovery adapter endpoints without changing
 
   const commentEndpoint = normalized.endpoints.find((endpoint) => endpoint.path === '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json');
   assert.ok(commentEndpoint);
-  assert.equal(commentEndpoint.resource.name, 'issue-comments');
-  assert.equal(commentEndpoint.resource.schemaPath, '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json');
+  assert.deepEqual(commentEndpoint.resource, {
+    name: 'issue-comments',
+    resourcePath: '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments',
+    schemaPath: '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json',
+    examplePath: '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.create.example.json',
+    description: 'Creates or updates a GitHub issue comment.',
+    pathPatternSource: '^/github/repos/[^/]+/[^/]+/issues/[^/]+/comments(?:/[^/]+(?:\\.json|/meta\\.json)?)?$',
+    pathPatternLiteral: '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/issues\\/[^\\/]+\\/comments(?:\\/[^\\/]+(?:\\.json|\\/meta\\.json)?)?$/',
+    idPatternLiteral: '/^(?:meta|\\d+)$/',
+    idPatternSource: '^(?:meta|\\d+)$',
+  });
 });
 
 test('normalizes GitLab slugged nested writeback paths to runtime matchers', () => {

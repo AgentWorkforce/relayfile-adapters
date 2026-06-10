@@ -1,19 +1,41 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Dropbox shared folder marker",
+  "title": "Linear agent activity",
   "type": "object",
   "required": [
-    "id"
+    "type"
   ],
   "properties": {
+    "type": {
+      "enum": [
+        "action",
+        "elicitation",
+        "error",
+        "response",
+        "thought"
+      ],
+      "description": "Linear agent activity content type."
+    },
+    "body": {
+      "type": "string",
+      "description": "Response, thought, elicitation, or error body."
+    },
+    "action": {
+      "type": "string",
+      "description": "Action name for action-type activities."
+    },
+    "parameter": {
+      "type": "string",
+      "description": "Action parameter or target."
+    },
+    "result": {
+      "type": "string",
+      "description": "Action result summary."
+    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
       "readOnly": true
-    },
-    "name": {
-      "type": "string",
-      "description": "Shared folder name."
     },
     "createdAt": {
       "type": "string",
