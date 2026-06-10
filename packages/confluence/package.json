@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-confluence",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Confluence adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -80,7 +80,7 @@
     "directory": "packages/confluence"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.37"
+    "@relayfile/adapter-core": "^0.3.38"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
