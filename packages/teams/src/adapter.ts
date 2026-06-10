@@ -117,7 +117,7 @@ export class TeamsAdapter extends IntegrationProvider {
 
     const events = await processNotifications(input.body, {
       config: this.config,
-      signal,
+      ...(signal ? { signal } : {}),
     });
 
     for (const event of events) {

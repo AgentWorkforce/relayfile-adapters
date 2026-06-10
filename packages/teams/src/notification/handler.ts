@@ -43,7 +43,7 @@ async function graphFetchResource(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    signal,
+    ...(signal ? { signal } : {}),
   });
 
   if (response.status === 404 || response.status === 410) {
@@ -86,21 +86,21 @@ function inferObjectFromPayload(
         return {
           objectType: 'reply',
           parts: {
-            teamId: parsed.parts.teamId,
-            channelId: parsed.parts.channelId,
+            teamId: parsed.parts.teamId ?? '',
+            channelId: parsed.parts.channelId ?? '',
             messageId: replyToId,
-            replyId: parsed.parts.messageId,
+            replyId: parsed.parts.messageId ?? '',
           },
         };
       }
     }
 
     if (parsed.objectType === 'member') {
-      const userId = asString(payload.userId) ?? asString(asRecord(payload.user)?.id) ?? parsed.parts.userId;
+      const userId = asString(payload.userId) ?? asString(asRecord(payload.user)?.id) ?? parsed.parts.userId ?? '';
       return {
         objectType: 'member',
         parts: {
-          teamId: parsed.parts.teamId,
+          teamId: parsed.parts.teamId ?? '',
           userId,
         },
       };

@@ -19,30 +19,30 @@ export function normalizeGraphResource(resource: string): string {
     return url.pathname.replace(/^\/(?:v1\.0|beta)\//, '/').replace(/\/+$/, '');
   }
 
-  const [pathOnly] = trimmed.split('?');
+  const [pathOnly = ''] = trimmed.split('?');
   return `/${pathOnly.replace(/^\/(?:v1\.0|beta)\//, '').replace(/^\/+/, '')}`.replace(/\/+$/, '');
 }
 
 export function makeObjectId(objectType: TeamsObjectType, parts: PathParts): string {
   switch (objectType) {
     case 'team':
-      return parts.teamId;
+      return (parts.teamId ?? '');
     case 'channel':
-      return `${parts.teamId}:${parts.channelId}`;
+      return `${(parts.teamId ?? '')}:${(parts.channelId ?? '')}`;
     case 'message':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}`;
+      return `${(parts.teamId ?? '')}:${(parts.channelId ?? '')}:${(parts.messageId ?? '')}`;
     case 'reply':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}:${parts.replyId}`;
+      return `${(parts.teamId ?? '')}:${(parts.channelId ?? '')}:${(parts.messageId ?? '')}:${(parts.replyId ?? '')}`;
     case 'tab':
-      return `${parts.teamId}:${parts.channelId}:${parts.tabId}`;
+      return `${(parts.teamId ?? '')}:${(parts.channelId ?? '')}:${(parts.tabId ?? '')}`;
     case 'member':
-      return `${parts.teamId}:${parts.userId}`;
+      return `${(parts.teamId ?? '')}:${(parts.userId ?? '')}`;
     case 'chat':
-      return parts.chatId;
+      return (parts.chatId ?? '');
     case 'chat_message':
-      return `${parts.chatId}:${parts.messageId}`;
+      return `${(parts.chatId ?? '')}:${(parts.messageId ?? '')}`;
     case 'reaction':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}:${parts.reactionType}:${parts.userId}`;
+      return `${(parts.teamId ?? '')}:${(parts.channelId ?? '')}:${(parts.messageId ?? '')}:${(parts.reactionType ?? '')}:${(parts.userId ?? '')}`;
     default:
       throw new Error(`Unsupported Teams object type: ${objectType}`);
   }
@@ -53,28 +53,28 @@ export function parseObjectId(objectType: TeamsObjectType, objectId: string): Pa
 
   switch (objectType) {
     case 'team':
-      return { teamId: parts[0] };
+      return { teamId: (parts[0] ?? '') };
     case 'channel':
-      return { teamId: parts[0], channelId: parts[1] };
+      return { teamId: (parts[0] ?? ''), channelId: (parts[1] ?? '') };
     case 'message':
-      return { teamId: parts[0], channelId: parts[1], messageId: parts[2] };
+      return { teamId: (parts[0] ?? ''), channelId: (parts[1] ?? ''), messageId: (parts[2] ?? '') };
     case 'reply':
-      return { teamId: parts[0], channelId: parts[1], messageId: parts[2], replyId: parts[3] };
+      return { teamId: (parts[0] ?? ''), channelId: (parts[1] ?? ''), messageId: (parts[2] ?? ''), replyId: (parts[3] ?? '') };
     case 'tab':
-      return { teamId: parts[0], channelId: parts[1], tabId: parts[2] };
+      return { teamId: (parts[0] ?? ''), channelId: (parts[1] ?? ''), tabId: (parts[2] ?? '') };
     case 'member':
-      return { teamId: parts[0], userId: parts[1] };
+      return { teamId: (parts[0] ?? ''), userId: (parts[1] ?? '') };
     case 'chat':
-      return { chatId: parts[0] };
+      return { chatId: (parts[0] ?? '') };
     case 'chat_message':
-      return { chatId: parts[0], messageId: parts[1] };
+      return { chatId: (parts[0] ?? ''), messageId: (parts[1] ?? '') };
     case 'reaction':
       return {
-        teamId: parts[0],
-        channelId: parts[1],
-        messageId: parts[2],
-        reactionType: parts[3],
-        userId: parts[4],
+        teamId: (parts[0] ?? ''),
+        channelId: (parts[1] ?? ''),
+        messageId: (parts[2] ?? ''),
+        reactionType: (parts[3] ?? ''),
+        userId: (parts[4] ?? ''),
       };
     default:
       throw new Error(`Unsupported Teams object type: ${objectType}`);
@@ -90,40 +90,40 @@ export function computePath(
 
   switch (objectType) {
     case 'team':
-      return joinPath(root, parts.teamId, 'metadata.json');
+      return joinPath(root, (parts.teamId ?? ''), 'metadata.json');
     case 'channel':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'metadata.json');
+      return joinPath(root, (parts.teamId ?? ''), 'channels', (parts.channelId ?? ''), 'metadata.json');
     case 'message':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'messages', `${parts.messageId}.json`);
+      return joinPath(root, (parts.teamId ?? ''), 'channels', (parts.channelId ?? ''), 'messages', `${(parts.messageId ?? '')}.json`);
     case 'reply':
       return joinPath(
         root,
-        parts.teamId,
+        (parts.teamId ?? ''),
         'channels',
-        parts.channelId,
+        (parts.channelId ?? ''),
         'messages',
-        parts.messageId,
+        (parts.messageId ?? ''),
         'replies',
-        `${parts.replyId}.json`,
+        `${(parts.replyId ?? '')}.json`,
       );
     case 'tab':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'tabs', `${parts.tabId}.json`);
+      return joinPath(root, (parts.teamId ?? ''), 'channels', (parts.channelId ?? ''), 'tabs', `${(parts.tabId ?? '')}.json`);
     case 'member':
-      return joinPath(root, parts.teamId, 'members', `${parts.userId}.json`);
+      return joinPath(root, (parts.teamId ?? ''), 'members', `${(parts.userId ?? '')}.json`);
     case 'chat':
-      return joinPath(root, 'chats', parts.chatId, 'metadata.json');
+      return joinPath(root, 'chats', (parts.chatId ?? ''), 'metadata.json');
     case 'chat_message':
-      return joinPath(root, 'chats', parts.chatId, 'messages', `${parts.messageId}.json`);
+      return joinPath(root, 'chats', (parts.chatId ?? ''), 'messages', `${(parts.messageId ?? '')}.json`);
     case 'reaction':
       return joinPath(
         root,
-        parts.teamId,
+        (parts.teamId ?? ''),
         'channels',
-        parts.channelId,
+        (parts.channelId ?? ''),
         'messages',
-        parts.messageId,
+        (parts.messageId ?? ''),
         'reactions',
-        `${normalizeSegment(parts.reactionType)}--${parts.userId}.json`,
+        `${normalizeSegment((parts.reactionType ?? ''))}--${(parts.userId ?? '')}.json`,
       );
     default:
       throw new Error(`Cannot compute path for unsupported Teams object type: ${objectType}`);
@@ -138,7 +138,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: 'new' },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: (match[3] ?? ''), replyId: 'new' },
     };
   }
 
@@ -147,7 +147,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: match[4] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: (match[3] ?? ''), replyId: (match[4] ?? '') },
     };
   }
 
@@ -157,11 +157,11 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
     return {
       objectType: 'reaction',
       parts: {
-        teamId: match[1],
-        channelId: match[2],
-        messageId: match[3],
-        reactionType: match[4],
-        userId: match[5],
+        teamId: (match[1] ?? ''),
+        channelId: (match[2] ?? ''),
+        messageId: (match[3] ?? ''),
+        reactionType: (match[4] ?? ''),
+        userId: (match[5] ?? ''),
       },
     };
   }
@@ -170,7 +170,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: 'new' },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: 'new' },
     };
   }
 
@@ -178,7 +178,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: (match[3] ?? '') },
     };
   }
 
@@ -186,7 +186,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'tab',
-      parts: { teamId: match[1], channelId: match[2], tabId: match[3] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), tabId: (match[3] ?? '') },
     };
   }
 
@@ -194,7 +194,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'channel',
-      parts: { teamId: match[1], channelId: match[2] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? '') },
     };
   }
 
@@ -202,7 +202,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'member',
-      parts: { teamId: match[1], userId: match[2] },
+      parts: { teamId: (match[1] ?? ''), userId: (match[2] ?? '') },
     };
   }
 
@@ -210,7 +210,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: 'new' },
+      parts: { chatId: (match[1] ?? ''), messageId: 'new' },
     };
   }
 
@@ -218,7 +218,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: match[2] },
+      parts: { chatId: (match[1] ?? ''), messageId: (match[2] ?? '') },
     };
   }
 
@@ -226,7 +226,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat',
-      parts: { chatId: match[1] },
+      parts: { chatId: (match[1] ?? '') },
     };
   }
 
@@ -234,7 +234,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'team',
-      parts: { teamId: match[1] },
+      parts: { teamId: (match[1] ?? '') },
     };
   }
 
@@ -249,7 +249,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: match[4] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: (match[3] ?? ''), replyId: (match[4] ?? '') },
     };
   }
 
@@ -257,7 +257,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), messageId: (match[3] ?? '') },
     };
   }
 
@@ -265,7 +265,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'tab',
-      parts: { teamId: match[1], channelId: match[2], tabId: match[3] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? ''), tabId: (match[3] ?? '') },
     };
   }
 
@@ -273,7 +273,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'channel',
-      parts: { teamId: match[1], channelId: match[2] },
+      parts: { teamId: (match[1] ?? ''), channelId: (match[2] ?? '') },
     };
   }
 
@@ -281,7 +281,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'member',
-      parts: { teamId: match[1], userId: match[2] },
+      parts: { teamId: (match[1] ?? ''), userId: (match[2] ?? '') },
     };
   }
 
@@ -289,7 +289,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match && !normalized.includes('/channels/') && !normalized.includes('/members/')) {
     return {
       objectType: 'team',
-      parts: { teamId: match[1] },
+      parts: { teamId: (match[1] ?? '') },
     };
   }
 
@@ -297,7 +297,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: match[2] },
+      parts: { chatId: (match[1] ?? ''), messageId: (match[2] ?? '') },
     };
   }
 
@@ -305,7 +305,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'chat',
-      parts: { chatId: match[1] },
+      parts: { chatId: (match[1] ?? '') },
     };
   }
 
