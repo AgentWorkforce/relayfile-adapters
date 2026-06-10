@@ -56,7 +56,7 @@ class RecordingAdapter extends GitHubAdapter {
 
   override async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push(`ingestIssueComment:${String(payload.action ?? '')}`);
-    return createResult('/github/repos/acme/widgets/issues/9/comments/3.json');
+    return createResult('/github/repos/acme/widgets/issues/9/comments/3/meta.json');
   }
 
   override async ingestPushCommits(_payload: Record<string, unknown>): Promise<IngestResult> {
@@ -192,7 +192,7 @@ test('WebhookRouter routes issue_comment.created to ingestIssueComment', async (
   );
 
   assert.deepEqual(adapter.calls, ['ingestIssueComment:created']);
-  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/comments/3.json']);
+  assert.deepEqual(result.paths, ['/github/repos/acme/widgets/issues/9/comments/3/meta.json']);
 });
 
 test('WebhookRouter routes issues.labeled to updateIssue', async () => {

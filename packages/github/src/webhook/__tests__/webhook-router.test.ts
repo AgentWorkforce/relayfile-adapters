@@ -41,7 +41,7 @@ function createAdapterMocks() {
       createResult('/github/repos/acme/widgets/pulls/7/review-threads/5.json'),
     ),
     ingestIssueComment: mock.method(adapter, 'ingestIssueComment', async () =>
-      createResult('/github/repos/acme/widgets/issues/9/comments/3.json'),
+      createResult('/github/repos/acme/widgets/issues/9/comments/3/meta.json'),
     ),
     ingestPushCommits: mock.method(adapter, 'ingestPushCommits', async () =>
       createResult('/github/repos/acme/widgets/commits/head.json'),
