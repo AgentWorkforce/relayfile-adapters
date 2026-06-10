@@ -26,6 +26,10 @@
       "types": "./dist/src/vfs-client/index.d.ts",
       "default": "./dist/src/vfs-client/index.js"
     },
+    "./http": {
+      "types": "./dist/src/http/index.d.ts",
+      "default": "./dist/src/http/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {

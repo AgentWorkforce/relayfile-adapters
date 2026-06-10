@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import type {
   AgentReview as ProactiveAgentReview,
   ChangeRequestContext,
@@ -273,7 +274,7 @@ export class GithubProactiveReviewAdapter implements ProactiveReviewAdapter {
   }
 
   private async proxy(input: { integration?: IntegrationMeta; request: ProxyRequest }): Promise<ProxyResponse> {
-    return this.requestProvider.proxy({
+    return withProxyRetry(this.requestProvider).proxy({
       ...input.request,
       connectionId: await this.connectionId(input.integration),
     });

@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GITHUB_API_BASE_URL } from './config.js';
 import { resources } from './resources.js';
@@ -152,7 +153,7 @@ export class GitHubWritebackHandler {
 
     const payload = createSubmitPayload(mappedReview, review.metadata?.commitSha);
 
-    return provider.proxy({
+    return withProxyRetry(provider).proxy({
       method: 'POST',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
@@ -292,7 +293,7 @@ export class GitHubWritebackHandler {
     workspaceId: string,
   ): Promise<ProxyResponse> {
     const connectionId = payload.metadata?.connectionId?.trim() || (await this.resolveConnectionIdFromWorkspace(workspaceId, { body: payload.body, comments: [], event: 'COMMENT', metadata: payload.metadata }));
-    return this.provider.proxy({
+    return withProxyRetry(this.provider).proxy({
       method: 'PATCH',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${target.owner}/${target.repo}/pulls/${target.prNumber}/reviews/${encodeURIComponent(target.reviewId)}`,
@@ -314,7 +315,7 @@ export class GitHubWritebackHandler {
   ): Promise<ProxyResponse> {
     const request = buildMergePullRequest(target, payload);
     const connectionId = await this.resolveConnectionIdFromMetadata(workspaceId, payload.metadata);
-    return this.provider.proxy({
+    return withProxyRetry(this.provider).proxy({
       ...request,
       connectionId,
       headers: {

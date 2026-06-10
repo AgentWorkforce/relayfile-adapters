@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
 import { ingestIssue } from './issues/issue-mapper.js';
@@ -280,7 +281,7 @@ async function proxyOperation(
   config: GitHubAdapterConfig,
   operation: GitHubOperation,
 ): Promise<ProxyResponse> {
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: operation.method,
     baseUrl: config.baseUrl || GITHUB_API_BASE_URL,
     endpoint: operation.path,

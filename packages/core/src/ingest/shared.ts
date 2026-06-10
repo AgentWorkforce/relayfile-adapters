@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import YAML from "yaml";
+import { fetchWithRetry } from "../http/index.js";
 
 export function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
@@ -11,7 +12,7 @@ export async function readSourceText(
   cwd = process.cwd()
 ): Promise<string> {
   if (isHttpUrl(location)) {
-    const response = await fetch(location);
+    const response = await fetchWithRetry(location);
     if (!response.ok) {
       throw new Error(`Failed to fetch ${location}: ${response.status} ${response.statusText}`);
     }

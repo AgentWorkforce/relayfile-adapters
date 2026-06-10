@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
@@ -267,7 +268,7 @@ async function fetchFile(
   path: string,
   ref: string,
 ): Promise<{ content: string; sha: string }> {
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePathForGitHub(path)}?ref=${encodeURIComponent(ref)}`,

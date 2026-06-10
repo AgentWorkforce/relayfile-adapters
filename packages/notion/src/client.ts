@@ -1,3 +1,4 @@
+import { fetchWithRetry, withProxyRetry } from '@relayfile/adapter-core/http';
 import {
   DEFAULT_NOTION_API_BASE_URL,
   DEFAULT_NOTION_API_VERSION,
@@ -70,7 +71,7 @@ export class NotionApiClient {
     if (this.provider?.proxy && this.config.connectionId) {
       const proxyHeaders = { ...headers };
       delete proxyHeaders.Authorization;
-      const response = await this.provider.proxy({
+      const response = await withProxyRetry(this.provider).proxy({
         method,
         baseUrl: this.config.apiBaseUrl,
         endpoint,
@@ -82,7 +83,7 @@ export class NotionApiClient {
       return this.unwrapProxyResponse<T>(response, method, resolvedEndpoint);
     }
 
-    const response = await fetch(`${this.config.apiBaseUrl}${resolvedEndpoint}`, {
+    const response = await fetchWithRetry(`${this.config.apiBaseUrl}${resolvedEndpoint}`, {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
