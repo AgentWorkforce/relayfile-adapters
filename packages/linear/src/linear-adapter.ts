@@ -1479,10 +1479,10 @@ function linearClientToVfs(client: RelayFileClientLike, workspaceId: string): Vf
         return undefined;
       }
       try {
-      const value = await readLinearFileWithFallbacks(client, path, workspaceId);
-      if (typeof value === 'string') {
-        return { content: value, revision: '0' };
-      }
+        const value = await readLinearFileWithFallbacks(client, path, workspaceId);
+        if (typeof value === 'string') {
+          return { content: value, revision: '0' };
+        }
         if (value && typeof value === 'object') {
           const record = value as { content?: unknown; revision?: unknown };
           if (typeof record.content !== 'string') {
