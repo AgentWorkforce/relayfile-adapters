@@ -336,4 +336,63 @@ describe('linear aliases', () => {
     assert.strictEqual(files.has(collisionAliasPath), false, 'record B stale collision alias is removed');
     assert.deepStrictEqual(deletedPaths, [collisionAliasPath]);
   });
+
+  it('cleans stale aliases when the client only supports object-shaped reads', async () => {
+    const files = new Map<string, string>();
+    const deletedPaths: string[] = [];
+    const client = {
+      async writeFile(input: { path: string; content: string }) {
+        files.set(input.path, input.content);
+        return { created: true };
+      },
+      async deleteFile(input: { path: string }) {
+        files.delete(input.path);
+        deletedPaths.push(input.path);
+      },
+      readFile(
+        inputOrWorkspaceId: string | { path: string },
+        _path?: string,
+      ): { content: string } | undefined {
+        if (typeof inputOrWorkspaceId === 'string') {
+          throw new Error('object-shaped readFile input required');
+        }
+        const content = files.get(inputOrWorkspaceId.path);
+        return content === undefined ? undefined : { content };
+      },
+    } satisfies RelayFileClientLike;
+    const provider: ConnectionProvider = {
+      name: 'linear-test-provider',
+      async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
+        return { status: 200, headers: {}, data: null as never };
+      },
+      async healthCheck() {
+        return true;
+      },
+    };
+    const adapter = new LinearAdapter(client, provider, {});
+    const objectId = 'issue-object-read';
+    const basePayload = { id: objectId, identifier: 'AGE-401' };
+
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.create',
+      objectType: 'issue',
+      objectId,
+      payload: { ...basePayload, title: 'Object read old title' },
+    });
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.update',
+      objectType: 'issue',
+      objectId,
+      payload: { ...basePayload, title: 'Object read new title' },
+    });
+
+    const oldAliasPath = linearByTitleAliasPath('/linear/issues', 'Object read old title', objectId);
+    const newAliasPath = linearByTitleAliasPath('/linear/issues', 'Object read new title', objectId);
+
+    assert.strictEqual(files.has(oldAliasPath), false);
+    assert.ok(files.has(newAliasPath));
+    assert.deepStrictEqual(deletedPaths, [oldAliasPath]);
+  });
 });

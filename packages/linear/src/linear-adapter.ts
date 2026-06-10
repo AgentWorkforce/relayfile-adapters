@@ -1331,14 +1331,14 @@ async function writeLinearAliases(
   const byIdAliasPath = linearByIdAliasPath(scope, byId);
   // Snapshot the previous record version before the by-id alias is
   // overwritten — it carries the prior title/name for stale alias cleanup.
-  const previousContent = await readLinearFile(client, byIdAliasPath);
+  const previousContent = await readLinearFile(client, byIdAliasPath, workspaceId);
   await writeLinearIndex(client, workspaceId, scope);
   await writeLinearFile(client, workspaceId, byIdAliasPath, content, semantics);
 
   let writtenAliasPath: string | undefined;
   if (title) {
     const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
-    const existingBaseContent = await readLinearFile(client, baseAliasPath);
+    const existingBaseContent = await readLinearFile(client, baseAliasPath, workspaceId);
     // A base alias holding this record's previous bytes is ours — overwrite
     // it in place instead of forking to the collision variant.
     const ownsBaseAlias =
@@ -1427,7 +1427,7 @@ async function cleanupStaleLinearTitleAliases(
 
   await cleanupStaleAliases(
     {
-      readFile: (path) => readLinearFile(client, path),
+      readFile: (path) => readLinearFile(client, path, workspaceId),
       deleteFile: (path) => deleteFile.call(client, { workspaceId, path }),
     },
     {
@@ -1479,10 +1479,10 @@ function linearClientToVfs(client: RelayFileClientLike, workspaceId: string): Vf
         return undefined;
       }
       try {
-        const value = await reader.call(client, path);
-        if (typeof value === 'string') {
-          return { content: value, revision: '0' };
-        }
+      const value = await readLinearFileWithFallbacks(client, path, workspaceId);
+      if (typeof value === 'string') {
+        return { content: value, revision: '0' };
+      }
         if (value && typeof value === 'object') {
           const record = value as { content?: unknown; revision?: unknown };
           if (typeof record.content !== 'string') {
@@ -1560,22 +1560,54 @@ async function writeLinearFile(
   });
 }
 
-async function readLinearFile(client: RelayFileClientLike, path: string): Promise<string | undefined> {
+async function readLinearFile(
+  client: RelayFileClientLike,
+  path: string,
+  workspaceId?: string,
+): Promise<string | undefined> {
+  const value = await readLinearFileWithFallbacks(client, path, workspaceId);
+  return typeof value === 'string'
+    ? value
+    : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
+      ? value.content
+      : undefined;
+}
+
+async function readLinearFileWithFallbacks(
+  client: RelayFileClientLike,
+  path: string,
+  workspaceId?: string,
+): Promise<ReadFileResult | string | undefined> {
   const reader = (client as unknown as Record<string, unknown>).readFile;
   if (typeof reader !== 'function') {
     return undefined;
   }
 
-  try {
-    const value = await reader.call(client, path);
-    return typeof value === 'string'
-      ? value
-      : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
-        ? value.content
-        : undefined;
-  } catch {
-    return undefined;
+  const attempts: Array<() => Promise<ReadFileResult | string | undefined>> = [];
+  if (workspaceId !== undefined) {
+    attempts.push(
+      () => reader.call(client, { workspaceId, path }),
+      () => reader.call(client, workspaceId, path),
+    );
   }
+  attempts.push(() => reader.call(client, path));
+
+  for (const attempt of attempts) {
+    try {
+      const value = await attempt();
+      if (isReadableFileResult(value)) {
+        return value;
+      }
+    } catch {
+      // Try the next supported readFile call shape.
+    }
+  }
+  return undefined;
+}
+
+function isReadableFileResult(value: unknown): value is ReadFileResult | string {
+  return typeof value === 'string'
+    || Boolean(value && typeof value === 'object' && 'content' in value && typeof value.content === 'string');
 }
 
 function sortJson(value: unknown): unknown {
