@@ -128,6 +128,24 @@ export const WRITEBACK_PATH_CATALOG = {
         "path": "/dropbox/files",
         "params": []
       }
+    ],
+    "folders": [
+      {
+        "path": "/dropbox/folders",
+        "params": []
+      }
+    ],
+    "shared-folders": [
+      {
+        "path": "/dropbox/shared-folders",
+        "params": []
+      }
+    ],
+    "shared-links": [
+      {
+        "path": "/dropbox/shared-links",
+        "params": []
+      }
     ]
   },
   "gcs": {
