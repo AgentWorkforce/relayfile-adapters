@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import { Buffer } from 'node:buffer';
 
@@ -46,7 +47,7 @@ export async function fetchAndWriteDiff(
   const prNumber = requirePositiveInteger(number, 'number');
   const connectionId = await resolveConnectionId(provider);
 
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${encodeURIComponent(trimmedOwner)}/${encodeURIComponent(trimmedRepo)}/pulls/${prNumber}`,

@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import {
   atomicUpsertRecordIndex,
@@ -278,7 +279,7 @@ async function fetchPullRequestFiles(
   let page = 1;
 
   while (true) {
-    const response = await provider.proxy({
+    const response = await withProxyRetry(provider).proxy({
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}/files`,
@@ -320,7 +321,7 @@ async function fetchPullRequestMetadata(
   connectionId: string,
   headers?: Record<string, string>,
 ): Promise<PullRequestMetadata> {
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}`,
@@ -344,7 +345,7 @@ async function fetchPullRequestDiff(
   connectionId: string,
   headers?: Record<string, string>,
 ): Promise<string> {
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}`,

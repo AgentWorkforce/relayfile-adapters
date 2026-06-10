@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
   GitHubRequestProvider,
@@ -28,7 +29,7 @@ export async function fetchIssue(
   connectionId?: string,
 ): Promise<GitHubIssue> {
   const endpoint = buildIssueEndpoint(owner, repo, number);
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint,
@@ -52,7 +53,7 @@ export async function fetchIssueComments(
   let nextEndpoint: string | null = `${buildIssueEndpoint(owner, repo, number)}/comments?per_page=${GITHUB_PAGE_SIZE}`;
 
   while (nextEndpoint) {
-    const response = await provider.proxy({
+    const response = await withProxyRetry(provider).proxy({
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: nextEndpoint,

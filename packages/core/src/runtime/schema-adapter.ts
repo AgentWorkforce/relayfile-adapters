@@ -8,6 +8,7 @@ import {
   type QueuedResponse,
 } from "@relayfile/sdk";
 import { minimatch } from "minimatch";
+import { withProxyRetry } from "../http/index.js";
 import {
   interpolateTemplate,
   pickFields,
@@ -287,7 +288,7 @@ export class SchemaAdapter {
           query: pageRequest.query,
           signal,
         };
-        response = await this.provider.proxy(proxyRequest);
+        response = await withProxyRetry(this.provider).proxy(proxyRequest);
       } catch (error) {
         if (isAbortError(error)) {
           throw error;
@@ -538,7 +539,7 @@ export class SchemaAdapter {
       match,
     });
 
-    return this.provider.proxy({
+    return withProxyRetry(this.provider).proxy({
       method: match.method,
       baseUrl: match.mapping.baseUrl ?? this.spec.adapter.baseUrl ?? "",
       endpoint: match.endpointPath,

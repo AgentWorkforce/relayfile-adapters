@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
   GitHubRequestProvider,
@@ -142,7 +143,7 @@ async function proxyGitHubRequest(
   const connectionId = resolveConnectionId(provider, endpoint, options.connectionId);
   const providerConfigKey = resolveProviderConfigKey(provider, options.providerConfigKey);
 
-  return provider.proxy({
+  return withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint,

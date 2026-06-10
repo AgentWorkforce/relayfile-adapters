@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -34,7 +35,7 @@ export async function registerGoogleCalendarWatch(
   };
 
   const baseUrl = options.apiBaseUrl ?? GOOGLE_CALENDAR_DEFAULT_BASE_URL;
-  const response = await provider.proxy<GoogleCalendarWatchResponse>({
+  const response = await withProxyRetry(provider).proxy<GoogleCalendarWatchResponse>({
     method: 'POST',
     baseUrl,
     endpoint: `/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/watch`,
@@ -65,7 +66,7 @@ export async function stopGoogleCalendarWatch(
     resourceId: metadata.googleCalendarResourceId,
   };
 
-  await provider.proxy({
+  await withProxyRetry(provider).proxy({
     method: 'POST',
     baseUrl: options.apiBaseUrl ?? GOOGLE_CALENDAR_DEFAULT_BASE_URL,
     endpoint: '/calendar/v3/channels/stop',
