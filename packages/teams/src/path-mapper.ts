@@ -19,30 +19,46 @@ export function normalizeGraphResource(resource: string): string {
     return url.pathname.replace(/^\/(?:v1\.0|beta)\//, '/').replace(/\/+$/, '');
   }
 
-  const [pathOnly] = trimmed.split('?');
+  const [pathOnly = ''] = trimmed.split('?');
   return `/${pathOnly.replace(/^\/(?:v1\.0|beta)\//, '').replace(/^\/+/, '')}`.replace(/\/+$/, '');
+}
+
+function requirePart(parts: PathParts, key: string, objectType: TeamsObjectType): string {
+  const value = parts[key];
+  if (!value) {
+    throw new Error(`Missing ${key} for Teams ${objectType} object`);
+  }
+  return value;
+}
+
+function capture(match: RegExpMatchArray, index: number): string {
+  const value = match[index];
+  if (value === undefined) {
+    throw new Error('Unexpected Teams path parser match without capture group');
+  }
+  return value;
 }
 
 export function makeObjectId(objectType: TeamsObjectType, parts: PathParts): string {
   switch (objectType) {
     case 'team':
-      return parts.teamId;
+      return requirePart(parts, 'teamId', objectType);
     case 'channel':
-      return `${parts.teamId}:${parts.channelId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'channelId', objectType)}`;
     case 'message':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'channelId', objectType)}:${requirePart(parts, 'messageId', objectType)}`;
     case 'reply':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}:${parts.replyId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'channelId', objectType)}:${requirePart(parts, 'messageId', objectType)}:${requirePart(parts, 'replyId', objectType)}`;
     case 'tab':
-      return `${parts.teamId}:${parts.channelId}:${parts.tabId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'channelId', objectType)}:${requirePart(parts, 'tabId', objectType)}`;
     case 'member':
-      return `${parts.teamId}:${parts.userId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'userId', objectType)}`;
     case 'chat':
-      return parts.chatId;
+      return requirePart(parts, 'chatId', objectType);
     case 'chat_message':
-      return `${parts.chatId}:${parts.messageId}`;
+      return `${requirePart(parts, 'chatId', objectType)}:${requirePart(parts, 'messageId', objectType)}`;
     case 'reaction':
-      return `${parts.teamId}:${parts.channelId}:${parts.messageId}:${parts.reactionType}:${parts.userId}`;
+      return `${requirePart(parts, 'teamId', objectType)}:${requirePart(parts, 'channelId', objectType)}:${requirePart(parts, 'messageId', objectType)}:${requirePart(parts, 'reactionType', objectType)}:${requirePart(parts, 'userId', objectType)}`;
     default:
       throw new Error(`Unsupported Teams object type: ${objectType}`);
   }
@@ -50,31 +66,38 @@ export function makeObjectId(objectType: TeamsObjectType, parts: PathParts): str
 
 export function parseObjectId(objectType: TeamsObjectType, objectId: string): PathParts {
   const parts = objectId.split(':');
+  const get = (index: number, key: string): string => {
+    const value = parts[index];
+    if (!value) {
+      throw new Error(`Invalid Teams ${objectType} object id "${objectId}": missing ${key}`);
+    }
+    return value;
+  };
 
   switch (objectType) {
     case 'team':
-      return { teamId: parts[0] };
+      return { teamId: get(0, 'teamId') };
     case 'channel':
-      return { teamId: parts[0], channelId: parts[1] };
+      return { teamId: get(0, 'teamId'), channelId: get(1, 'channelId') };
     case 'message':
-      return { teamId: parts[0], channelId: parts[1], messageId: parts[2] };
+      return { teamId: get(0, 'teamId'), channelId: get(1, 'channelId'), messageId: get(2, 'messageId') };
     case 'reply':
-      return { teamId: parts[0], channelId: parts[1], messageId: parts[2], replyId: parts[3] };
+      return { teamId: get(0, 'teamId'), channelId: get(1, 'channelId'), messageId: get(2, 'messageId'), replyId: get(3, 'replyId') };
     case 'tab':
-      return { teamId: parts[0], channelId: parts[1], tabId: parts[2] };
+      return { teamId: get(0, 'teamId'), channelId: get(1, 'channelId'), tabId: get(2, 'tabId') };
     case 'member':
-      return { teamId: parts[0], userId: parts[1] };
+      return { teamId: get(0, 'teamId'), userId: get(1, 'userId') };
     case 'chat':
-      return { chatId: parts[0] };
+      return { chatId: get(0, 'chatId') };
     case 'chat_message':
-      return { chatId: parts[0], messageId: parts[1] };
+      return { chatId: get(0, 'chatId'), messageId: get(1, 'messageId') };
     case 'reaction':
       return {
-        teamId: parts[0],
-        channelId: parts[1],
-        messageId: parts[2],
-        reactionType: parts[3],
-        userId: parts[4],
+        teamId: get(0, 'teamId'),
+        channelId: get(1, 'channelId'),
+        messageId: get(2, 'messageId'),
+        reactionType: get(3, 'reactionType'),
+        userId: get(4, 'userId'),
       };
     default:
       throw new Error(`Unsupported Teams object type: ${objectType}`);
@@ -90,40 +113,40 @@ export function computePath(
 
   switch (objectType) {
     case 'team':
-      return joinPath(root, parts.teamId, 'metadata.json');
+      return joinPath(root, requirePart(parts, 'teamId', objectType), 'metadata.json');
     case 'channel':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'metadata.json');
+      return joinPath(root, requirePart(parts, 'teamId', objectType), 'channels', requirePart(parts, 'channelId', objectType), 'metadata.json');
     case 'message':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'messages', `${parts.messageId}.json`);
+      return joinPath(root, requirePart(parts, 'teamId', objectType), 'channels', requirePart(parts, 'channelId', objectType), 'messages', `${requirePart(parts, 'messageId', objectType)}.json`);
     case 'reply':
       return joinPath(
         root,
-        parts.teamId,
+        requirePart(parts, 'teamId', objectType),
         'channels',
-        parts.channelId,
+        requirePart(parts, 'channelId', objectType),
         'messages',
-        parts.messageId,
+        requirePart(parts, 'messageId', objectType),
         'replies',
-        `${parts.replyId}.json`,
+        `${requirePart(parts, 'replyId', objectType)}.json`,
       );
     case 'tab':
-      return joinPath(root, parts.teamId, 'channels', parts.channelId, 'tabs', `${parts.tabId}.json`);
+      return joinPath(root, requirePart(parts, 'teamId', objectType), 'channels', requirePart(parts, 'channelId', objectType), 'tabs', `${requirePart(parts, 'tabId', objectType)}.json`);
     case 'member':
-      return joinPath(root, parts.teamId, 'members', `${parts.userId}.json`);
+      return joinPath(root, requirePart(parts, 'teamId', objectType), 'members', `${requirePart(parts, 'userId', objectType)}.json`);
     case 'chat':
-      return joinPath(root, 'chats', parts.chatId, 'metadata.json');
+      return joinPath(root, 'chats', requirePart(parts, 'chatId', objectType), 'metadata.json');
     case 'chat_message':
-      return joinPath(root, 'chats', parts.chatId, 'messages', `${parts.messageId}.json`);
+      return joinPath(root, 'chats', requirePart(parts, 'chatId', objectType), 'messages', `${requirePart(parts, 'messageId', objectType)}.json`);
     case 'reaction':
       return joinPath(
         root,
-        parts.teamId,
+        requirePart(parts, 'teamId', objectType),
         'channels',
-        parts.channelId,
+        requirePart(parts, 'channelId', objectType),
         'messages',
-        parts.messageId,
+        requirePart(parts, 'messageId', objectType),
         'reactions',
-        `${normalizeSegment(parts.reactionType)}--${parts.userId}.json`,
+        `${normalizeSegment(requirePart(parts, 'reactionType', objectType))}--${requirePart(parts, 'userId', objectType)}.json`,
       );
     default:
       throw new Error(`Cannot compute path for unsupported Teams object type: ${objectType}`);
@@ -138,7 +161,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: 'new' },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: capture(match, 3), replyId: 'new' },
     };
   }
 
@@ -147,7 +170,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: match[4] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: capture(match, 3), replyId: capture(match, 4) },
     };
   }
 
@@ -157,11 +180,11 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
     return {
       objectType: 'reaction',
       parts: {
-        teamId: match[1],
-        channelId: match[2],
-        messageId: match[3],
-        reactionType: match[4],
-        userId: match[5],
+        teamId: capture(match, 1),
+        channelId: capture(match, 2),
+        messageId: capture(match, 3),
+        reactionType: capture(match, 4),
+        userId: capture(match, 5),
       },
     };
   }
@@ -170,7 +193,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: 'new' },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: 'new' },
     };
   }
 
@@ -178,7 +201,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: capture(match, 3) },
     };
   }
 
@@ -186,7 +209,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'tab',
-      parts: { teamId: match[1], channelId: match[2], tabId: match[3] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), tabId: capture(match, 3) },
     };
   }
 
@@ -194,7 +217,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'channel',
-      parts: { teamId: match[1], channelId: match[2] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2) },
     };
   }
 
@@ -202,7 +225,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'member',
-      parts: { teamId: match[1], userId: match[2] },
+      parts: { teamId: capture(match, 1), userId: capture(match, 2) },
     };
   }
 
@@ -210,7 +233,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: 'new' },
+      parts: { chatId: capture(match, 1), messageId: 'new' },
     };
   }
 
@@ -218,7 +241,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: match[2] },
+      parts: { chatId: capture(match, 1), messageId: capture(match, 2) },
     };
   }
 
@@ -226,7 +249,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'chat',
-      parts: { chatId: match[1] },
+      parts: { chatId: capture(match, 1) },
     };
   }
 
@@ -234,7 +257,7 @@ export function parseTeamsPath(path: string): { objectType: TeamsObjectType; par
   if (match) {
     return {
       objectType: 'team',
-      parts: { teamId: match[1] },
+      parts: { teamId: capture(match, 1) },
     };
   }
 
@@ -249,7 +272,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'reply',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3], replyId: match[4] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: capture(match, 3), replyId: capture(match, 4) },
     };
   }
 
@@ -257,7 +280,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'message',
-      parts: { teamId: match[1], channelId: match[2], messageId: match[3] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), messageId: capture(match, 3) },
     };
   }
 
@@ -265,7 +288,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'tab',
-      parts: { teamId: match[1], channelId: match[2], tabId: match[3] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2), tabId: capture(match, 3) },
     };
   }
 
@@ -273,7 +296,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'channel',
-      parts: { teamId: match[1], channelId: match[2] },
+      parts: { teamId: capture(match, 1), channelId: capture(match, 2) },
     };
   }
 
@@ -281,7 +304,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'member',
-      parts: { teamId: match[1], userId: match[2] },
+      parts: { teamId: capture(match, 1), userId: capture(match, 2) },
     };
   }
 
@@ -289,7 +312,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match && !normalized.includes('/channels/') && !normalized.includes('/members/')) {
     return {
       objectType: 'team',
-      parts: { teamId: match[1] },
+      parts: { teamId: capture(match, 1) },
     };
   }
 
@@ -297,7 +320,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'chat_message',
-      parts: { chatId: match[1], messageId: match[2] },
+      parts: { chatId: capture(match, 1), messageId: capture(match, 2) },
     };
   }
 
@@ -305,7 +328,7 @@ export function parseResourceUrl(resource: string): { objectType: TeamsObjectTyp
   if (match) {
     return {
       objectType: 'chat',
-      parts: { chatId: match[1] },
+      parts: { chatId: capture(match, 1) },
     };
   }
 

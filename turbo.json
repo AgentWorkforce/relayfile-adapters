@@ -6,21 +6,82 @@
   ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "@relayfile/adapter-linear#build": {
-      "outputs": ["dist/**"]
+      "outputs": [
+        "dist/**"
+      ]
     },
     "@relayfile/adapter-slack#build": {
-      "outputs": ["dist/**"]
+      "outputs": [
+        "dist/**"
+      ]
     },
     "test": {
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "outputs": []
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "@relayfile/adapter-core#catalog:check": {
+      "dependsOn": [
+        "build",
+        "@relayfile/adapter-airtable#build",
+        "@relayfile/adapter-asana#build",
+        "@relayfile/adapter-calendly#build",
+        "@relayfile/adapter-clickup#build",
+        "@relayfile/adapter-confluence#build",
+        "@relayfile/adapter-docker-hub#build",
+        "@relayfile/adapter-dropbox#build",
+        "@relayfile/adapter-fathom#build",
+        "@relayfile/adapter-github#build",
+        "@relayfile/adapter-gitlab#build",
+        "@relayfile/adapter-google-calendar#build",
+        "@relayfile/adapter-granola#build",
+        "@relayfile/adapter-hubspot#build",
+        "@relayfile/adapter-intercom#build",
+        "@relayfile/adapter-jira#build",
+        "@relayfile/adapter-linear#build",
+        "@relayfile/adapter-mailgun#build",
+        "@relayfile/adapter-mixpanel#build",
+        "@relayfile/adapter-notion#build",
+        "@relayfile/adapter-pipedrive#build",
+        "@relayfile/adapter-reddit#build",
+        "@relayfile/adapter-salesforce#build",
+        "@relayfile/adapter-segment#build",
+        "@relayfile/adapter-sendgrid#build",
+        "@relayfile/adapter-shopify#build",
+        "@relayfile/adapter-slack#build",
+        "@relayfile/adapter-stripe#build",
+        "@relayfile/adapter-teams#build",
+        "@relayfile/adapter-x#build",
+        "@relayfile/adapter-zendesk#build",
+        "@relayfile/azure-blob#build",
+        "@relayfile/box#build",
+        "@relayfile/gcs#build",
+        "@relayfile/gmail#build",
+        "@relayfile/google-drive#build",
+        "@relayfile/onedrive#build",
+        "@relayfile/postgres#build",
+        "@relayfile/redis#build",
+        "@relayfile/relay-helpers#build",
+        "@relayfile/s3#build",
+        "@relayfile/sharepoint#build",
+        "@relayfile/webhook-server#build"
+      ],
+      "cache": false,
       "outputs": []
     }
   }

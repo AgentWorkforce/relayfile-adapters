@@ -23,8 +23,11 @@ function normalizeWritebackContent(content: unknown): string {
   if (typeof body === 'string') {
     return body;
   }
-  if (body && typeof body === 'object' && typeof (body as Record<string, unknown>).content === 'string') {
-    return (body as Record<string, string>).content;
+  if (body && typeof body === 'object') {
+    const bodyContent = (body as Record<string, unknown>).content;
+    if (typeof bodyContent === 'string') {
+      return bodyContent;
+    }
   }
   if (typeof record.text === 'string') {
     return record.text;

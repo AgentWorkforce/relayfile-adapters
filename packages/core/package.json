@@ -45,6 +45,7 @@
     "clean": "rm -rf dist",
     "test": "node --import tsx --test dist/tests/**/*.test.js dist/src/**/*.test.js",
     "test:round-trip": "vitest run tests/round-trip",
+    "catalog:check": "node dist/src/cli.js writeback-paths check",
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit"
   },

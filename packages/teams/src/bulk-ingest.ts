@@ -39,7 +39,7 @@ async function graphJson<T>(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    signal,
+    ...(signal ? { signal } : {}),
   });
 
   if (!response.ok) {
@@ -73,7 +73,7 @@ async function graphCollectAll<T>(
     deltaLink = page['@odata.deltaLink'] ?? deltaLink;
   }
 
-  return { items, deltaLink };
+  return { items, ...(deltaLink !== undefined ? { deltaLink } : {}) };
 }
 
 async function collectChannelMessages(
@@ -117,7 +117,7 @@ async function collectChannelMessages(
     }
   }
 
-  return { files, deltaLink };
+  return { files, ...(deltaLink !== undefined ? { deltaLink } : {}) };
 }
 
 export async function bulkIngestTeam(
@@ -173,8 +173,8 @@ export async function bulkIngestTeam(
     const messageResult = await collectChannelMessages(config, teamId, channel.id, {
       includeReplies: options.includeReplies !== false,
       messageMode: options.messageMode ?? 'list',
-      deltaLinks: options.deltaLinks,
-      signal: options.signal,
+      ...(options.deltaLinks ? { deltaLinks: options.deltaLinks } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     files.push(...messageResult.files);
     if (messageResult.deltaLink) {

@@ -27,7 +27,7 @@ async function graphJson<T>(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
   if (!response.ok && !(method === 'DELETE' && response.status === 404)) {
@@ -59,16 +59,20 @@ export function buildSubscriptionRequest(
   input: CreateSubscriptionInput,
 ): CreateSubscriptionInput {
   const includeResourceData = input.includeResourceData ?? config.includeResourceData ?? false;
+  const clientState = input.clientState ?? config.clientState;
+  const encryptionCertificate =
+    input.encryptionCertificate ?? (includeResourceData ? config.encryptionCertificate : undefined);
+  const encryptionCertificateId =
+    input.encryptionCertificateId ?? (includeResourceData ? config.encryptionCertificateId : undefined);
+  const lifecycleNotificationUrl = input.lifecycleNotificationUrl ?? config.lifecycleNotificationUrl;
 
   return {
     ...input,
-    clientState: input.clientState ?? config.clientState,
+    ...(clientState !== undefined ? { clientState } : {}),
     includeResourceData,
-    encryptionCertificate:
-      input.encryptionCertificate ?? (includeResourceData ? config.encryptionCertificate : undefined),
-    encryptionCertificateId:
-      input.encryptionCertificateId ?? (includeResourceData ? config.encryptionCertificateId : undefined),
-    lifecycleNotificationUrl: input.lifecycleNotificationUrl ?? config.lifecycleNotificationUrl,
+    ...(encryptionCertificate !== undefined ? { encryptionCertificate } : {}),
+    ...(encryptionCertificateId !== undefined ? { encryptionCertificateId } : {}),
+    ...(lifecycleNotificationUrl !== undefined ? { lifecycleNotificationUrl } : {}),
   };
 }
 
@@ -119,8 +123,10 @@ export function defaultSubscriptionResources(
   const expirationDateTime = computeExpirationDateTime(identifiers.minutesUntilExpiration);
   const base = {
     notificationUrl: identifiers.notificationUrl,
-    clientState: identifiers.clientState,
-    includeResourceData: identifiers.includeResourceData,
+    ...(identifiers.clientState !== undefined ? { clientState: identifiers.clientState } : {}),
+    ...(identifiers.includeResourceData !== undefined
+      ? { includeResourceData: identifiers.includeResourceData }
+      : {}),
     expirationDateTime,
   };
 
