@@ -98,6 +98,7 @@ export const adapters = [
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
       ['/github/repos/<owner>/<repo>/issues/<issueNumber>/meta.json', 'Issue metadata.'],
+      ['/github/repos/<owner>/<repo>/issues/<issueNumber>/comments/<commentId>/meta.json', 'Issue comment records (directory records so per-comment children such as reactions can nest without a file/dir collision).'],
       ['/github/repos/<owner>/<repo>/commits/<sha>/metadata.json', 'Commit metadata.'],
     ],
     endpoints: [
@@ -286,7 +287,7 @@ export const adapters = [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
       ['/linear/users/<userId>.json', 'User records.'],
-      ['/linear/comments/<commentId>.json', 'Comment records.'],
+      ['/linear/comments/<name>__<commentId>/meta.json', 'Comment records (directory records so per-comment children can nest without a file/dir collision).'],
     ],
     endpoints: [
       endpoint('/linear/issues/new.json', 'Create Linear issue', 'Creates a Linear issue.', ['teamId', 'title'], {

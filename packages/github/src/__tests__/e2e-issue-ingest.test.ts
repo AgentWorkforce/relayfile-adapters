@@ -120,7 +120,7 @@ test('GitHubAdapter ingests an issue and its comments into the VFS', async () =>
   assert.equal(commentFiles.length, mockIssueComments.length);
   assert.deepEqual(
     commentFiles,
-    mockIssueComments.map((comment) => `${commentsPath}${comment.id}.json`).sort(),
+    mockIssueComments.map((comment) => `${commentsPath}${comment.id}/meta.json`).sort(),
   );
 
   const commentBodies = commentFiles.map((path) => readJsonFile(vfs, path).body);
@@ -279,7 +279,7 @@ async function writeIssueComments(
       result,
       await writeFile(
         vfs,
-        `${issueCommentsPath(owner, repo, issueNumber, title)}${commentId}.json`,
+        `${issueCommentsPath(owner, repo, issueNumber, title)}${commentId}/meta.json`,
         `${JSON.stringify(payload, null, 2)}\n`,
       ),
     );

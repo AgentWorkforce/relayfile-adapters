@@ -8,6 +8,9 @@ import {
   linearByIdAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearCommentLegacyPath,
+  linearCommentPath,
+  linearCommentReadCandidatePaths,
   linearIssueByEditedPath,
   normalizeLinearObjectType,
   normalizeNangoLinearModel,
@@ -221,6 +224,52 @@ describe('linear path-mapper', () => {
       const issueScope = linearByUuidAliasPath('/linear/issues', uuid);
       const projectScope = linearByUuidAliasPath('/linear/projects', uuid);
       assert.notEqual(issueScope, projectScope);
+    });
+  });
+
+  describe('linearCommentPath', () => {
+    const commentId = '0f6f0a0c-6a44-4f6e-93f7-2c8b3a9d1e55';
+
+    it('is a directory record and cannot collide with child records under the comment id', () => {
+      const comment = linearCommentPath(commentId, 'AGE-8');
+      assert.equal(comment, `/linear/comments/AGE-8__${commentId}/meta.json`);
+
+      // A comment's children (Linear supports per-comment emoji reactions and
+      // threaded replies; the webhook normalizer already recognizes `reaction`
+      // payloads) must nest UNDER the comment's directory — never as a sibling
+      // that shares the comment's name with a different node type. This is the
+      // invariant whose violation wedges a POSIX mount: a flat leaf file
+      // `comments/<name>__<id>.json` cannot coexist with a
+      // `comments/<name>__<id>/` directory (`mkdir ... : not a directory`).
+      const commentDir = comment.replace(/\/meta\.json$/u, '');
+      const hypotheticalReaction = `${commentDir}/reactions/tada--user-1.json`;
+      assert.ok(
+        hypotheticalReaction.startsWith(`${commentDir}/`),
+        'children must nest under the comment directory',
+      );
+      assert.notEqual(
+        comment,
+        linearCommentLegacyPath(commentId, 'AGE-8'),
+        'comment stem must be a directory record, not the flat .json leaf',
+      );
+
+      // Back-compat: readers can still resolve a comment mirrored by a
+      // pre-migration adapter at the legacy flat path.
+      assert.deepEqual(linearCommentReadCandidatePaths(commentId, 'AGE-8'), [
+        comment,
+        linearCommentLegacyPath(commentId, 'AGE-8'),
+      ]);
+      assert.equal(
+        linearCommentLegacyPath(commentId, 'AGE-8'),
+        `/linear/comments/AGE-8__${commentId}.json`,
+      );
+    });
+
+    it('routes comment object types through the directory record', () => {
+      assert.equal(
+        computeLinearPath('comment', commentId, 'AGE-8'),
+        `/linear/comments/AGE-8__${commentId}/meta.json`,
+      );
     });
   });
 });

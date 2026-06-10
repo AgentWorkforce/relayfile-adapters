@@ -7,6 +7,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull r
 \`/github/LAYOUT.md\` is this guide.
 \`/github/repos/_index.json\` lists materialized repositories.
 \`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
+\`issues/<number>__<slug>/comments/<commentId>/meta.json\` holds issue comment records (each a directory record, so per-comment children such as reactions can nest under \`comments/<commentId>/\` without a file/directory collision).
 \`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
 Issue and pull request aliases are materialized under \`/github/repos/<owner>__<repo>/<issues|pulls>/...\`, distinct from the canonical \`/github/repos/<owner>/<repo>/...\` tree. Alias views include \`by-id/<number>.json\`, \`by-title/<slug>__<number>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, \`by-priority/<priority>/<number>.json\`, and \`by-edited/YYYY-MM-DD/<number>.json\`. The edited-date bucket uses the provider update timestamp, or a merge/close timestamp when that is the most recent activity-summary fallback date.
 

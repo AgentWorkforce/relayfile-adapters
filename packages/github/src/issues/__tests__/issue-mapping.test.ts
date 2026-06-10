@@ -268,8 +268,8 @@ describe('issue mapping', () => {
       '/github/repos/octocat__hello-world/issues/_index.json',
       '/github/repos/octocat__hello-world/issues/by-id/10.json',
       '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage__10.json',
-      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
-      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
+      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
+      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
       '/github/repos/octocat/hello-world/issues/_index.json',
       '/github/repos/octocat/hello-world/pulls/_index.json',
       '/github/repos/_index.json',
@@ -290,7 +290,7 @@ describe('issue mapping', () => {
     assert.strictEqual(meta.number, 10);
     assert.strictEqual(meta.title, 'Track adapter issue ingestion coverage');
     assert.deepStrictEqual(meta.labels, ['bug']);
-    const comment7001 = JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json') ?? '');
+    const comment7001 = JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json') ?? '');
     assert.strictEqual(comment7001.id, 7001);
     assert.strictEqual(comment7001.author.login, 'monalisa');
     // PR 2's alias artifacts (`<owner>__<repo>` prefix) are written to the
@@ -302,8 +302,8 @@ describe('issue mapping', () => {
       filesDeleted: 0,
       paths: [
         '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
-        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001.json',
-        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002.json',
+        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
+        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
         '/github/repos/octocat/hello-world/issues/_index.json',
         '/github/repos/octocat/hello-world/pulls/_index.json',
         '/github/repos/_index.json',
@@ -340,8 +340,8 @@ describe('issue mapping', () => {
       filesUpdated: 0,
       filesDeleted: 0,
       paths: [
-        '/github/repos/octocat/hello-world/issues/10/comments/7001.json',
-        '/github/repos/octocat/hello-world/issues/10/comments/7002.json',
+        '/github/repos/octocat/hello-world/issues/10/comments/7001/meta.json',
+        '/github/repos/octocat/hello-world/issues/10/comments/7002/meta.json',
       ],
       errors: [],
     });
@@ -408,14 +408,14 @@ describe('issue mapping', () => {
     );
 
     assert.strictEqual(issueMapping.vfsPath, 'issues/10__track-adapter-issue-ingestion-coverage/meta.json');
-    assert.strictEqual(commentMapping.vfsPath, 'issues/10/comments/7001.json');
+    assert.strictEqual(commentMapping.vfsPath, 'issues/10/comments/7001/meta.json');
     assert.strictEqual(
       `/github/repos/${encodeURIComponent(mockRepoContext.owner)}/${encodeURIComponent(mockRepoContext.repo)}/${issueMapping.vfsPath}`,
       '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
     );
     assert.strictEqual(
       `/github/repos/${encodeURIComponent(mockRepoContext.owner)}/${encodeURIComponent(mockRepoContext.repo)}/${commentMapping.vfsPath}`,
-      '/github/repos/octocat/hello-world/issues/10/comments/7001.json',
+      '/github/repos/octocat/hello-world/issues/10/comments/7001/meta.json',
     );
   });
 });

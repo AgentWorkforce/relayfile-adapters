@@ -19,8 +19,8 @@ export const resources = [
   {
     name: "issue-comments",
     path: "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
-    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/issues\/[^\/]+\/comments(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^\d+$/,
+    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/issues\/[^\/]+\/comments(?:\/[^\/]+(?:\.json|\/meta\.json)?)?$/,
+    idPattern: /^(?:meta|\d+)$/,
     schema: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.create.example.json",
   },

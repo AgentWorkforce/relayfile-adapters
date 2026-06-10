@@ -19,10 +19,12 @@
  *     grouping field and `identifier` are present. Index row carries
  *     `{ id, title, updated, identifier, state }`.
  *
- *   * **comment** — canonical `/linear/comments/<slug>__<id>.json`, no
- *     subtree aliases (current cloud + adapter shape only writes the
- *     canonical record and the index row). Index row
- *     `{ id, title, updated }`.
+ *   * **comment** — canonical `/linear/comments/<slug>__<id>/meta.json` (a
+ *     directory record so per-comment children like reactions or threaded
+ *     replies can nest without a file/dir collision; pre-0.9.x mirrors hold
+ *     the legacy flat `<slug>__<id>.json`), no subtree aliases (current cloud
+ *     + adapter shape only writes the canonical record and the index row).
+ *     Index row `{ id, title, updated }`.
  *
  *   * **user**, **team** — canonical `/linear/users/<id>.json` /
  *     `/linear/teams/<id>.json`, index row `{ id, title, updated }`.
@@ -72,6 +74,7 @@ import {
   linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearCommentLegacyPath,
   linearCommentPath,
   linearCommentsIndexPath,
   linearCyclesIndexPath,
@@ -564,7 +567,14 @@ async function emitComments(
   const fanOut = await runEmitBatch(client, workspaceId, records, async (record) => {
     if (isDeleteRecord(record)) {
       indexReconciler.remove(record.id);
-      return { deletes: [{ path: linearCommentPath(record.id) }] };
+      // Tombstone both the directory record and the legacy flat leaf so a
+      // mirror populated by a pre-0.9.x adapter is cleaned up too.
+      return {
+        deletes: [
+          { path: linearCommentPath(record.id) },
+          { path: linearCommentLegacyPath(record.id) },
+        ],
+      };
     }
     const id = readNonEmptyString(record.id);
     if (!id) return {};

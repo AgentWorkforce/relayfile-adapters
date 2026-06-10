@@ -33,8 +33,12 @@ const MERGE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/merge\.json$/;
 const ISSUE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([^/]+?)(?:\.json)?$/;
+// Issue comments are directory records (`comments/<id>/meta.json`); accept the
+// legacy flat leaf (`comments/<id>.json`) too so writebacks against a
+// pre-migration mirror still resolve. Create drafts (`comments/<draft>.json`)
+// continue to match via the bare `<segment>.json` alternative.
 const ISSUE_COMMENT_WRITEBACK_PATH =
-  /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)(?:__[^/]+)?\/comments\/([^/]+?)(?:\.json)?$/;
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)(?:__[^/]+)?\/comments\/([^/]+?)(?:\.json|\/meta\.json)?$/;
 
 interface GitHubReviewResponse {
   id: number;

@@ -35,7 +35,7 @@ test('Linear comment paths prefer the parent issue identifier over a body snippe
     }),
   );
 
-  assert.equal(path, `/linear/comments/AGE-8__${COMMENT_ID}.json`);
+  assert.equal(path, `/linear/comments/AGE-8__${COMMENT_ID}/meta.json`);
 });
 
 test('Linear naming collision suffixes are deterministic and derived from the id', () => {

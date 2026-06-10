@@ -231,6 +231,12 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
     return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
   }
+  if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments') {
+    // Issue comments are directory records (`comments/<id>/meta.json`); the
+    // legacy flat leaf (`comments/<id>.json`) stays matchable for create
+    // drafts and pre-migration mirrors.
+    return '^/github/repos/[^/]+/[^/]+/issues/[^/]+/comments(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
+  }
 
   const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
     if (segment === '{projectPath}') {
@@ -278,6 +284,13 @@ function idPatternFor(adapterSlug, resourcePath) {
     }
     if (resourcePath.endsWith('/issues')) {
       return pattern('^[1-9]\\d*$');
+    }
+    if (resourcePath.endsWith('/comments')) {
+      // `meta` is the filename stem of a directory record's canonical file
+      // (`comments/<id>/meta.json`); the writeback handler re-derives the
+      // numeric comment id from the full path. Mirrors the slack messages
+      // resource.
+      return pattern('^(?:meta|\\d+)$');
     }
     return pattern('^\\d+$');
   }

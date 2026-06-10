@@ -155,6 +155,64 @@ export function githubRepoIssuesIndexPath(owner: string, repo: string): string {
   return `${githubRepoPrefix(owner, repo)}/issues/_index.json`;
 }
 
+/**
+ * Canonical issue-comment record path. The comment is a **directory record**
+ * (`comments/<commentId>/meta.json`) — matching `githubIssuePath` and
+ * `githubPullRequestPath`, which both use `<number>__<slug>/meta.json`. This is
+ * deliberate: a comment can grow children (GitHub exposes per-comment reactions
+ * at `/repos/{owner}/{repo}/issues/comments/{id}/reactions`, which would
+ * materialize under `comments/<commentId>/reactions/...`), so its stem MUST be
+ * a directory. A flat leaf file `comments/<commentId>.json` would collide with
+ * that same `<commentId>` directory — one name as both a file and a directory
+ * cannot be materialized on a POSIX mount (`mkdir ... : not a directory`),
+ * wedging the whole mirror. Readers should fall back to the legacy filename via
+ * {@link githubIssueCommentReadCandidatePaths}.
+ */
+export function githubIssueCommentPath(
+  owner: string,
+  repo: string,
+  issueNumber: number | string,
+  commentId: number | string,
+  issueTitle?: string,
+): string {
+  return `${githubRepoPrefix(owner, repo)}/issues/${githubNumberSlug(issueNumber, issueTitle)}/comments/${encodeGitHubPathSegment(String(commentId))}/meta.json`;
+}
+
+/**
+ * @deprecated Pre-0.9.x emitted a flat `.../comments/<commentId>.json` leaf
+ * file, which collides with any same-named `<commentId>` child directory on a
+ * POSIX mount. Use {@link githubIssueCommentPath}. Retained for back-compat
+ * reads only — see {@link githubIssueCommentReadCandidatePaths}.
+ */
+export function githubIssueCommentLegacyPath(
+  owner: string,
+  repo: string,
+  issueNumber: number | string,
+  commentId: number | string,
+  issueTitle?: string,
+): string {
+  return `${githubRepoPrefix(owner, repo)}/issues/${githubNumberSlug(issueNumber, issueTitle)}/comments/${encodeGitHubPathSegment(String(commentId))}.json`;
+}
+
+/**
+ * Reader hint: candidate paths for a GitHub issue-comment canonical record, in
+ * order of preference — current (`<commentId>/meta.json`) then legacy
+ * (`<commentId>.json`) — so a comment mirrored by either the current or a
+ * pre-0.9.x adapter still reads.
+ */
+export function githubIssueCommentReadCandidatePaths(
+  owner: string,
+  repo: string,
+  issueNumber: number | string,
+  commentId: number | string,
+  issueTitle?: string,
+): string[] {
+  return [
+    githubIssueCommentPath(owner, repo, issueNumber, commentId, issueTitle),
+    githubIssueCommentLegacyPath(owner, repo, issueNumber, commentId, issueTitle),
+  ];
+}
+
 export function githubPullRequestPath(
   owner: string,
   repo: string,

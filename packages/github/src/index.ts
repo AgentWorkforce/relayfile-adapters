@@ -331,12 +331,15 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/review-threads/${objectId}.json`;
       }
       case 'issue_comment': {
+        // Directory records (`comments/<id>/meta.json`) so a comment's stem can
+        // hold child records (e.g. reactions) without a file/dir collision on a
+        // POSIX mount. See `githubIssueCommentPath` in `./path-mapper.ts`.
         const issue = asRecord(payload.issue);
         const issueNumber = readNumericLike(issue?.number);
         if (issueNumber) {
-          return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments/${objectId}.json`;
+          return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments/${objectId}/meta.json`;
         }
-        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${objectId}.json`;
+        return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/comments/${objectId}/meta.json`;
       }
       case 'check_run':
         return `/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/checks/${objectId}.json`;

@@ -430,7 +430,7 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   const adapter = createAdapter();
 
   assert.equal(linearIssuePath('issue 1/2'), '/linear/issues/issue%201%2F2.json');
-  assert.equal(linearCommentPath('comment:42'), '/linear/comments/comment%3A42.json');
+  assert.equal(linearCommentPath('comment:42'), '/linear/comments/comment%3A42/meta.json');
   assert.equal(linearProjectPath('project#7'), '/linear/projects/project%237.json');
   assert.equal(linearCyclePath('cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(linearTeamPath('team eng'), '/linear/teams/team%20eng.json');
@@ -439,9 +439,9 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   assert.equal(linearRoadmapPath('roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
 
   assert.equal(computeLinearPath('Issue', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
-  assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42.json');
+  assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42/meta.json');
   assert.equal(computeLinearPath('Issue', 'issue_123', 'AGE-8'), '/linear/issues/AGE-8__issue_123.json');
-  assert.equal(computeLinearPath('comment', 'comment_123', 'AGE-8'), '/linear/comments/AGE-8__comment_123.json');
+  assert.equal(computeLinearPath('comment', 'comment_123', 'AGE-8'), '/linear/comments/AGE-8__comment_123/meta.json');
   assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(computeLinearPath('Cycles', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(computeLinearPath('teams', 'team eng'), '/linear/teams/team%20eng.json');
@@ -450,7 +450,7 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   assert.equal(computeLinearPath('roadmaps', 'roadmap alpha'), '/linear/roadmaps/roadmap%20alpha.json');
 
   assert.equal(adapter.computePath('issues', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
-  assert.equal(adapter.computePath('comment', 'comment:42'), '/linear/comments/comment%3A42.json');
+  assert.equal(adapter.computePath('comment', 'comment:42'), '/linear/comments/comment%3A42/meta.json');
   assert.equal(adapter.computePath('projects', 'project#7'), '/linear/projects/project%237.json');
   assert.equal(adapter.computePath('cycle', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(adapter.computePath('team', 'team eng'), '/linear/teams/team%20eng.json');
@@ -494,7 +494,7 @@ test('ingestWebhook writes identifier-aware issue and comment filenames at runti
       '/linear/issues/by-id/AGE-8.json',
       '/linear/issues/by-title/ship-mixed-case-path-handling-before-friday.json',
       '/linear/LAYOUT.md',
-      '/linear/comments/AGE-8__comment_123.json',
+      '/linear/comments/AGE-8__comment_123/meta.json',
       '/linear/LAYOUT.md',
     ],
   );

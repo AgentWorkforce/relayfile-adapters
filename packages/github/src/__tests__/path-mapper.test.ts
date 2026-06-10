@@ -15,6 +15,9 @@ import {
   githubCheckRunPath,
   githubCommitPath,
   githubDeploymentStatusPath,
+  githubIssueCommentLegacyPath,
+  githubIssueCommentPath,
+  githubIssueCommentReadCandidatePaths,
   githubIssuePath,
   githubLegacyByTitleAliasPath,
   githubNumberedByTitleAliasPath,
@@ -30,6 +33,7 @@ import {
   normalizeNangoGitHubModel,
   GITHUB_PATH_ROOT,
 } from '../path-mapper.js';
+import { mapIssueComment } from '../issues/comment-mapper.js';
 
 describe('path-mapper', () => {
   describe('encodeGitHubPathSegment', () => {
@@ -383,6 +387,61 @@ describe('path-mapper', () => {
     it('returns undefined for unknown types', () => {
       assert.equal(tryNormalizeGitHubObjectType('events'), undefined);
       assert.equal(tryNormalizeGitHubObjectType('deployments'), undefined);
+    });
+  });
+
+  describe('githubIssueCommentPath', () => {
+    it('is a directory record and cannot collide with child records under the comment id', () => {
+      const comment = githubIssueCommentPath('octocat', 'hello-world', 10, 7001, 'Fix login bug');
+      assert.equal(
+        comment,
+        '/github/repos/octocat/hello-world/issues/10__fix-login-bug/comments/7001/meta.json',
+      );
+
+      // A comment's children (e.g. per-comment reactions, which GitHub exposes
+      // at /repos/{o}/{r}/issues/comments/{id}/reactions) must nest UNDER the
+      // comment's directory — never as a sibling that shares the comment's
+      // name with a different node type. This is the invariant whose violation
+      // wedges a POSIX mount: a flat leaf file `comments/<id>.json` cannot
+      // coexist with a `comments/<id>/` directory
+      // (`mkdir ... : not a directory`).
+      const commentDir = comment.replace(/\/meta\.json$/u, '');
+      assert.ok(commentDir.endsWith('/comments/7001'), 'comment stem is the directory key');
+      const hypotheticalReaction = `${commentDir}/reactions/+1--octocat.json`;
+      assert.ok(
+        hypotheticalReaction.startsWith(`${commentDir}/`),
+        'children must nest under the comment directory',
+      );
+      assert.notEqual(
+        comment,
+        githubIssueCommentLegacyPath('octocat', 'hello-world', 10, 7001, 'Fix login bug'),
+        'comment stem must be a directory record, not the flat .json leaf',
+      );
+
+      // Back-compat: readers can still resolve a comment mirrored by a
+      // pre-migration adapter at the legacy flat path.
+      assert.deepEqual(
+        githubIssueCommentReadCandidatePaths('octocat', 'hello-world', 10, 7001, 'Fix login bug'),
+        [comment, githubIssueCommentLegacyPath('octocat', 'hello-world', 10, 7001, 'Fix login bug')],
+      );
+      assert.equal(
+        githubIssueCommentLegacyPath('octocat', 'hello-world', 10, 7001, 'Fix login bug'),
+        '/github/repos/octocat/hello-world/issues/10__fix-login-bug/comments/7001.json',
+      );
+    });
+
+    it('agrees with mapIssueComment on the canonical record path', () => {
+      const mapped = mapIssueComment(
+        { id: 7001, body: 'Looks good', user: { login: 'octocat' } },
+        'octocat',
+        'hello-world',
+        10,
+        'Fix login bug',
+      );
+      assert.equal(
+        `/github/repos/octocat/hello-world/${mapped.vfsPath}`,
+        githubIssueCommentPath('octocat', 'hello-world', 10, 7001, 'Fix login bug'),
+      );
     });
   });
 });
