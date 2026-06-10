@@ -185,7 +185,7 @@ export interface IngestResult {
     statuses/{status_id}.json
   issues/{number}/
     meta.json
-    comments/{comment_id}.json
+    comments/{comment_id}/meta.json
   branches/{name}.json
   actions/runs/{run_id}.json
 ```

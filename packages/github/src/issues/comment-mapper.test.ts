@@ -14,7 +14,7 @@ describe('issue comment mapper', () => {
       10,
     );
 
-    assert.strictEqual(mapped.vfsPath, 'issues/10/comments/7001.json');
+    assert.strictEqual(mapped.vfsPath, 'issues/10/comments/7001/meta.json');
     assert.deepStrictEqual(JSON.parse(mapped.content), {
       id: 7001,
       body: 'I can pick this up after the PR ingestion flow lands.',
@@ -63,8 +63,8 @@ describe('issue comment mapper', () => {
       filesUpdated: 0,
       filesDeleted: 0,
       paths: [
-        '/github/repos/octocat/hello-world/issues/10/comments/7001.json',
-        '/github/repos/octocat/hello-world/issues/10/comments/7002.json',
+        '/github/repos/octocat/hello-world/issues/10/comments/7001/meta.json',
+        '/github/repos/octocat/hello-world/issues/10/comments/7002/meta.json',
       ],
       errors: [],
     });

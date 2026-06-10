@@ -157,7 +157,7 @@ describe('linear index emission', () => {
     ]);
 
     assert.equal(linearIssuePath('issue-1'), '/linear/issues/issue-1.json');
-    assert.equal(linearCommentPath('comment-1'), '/linear/comments/comment-1.json');
+    assert.equal(linearCommentPath('comment-1'), '/linear/comments/comment-1/meta.json');
     assert.equal(linearUserPath('user-1'), '/linear/users/user-1.json');
     assert.equal(linearTeamPath('team-1'), '/linear/teams/team-1.json');
     assert.equal(linearProjectPath('project-1'), '/linear/projects/project-1.json');

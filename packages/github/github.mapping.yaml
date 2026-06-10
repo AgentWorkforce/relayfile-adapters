@@ -25,7 +25,7 @@ webhooks:
   pull_request_review_thread.resolved:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/review-threads/{{thread.id}}.json
   issue_comment.created:
-    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}.json
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
     extract:
       - action
       - issue.number

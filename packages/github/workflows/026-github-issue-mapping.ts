@@ -35,7 +35,7 @@ Plan issue mapping:
 - Write meta.json to /github/repos/{owner}/{repo}/issues/{number}/meta.json
 - Issue JSON: number, title, state, body, author, labels, assignees, milestone, created_at, updated_at, closed_at
 - Fetch comments via GET /repos/{owner}/{repo}/issues/{number}/comments
-- Write each to /issues/{number}/comments/{comment_id}.json
+- Write each to /issues/{number}/comments/{comment_id}/meta.json
 - Comment JSON: id, body, author, created_at, updated_at, reactions
 - Handle issues.opened and issues.closed events
 
@@ -93,7 +93,7 @@ Export async function ingestIssue(provider, owner, repo, number, vfs):
 
 Export function mapIssueComment(comment, owner, repo, issueNumber):
 - Transform to: { id, body, author: { login, avatarUrl }, created_at, updated_at, reactions: { total_count, '+1', '-1', laugh, etc } }
-- Return { vfsPath: 'issues/{number}/comments/{comment_id}.json', content: JSON }
+- Return { vfsPath: 'issues/{number}/comments/{comment_id}/meta.json', content: JSON }
 
 Export async function ingestIssueComments(provider, owner, repo, number, vfs):
 - Fetch all comments with pagination
@@ -142,7 +142,7 @@ Mock provider.proxy() with fixture data.`,
 Verify:
 - Correct GitHub API endpoints for issues
 - PR filtering via pull_request field
-- VFS paths: /issues/{number}/meta.json, /issues/{number}/comments/{id}.json
+- VFS paths: /issues/{number}/meta.json, /issues/{number}/comments/{id}/meta.json
 - Pagination handling
 - Tests cover happy path and edge cases
 

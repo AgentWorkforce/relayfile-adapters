@@ -328,8 +328,44 @@ export function linearPrioritySlug(priority: number | string): string {
   return slugifyAlias(priority);
 }
 
+/**
+ * Canonical comment record path. The comment is a **directory record**
+ * (`comments/<name>__<id>/meta.json`), not a flat leaf file. This is
+ * deliberate: a Linear comment can grow children — Linear supports per-comment
+ * emoji reactions (the webhook normalizer already recognizes `reaction`
+ * payloads) and threaded replies — which would materialize under
+ * `comments/<name>__<id>/...`. A flat leaf `comments/<name>__<id>.json` cannot
+ * coexist with that same-named directory on a POSIX mount
+ * (`mkdir ... : not a directory`), wedging the whole mirror. Readers should
+ * fall back to the legacy filename via
+ * {@link linearCommentReadCandidatePaths}.
+ */
 export function linearCommentPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
+  return `${LINEAR_PATH_ROOT}/comments/${nameWithId(humanReadable, commentId, opts)}/meta.json`;
+}
+
+/**
+ * @deprecated Pre-0.9.x emitted a flat `/linear/comments/<name>__<id>.json`
+ * leaf file, which collides with any same-named child directory on a POSIX
+ * mount. Use {@link linearCommentPath}. Retained for back-compat reads (and
+ * legacy-mirror tombstone deletes) only — see
+ * {@link linearCommentReadCandidatePaths}.
+ */
+export function linearCommentLegacyPath(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string {
   return `${LINEAR_PATH_ROOT}/comments/${nameWithId(humanReadable, commentId, opts)}.json`;
+}
+
+/**
+ * Reader hint: candidate paths for a Linear comment canonical record, in order
+ * of preference — current (`<name>__<id>/meta.json`) then legacy
+ * (`<name>__<id>.json`) — so a comment mirrored by either the current or a
+ * pre-0.9.x adapter still reads.
+ */
+export function linearCommentReadCandidatePaths(commentId: string, humanReadable?: string, opts?: NameWithIdOptions): string[] {
+  return [
+    linearCommentPath(commentId, humanReadable, opts),
+    linearCommentLegacyPath(commentId, humanReadable, opts),
+  ];
 }
 
 export function linearCommentsIndexPath(): string {

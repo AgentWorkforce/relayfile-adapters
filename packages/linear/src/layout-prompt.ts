@@ -6,6 +6,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 
 \`/linear/LAYOUT.md\` is this guide.
 \`/linear/issues/\`, \`/linear/comments/\`, \`/linear/users/\`, \`/linear/teams/\`, \`/linear/projects/\`, \`/linear/cycles/\`, \`/linear/milestones/\`, and \`/linear/roadmaps/\` each own their canonical JSON records plus a sibling \`_index.json\`.
+\`/linear/comments/<name>__<id>/meta.json\` is the canonical comment record (a directory record, so per-comment children such as reactions or threaded replies can nest under \`comments/<name>__<id>/\` without a file/directory collision).
 
 Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\`, and \`/linear/issues/by-edited/YYYY-MM-DD/<issue-uuid>.json\` are additional lookups. The edited-date bucket is formatted as \`YYYY-MM-DD\` and uses the first available timestamp in this order: \`updatedAt\`, \`updated_at\`, \`completedAt\`, \`canceledAt\`, \`createdAt\`, then \`created_at\`.
 
@@ -27,7 +28,7 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 
 ## JSONL And Querying
 
-Linear does not emit JSONL in this adapter today. Comments are individual \`.json\` records rather than \`comments.jsonl\`.
+Linear does not emit JSONL in this adapter today. Comments are individual \`comments/<name>__<id>/meta.json\` directory records rather than \`comments.jsonl\`.
 
 Examples:
 

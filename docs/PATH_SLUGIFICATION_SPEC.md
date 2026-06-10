@@ -70,7 +70,7 @@ function slugWithIdSuffix(title: string, id: string): string {
 | Function | Change |
 |---|---|
 | `linearIssuePath(issueId, title?)` | When `title` provided: `/linear/issues/<slug>.json` |
-| `linearCommentPath(issueId, commentId)` | No change — comments have no title |
+| `linearCommentPath(commentId, humanReadable?)` | Directory record: `/linear/comments/<name>__<id>/meta.json` |
 | `linearMetadataPath` | No change — workspace-level |
 
 **Callers to update:** wherever issues are ingested, pass the issue `title` into the path mapper.

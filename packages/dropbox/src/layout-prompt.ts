@@ -41,6 +41,7 @@ Read discovery schemas before writeback:
 - \`discovery/dropbox/folders/.schema.json\`
 - \`discovery/dropbox/shared-folders/.schema.json\`
 - \`discovery/dropbox/shared-links/.schema.json\`
+- \`discovery/dropbox/cursors/.schema.json\`
 
 ## Notes
 

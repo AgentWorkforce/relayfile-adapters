@@ -72,7 +72,11 @@ export function mapIssueComment(
   void repo;
 
   return {
-    vfsPath: `issues/${githubNumberSlug(issueNumber, issueTitle)}/comments/${commentId}.json`,
+    // Directory record (`comments/<id>/meta.json`), NOT a flat leaf file: a
+    // comment can grow child records (e.g. per-comment reactions), and a flat
+    // `comments/<id>.json` cannot coexist with a `comments/<id>/` directory on
+    // a POSIX mount. See `githubIssueCommentPath` in `../path-mapper.ts`.
+    vfsPath: `issues/${githubNumberSlug(issueNumber, issueTitle)}/comments/${commentId}/meta.json`,
     content: `${JSON.stringify(mapped, null, 2)}\n`,
   };
 }
@@ -137,7 +141,7 @@ function buildAbsoluteVfsPath(owner: string, repo: string, relativePath: string)
 function buildFallbackPath(comment: JsonObject, issueNumber: number): string {
   const commentId = comment.id;
   return typeof commentId === 'number' && Number.isInteger(commentId) && commentId > 0
-    ? `issues/${issueNumber}/comments/${commentId}.json`
+    ? `issues/${issueNumber}/comments/${commentId}/meta.json`
     : `issues/${issueNumber}/comments/unknown.json`;
 }
 

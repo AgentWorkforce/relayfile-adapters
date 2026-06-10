@@ -108,6 +108,12 @@
     ]
   },
   "dropbox": {
+    "cursors": [
+      {
+        "path": "/dropbox/cursors",
+        "params": []
+      }
+    ],
     "files": [
       {
         "path": "/dropbox/files",

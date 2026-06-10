@@ -98,6 +98,7 @@ export const adapters = [
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
       ['/github/repos/<owner>/<repo>/issues/<issueNumber>/meta.json', 'Issue metadata.'],
+      ['/github/repos/<owner>/<repo>/issues/<issueNumber>/comments/<commentId>/meta.json', 'Issue comment records (directory records so per-comment children such as reactions can nest without a file/dir collision).'],
       ['/github/repos/<owner>/<repo>/commits/<sha>/metadata.json', 'Commit metadata.'],
     ],
     endpoints: [
@@ -310,7 +311,7 @@ export const adapters = [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
       ['/linear/users/<userId>.json', 'User records.'],
-      ['/linear/comments/<commentId>.json', 'Comment records.'],
+      ['/linear/comments/<name>__<commentId>/meta.json', 'Comment records (directory records so per-comment children can nest without a file/dir collision).'],
     ],
     endpoints: [
       endpoint('/linear/issues/new.json', 'Create Linear issue', 'Creates a Linear issue.', ['teamId', 'title'], {
@@ -332,6 +333,13 @@ export const adapters = [
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
       }, { body: 'Replace example comment body.' }),
+      endpoint('/linear/agent-sessions/{sessionId}/activities/new.json', 'Create Linear agent activity', 'Creates an activity on a Linear agent session.', ['type'], {
+        type: en(['action', 'elicitation', 'error', 'response', 'thought'], 'Linear agent activity content type.'),
+        body: str('Response, thought, elicitation, or error body.'),
+        action: str('Action name for action-type activities.'),
+        parameter: str('Action parameter or target.'),
+        result: str('Action result summary.'),
+      }, { type: 'response', body: 'Replace example agent activity body.' }),
     ],
   },
   {
@@ -532,6 +540,9 @@ export const adapters = [
     readPaths: [['/dropbox/<account>/<path>', 'Dropbox file content.']],
     endpoints: [
       endpoint('/dropbox/files/new.json', 'Create Dropbox file', 'Uploads a Dropbox file.', ['path_display'], { path_display: str('Dropbox display path.'), contentBase64: str('Base64 content.'), mode: str('Upload mode.') }, { path_display: '/Team/Notes.md' }),
+      endpoint('/dropbox/folders/new.json', 'Create Dropbox folder', 'Creates or updates Dropbox folder metadata.', ['path_display'], { path_display: str('Dropbox display path.'), name: str('Folder name.') }, { path_display: '/Team' }),
+      endpoint('/dropbox/shared-folders/new.json', 'Create Dropbox shared folder marker', 'Creates or updates Dropbox shared folder metadata.', ['id'], { id: str('Dropbox shared folder id.'), name: str('Shared folder name.') }, { id: '845281924' }),
+      endpoint('/dropbox/shared-links/new.json', 'Create Dropbox shared link marker', 'Creates or updates Dropbox shared link metadata.', ['url'], { url: str('Dropbox shared link URL.'), name: str('Shared link name.') }, { url: 'https://www.dropbox.com/scl/fi/example/report.pdf?dl=0' }),
       endpoint('/dropbox/cursors/new.json', 'Create Dropbox cursor', 'Stores a list_folder cursor.', ['cursor'], { cursor: str('Dropbox cursor.'), accountId: str('Account id.') }, { cursor: 'cursor-2' }),
     ],
   },

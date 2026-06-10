@@ -382,6 +382,19 @@ describe('writeback', () => {
     assert.deepStrictEqual(update.body, { body: 'Updated comment body.' });
   });
 
+  it('resolves directory-record issue comment updates (comments/<id>/meta.json)', () => {
+    // Canonical comment records are directory records; editing the meta.json
+    // must patch the same comment the legacy flat path addressed.
+    const update = resolveWritebackRequest(
+      '/github/repos/acme/widgets/issues/42/comments/123/meta.json',
+      JSON.stringify({ body: 'Updated via directory record.' }),
+    );
+
+    assert.strictEqual(update.method, 'PATCH');
+    assert.strictEqual(update.endpoint, '/repos/acme/widgets/issues/comments/123');
+    assert.deepStrictEqual(update.body, { body: 'Updated via directory record.' });
+  });
+
   it('resolves pull request merge writebacks to GitHub merge requests', () => {
     const request = resolveWritebackRequest(
       '/github/repos/acme/widgets/pulls/42/merge.json',

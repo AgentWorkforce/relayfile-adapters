@@ -210,6 +210,9 @@ function resourceNameFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'slack' && resourcePath.includes('/users/') && resourcePath.endsWith('/messages')) {
     return 'direct-messages';
   }
+  if (adapterSlug === 'linear' && resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
+    return 'agent-activities';
+  }
   const last = resourcePath.split('/').filter(Boolean).at(-1);
   if (!last) return adapterSlug;
   if (/^\{[^}]+\}\.json$/u.test(last)) {
@@ -219,6 +222,14 @@ function resourceNameFor(adapterSlug, resourcePath) {
 }
 
 function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'dropbox') {
+    if (resourcePath === '/dropbox/files' || resourcePath === '/dropbox/folders') {
+      return `^${escapeRegex(resourcePath)}/(?!_index\\.json$)(?!by-(?:id|path)/)[^/]+(?:\\.json)?$`;
+    }
+    if (resourcePath === '/dropbox/shared-folders' || resourcePath === '/dropbox/shared-links') {
+      return `^${escapeRegex(resourcePath)}/(?!_index\\.json$)(?:by-id/)?[^/]+(?:\\.json)?$`;
+    }
+  }
   if (adapterSlug === 'slack' && resourcePath === '/slack/channels/{channelId}/messages') {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
@@ -230,6 +241,12 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
   }
   if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
     return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
+  }
+  if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments') {
+    // Issue comments are directory records (`comments/<id>/meta.json`); the
+    // legacy flat leaf (`comments/<id>.json`) stays matchable for create
+    // drafts and pre-migration mirrors.
+    return '^/github/repos/[^/]+/[^/]+/issues/[^/]+/comments(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
 
   const resourceSegments = resourcePath.split('/').filter(Boolean).map((segment) => {
@@ -252,6 +269,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
 
 function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'linear') {
+    if (resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
+      return pattern('^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+    }
     return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }
   if (adapterSlug === 'notion') {
@@ -289,9 +309,19 @@ function idPatternFor(adapterSlug, resourcePath) {
     if (resourcePath.endsWith('/issues')) {
       return pattern('^[1-9]\\d*$');
     }
+    if (resourcePath.endsWith('/comments')) {
+      // `meta` is the filename stem of a directory record's canonical file
+      // (`comments/<id>/meta.json`); the writeback handler re-derives the
+      // numeric comment id from the full path. Mirrors the slack messages
+      // resource.
+      return pattern('^(?:meta|\\d+)$');
+    }
     return pattern('^\\d+$');
   }
-  if (adapterSlug === 'hubspot' || adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
+  if (adapterSlug === 'hubspot') {
+    return pattern('^\\d+$');
+  }
+  if (adapterSlug === 'pipedrive' || adapterSlug === 'asana') {
     return pattern('^(?:[A-Za-z0-9_.~-]+--)?\\d+$');
   }
   if (adapterSlug === 'jira') {
