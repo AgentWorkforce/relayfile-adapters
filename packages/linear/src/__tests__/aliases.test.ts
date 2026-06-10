@@ -7,10 +7,15 @@ import { linearByIdAliasPath, linearByTitleAliasPath, linearIssuePath } from '..
 
 function createAdapter() {
   const files = new Map<string, string>();
+  const deletedPaths: string[] = [];
   const client = {
     async writeFile(input: { path: string; content: string }) {
       files.set(input.path, input.content);
       return { created: true };
+    },
+    async deleteFile(input: { path: string }) {
+      files.delete(input.path);
+      deletedPaths.push(input.path);
     },
     // Sync helper kept for tests that read directly. Accepts (path), (input),
     // or (workspaceId, path) so it works both for the adapter's auxiliary
@@ -46,6 +51,7 @@ function createAdapter() {
   return {
     adapter: new LinearAdapter(client, provider, {}),
     client,
+    deletedPaths,
     files,
   };
 }
@@ -206,5 +212,128 @@ describe('linear aliases', () => {
   it('slugging is deterministic, ASCII-folded, and strips traversal characters', () => {
     assert.strictEqual(slugifyAlias('Café ../ Roadmap'), 'cafe-roadmap');
     assert.strictEqual(slugifyAlias('Café ../ Roadmap'), slugifyAlias('Café ../ Roadmap'));
+  });
+
+  it('deletes the stale by-title alias when an issue title changes on re-ingest (issue #106)', async () => {
+    const { adapter, client, deletedPaths, files } = createAdapter();
+    const objectId = 'issue-106';
+    const basePayload = { id: objectId, identifier: 'AGE-106' };
+
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.create',
+      objectType: 'issue',
+      objectId,
+      payload: { ...basePayload, title: 'Original title' },
+    });
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.update',
+      objectType: 'issue',
+      objectId,
+      payload: { ...basePayload, title: 'Renamed title' },
+    });
+
+    const canonicalPath = linearIssuePath(objectId, 'AGE-106');
+    const oldAliasPath = linearByTitleAliasPath('/linear/issues', 'Original title', objectId);
+    const newAliasPath = linearByTitleAliasPath('/linear/issues', 'Renamed title', objectId);
+
+    // (a) the new alias is written, (b) the stale alias is deleted,
+    // (c) the canonical record file is intact.
+    assert.strictEqual(client.readFile(newAliasPath), client.readFile(canonicalPath));
+    assert.strictEqual(files.has(oldAliasPath), false);
+    assert.ok(files.has(canonicalPath));
+    assert.deepStrictEqual(deletedPaths, [oldAliasPath]);
+  });
+
+  it('deletes the stale by-name alias when a project is renamed on re-ingest (issue #106)', async () => {
+    const { adapter, client, deletedPaths, files } = createAdapter();
+    const objectId = 'project-106';
+
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'project.create',
+      objectType: 'project',
+      objectId,
+      payload: { id: objectId, name: 'Old project name' },
+    });
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'project.update',
+      objectType: 'project',
+      objectId,
+      payload: { id: objectId, name: 'New project name' },
+    });
+
+    const canonicalPath = '/linear/projects/project-106.json';
+    const oldAliasPath = linearByTitleAliasPath('/linear/projects', 'Old project name', objectId);
+    const newAliasPath = linearByTitleAliasPath('/linear/projects', 'New project name', objectId);
+
+    assert.strictEqual(client.readFile(newAliasPath), client.readFile(canonicalPath));
+    assert.strictEqual(files.has(oldAliasPath), false);
+    assert.ok(files.has(canonicalPath));
+    assert.deepStrictEqual(deletedPaths, [oldAliasPath]);
+  });
+
+  it('deletes nothing when a record is re-ingested with an unchanged title', async () => {
+    const { adapter, deletedPaths, files } = createAdapter();
+    const objectId = 'issue-stable';
+    const payload = { id: objectId, identifier: 'AGE-200', title: 'Stable title' };
+
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.create',
+      objectType: 'issue',
+      objectId,
+      payload,
+    });
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.update',
+      objectType: 'issue',
+      objectId,
+      payload,
+    });
+
+    const aliasPath = linearByTitleAliasPath('/linear/issues', 'Stable title', objectId);
+    assert.ok(files.has(aliasPath));
+    assert.ok(files.has(linearIssuePath(objectId, 'AGE-200')));
+    assert.deepStrictEqual(deletedPaths, []);
+  });
+
+  it('does not delete a by-title alias owned by another record sharing the slug', async () => {
+    const { adapter, deletedPaths, files } = createAdapter();
+
+    // Record A claims the base slug.
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.create',
+      objectType: 'issue',
+      objectId: 'issue-a',
+      payload: { id: 'issue-a', identifier: 'AGE-301', title: 'Shared title' },
+    });
+    // Record B collides and lands on the hashed variant.
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.create',
+      objectType: 'issue',
+      objectId: 'issue-b',
+      payload: { id: 'issue-b', identifier: 'AGE-302', title: 'Shared title' },
+    });
+    // Record B is renamed — only B's stale collision alias may be removed.
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'issue.update',
+      objectType: 'issue',
+      objectId: 'issue-b',
+      payload: { id: 'issue-b', identifier: 'AGE-302', title: 'Renamed shared title' },
+    });
+
+    const baseAliasPath = linearByTitleAliasPath('/linear/issues', 'Shared title', 'issue-a');
+    const collisionAliasPath = linearByTitleAliasPath('/linear/issues', 'Shared title', 'issue-b', true);
+
+    assert.ok(files.has(baseAliasPath), 'record A keeps its base alias');
+    assert.strictEqual(files.has(collisionAliasPath), false, 'record B stale collision alias is removed');
+    assert.deepStrictEqual(deletedPaths, [collisionAliasPath]);
   });
 });

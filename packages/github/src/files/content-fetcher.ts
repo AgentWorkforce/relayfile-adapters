@@ -61,6 +61,8 @@ export interface HeadBaseFileResult {
 }
 
 export interface VfsLike {
+  delete?(path: string): Promise<unknown> | unknown;
+  deleteFile?(path: string): Promise<unknown> | unknown;
   exists?(path: string): Promise<boolean> | boolean;
   get?(path: string): Promise<unknown> | unknown;
   has?(path: string): Promise<boolean> | boolean;

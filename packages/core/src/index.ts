@@ -24,6 +24,7 @@ export * from "./atomic-index/index.js";
 export * from "./emit-auxiliary/index.js";
 export * from "./digest/index.js";
 export * from "./alias-slug.js";
+export * from "./alias-lifecycle.js";
 export * from "./layout-contract.js";
 export * from "./proactive/review-adapter.js";
 export * from "./triggers/catalog.generated.js";

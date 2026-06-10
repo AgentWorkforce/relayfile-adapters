@@ -17,6 +17,7 @@ import {
   upsertRepoIndexRow,
 } from '../index-emitter.js';
 import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { cleanupStaleGitHubTitleAliases } from '../alias-cleanup.js';
 import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
@@ -869,22 +870,39 @@ async function writeBulkPullRequestAliases(
   }
 
   const scope = `/github/repos/${encodeURIComponent(owner)}__${encodeURIComponent(repo)}/pulls`;
+  const byIdAliasPath = githubByIdAliasPath(owner, repo, 'pulls', number);
+  // Snapshot the previous record version before the by-id alias is
+  // overwritten — it carries the prior title for stale alias cleanup.
+  const previousContent = await readVfsContent(vfs, byIdAliasPath);
   await writeGitHubIndex(vfs, scope);
-  await runVfsWrite(vfs, githubByIdAliasPath(owner, repo, 'pulls', number), content);
+  await runVfsWrite(vfs, byIdAliasPath, content);
 
-  if (!title.trim()) {
-    return;
+  let writtenAliasPath: string | undefined;
+  if (title.trim()) {
+    const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
+    const aliasPath = await resolveAliasPath(
+      vfs,
+      baseAliasPath,
+      githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number, true),
+      content,
+      previousContent,
+    );
+    await runVfsWrite(vfs, aliasPath, content);
+    writtenAliasPath = aliasPath;
   }
 
-  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
-  const aliasPath = await resolveAliasPath(
+  // Stale alias lifecycle (issue #106): delete the previous by-title alias
+  // when the pull request title changed. Only the stale alias file is
+  // removed — the canonical record file is never touched.
+  await cleanupStaleGitHubTitleAliases(
     vfs,
-    baseAliasPath,
-    githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number, true),
-    content,
+    owner,
+    repo,
+    'pulls',
+    number,
+    previousContent,
+    writtenAliasPath ? [writtenAliasPath] : [],
   );
-  // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.
-  await runVfsWrite(vfs, aliasPath, content);
 }
 
 async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
@@ -930,6 +948,7 @@ async function resolveAliasPath(
   baseAliasPath: string,
   collisionAliasPath: string,
   content: string,
+  previousContent?: string,
 ): Promise<string> {
   const exists = await pathExists(vfs, baseAliasPath);
   if (!exists) {
@@ -937,6 +956,11 @@ async function resolveAliasPath(
   }
 
   const existing = await readVfsContent(vfs, baseAliasPath);
+  // A base alias holding this record's previous bytes is ours — overwrite it
+  // in place instead of forking to the collision variant.
+  if (existing !== undefined && previousContent !== undefined && existing === previousContent) {
+    return baseAliasPath;
+  }
   return existing === undefined || existing !== content ? collisionAliasPath : baseAliasPath;
 }
 

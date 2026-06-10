@@ -15,6 +15,7 @@ import {
   atomicUpsertRepoIndex,
 } from '../atomic-index.js';
 import { githubLayoutPromptFile } from '../layout-prompt.js';
+import { cleanupStaleGitHubTitleAliases } from '../alias-cleanup.js';
 import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
 import { parsePullRequest, type PullRequestMetadata } from './parser.js';
@@ -420,16 +421,32 @@ async function writePullRequestAliases(
   }
 
   const scope = `/github/repos/${encodeURIComponent(owner)}__${encodeURIComponent(repo)}/pulls`;
+  const byIdAliasPath = githubByIdAliasPath(owner, repo, 'pulls', number);
+  // Snapshot the previous record version before the by-id alias is
+  // overwritten — it carries the prior title for stale alias cleanup.
+  const previousContent = await readVfsContent(vfs, byIdAliasPath);
   await writeGitHubIndex(vfs, scope);
-  await runVfsWrite(vfs, githubByIdAliasPath(owner, repo, 'pulls', number), content);
+  await runVfsWrite(vfs, byIdAliasPath, content);
 
-  if (!title.trim()) {
-    return;
+  let writtenAliasPath: string | undefined;
+  if (title.trim()) {
+    const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
+    await runVfsWrite(vfs, baseAliasPath, content);
+    writtenAliasPath = baseAliasPath;
   }
 
-  const baseAliasPath = githubNumberedByTitleAliasPath(owner, repo, 'pulls', title, number);
-  // TODO(issue #106): remove stale by-title aliases when a pull request title changes on re-ingest; this wave only writes the current alias.
-  await runVfsWrite(vfs, baseAliasPath, content);
+  // Stale alias lifecycle (issue #106): delete the previous by-title alias
+  // when the pull request title changed. Only the stale alias file is
+  // removed — the canonical record file is never touched.
+  await cleanupStaleGitHubTitleAliases(
+    vfs,
+    owner,
+    repo,
+    'pulls',
+    number,
+    previousContent,
+    writtenAliasPath ? [writtenAliasPath] : [],
+  );
 }
 
 async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
