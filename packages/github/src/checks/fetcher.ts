@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
@@ -33,7 +34,7 @@ export async function fetchCheckRuns(
   let totalCount = 0;
 
   while (true) {
-    const response = await provider.proxy({
+    const response = await withProxyRetry(provider).proxy({
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${owner}/${repo}/commits/${sha}/check-runs`,
@@ -71,7 +72,7 @@ export async function fetchCheckRunDetail(
   connectionId?: string,
 ): Promise<JsonObject> {
   const resolvedConnectionId = await resolveConnectionId(provider, connectionId);
-  const response = await provider.proxy({
+  const response = await withProxyRetry(provider).proxy({
     method: 'GET',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${owner}/${repo}/check-runs/${checkRunId}`,

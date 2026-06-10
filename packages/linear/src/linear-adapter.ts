@@ -1,5 +1,11 @@
 import type { ConnectionProvider } from '@relayfile/sdk';
-import { upsertIndexAtomic, type AtomicUpsertOptions, type VfsLike } from '@relayfile/adapter-core';
+import {
+  cleanupStaleAliases,
+  readAliasKeyFromContent,
+  upsertIndexAtomic,
+  type AtomicUpsertOptions,
+  type VfsLike,
+} from '@relayfile/adapter-core';
 export type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
 
 import {
@@ -1322,22 +1328,114 @@ async function writeLinearAliases(
     ? asString(event.payload.identifier) ?? event.objectId
     : event.objectId;
 
+  const byIdAliasPath = linearByIdAliasPath(scope, byId);
+  // Snapshot the previous record version before the by-id alias is
+  // overwritten — it carries the prior title/name for stale alias cleanup.
+  const previousContent = await readLinearFile(client, byIdAliasPath, workspaceId);
   await writeLinearIndex(client, workspaceId, scope);
-  await writeLinearFile(client, workspaceId, linearByIdAliasPath(scope, byId), content, semantics);
+  await writeLinearFile(client, workspaceId, byIdAliasPath, content, semantics);
 
-  if (!title) {
+  let writtenAliasPath: string | undefined;
+  if (title) {
+    const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
+    const existingBaseContent = await readLinearFile(client, baseAliasPath, workspaceId);
+    // A base alias holding this record's previous bytes is ours — overwrite
+    // it in place instead of forking to the collision variant.
+    const ownsBaseAlias =
+      existingBaseContent !== undefined && existingBaseContent === previousContent;
+    const aliasPath =
+      existingBaseContent !== undefined && existingBaseContent !== content && !ownsBaseAlias
+        ? linearByTitleAliasPath(scope, title, event.objectId, true)
+        : baseAliasPath;
+
+    await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
+    writtenAliasPath = aliasPath;
+  }
+
+  // Stale alias lifecycle (issue #106): delete the previous by-title alias
+  // when the record's title/name changed. Only the stale alias file is
+  // removed — the canonical record file is never touched.
+  await cleanupStaleLinearTitleAliases(client, workspaceId, {
+    scope,
+    objectType: normalizedType,
+    objectId: event.objectId,
+    previousContent,
+    keepPaths: writtenAliasPath ? [writtenAliasPath] : [],
+  });
+}
+
+/**
+ * Removes the stale `by-title` alias left behind when an issue title or
+ * project name changes between ingests (issue #106).
+ *
+ * Prior state comes from the mirror itself: the title-independent `by-id`
+ * alias stores the canonical bytes of the previous record version, read
+ * before being overwritten. The previous title/name is extracted from that
+ * snapshot, the alias paths the previous version may occupy (base +
+ * collision variants) are derived, and a candidate is deleted only when its
+ * bytes still match the snapshot — proving it belonged to this record and
+ * not to a different record sharing the slug.
+ *
+ * No-ops when the client exposes no `deleteFile` or when prior state is
+ * unavailable. Never deletes canonical record files — a title change is an
+ * alias cleanup, not a record deletion.
+ */
+async function cleanupStaleLinearTitleAliases(
+  client: RelayFileClientLike,
+  workspaceId: string,
+  options: {
+    scope: string;
+    objectType: 'issue' | 'project';
+    objectId: string;
+    previousContent: string | undefined;
+    keepPaths: readonly string[];
+  },
+): Promise<void> {
+  const { scope, objectType, objectId, previousContent, keepPaths } = options;
+  const deleteFile = client.deleteFile;
+  if (previousContent === undefined || !deleteFile) {
     return;
   }
 
-  const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
-  const existingBaseContent = await readLinearFile(client, baseAliasPath);
-  const aliasPath =
-    existingBaseContent !== undefined && existingBaseContent !== content
-      ? linearByTitleAliasPath(scope, title, event.objectId, true)
-      : baseAliasPath;
+  // Ownership guard: the by-id alias is last-write-wins, so when two records
+  // claim the same identifier the snapshot may belong to a different record.
+  // Never clean up aliases on behalf of another record.
+  const previousObjectId = readAliasKeyFromContent(previousContent, 'objectId');
+  if (previousObjectId !== undefined && previousObjectId !== objectId) {
+    return;
+  }
 
-  // TODO(issue #106): remove stale by-title aliases when a record title changes on re-ingest; this wave only writes the current alias.
-  await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
+  const previousTitle = readAliasKeyFromContent(
+    previousContent,
+    'payload',
+    objectType === 'issue' ? 'title' : 'name',
+  );
+  if (!previousTitle) {
+    return;
+  }
+
+  const candidatePaths: string[] = [];
+  try {
+    candidatePaths.push(
+      linearByTitleAliasPath(scope, previousTitle, objectId),
+      linearByTitleAliasPath(scope, previousTitle, objectId, true),
+    );
+  } catch {
+    // Previous title slugs to an empty string — no alias was emitted for it.
+    return;
+  }
+
+  await cleanupStaleAliases(
+    {
+      readFile: (path) => readLinearFile(client, path, workspaceId),
+      deleteFile: (path) => deleteFile.call(client, { workspaceId, path }),
+    },
+    {
+      previousContent,
+      candidatePaths,
+      keepPaths,
+    },
+  );
 }
 
 async function writeLinearIndex(
@@ -1381,7 +1479,7 @@ function linearClientToVfs(client: RelayFileClientLike, workspaceId: string): Vf
         return undefined;
       }
       try {
-        const value = await reader.call(client, path);
+        const value = await readLinearFileWithFallbacks(client, path, workspaceId);
         if (typeof value === 'string') {
           return { content: value, revision: '0' };
         }
@@ -1462,22 +1560,54 @@ async function writeLinearFile(
   });
 }
 
-async function readLinearFile(client: RelayFileClientLike, path: string): Promise<string | undefined> {
+async function readLinearFile(
+  client: RelayFileClientLike,
+  path: string,
+  workspaceId?: string,
+): Promise<string | undefined> {
+  const value = await readLinearFileWithFallbacks(client, path, workspaceId);
+  return typeof value === 'string'
+    ? value
+    : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
+      ? value.content
+      : undefined;
+}
+
+async function readLinearFileWithFallbacks(
+  client: RelayFileClientLike,
+  path: string,
+  workspaceId?: string,
+): Promise<ReadFileResult | string | undefined> {
   const reader = (client as unknown as Record<string, unknown>).readFile;
   if (typeof reader !== 'function') {
     return undefined;
   }
 
-  try {
-    const value = await reader.call(client, path);
-    return typeof value === 'string'
-      ? value
-      : value && typeof value === 'object' && 'content' in value && typeof value.content === 'string'
-        ? value.content
-        : undefined;
-  } catch {
-    return undefined;
+  const attempts: Array<() => Promise<ReadFileResult | string | undefined>> = [];
+  if (workspaceId !== undefined) {
+    attempts.push(
+      () => reader.call(client, { workspaceId, path }),
+      () => reader.call(client, workspaceId, path),
+    );
   }
+  attempts.push(() => reader.call(client, path));
+
+  for (const attempt of attempts) {
+    try {
+      const value = await attempt();
+      if (isReadableFileResult(value)) {
+        return value;
+      }
+    } catch {
+      // Try the next supported readFile call shape.
+    }
+  }
+  return undefined;
+}
+
+function isReadableFileResult(value: unknown): value is ReadFileResult | string {
+  return typeof value === 'string'
+    || Boolean(value && typeof value === 'object' && 'content' in value && typeof value.content === 'string');
 }
 
 function sortJson(value: unknown): unknown {

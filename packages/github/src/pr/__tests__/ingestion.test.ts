@@ -13,6 +13,7 @@ import { type VfsLike } from '../../files/content-fetcher.js';
 import type { GitHubRequestProvider, ProxyRequest, ProxyResponse } from '../../types.js';
 import { fetchAndWriteDiff, ingestPullRequest } from '../diff-writer.js';
 import { buildVFSPath, mapPRFiles } from '../file-mapper.js';
+import { githubByIdAliasPath, githubNumberedByTitleAliasPath } from '../../path-mapper.js';
 import { parsePullRequest } from '../parser.js';
 
 interface FixtureProviderOptions {
@@ -114,19 +115,25 @@ function createFixtureProvider(options: FixtureProviderOptions = {}) {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
+  const deletes: string[] = [];
   const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
   const exists = mock.fn((path: string) => writes.has(path));
   const readFile = mock.fn((path: string) => writes.get(path));
+  const deleteFile = mock.fn(async (path: string) => {
+    writes.delete(path);
+    deletes.push(path);
+  });
 
   const vfs: VfsLike = {
+    deleteFile,
     exists,
     readFile,
     writeFile,
   };
 
-  return { exists, readFile, vfs, writeFile, writes };
+  return { deleteFile, deletes, exists, readFile, vfs, writeFile, writes };
 }
 
 describe('pull request ingestion', () => {
@@ -509,6 +516,70 @@ describe('pull request ingestion', () => {
     assert.strictEqual(
       buildVFSPath(' acme org ', 'widgets', 7, '/files/src/my file.ts'),
       '/github/repos/acme%20org/widgets/pulls/7/files/src/my%20file.ts',
+    );
+  });
+
+  it('deletes the stale by-title alias when a pull request title changes on re-ingest (issue #106)', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+
+    const first = createFixtureProvider();
+    await ingestPullRequest(first.provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs);
+
+    const renamed = createFixtureProvider({ prPayload: { title: 'Renamed fixture pull request' } });
+    await ingestPullRequest(renamed.provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs);
+
+    const oldAliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      mockPRPayload.title,
+      42,
+    );
+    const newAliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      'Renamed fixture pull request',
+      42,
+    );
+    const byIdAliasPath = githubByIdAliasPath(mockRepoContext.owner, mockRepoContext.repo, 'pulls', 42);
+    const canonicalMetaPath = buildVFSPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      42,
+      'meta.json',
+      'Renamed fixture pull request',
+    );
+
+    // (a) the new alias is written, (b) the stale alias is deleted,
+    // (c) the canonical record and by-id alias are intact.
+    assert.ok(writes.has(newAliasPath));
+    assert.strictEqual(writes.has(oldAliasPath), false);
+    assert.deepStrictEqual(deletes, [oldAliasPath]);
+    assert.ok(writes.has(canonicalMetaPath));
+    assert.ok(writes.has(byIdAliasPath));
+    assert.strictEqual(writes.get(newAliasPath), writes.get(byIdAliasPath));
+  });
+
+  it('deletes nothing when a pull request is re-ingested with an unchanged title', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+
+    const { provider } = createFixtureProvider();
+    await ingestPullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs);
+    await ingestPullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs);
+
+    const aliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      mockPRPayload.title,
+      42,
+    );
+
+    assert.deepStrictEqual(deletes, []);
+    assert.ok(writes.has(aliasPath));
+    assert.ok(
+      writes.has(buildVFSPath(mockRepoContext.owner, mockRepoContext.repo, 42, 'meta.json', mockPRPayload.title)),
     );
   });
 });

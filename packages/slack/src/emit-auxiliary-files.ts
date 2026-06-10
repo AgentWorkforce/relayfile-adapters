@@ -26,10 +26,10 @@
  *      Bot-flip (`is_bot: true → false`) deletes the stale `bots/` alias
  *      while leaving `by-name` in place.
  *
- *   3. **Message** / **Thread** / **Thread reply** records emit only the
- *      canonical `meta.json` (and per-reply `<ts>.json`) under their
- *      channel directory. No alias fan-out and no index file at this
- *      level. Because the message record itself doesn't carry the parent
+ *   3. **Message** / **Thread** / **Thread reply** records emit only their
+ *      canonical `meta.json` under the channel directory. No alias fan-out
+ *      and no index file at this level. Because the message record itself
+ *      doesn't carry the parent
  *      channel name, the path falls back to the bare `<channelId>` segment
  *      — readers join via the channel index to discover the human-readable
  *      directory name.

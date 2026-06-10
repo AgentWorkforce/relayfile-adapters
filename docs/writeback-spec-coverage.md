@@ -22,6 +22,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | gmail | None | 0 | 3 | Inline JS schemas. |
 | google-calendar | None | 0 | 1 | Inline JS schemas. |
 | google-drive | None | 0 | 2 | Inline JS schemas. |
+| granola | None | 0 | 2 | Inline JS schemas. |
 | hubspot | None | 0 | 4 | Inline JS schemas. |
 | intercom | None | 0 | 3 | Inline JS schemas. |
 | jira | None | 0 | 4 | Inline JS schemas. |
@@ -31,6 +32,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | pipedrive | None | 0 | 4 | Inline JS schemas. |
 | postgres | None | 0 | 2 | Inline JS schemas; database/table shape is runtime-native rather than provider OpenAPI. |
 | redis | None | 0 | 2 | Inline JS schemas; key/value shape is runtime-native rather than provider OpenAPI. |
+| reddit | None | 0 | 2 | Inline JS schemas. |
 | s3 | None | 0 | 2 | Inline JS schemas. |
 | salesforce | None | 0 | 5 | Inline JS schemas. |
 | sharepoint | None | 0 | 2 | Inline JS schemas. |

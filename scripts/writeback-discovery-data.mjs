@@ -181,6 +181,30 @@ export const adapters = [
     ],
   },
   {
+    slug: 'granola',
+    title: 'Granola adapter',
+    overview:
+      'The Granola adapter exposes meeting notes and folders under `/granola`, with writeback routes for creating notes and folders.',
+    readPaths: [
+      ['/granola/notes/<noteId>.json', 'Note records.'],
+      ['/granola/notes/by-id/<noteId>.json', 'Note lookup aliases.'],
+      ['/granola/folders/<folderId>.json', 'Folder records.'],
+      ['/granola/folders/by-id/<folderId>.json', 'Folder lookup aliases.'],
+    ],
+    endpoints: [
+      endpoint('/granola/notes/new.json', 'Create Granola note', 'Creates a Granola note.', ['title'], {
+        title: str('Note title.', undefined, { minLength: 1 }),
+        summary_markdown: str('Markdown note body.'),
+        summary_text: str('Plain-text note summary.'),
+        folder_membership: arr(obj('Folder membership entry. Provide the Granola folder `id` (`fol_…`). List `/granola/folders/` to find available folders.'), 'Folders the note belongs to.'),
+      }, { title: 'Replace example note title', summary_markdown: '# Notes\n\nReplace example note body.' }),
+      endpoint('/granola/folders/new.json', 'Create Granola folder', 'Creates a Granola folder.', ['name'], {
+        name: str('Folder name.', undefined, { minLength: 1 }),
+        parent_folder_id: str('Parent Granola folder id (`fol_…`). Omit for a top-level folder.'),
+      }, { name: 'Replace example folder name' }),
+    ],
+  },
+  {
     slug: 'hubspot',
     title: 'HubSpot adapter',
     overview:
@@ -372,6 +396,32 @@ export const adapters = [
     ],
   },
   {
+    slug: 'reddit',
+    title: 'Reddit adapter',
+    overview:
+      'The Reddit adapter exposes tracked subreddits and posts under `/reddit`, with writeback routes for tracking subreddits and creating posts.',
+    readPaths: [
+      ['/reddit/subreddits/<subreddit>.json', 'Tracked subreddit records.'],
+      ['/reddit/subreddits/<subreddit>/posts/<title>__<postId>.json', 'Post records scoped by subreddit.'],
+      ['/reddit/posts/by-id/<subreddit>__<postId>.json', 'Post lookup aliases.'],
+      ['/reddit/posts/by-status/<status>/<subreddit>__<postId>.json', 'Post status aliases.'],
+    ],
+    endpoints: [
+      endpoint('/reddit/subreddits/new.json', 'Track Reddit subreddit', 'Starts tracking a subreddit so its posts sync under `/reddit`.', ['name'], {
+        name: str('Subreddit name without the `r/` prefix.', undefined, { minLength: 1 }),
+      }, { name: 'selfhosted' }),
+      endpoint('/reddit/subreddits/{subreddit}/posts/new.json', 'Create Reddit post', 'Submits a post to the subreddit named by the path.', ['title'], {
+        title: str('Post title.', undefined, { minLength: 1 }),
+        text: str('Self-post body. Used when `kind` is `self`.'),
+        link_url: str('External URL for link posts. Used when `kind` is `link`.', 'uri'),
+        kind: en(['self', 'link'], 'Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`.'),
+        flair_id: str('Subreddit flair template id.'),
+        nsfw: bool('Whether the post is marked NSFW.'),
+        spoiler: bool('Whether the post is marked as a spoiler.'),
+      }, { title: 'Replace example post title', text: 'Replace example post body.', kind: 'self' }),
+    ],
+  },
+  {
     slug: 'salesforce',
     title: 'Salesforce adapter',
     overview:
@@ -395,12 +445,16 @@ export const adapters = [
     slug: 'slack',
     title: 'Slack adapter',
     overview:
-      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions.',
+      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions. Direct messages use `/slack/users/<userId>/messages` as the product contract for both reads and writes; Slack internal `D...` IM channel ids stay in record payload metadata. It also advertises history-independent discovery lookup indexes for Slack channel and user ids under `/discovery/slack`.',
     readPaths: [
       ['/slack/channels/<channelId>.json', 'Channel records.'],
       ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
-      ['/slack/channels/<channelId>/messages/<messageTs>/replies/<replyTs>.json', 'Thread reply records.'],
+      ['/slack/channels/<channelId>/threads/<threadTs>/replies/<replyTs>/meta.json', 'Thread reply records (directory records; legacy flat `/messages/<messageTs>/replies/<replyTs>.json` writeback paths still route for edits/deletes).'],
       ['/slack/users/<userId>.json', 'User records.'],
+      ['/slack/users/<userId>/messages/<messageTs>/meta.json', '1:1 direct message records addressed by bare Slack user id.'],
+      ['/slack/users/<userId>/messages/<messageTs>/replies/<replyTs>/meta.json', 'Threaded replies in a 1:1 direct message (directory records; legacy flat `<replyTs>.json` still readable).'],
+      ['/discovery/slack/channels/_index.json', 'History-independent channel id/name lookup rows for writeback context, materialized from Slack channel discovery syncs.'],
+      ['/discovery/slack/users/_index.json', 'History-independent user id/name lookup rows for direct-message writeback context, materialized from Slack user discovery syncs.'],
     ],
     endpoints: [
       endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, slackContentRequirement()),

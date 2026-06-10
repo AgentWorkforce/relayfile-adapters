@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { createHash } from 'node:crypto';
 
 import type { ConnectionProvider, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
@@ -54,7 +55,7 @@ export async function fetchOnDemand(
       request.query = query;
     }
 
-    const response = await provider.proxy<Record<string, unknown>>(request);
+    const response = await withProxyRetry(provider).proxy<Record<string, unknown>>(request);
     assertOk(response, endpoint);
     const data = expectRecord(response.data, endpoint);
     const page = normalizePayloadPage(data);

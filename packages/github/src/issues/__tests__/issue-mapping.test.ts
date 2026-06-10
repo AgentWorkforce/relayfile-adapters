@@ -79,19 +79,27 @@ function createFixtureProvider(options?: {
 
 function createMemoryVfs() {
   const writes = new Map<string, string>();
+  const deletes: string[] = [];
   const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
     return { created: true as const };
   });
   const exists = mock.fn((path: string) => writes.has(path));
   const readFile = mock.fn((path: string) => writes.get(path));
+  const deleteFile = mock.fn(async (path: string) => {
+    writes.delete(path);
+    deletes.push(path);
+  });
 
   return {
+    deleteFile,
+    deletes,
     exists,
     readFile,
     writes,
     writeFile,
     vfs: {
+      deleteFile,
       exists,
       readFile,
       writeFile,
@@ -417,5 +425,44 @@ describe('issue mapping', () => {
       `/github/repos/${encodeURIComponent(mockRepoContext.owner)}/${encodeURIComponent(mockRepoContext.repo)}/${commentMapping.vfsPath}`,
       '/github/repos/octocat/hello-world/issues/10/comments/7001.json',
     );
+  });
+
+  it('deletes the stale by-title alias when an issue title changes on re-ingest (issue #106)', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+
+    const first = createFixtureProvider();
+    await ingestIssue(first.provider, mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, vfs);
+
+    const renamed = createFixtureProvider({
+      issue: { ...cloneFixture(mockIssuePayload), title: 'Renamed adapter issue coverage' } as JsonObject,
+    });
+    await ingestIssue(renamed.provider, mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, vfs);
+
+    const oldAliasPath = '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage__10.json';
+    const newAliasPath = '/github/repos/octocat__hello-world/issues/by-title/renamed-adapter-issue-coverage__10.json';
+
+    // (a) the new alias is written, (b) the stale alias is deleted,
+    // (c) the canonical record and by-id alias are intact.
+    assert.ok(writes.has(newAliasPath));
+    assert.strictEqual(writes.has(oldAliasPath), false);
+    assert.deepStrictEqual(deletes, [oldAliasPath]);
+    assert.ok(writes.has('/github/repos/octocat/hello-world/issues/10__renamed-adapter-issue-coverage/meta.json'));
+    assert.ok(writes.has('/github/repos/octocat__hello-world/issues/by-id/10.json'));
+    assert.strictEqual(
+      writes.get(newAliasPath),
+      writes.get('/github/repos/octocat__hello-world/issues/by-id/10.json'),
+    );
+  });
+
+  it('deletes nothing when an issue is re-ingested with an unchanged title', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+
+    const { provider } = createFixtureProvider();
+    await ingestIssue(provider, mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, vfs);
+    await ingestIssue(provider, mockRepoContext.owner, mockRepoContext.repo, mockIssuePayload.number, vfs);
+
+    assert.deepStrictEqual(deletes, []);
+    assert.ok(writes.has('/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage__10.json'));
+    assert.ok(writes.has('/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json'));
   });
 });
