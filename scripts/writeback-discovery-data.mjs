@@ -181,6 +181,30 @@ export const adapters = [
     ],
   },
   {
+    slug: 'granola',
+    title: 'Granola adapter',
+    overview:
+      'The Granola adapter exposes meeting notes and folders under `/granola`, with writeback routes for creating notes and folders.',
+    readPaths: [
+      ['/granola/notes/<noteId>.json', 'Note records.'],
+      ['/granola/notes/by-id/<noteId>.json', 'Note lookup aliases.'],
+      ['/granola/folders/<folderId>.json', 'Folder records.'],
+      ['/granola/folders/by-id/<folderId>.json', 'Folder lookup aliases.'],
+    ],
+    endpoints: [
+      endpoint('/granola/notes/new.json', 'Create Granola note', 'Creates a Granola note.', ['title'], {
+        title: str('Note title.', undefined, { minLength: 1 }),
+        summary_markdown: str('Markdown note body.'),
+        summary_text: str('Plain-text note summary.'),
+        folder_membership: arr(obj('Folder membership entry. Provide the Granola folder `id` (`fol_…`). List `/granola/folders/` to find available folders.'), 'Folders the note belongs to.'),
+      }, { title: 'Replace example note title', summary_markdown: '# Notes\n\nReplace example note body.' }),
+      endpoint('/granola/folders/new.json', 'Create Granola folder', 'Creates a Granola folder.', ['name'], {
+        name: str('Folder name.', undefined, { minLength: 1 }),
+        parent_folder_id: str('Parent Granola folder id (`fol_…`). Omit for a top-level folder.'),
+      }, { name: 'Replace example folder name' }),
+    ],
+  },
+  {
     slug: 'hubspot',
     title: 'HubSpot adapter',
     overview:
@@ -369,6 +393,32 @@ export const adapters = [
       endpoint('/pipedrive/persons/new.json', 'Create Pipedrive person', 'Creates a Pipedrive person.', ['name'], pipedrivePersonProps(), { name: 'Replace example person name' }),
       endpoint('/pipedrive/organizations/new.json', 'Create Pipedrive organization', 'Creates a Pipedrive organization.', ['name'], pipedriveOrganizationProps(), { name: 'Replace example organization name' }),
       endpoint('/pipedrive/activities/new.json', 'Create Pipedrive activity', 'Creates a Pipedrive activity.', ['subject'], pipedriveActivityProps(), { subject: 'Replace example activity subject' }),
+    ],
+  },
+  {
+    slug: 'reddit',
+    title: 'Reddit adapter',
+    overview:
+      'The Reddit adapter exposes tracked subreddits and posts under `/reddit`, with writeback routes for tracking subreddits and creating posts.',
+    readPaths: [
+      ['/reddit/subreddits/<subreddit>.json', 'Tracked subreddit records.'],
+      ['/reddit/subreddits/<subreddit>/posts/<title>__<postId>.json', 'Post records scoped by subreddit.'],
+      ['/reddit/posts/by-id/<subreddit>__<postId>.json', 'Post lookup aliases.'],
+      ['/reddit/posts/by-status/<status>/<subreddit>__<postId>.json', 'Post status aliases.'],
+    ],
+    endpoints: [
+      endpoint('/reddit/subreddits/new.json', 'Track Reddit subreddit', 'Starts tracking a subreddit so its posts sync under `/reddit`.', ['name'], {
+        name: str('Subreddit name without the `r/` prefix.', undefined, { minLength: 1 }),
+      }, { name: 'selfhosted' }),
+      endpoint('/reddit/subreddits/{subreddit}/posts/new.json', 'Create Reddit post', 'Submits a post to the subreddit named by the path.', ['title'], {
+        title: str('Post title.', undefined, { minLength: 1 }),
+        text: str('Self-post body. Used when `kind` is `self`.'),
+        link_url: str('External URL for link posts. Used when `kind` is `link`.', 'uri'),
+        kind: en(['self', 'link'], 'Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`.'),
+        flair_id: str('Subreddit flair template id.'),
+        nsfw: bool('Whether the post is marked NSFW.'),
+        spoiler: bool('Whether the post is marked as a spoiler.'),
+      }, { title: 'Replace example post title', text: 'Replace example post body.', kind: 'self' }),
     ],
   },
   {
