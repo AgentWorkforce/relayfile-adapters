@@ -25,6 +25,7 @@ import {
   bulkWriteToVFS,
   mergeIngestResults,
 } from '../bulk-writer.js';
+import { githubByIdAliasPath, githubNumberedByTitleAliasPath } from '../../path-mapper.js';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com';
 
@@ -58,19 +59,25 @@ function createContentResponse(path: string, ref: string, content: string): Prox
 
 function createMemoryVfs(initialEntries: Record<string, string> = {}) {
   const writes = new Map(Object.entries(initialEntries));
+  const deletes: string[] = [];
   const exists = mock.fn(async (path: string) => writes.has(path));
   const readFile = mock.fn(async (path: string) => writes.get(path));
   const writeFile = mock.fn(async (path: string, content: string) => {
     writes.set(path, content);
   });
+  const deleteFile = mock.fn(async (path: string) => {
+    writes.delete(path);
+    deletes.push(path);
+  });
 
   const vfs: VfsLike = {
+    deleteFile,
     exists,
     readFile,
     writeFile,
   };
 
-  return { exists, readFile, vfs, writeFile, writes };
+  return { deleteFile, deletes, exists, readFile, vfs, writeFile, writes };
 }
 
 function createProvider(
@@ -655,5 +662,146 @@ describe('bulk ingest', () => {
     assert.strictEqual(result.paths.length, 246);
     assert.strictEqual(writes.size, 249);
     assert.strictEqual(provider.proxy.mock.calls.length, 244);
+  });
+  it('bulkIngestPR deletes the stale by-title alias when the title changes on re-ingest (issue #106)', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+    const createBulkProvider = (prPayload: Record<string, unknown>) =>
+      createProvider(async (request) => {
+        if (
+          request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
+        ) {
+          return jsonResponse(mockPRFiles as unknown as ProxyResponse['data']);
+        }
+
+        if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
+          if (request.headers?.Accept === 'application/vnd.github.diff') {
+            return {
+              status: 200,
+              headers: { 'content-type': 'text/plain; charset=utf-8' },
+              data: mockDiff,
+            };
+          }
+
+          return jsonResponse(prPayload as unknown as ProxyResponse['data']);
+        }
+
+        const prefix = `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/contents/`;
+        if (request.endpoint.startsWith(prefix)) {
+          const path = decodeURIComponent(request.endpoint.slice(prefix.length));
+          const ref = request.query?.ref ?? mockRepoContext.headSha;
+          const source = ref === mockRepoContext.baseSha ? mockBaseFileContents : mockFileContents;
+          return jsonResponse({
+            type: 'file',
+            encoding: 'base64',
+            path,
+            sha: `${ref}:${path}`,
+            size: Buffer.from(source[path] ?? '', 'base64').byteLength,
+            content: source[path] ?? '',
+          });
+        }
+
+        throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
+      });
+
+    await bulkIngestPR(
+      createBulkProvider(mockPRPayload as unknown as Record<string, unknown>),
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      42,
+      vfs,
+      { skipCached: false },
+    );
+    await bulkIngestPR(
+      createBulkProvider({ ...mockPRPayload, title: 'Renamed bulk pull request' }),
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      42,
+      vfs,
+      { skipCached: false },
+    );
+
+    const oldAliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      mockPRPayload.title,
+      42,
+    );
+    const newAliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      'Renamed bulk pull request',
+      42,
+    );
+    const byIdAliasPath = githubByIdAliasPath(mockRepoContext.owner, mockRepoContext.repo, 'pulls', 42);
+
+    // (a) the new alias is written, (b) the stale alias is deleted,
+    // (c) the canonical record and by-id alias are intact.
+    assert.ok(writes.has(newAliasPath));
+    assert.strictEqual(writes.has(oldAliasPath), false);
+    assert.deepStrictEqual(deletes, [oldAliasPath]);
+    assert.ok(
+      writes.has('/github/repos/octocat/hello-world/pulls/42__renamed-bulk-pull-request/meta.json'),
+    );
+    assert.ok(writes.has(byIdAliasPath));
+    assert.strictEqual(writes.get(newAliasPath), writes.get(byIdAliasPath));
+  });
+
+  it('bulkIngestPR deletes nothing when re-ingested with an unchanged title', async () => {
+    const { vfs, writes, deletes } = createMemoryVfs();
+    const provider = createProvider(async (request) => {
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
+      ) {
+        return jsonResponse(mockPRFiles as unknown as ProxyResponse['data']);
+      }
+
+      if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
+        if (request.headers?.Accept === 'application/vnd.github.diff') {
+          return {
+            status: 200,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+            data: mockDiff,
+          };
+        }
+
+        return jsonResponse(mockPRPayload as unknown as ProxyResponse['data']);
+      }
+
+      const prefix = `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/contents/`;
+      if (request.endpoint.startsWith(prefix)) {
+        const path = decodeURIComponent(request.endpoint.slice(prefix.length));
+        const ref = request.query?.ref ?? mockRepoContext.headSha;
+        const source = ref === mockRepoContext.baseSha ? mockBaseFileContents : mockFileContents;
+        return jsonResponse({
+          type: 'file',
+          encoding: 'base64',
+          path,
+          sha: `${ref}:${path}`,
+          size: Buffer.from(source[path] ?? '', 'base64').byteLength,
+          content: source[path] ?? '',
+        });
+      }
+
+      throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
+    });
+
+    await bulkIngestPR(provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs, { skipCached: false });
+    await bulkIngestPR(provider, mockRepoContext.owner, mockRepoContext.repo, 42, vfs, { skipCached: false });
+
+    const aliasPath = githubNumberedByTitleAliasPath(
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      'pulls',
+      mockPRPayload.title,
+      42,
+    );
+
+    assert.deepStrictEqual(deletes, []);
+    assert.ok(writes.has(aliasPath));
+    assert.ok(
+      writes.has('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/meta.json'),
+    );
   });
 });

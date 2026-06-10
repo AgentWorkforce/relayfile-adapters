@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type {
   GitHubRequestProvider,
@@ -167,7 +168,7 @@ export async function parsePullRequest(
 
   let response: ProxyResponse;
   try {
-    response = await provider.proxy({
+    response = await withProxyRetry(provider).proxy({
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${encodeURIComponent(trimmedOwner)}/${encodeURIComponent(trimmedRepo)}/pulls/${prNumber}`,

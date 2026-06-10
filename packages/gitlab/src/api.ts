@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import type { ConnectionProvider, GitLabAdapterConfig, ProxyMethod, ProxyResponse } from './types.js';
 
 function normalizeHeaders(headers: Record<string, string>): Record<string, string> {
@@ -57,7 +58,7 @@ export class GitLabApiClient {
       query?: Record<string, string>;
     } = {},
   ): Promise<T> {
-    const response = await this.provider.proxy({
+    const response = await withProxyRetry(this.provider).proxy({
       method,
       baseUrl: this.config.baseUrl,
       endpoint,
@@ -85,7 +86,7 @@ export class GitLabApiClient {
     const perPage = query.per_page ?? String(this.config.perPage);
 
     for (;;) {
-      const response = await this.provider.proxy({
+      const response = await withProxyRetry(this.provider).proxy({
         method: 'GET',
         baseUrl: this.config.baseUrl,
         endpoint,

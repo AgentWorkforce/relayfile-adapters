@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { computeGoogleCalendarPath } from './path-mapper.js';
 import {
   GOOGLE_CALENDAR_DEFAULT_BASE_URL,
@@ -92,7 +93,7 @@ async function fetchGoogleCalendarSyncPageOnce(
   const baseUrl = config.apiBaseUrl ?? GOOGLE_CALENDAR_DEFAULT_BASE_URL;
   const endpoint = `/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
   const connectionId = config.connectionId ?? GOOGLE_CALENDAR_PROVIDER_NAME;
-  const response = await provider.proxy<GoogleCalendarEventsListResponse>({
+  const response = await withProxyRetry(provider).proxy<GoogleCalendarEventsListResponse>({
     method: 'GET',
     baseUrl,
     endpoint,

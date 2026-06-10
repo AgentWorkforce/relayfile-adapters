@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import type { ConnectionProvider, WritebackPathTarget, WritebackResult } from './types.js';
 import { parseGitLabPath } from './path-mapper.js';
@@ -108,7 +109,7 @@ export class GitLabWritebackHandler {
           break;
       }
 
-      const response = await this.provider.proxy({
+      const response = await withProxyRetry(this.provider).proxy({
         method,
         baseUrl: this.options.baseUrl ?? 'https://gitlab.com',
         endpoint,

@@ -1,3 +1,4 @@
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from '../config.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue } from '../types.js';
 
@@ -192,7 +193,7 @@ async function fetchVariant(
   }
 
   try {
-    const response = await provider.proxy({
+    const response = await withProxyRetry(provider).proxy({
       method: 'GET',
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${encodeURIComponent(file.owner)}/${encodeURIComponent(file.repo)}/contents/${encodePath(path)}`,

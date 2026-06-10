@@ -68,7 +68,12 @@ function extractRepliesPath(path: string): string | null {
     return path.replace(/\/meta\.json$/u, '/replies');
   }
 
-  const match = path.match(/^(\/slack\/channels\/[^/]+\/threads\/[^/]+)\/replies\/[^/]+\.json$/u);
+  // Accept both the current reply record (`replies/<ts>/meta.json`) and the
+  // legacy flat leaf (`replies/<ts>.json`) so a mirror mid-migration still maps
+  // a reply path back to its parent replies listing.
+  const match = path.match(
+    /^(\/slack\/channels\/[^/]+\/threads\/[^/]+)\/replies\/[^/]+(?:\/meta)?\.json$/u,
+  );
   return match?.[1] ? `${match[1]}/replies` : null;
 }
 

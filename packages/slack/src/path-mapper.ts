@@ -17,6 +17,15 @@ export interface SlackMessageReference {
   messageTs: string;
 }
 
+export interface SlackDirectMessageReference {
+  userId: string;
+  messageTs: string;
+}
+
+export interface SlackDirectMessageThreadReplyReference extends SlackDirectMessageReference {
+  replyTs: string;
+}
+
 export interface SlackThreadReference {
   channelId: string;
   threadTs: string;
@@ -61,11 +70,25 @@ function slugify(value: string): string {
  * Compose an `<id>__<slug>` segment, mirroring `github`'s `nameWithId` and the
  * convention used across v2 adapters. When `humanReadable` slugifies to empty
  * (no name available, emoji-only, etc.) returns the bare normalized id.
+ *
+ * A `humanReadable` value that is just the id itself (any case — upstream
+ * name resolution sometimes falls back to the id) also returns the bare
+ * normalized id, so `slackNameWithId('c0ad7uu0j1g', 'C0AD7UU0J1G')` yields
+ * `C0AD7UU0J1G`, not the duplicate tree `C0AD7UU0J1G__c0ad7uu0j1g`.
  */
 export function slackNameWithId(humanReadable: string | undefined, id: string): string {
   const normalizedId = normalizeSegment(id);
-  const slug = humanReadable ? slugify(humanReadable) : '';
+  const trimmedName = humanReadable?.trim();
+  const slug =
+    trimmedName && !isSlackIdFallbackName(trimmedName, id) ? slugify(trimmedName) : '';
   return slug ? `${normalizedId}__${slug}` : normalizedId;
+}
+
+function isSlackIdFallbackName(value: string, id: string): boolean {
+  return (
+    value.localeCompare(id, undefined, { sensitivity: 'accent' }) === 0 ||
+    slugify(value) === slugify(id)
+  );
 }
 
 /**
@@ -316,6 +339,105 @@ export function slackMessageReadCandidatePaths(
   ];
 }
 
+export function directMessageDirectory(userId: string): string {
+  return joinPath(SLACK_ROOT, 'users', normalizeSegment(userId), 'messages');
+}
+
+export function directMessagePath(userId: string, messageTs: string): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(messageTs),
+    'meta.json',
+  );
+}
+
+/**
+ * Canonical 1:1 direct-message thread-reply record path. Like
+ * {@link threadReplyPath}, the reply is a directory record
+ * (`replies/<ts>/meta.json`) so its stem is a directory and can carry children
+ * without the file/dir name collision that wedges a POSIX mount. Pre-0.8.x
+ * emitted a flat `replies/<ts>.json` leaf — read it back via
+ * {@link slackDirectMessageThreadReplyReadCandidatePaths}.
+ */
+export function directMessageThreadReplyPath(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(threadTs),
+    'replies',
+    messageSegmentV2(replyTs),
+    'meta.json',
+  );
+}
+
+/**
+ * @deprecated Pre-0.8.x emitted a flat `.../replies/<ts>.json` leaf. Use
+ * {@link directMessageThreadReplyPath}. Retained for back-compat reads only —
+ * see {@link slackDirectMessageThreadReplyReadCandidatePaths}.
+ */
+export function directMessageThreadReplyLegacyPath(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string {
+  return joinPath(
+    directMessageDirectory(userId),
+    messageSegmentV2(threadTs),
+    'replies',
+    `${messageSegmentV2(replyTs)}.json`,
+  );
+}
+
+/**
+ * Reader hint: candidate paths for a DM thread-reply canonical record, current
+ * (`<ts>/meta.json`) then legacy (`<ts>.json`), so a reply mirrored by either
+ * the current or a pre-0.8.x adapter still reads.
+ */
+export function slackDirectMessageThreadReplyReadCandidatePaths(
+  userId: string,
+  threadTs: string,
+  replyTs: string,
+): string[] {
+  return [
+    directMessageThreadReplyPath(userId, threadTs, replyTs),
+    directMessageThreadReplyLegacyPath(userId, threadTs, replyTs),
+  ];
+}
+
+export function parseSlackDirectMessagePath(path: string): SlackDirectMessageReference | null {
+  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/meta\.json$/.exec(path);
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  return {
+    userId: decodeURIComponent(match[1]),
+    messageTs: pathTokenToSlackTimestamp(match[2]),
+  };
+}
+
+export function parseSlackDirectMessageThreadReplyPath(
+  path: string,
+): SlackDirectMessageThreadReplyReference | null {
+  // Accept both the current reply record (`replies/<ts>/meta.json`) and the
+  // legacy flat leaf (`replies/<ts>.json`) so routing works mid-migration.
+  const match = /^\/slack\/users\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+?)(?:\/meta)?\.json$/.exec(
+    path,
+  );
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null;
+  }
+
+  return {
+    userId: decodeURIComponent(match[1]),
+    messageTs: pathTokenToSlackTimestamp(match[2]),
+    replyTs: pathTokenToSlackTimestamp(match[3]),
+  };
+}
+
 export function channelThreadsDirectory(channelId: string, channelName?: string): string {
   return joinPath(SLACK_ROOT, 'channels', channelSegmentV2(channelName, channelId), 'threads');
 }
@@ -328,7 +450,40 @@ export function threadPath(channelId: string, threadTs: string, channelName?: st
   );
 }
 
+/**
+ * Canonical thread-reply record path. The reply is a **directory record**
+ * (`replies/<ts>/meta.json`) — matching `messagePath`, `directMessagePath`, and
+ * `threadPath`, all of which use `<ts>/meta.json`. This is deliberate: a reply
+ * can carry children (reactions live at `replies/<ts>/reactions/...`, see
+ * {@link reactionPath}), so its stem MUST be a directory. The pre-0.8.x adapter
+ * wrote a flat leaf file `replies/<ts>.json`, which collided with that same
+ * `<ts>` directory — one name as both a file and a directory — and could not be
+ * materialized on a POSIX mount (`mkdir ... : not a directory`), wedging the
+ * whole mirror. Readers should fall back to the legacy filename via
+ * {@link slackThreadReplyReadCandidatePaths}.
+ */
 export function threadReplyPath(
+  channelId: string,
+  threadTs: string,
+  replyTs: string,
+  channelName?: string,
+): string {
+  return joinPath(
+    channelThreadsDirectory(channelId, channelName),
+    slackTimestampToPathToken(threadTs),
+    'replies',
+    slackTimestampToPathToken(replyTs),
+    'meta.json',
+  );
+}
+
+/**
+ * @deprecated Pre-0.8.x emitted a flat `.../replies/<ts>.json` leaf file, which
+ * collided with the `<ts>` reaction directory. Use {@link threadReplyPath}.
+ * Retained for back-compat reads only — see
+ * {@link slackThreadReplyReadCandidatePaths}.
+ */
+export function threadReplyLegacyPath(
   channelId: string,
   threadTs: string,
   replyTs: string,
@@ -340,6 +495,23 @@ export function threadReplyPath(
     'replies',
     `${slackTimestampToPathToken(replyTs)}.json`,
   );
+}
+
+/**
+ * Reader hint: candidate paths for a Slack thread-reply canonical record, in
+ * order of preference — current (`<ts>/meta.json`) then legacy (`<ts>.json`) —
+ * so a reply mirrored by either the current or a pre-0.8.x adapter still reads.
+ */
+export function slackThreadReplyReadCandidatePaths(
+  channelId: string,
+  threadTs: string,
+  replyTs: string,
+  channelName?: string,
+): string[] {
+  return [
+    threadReplyPath(channelId, threadTs, replyTs, channelName),
+    threadReplyLegacyPath(channelId, threadTs, replyTs, channelName),
+  ];
 }
 
 export function userMetadataPath(userId: string, userName?: string): string {
@@ -420,6 +592,15 @@ export function slackUsersIndexPath(): string {
 function aliasFilename(name: string, id: string, colliding: boolean): string {
   const slug = slugifyAlias(name);
   return colliding ? `${slug}-${aliasCollisionSuffix(id)}` : slug;
+}
+
+function pathTokenToSlackTimestamp(token: string): string {
+  const decoded = decodeURIComponent(token);
+  const lastUnderscore = decoded.lastIndexOf('_');
+  if (lastUnderscore < 0) {
+    return decoded;
+  }
+  return `${decoded.slice(0, lastUnderscore)}.${decoded.slice(lastUnderscore + 1)}`;
 }
 
 /**

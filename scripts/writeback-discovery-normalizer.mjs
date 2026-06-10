@@ -292,6 +292,16 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'gitlab') {
     return pattern('^[A-Za-z0-9_.:-]+$');
   }
+  if (adapterSlug === 'granola') {
+    return resourcePath.endsWith('/folders')
+      ? pattern('^fol_[A-Za-z0-9]{14}$')
+      : pattern('^not_[A-Za-z0-9]{14}$');
+  }
+  if (adapterSlug === 'reddit') {
+    return resourcePath.endsWith('/posts')
+      ? pattern('^[A-Za-z0-9_/-]+$')
+      : pattern('^[A-Za-z0-9_][A-Za-z0-9_-]{1,63}$');
+  }
   if (adapterSlug === 'github') {
     if (resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
       return pattern('^[1-9]\\d*(?:__.*)?$');

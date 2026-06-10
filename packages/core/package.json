@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-core",
-  "version": "0.3.34",
+  "version": "0.3.37",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/src/index.js",
@@ -25,6 +25,10 @@
     "./vfs-client": {
       "types": "./dist/src/vfs-client/index.d.ts",
       "default": "./dist/src/vfs-client/index.js"
+    },
+    "./http": {
+      "types": "./dist/src/http/index.d.ts",
+      "default": "./dist/src/http/index.js"
     },
     "./package.json": "./package.json"
   },

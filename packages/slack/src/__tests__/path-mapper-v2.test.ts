@@ -4,9 +4,20 @@ import test from 'node:test';
 import {
   channelMetadataPath,
   channelMessagesDirectory,
+  directMessageDirectory,
+  directMessagePath,
+  directMessageThreadReplyLegacyPath,
+  directMessageThreadReplyPath,
   messageLegacyPath,
   messagePath,
+  parseSlackDirectMessagePath,
+  parseSlackDirectMessageThreadReplyPath,
+  reactionPath,
   slackBotsAliasPath,
+  slackDirectMessageThreadReplyReadCandidatePaths,
+  slackThreadReplyReadCandidatePaths,
+  threadReplyLegacyPath,
+  threadReplyPath,
   slackByNameChannelAliasPath,
   slackByNameUserAliasPath,
   slackChannelsIndexPath,
@@ -25,6 +36,22 @@ test('slackNameWithId composes <id>__<slug>', () => {
 test('slackNameWithId falls back to bare id when name is empty', () => {
   assert.equal(slackNameWithId(undefined, 'C0ADE9B71CN'), 'C0ADE9B71CN');
   assert.equal(slackNameWithId('', 'C0ADE9B71CN'), 'C0ADE9B71CN');
+});
+
+test('slackNameWithId returns bare id when the name is just the id fallback', () => {
+  // Regression: upstream channel-name resolution sometimes falls back to the
+  // channel id itself; that must not mint a duplicate `<ID>__<lowercased-id>`
+  // tree (observed live as C0AD7UU0J1G__c0ad7uu0j1g).
+  assert.equal(slackNameWithId('c0ad7uu0j1g', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+  assert.equal(slackNameWithId('C0AD7UU0J1G', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+  assert.equal(slackNameWithId(' C0AD7UU0J1G ', 'C0AD7UU0J1G'), 'C0AD7UU0J1G');
+});
+
+test('channelMetadataPath ignores an id-fallback channel name', () => {
+  assert.equal(
+    channelMetadataPath('C0AD7UU0J1G', 'c0ad7uu0j1g'),
+    '/slack/channels/C0AD7UU0J1G/meta.json',
+  );
 });
 
 test('channelMetadataPath uses <id>__<slug> with channel name', () => {
@@ -81,6 +108,58 @@ test('channelMessagesDirectory uses the v2 channel segment', () => {
     channelMessagesDirectory('C0ADE9B71CN', 'general'),
     '/slack/channels/C0ADE9B71CN__general/messages',
   );
+});
+
+test('direct message paths use bare user id message roots', () => {
+  assert.equal(directMessageDirectory('U0123ABCDEF'), '/slack/users/U0123ABCDEF/messages');
+  assert.equal(
+    directMessagePath('U0123ABCDEF', '1711111111.000100'),
+    '/slack/users/U0123ABCDEF/messages/1711111111_000100/meta.json',
+  );
+  assert.equal(
+    directMessageThreadReplyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200/meta.json',
+  );
+  assert.deepEqual(
+    parseSlackDirectMessagePath(directMessagePath('U0123ABCDEF', '1711111111.000100')),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+    },
+  );
+  assert.deepEqual(
+    parseSlackDirectMessageThreadReplyPath(
+      directMessageThreadReplyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    ),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+      replyTs: '1711111222.000200',
+    },
+  );
+  // Legacy flat reply paths must still parse so routing works mid-migration.
+  assert.deepEqual(
+    parseSlackDirectMessageThreadReplyPath(
+      directMessageThreadReplyLegacyPath('U0123ABCDEF', '1711111111.000100', '1711111222.000200'),
+    ),
+    {
+      userId: 'U0123ABCDEF',
+      messageTs: '1711111111.000100',
+      replyTs: '1711111222.000200',
+    },
+  );
+  assert.deepEqual(
+    slackDirectMessageThreadReplyReadCandidatePaths(
+      'U0123ABCDEF',
+      '1711111111.000100',
+      '1711111222.000200',
+    ),
+    [
+      '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200/meta.json',
+      '/slack/users/U0123ABCDEF/messages/1711111111_000100/replies/1711111222_000200.json',
+    ],
+  );
+  assert.equal(parseSlackDirectMessagePath('/slack/channels/D123/messages/1711111111_000100/meta.json'), null);
 });
 
 test('messageLegacyPath continues to emit `<slug>--<id>` and `message.json`', () => {
@@ -161,4 +240,53 @@ test('slackBotsAliasPath emits /slack/users/bots/<id>__<slug>.json', () => {
 
 test('slackBotsAliasPath falls back to bare id when no name is given', () => {
   assert.equal(slackBotsAliasPath('B0123BOT'), '/slack/users/bots/B0123BOT.json');
+});
+
+test('threadReplyPath is a directory record and does not collide with its reaction children', () => {
+  const channelId = 'C123';
+  const threadTs = '1711111111.000100';
+  const replyTs = '1711111222.000200';
+
+  const reply = threadReplyPath(channelId, threadTs, replyTs);
+  assert.equal(
+    reply,
+    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200/meta.json',
+  );
+
+  // The reply's children (reactions) must nest UNDER the reply's directory —
+  // never as a sibling that shares the reply's name with a different node type.
+  // This is the invariant whose violation wedged the mount: a flat leaf file
+  // `replies/<ts>.json` could not coexist with the `replies/<ts>/` directory.
+  const replyDir = reply.replace(/\/meta\.json$/u, '');
+  const reaction = reactionPath({
+    targetType: 'thread_reply',
+    channelId,
+    threadTs,
+    replyTs,
+    reaction: 'tada',
+    userId: 'U1',
+  });
+  assert.equal(
+    reaction,
+    `${replyDir}/reactions/tada--U1.json`,
+  );
+  assert.ok(
+    reaction.startsWith(`${replyDir}/`),
+    'reaction must nest under the reply directory',
+  );
+  assert.ok(
+    !reaction.startsWith(`${replyDir}.json`),
+    'reply stem must be a directory, not a flat .json file',
+  );
+
+  // Back-compat: readers can still resolve a reply mirrored by a pre-0.8.x
+  // adapter at the legacy flat path.
+  assert.deepEqual(slackThreadReplyReadCandidatePaths(channelId, threadTs, replyTs), [
+    reply,
+    threadReplyLegacyPath(channelId, threadTs, replyTs),
+  ]);
+  assert.equal(
+    threadReplyLegacyPath(channelId, threadTs, replyTs),
+    '/slack/channels/C123/threads/1711111111_000100/replies/1711111222_000200.json',
+  );
 });
