@@ -78,12 +78,14 @@ function asString(value: unknown): string | undefined {
 export class TeamsAdapter extends IntegrationProvider {
   readonly name = 'teams';
   readonly version = '0.1.0';
+  protected override readonly client: RelayFileClient;
 
   constructor(
     client: RelayFileClient,
     private readonly config: TeamsAdapterConfig,
   ) {
     super(client);
+    this.client = client;
   }
 
   supportedEvents(): string[] {
