@@ -19,6 +19,7 @@
   "include": [
     "src/**/*.ts",
     "tests/storage-bridge/**/*.test.ts",
+    "tests/alias-lifecycle/**/*.test.ts",
     "tests/runtime/**/*.test.ts",
     "tests/spec/**/*.test.ts",
     "tests/atomic-index/**/*.test.ts",
