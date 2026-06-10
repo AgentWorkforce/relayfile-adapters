@@ -15,18 +15,17 @@
       "type": "string",
       "description": "Self-post body. Used when `kind` is `self`."
     },
-    "url": {
+    "link_url": {
       "type": "string",
       "format": "uri",
-      "description": "Provider URL for the record.",
-      "readOnly": true
+      "description": "External URL for link posts. Used when `kind` is `link`."
     },
     "kind": {
       "enum": [
         "self",
         "link"
       ],
-      "description": "Post kind. Defaults to `link` when `url` is provided, otherwise `self`."
+      "description": "Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`."
     },
     "flair_id": {
       "type": "string",
@@ -55,6 +54,12 @@
       "type": "string",
       "format": "date-time",
       "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
       "readOnly": true
     },
     "identifier": {

@@ -413,8 +413,8 @@ export const adapters = [
       endpoint('/reddit/subreddits/{subreddit}/posts/new.json', 'Create Reddit post', 'Submits a post to the subreddit named by the path.', ['title'], {
         title: str('Post title.', undefined, { minLength: 1 }),
         text: str('Self-post body. Used when `kind` is `self`.'),
-        url: str('Link URL. Used when `kind` is `link`.', 'uri'),
-        kind: en(['self', 'link'], 'Post kind. Defaults to `link` when `url` is provided, otherwise `self`.'),
+        link_url: str('External URL for link posts. Used when `kind` is `link`.', 'uri'),
+        kind: en(['self', 'link'], 'Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`.'),
         flair_id: str('Subreddit flair template id.'),
         nsfw: bool('Whether the post is marked NSFW.'),
         spoiler: bool('Whether the post is marked as a spoiler.'),
