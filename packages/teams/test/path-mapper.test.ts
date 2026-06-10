@@ -83,6 +83,11 @@ describe('makeObjectId / parseObjectId round trips', () => {
     assert.throws(() => makeObjectId('nope' as TeamsObjectType, {}), /Unsupported Teams object type/);
     assert.throws(() => parseObjectId('nope' as TeamsObjectType, 'id'), /Unsupported Teams object type/);
   });
+
+  it('rejects missing required object id segments instead of emitting empty path segments', () => {
+    assert.throws(() => makeObjectId('message', { teamId: 'team-1', channelId: 'channel-1' }), /Missing messageId/);
+    assert.throws(() => parseObjectId('reply', 'team-1:channel-1:msg-1'), /missing replyId/);
+  });
 });
 
 describe('computePath / parseTeamsPath round trips', () => {
@@ -113,6 +118,11 @@ describe('computePath / parseTeamsPath round trips', () => {
       computePath('message', 'team-1:channel-1:msg-1', '/custom'),
       '/custom/team-1/channels/channel-1/messages/msg-1.json',
     );
+  });
+
+  it('rejects incomplete object ids before computing canonical paths', () => {
+    assert.throws(() => computePath('channel', 'team-1'), /missing channelId/);
+    assert.throws(() => computePath('chat_message', 'chat-1:'), /missing messageId/);
   });
 
   it('parses reaction paths into reaction type and user', () => {

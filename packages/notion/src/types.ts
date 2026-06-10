@@ -388,6 +388,8 @@ export interface NotionAliasMetadata {
 
 export interface NotionVfsFile extends BulkWriteFile {
   path: string;
+  content: string;
+  contentType?: string;
   aliasMetadata?: NotionAliasMetadata;
   semantics?: FileSemantics;
 }
