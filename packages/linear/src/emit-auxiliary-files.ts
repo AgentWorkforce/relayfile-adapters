@@ -29,13 +29,14 @@
  *   * **user**, **team** — canonical `/linear/users/<id>.json` /
  *     `/linear/teams/<id>.json`, index row `{ id, title, updated }`.
  *
- *   * **project** — canonical `/linear/projects/<id>.json`. No index file
- *     today; the helper exists in the path-mapper but no `_index.json`
- *     emitter is wired in. We still emit the canonical file so cloud's
- *     existing project sync surfaces survive the port.
+ *   * **project** — canonical `/linear/projects/<id>.json`, plus
+ *     `_index.json` and read aliases keyed by project id/title.
  *
- *   * **cycle**, **milestone**, **roadmap** — canonical paths only. Same
- *     rationale as projects.
+ *   * **state** — canonical `/linear/states/<id>.json`, no subtree aliases.
+ *     Index row `{ id, title, updated }`.
+ *
+ *   * **cycle**, **milestone**, **roadmap** — canonical paths plus
+ *     `_index.json` rows.
  *
  * Reconciliation: every issue write reads the prior by-uuid alias (the
  * stable anchor keyed on `issue.id`, always emitted) to recover the
@@ -92,6 +93,8 @@ import {
   linearProjectPath,
   linearRoadmapsIndexPath,
   linearRoadmapPath,
+  linearStatesIndexPath,
+  linearStatePath,
   linearTeamPath,
   linearTeamsIndexPath,
   linearUserPath,
@@ -104,6 +107,7 @@ import {
   linearMilestoneIndexRow,
   linearProjectIndexRow,
   linearRoadmapIndexRow,
+  linearStateIndexRow,
   linearTeamIndexRow,
   linearUserIndexRow,
   type LinearBaseIndexRow,
@@ -118,6 +122,7 @@ import type {
   LinearMilestone,
   LinearProject,
   LinearRoadmap,
+  LinearState,
   LinearTeam,
   LinearUser,
 } from './types.js';
@@ -141,6 +146,7 @@ export type LinearProjectEmitRecord = LinearProject | { id: string; _deleted: tr
 export type LinearCycleEmitRecord = LinearCycle | { id: string; _deleted: true };
 export type LinearMilestoneEmitRecord = LinearMilestone | { id: string; _deleted: true };
 export type LinearRoadmapEmitRecord = LinearRoadmap | { id: string; _deleted: true };
+export type LinearStateEmitRecord = LinearState | { id: string; _deleted: true };
 
 export interface LinearEmitAuxiliaryFilesInput {
   workspaceId: string;
@@ -149,6 +155,7 @@ export interface LinearEmitAuxiliaryFilesInput {
   users?: readonly LinearUserEmitRecord[];
   teams?: readonly LinearTeamEmitRecord[];
   projects?: readonly LinearProjectEmitRecord[];
+  states?: readonly LinearStateEmitRecord[];
   cycles?: readonly LinearCycleEmitRecord[];
   milestones?: readonly LinearMilestoneEmitRecord[];
   roadmaps?: readonly LinearRoadmapEmitRecord[];
@@ -178,6 +185,7 @@ export async function emitLinearAuxiliaryFiles(
   const users = input.users ?? [];
   const teams = input.teams ?? [];
   const projects = input.projects ?? [];
+  const states = input.states ?? [];
   const cycles = input.cycles ?? [];
   const milestones = input.milestones ?? [];
   const roadmaps = input.roadmaps ?? [];
@@ -186,6 +194,7 @@ export async function emitLinearAuxiliaryFiles(
   const hasUsers = hasOwn(input, 'users');
   const hasTeams = hasOwn(input, 'teams');
   const hasProjects = hasOwn(input, 'projects');
+  const hasStates = hasOwn(input, 'states');
   const hasCycles = hasOwn(input, 'cycles');
   const hasMilestones = hasOwn(input, 'milestones');
   const hasRoadmaps = hasOwn(input, 'roadmaps');
@@ -196,6 +205,7 @@ export async function emitLinearAuxiliaryFiles(
     !hasUsers &&
     !hasTeams &&
     !hasProjects &&
+    !hasStates &&
     !hasCycles &&
     !hasMilestones &&
     !hasRoadmaps
@@ -217,6 +227,9 @@ export async function emitLinearAuxiliaryFiles(
   }
   if (hasProjects) {
     accumulate(aggregate, await emitProjects(client, workspaceId, projects, input.connectionId));
+  }
+  if (hasStates) {
+    accumulate(aggregate, await emitStates(client, workspaceId, states, input.connectionId));
   }
   if (hasCycles) {
     accumulate(aggregate, await emitCycles(client, workspaceId, cycles, input.connectionId));
@@ -678,6 +691,21 @@ async function emitCycles(
     canonicalPath: (id) => linearCyclePath(id),
     indexRow: (record) => linearCycleIndexRow(record),
     objectType: 'cycle',
+    connectionId,
+  });
+}
+
+async function emitStates(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  records: readonly LinearStateEmitRecord[],
+  connectionId: string | undefined,
+): Promise<EmitAuxiliaryFilesResult> {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearStatesIndexPath(),
+    canonicalPath: (id) => linearStatePath(id),
+    indexRow: (record) => linearStateIndexRow(record),
+    objectType: 'state',
     connectionId,
   });
 }

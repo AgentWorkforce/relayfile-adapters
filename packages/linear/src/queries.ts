@@ -3,6 +3,7 @@ import type {
   LinearMilestone,
   LinearProject,
   LinearRoadmap,
+  LinearState,
   LinearTeam,
   LinearUser,
 } from './types.js';
@@ -592,6 +593,14 @@ export function linearProjectIndexRow(project: LinearProject): LinearBaseIndexRo
     id: project.id,
     title: normalizeIndexTitle(project.name),
     updated: normalizeUpdated(project.updatedAt, project.updated_at, project.createdAt, project.created_at),
+  };
+}
+
+export function linearStateIndexRow(state: LinearState): LinearBaseIndexRow {
+  return {
+    id: state.id,
+    title: normalizeIndexTitle(state.name) || normalizeIndexTitle(state.team_name),
+    updated: normalizeUpdated(state.updatedAt, state.updated_at, state.createdAt, state.created_at),
   };
 }
 

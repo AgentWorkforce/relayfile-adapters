@@ -34,6 +34,13 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       writebackResources: [],
     },
     {
+      path: 'linear/states',
+      title: 'Workflow States',
+      materialization: 'eager',
+      aliasSegments: [],
+      writebackResources: [],
+    },
+    {
       path: 'linear/teams',
       title: 'Teams',
       materialization: 'eager',

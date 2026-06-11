@@ -31,6 +31,7 @@ test('layoutManifest exposes Linear resources with canonical aliases and writeba
     'by-uuid',
   ]);
   assert.ok(manifest.resources.length > 0);
+  assert.ok(manifest.resources.some((resource) => resource.path === 'linear/states'));
 
   for (const resource of manifest.resources) {
     assert.ok(resource.path.startsWith('linear/'));

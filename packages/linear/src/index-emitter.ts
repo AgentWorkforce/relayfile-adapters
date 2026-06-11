@@ -6,6 +6,7 @@ import {
   linearProjectsIndexPath,
   linearRootIndexPath,
   linearRoadmapsIndexPath,
+  linearStatesIndexPath,
   linearTeamsIndexPath,
   linearUsersIndexPath,
 } from './path-mapper.js';
@@ -18,6 +19,7 @@ export type LinearIndexBucket =
   | 'milestones'
   | 'projects'
   | 'roadmaps'
+  | 'states'
   | 'teams'
   | 'users';
 
@@ -44,6 +46,7 @@ export function buildLinearRootIndexFile(
     { id: 'teams', title: 'Teams' },
     { id: 'users', title: 'Users' },
     { id: 'projects', title: 'Projects' },
+    { id: 'states', title: 'Workflow States' },
     { id: 'cycles', title: 'Cycles' },
     { id: 'milestones', title: 'Milestones' },
     { id: 'roadmaps', title: 'Roadmaps' },
@@ -58,6 +61,10 @@ export function buildLinearRootIndexFile(
 
 export function buildLinearIndexFile(
   bucket: 'comments' | 'cycles' | 'milestones' | 'projects' | 'roadmaps' | 'teams' | 'users',
+  rows: LinearBaseIndexRow[],
+): LinearIndexFile;
+export function buildLinearIndexFile(
+  bucket: 'states',
   rows: LinearBaseIndexRow[],
 ): LinearIndexFile;
 export function buildLinearIndexFile(
@@ -88,6 +95,8 @@ function indexPathForBucket(bucket: LinearIndexBucket): string {
       return linearMilestonesIndexPath();
     case 'projects':
       return linearProjectsIndexPath();
+    case 'states':
+      return linearStatesIndexPath();
     case 'roadmaps':
       return linearRoadmapsIndexPath();
     case 'users':

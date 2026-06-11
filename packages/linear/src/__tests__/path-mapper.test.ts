@@ -38,6 +38,7 @@ describe('linear path-mapper', () => {
       assert.equal(normalizeLinearObjectType('LinearMilestone'), 'milestone');
       assert.equal(normalizeLinearObjectType('LinearProject'), 'project');
       assert.equal(normalizeLinearObjectType('LinearRoadmap'), 'roadmap');
+      assert.equal(normalizeLinearObjectType('LinearState'), 'state');
     });
 
     it('throws on unknown types', () => {
@@ -66,6 +67,7 @@ describe('linear path-mapper', () => {
       assert.equal(normalizeNangoLinearModel('LinearMilestone'), 'milestone');
       assert.equal(normalizeNangoLinearModel('LinearProject'), 'project');
       assert.equal(normalizeNangoLinearModel('LinearRoadmap'), 'roadmap');
+      assert.equal(normalizeNangoLinearModel('LinearState'), 'state');
       assert.equal(normalizeNangoLinearModel('LinearTeam'), 'team');
       assert.equal(normalizeNangoLinearModel('LinearUser'), 'user');
     });
@@ -84,6 +86,10 @@ describe('linear path-mapper', () => {
       assert.equal(
         computeLinearPath('LinearUser', 'usr_123'),
         '/linear/users/usr_123.json',
+      );
+      assert.equal(
+        computeLinearPath('LinearState', 'state_123'),
+        '/linear/states/state_123.json',
       );
     });
 

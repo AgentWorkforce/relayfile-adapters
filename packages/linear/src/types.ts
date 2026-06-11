@@ -104,8 +104,17 @@ export interface LinearTeam {
 export interface LinearState {
   id: string;
   name?: string;
+  description?: string | null;
   type?: string;
   color?: string;
+  position?: number;
+  team_id?: string;
+  team_key?: string | null;
+  team_name?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface LinearLabel {
