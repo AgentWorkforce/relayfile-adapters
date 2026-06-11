@@ -8,18 +8,11 @@ export interface AdapterResourceConfig {
   readonly sampleIndexPath?: string;
 }
 
-export const resources = [
-  {
-    name: 'recordings',
-    path: '/recall/recordings',
-    pathPattern: /^\/recall\/recordings(?:\/[^/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_-]+$/,
-    schema: 'discovery/recall/recordings/.schema.json',
-    createExample: 'discovery/recall/recordings/.create.example.json',
-  },
-] as const satisfies readonly AdapterResourceConfig[];
+// Recall is read-only for Relayfile: webhook/storage materialization and
+// digests are supported, but no file-native writeback contract is exposed.
+export const resources = [] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('.json') ? path : path.replace(/\/$/, '');
-  return resources.find((resource) => resource.pathPattern.test(normalizedPath));
+  void path;
+  return undefined;
 }

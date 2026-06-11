@@ -36,6 +36,12 @@
     "reason": "No resources.ts with writeback path templates"
   },
   {
+    "packageName": "@relayfile/adapter-recall",
+    "packagePath": "packages/recall",
+    "provider": "recall",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
     "packageName": "@relayfile/adapter-segment",
     "packagePath": "packages/segment",
     "provider": "segment",

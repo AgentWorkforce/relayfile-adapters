@@ -505,14 +505,6 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
-  "recall": {
-    "recordings": [
-      {
-        "path": "/recall/recordings",
-        "params": []
-      }
-    ]
-  },
   "reddit": {
     "posts": [
       {
@@ -728,6 +720,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "packageName": "@relayfile/adapter-mixpanel",
     "packagePath": "packages/mixpanel",
     "provider": "mixpanel",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-recall",
+    "packagePath": "packages/recall",
+    "provider": "recall",
     "reason": "No resources.ts with writeback path templates"
   },
   {
