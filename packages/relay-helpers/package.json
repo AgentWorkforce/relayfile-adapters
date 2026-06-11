@@ -32,6 +32,6 @@
   },
   "dependencies": {
     "@relayfile/adapter-core": "^0.3.38",
-    "@relayfile/adapter-linear": "^0.3.13"
+    "@relayfile/adapter-linear": "^0.3.12"
   }
 }

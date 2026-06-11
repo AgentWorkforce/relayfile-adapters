@@ -206,6 +206,52 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
   ]);
 });
 
+test('ingestWebhook writes Linear workflow state files and updates the state index', async () => {
+  const client = createRecordingClient({
+    '/linear/states/_index.json': JSON.stringify([
+      {
+        id: 'state_existing',
+        title: 'Backlog',
+        updated: '2026-04-08T09:00:00.000Z',
+      },
+    ]),
+  });
+  const adapter = createAdapter({}, client);
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'state.update',
+    objectType: 'state',
+    objectId: 'state_started',
+    payload: {
+      id: 'state_started',
+      name: 'In Progress',
+      type: 'started',
+      team_id: 'team_eng',
+      updated_at: '2026-04-09T10:00:00.000Z',
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.paths, [
+    '/linear/states/state_started.json',
+    '/linear/LAYOUT.md',
+    '/linear/states/_index.json',
+  ]);
+  assert.deepEqual(JSON.parse(client.files.get('/linear/states/_index.json') ?? '[]'), [
+    {
+      id: 'state_started',
+      title: 'In Progress',
+      updated: '2026-04-09T10:00:00.000Z',
+    },
+    {
+      id: 'state_existing',
+      title: 'Backlog',
+      updated: '2026-04-08T09:00:00.000Z',
+    },
+  ]);
+});
+
 test('ingestWebhook writes Linear agent webhook events to synthetic trigger paths', async () => {
   const client = createRecordingClient();
   const adapter = createAdapter({}, client);

@@ -1027,6 +1027,8 @@ function bucketForObjectType(objectType: string): LinearIndexBucket | undefined 
       return 'projects';
     case 'roadmap':
       return 'roadmaps';
+    case 'state':
+      return 'states';
     case 'team':
       return 'teams';
     case 'user':
