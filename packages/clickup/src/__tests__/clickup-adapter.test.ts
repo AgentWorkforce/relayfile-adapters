@@ -232,6 +232,12 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
     endpoint: '/api/v2/list/list_123/task',
     body: { name: 'New task' },
   });
+  assert.deepEqual(resolveWritebackRequest('/clickup/tasks/task_123/comments/draft-comment.json', '{"comment_text":"Looks good"}'), {
+    action: 'task_comment',
+    method: 'POST',
+    endpoint: '/api/v2/task/task_123/comment',
+    body: { comment_text: 'Looks good' },
+  });
   assert.throws(
     () => resolveWritebackRequest('/clickup/tasks/task_123/comments/draft-comment.json', '   '),
     /non-empty comment_text/,
@@ -241,6 +247,42 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
     method: 'PUT',
     endpoint: '/api/v2/task/task_123',
     body: { name: 'Renamed' },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/folders/folder_123/lists/draft-list.json', '{"name":"Launch","content":"Q3"}'), {
+    action: 'create_list',
+    method: 'POST',
+    endpoint: '/api/v2/folder/folder_123/list',
+    body: { name: 'Launch', content: 'Q3' },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/spaces/space_123/lists/draft-list.json', '{"name":"Backlog"}'), {
+    action: 'create_list',
+    method: 'POST',
+    endpoint: '/api/v2/space/space_123/list',
+    body: { name: 'Backlog' },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/lists/list_123.json', '{"name":"Roadmap","archived":false}'), {
+    action: 'update_list',
+    method: 'PUT',
+    endpoint: '/api/v2/list/list_123',
+    body: { name: 'Roadmap', archived: false },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/spaces/space_123/folders/draft-folder.json', '{"name":"Product"}'), {
+    action: 'create_folder',
+    method: 'POST',
+    endpoint: '/api/v2/space/space_123/folder',
+    body: { name: 'Product' },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/folders/folder_123.json', '{"name":"Product Ops"}'), {
+    action: 'update_folder',
+    method: 'PUT',
+    endpoint: '/api/v2/folder/folder_123',
+    body: { name: 'Product Ops' },
+  });
+  assert.deepEqual(resolveWritebackRequest('/clickup/spaces/space_123.json', '{"name":"Engineering","private":true,"color":"#123456"}'), {
+    action: 'update_space',
+    method: 'PUT',
+    endpoint: '/api/v2/space/space_123',
+    body: { name: 'Engineering', private: true, color: '#123456' },
   });
   assert.throws(
     () => resolveWritebackRequest('/clickup/tasks/task_123.json', '{"id":"task_123","name":"Renamed"}'),
@@ -254,6 +296,16 @@ test('path mapper, read resolver, and writeback resolver cover ClickUp task and 
     action: 'delete_task',
     method: 'DELETE',
     endpoint: '/api/v2/task/task123',
+  });
+  assert.deepEqual(resolveDeleteRequest('/clickup/lists/list123.json'), {
+    action: 'delete_list',
+    method: 'DELETE',
+    endpoint: '/api/v2/list/list123',
+  });
+  assert.deepEqual(resolveDeleteRequest('/clickup/folders/folder123.json'), {
+    action: 'delete_folder',
+    method: 'DELETE',
+    endpoint: '/api/v2/folder/folder123',
   });
   assert.throws(
     () => resolveDeleteRequest('/clickup/tasks/draft-task.json'),

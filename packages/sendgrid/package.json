@@ -16,6 +16,11 @@
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
     },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js",
+      "default": "./dist/resources.js"
+    },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",

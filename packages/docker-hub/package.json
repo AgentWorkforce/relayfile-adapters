@@ -21,6 +21,16 @@
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
     },
+    "./webhook": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
+    },
+    "./webhook-normalizer": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",

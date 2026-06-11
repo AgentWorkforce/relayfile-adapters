@@ -30,8 +30,17 @@ test('onedrive rejects read-only writeback fields', () => {
 });
 
 test('onedrive resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/onedrive/{accountId}/items/draft.json", JSON.stringify({"accountId":"user@example.com","name":"Notes.txt","contentBase64":"SGVsbG8="}));
-  assert.equal(request.operation, 'create');
+  const body = {"accountId":"user@example.com","name":"Notes.txt","contentBase64":"SGVsbG8="};
+  const request = resolveWritebackRequest("/onedrive/{accountId}/items/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'onedrive.items.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/v1.0/me/drive/items/{itemId}',
+    resource: 'items',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new OnedriveAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   const event = adapter.mapNangoSyncRecord({ id: 'nango_1', updatedAt: '2026-05-09T00:00:00.000Z' });
   assert.equal(event.source, "onedrive");

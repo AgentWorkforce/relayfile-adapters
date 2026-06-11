@@ -30,8 +30,17 @@ test('gcs rejects read-only writeback fields', () => {
 });
 
 test('gcs resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/gcs/{bucket}/objects/draft.json", JSON.stringify({"bucket":"reports","name":"q1/report.json","contentBase64":"e30=","contentType":"application/json"}));
-  assert.equal(request.operation, 'create');
+  const body = {"bucket":"reports","name":"q1/report.json","contentBase64":"e30=","contentType":"application/json"};
+  const request = resolveWritebackRequest("/gcs/{bucket}/objects/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'gcs.objects.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/storage/v1/b/{bucket}/o/{name}',
+    resource: 'objects',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new GcsAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.throws(() => adapter.mapNangoSyncRecord({ id: 'nango_1' }), /does not declare/);
 });

@@ -30,8 +30,17 @@ test('box rejects read-only writeback fields', () => {
 });
 
 test('box resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/box/files/draft.json", JSON.stringify({"name":"brief.txt","parentId":"0","contentBase64":"SGVsbG8="}));
-  assert.equal(request.operation, 'create');
+  const body = {"name":"brief.txt","parentId":"0","contentBase64":"SGVsbG8="};
+  const request = resolveWritebackRequest("/box/files/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'box.files.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/2.0/files/content',
+    resource: 'files',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new BoxAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   const event = adapter.mapNangoSyncRecord({ id: 'nango_1', updatedAt: '2026-05-09T00:00:00.000Z' });
   assert.equal(event.source, "box");

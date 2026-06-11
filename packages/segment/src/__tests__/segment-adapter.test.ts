@@ -5,6 +5,7 @@ import {
   SegmentAdapter,
   computeSegmentPath,
   resolveReadRequest,
+  resolveWritebackRequest,
   segmentGroupPath,
   segmentIdentifyPath,
   segmentPagePath,
@@ -224,4 +225,78 @@ test('read routes use Segment Public API delivery overview instead of write-only
       granularity: 'DAY',
     },
   });
+});
+
+test('writeback routes emit Segment Tracking API requests', () => {
+  assert.deepEqual(resolveWritebackRequest('/segment/identify/user_123.json', '{"traits":{"email":"ada@example.com"}}'), {
+    action: 'identify',
+    method: 'POST',
+    endpoint: '/v1/identify',
+    body: {
+      traits: { email: 'ada@example.com' },
+      userId: 'user_123',
+    },
+  });
+
+  assert.deepEqual(
+    resolveWritebackRequest(
+      '/segment/track/signed-up--msg_123.json',
+      '{"event":"Signed Up","userId":"user_123","properties":{"plan":"pro"}}',
+    ),
+    {
+      action: 'track',
+      method: 'POST',
+      endpoint: '/v1/track',
+      body: {
+        event: 'Signed Up',
+        messageId: 'msg_123',
+        properties: { plan: 'pro' },
+        userId: 'user_123',
+      },
+    },
+  );
+
+  assert.deepEqual(
+    resolveWritebackRequest(
+      '/segment/page/docs-home--msg_456.json',
+      '{"name":"Docs Home","userId":"user_123","properties":{"path":"/docs"}}',
+    ),
+    {
+      action: 'page',
+      method: 'POST',
+      endpoint: '/v1/page',
+      body: {
+        messageId: 'msg_456',
+        name: 'Docs Home',
+        properties: { path: '/docs' },
+        userId: 'user_123',
+      },
+    },
+  );
+
+  assert.deepEqual(resolveWritebackRequest('/segment/groups/company_123.json', '{"traits":{"plan":"enterprise"}}'), {
+    action: 'group',
+    method: 'POST',
+    endpoint: '/v1/group',
+    body: {
+      groupId: 'company_123',
+      traits: { plan: 'enterprise' },
+    },
+  });
+
+  assert.deepEqual(resolveWritebackRequest('/segment/batch/new.json', '{"batch":[{"type":"track","event":"Signed Up"}]}'), {
+    action: 'batch',
+    method: 'POST',
+    endpoint: '/v1/batch',
+    body: {
+      batch: [{ type: 'track', event: 'Signed Up' }],
+      context: undefined,
+      integrations: undefined,
+    },
+  });
+
+  assert.throws(
+    () => resolveWritebackRequest('/segment/track/new.json', '{"userId":"user_123"}'),
+    /requires `event`/,
+  );
 });

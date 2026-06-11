@@ -17,12 +17,13 @@ function routeForDomain(route: string, domain: string): string {
 }
 
 export function resolveWritebackRequest(path: string, content: string): MailgunWritebackRequest {
-  const sendMatch = /^\/mailgun\/domains\/([^/]+)\/messages\/new\.json$/.exec(path);
-  if (sendMatch?.[1]) {
+  const sendMatch = /^\/mailgun\/domains\/([^/]+)\/messages\/([^/]+)\.json$/.exec(path);
+  if (sendMatch?.[1] && sendMatch[2] && isDraftFilename(sendMatch[2])) {
     return buildSendMessage(decodeURIComponent(sendMatch[1]), content);
   }
 
-  if (path === '/mailgun/lists/new.json') {
+  const listCreateMatch = /^\/mailgun\/lists\/([^/]+)\.json$/.exec(path);
+  if (listCreateMatch?.[1] && isListCreateDraftPath(decodeURIComponent(listCreateMatch[1]), content)) {
     return buildCreateList(content);
   }
 
@@ -144,6 +145,23 @@ function buildListBody(payload: Record<string, unknown>): Record<string, unknown
   copyOptionalString(payload, body, 'reply_preference');
   copyOptionalString(payload, body, 'address');
   return body;
+}
+
+function isListCreateDraftPath(filename: string, content: string): boolean {
+  if (isDraftName(filename)) {
+    return true;
+  }
+  const payload = parseJsonObject(content);
+  const address = readString(payload, 'address');
+  return Boolean(address && address !== filename && !filename.includes('@'));
+}
+
+function isDraftFilename(encodedFilename: string): boolean {
+  return isDraftName(decodeURIComponent(encodedFilename));
+}
+
+function isDraftName(filename: string): boolean {
+  return /^(new|create|draft|send)(?:[-_\s].*)?$/iu.test(filename);
 }
 
 function copyOptionalString(
