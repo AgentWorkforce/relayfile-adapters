@@ -161,6 +161,7 @@ export const KNOWN_TRIGGER_CATALOG = {
     "calendar.sync"
   ],
   "granola": [
+    "file.created",
     "recording.created"
   ],
   "hubspot": [

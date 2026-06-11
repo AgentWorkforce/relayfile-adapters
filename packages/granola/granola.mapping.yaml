@@ -11,3 +11,9 @@ webhooks:
       - created_at
       - updated_at
       - web_url
+  # Storage-bridge event: emitted when any pipeline (e.g. NB-Whisper) writes
+  # a note directly to the granola VFS mount (/granola/notes/<id>.json).
+  # This is NOT a Granola API webhook — it fires via the storage-change
+  # dispatcher the same way gmail/google-drive file.created events do.
+  file.created:
+    description: A note was written to the granola VFS mount (storage-bridge path, e.g. from the NB-Whisper transcript pipeline).

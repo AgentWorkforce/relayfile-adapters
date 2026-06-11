@@ -153,6 +153,7 @@
     "calendar.sync"
   ],
   "granola": [
+    "file.created",
     "recording.created"
   ],
   "hubspot": [
