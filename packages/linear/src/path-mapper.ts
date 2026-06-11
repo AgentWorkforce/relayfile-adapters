@@ -18,6 +18,7 @@ export const LINEAR_OBJECT_TYPES = [
   'milestone',
   'project',
   'roadmap',
+  'state',
   'team',
   'user',
 ] as const;
@@ -58,6 +59,9 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   roadmap: 'roadmap',
   roadmaps: 'roadmap',
   linearroadmap: 'roadmap',
+  state: 'state',
+  states: 'state',
+  linearstate: 'state',
   team: 'team',
   teams: 'team',
   linearteam: 'team',
@@ -80,6 +84,7 @@ const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
   LinearMilestone: 'milestone',
   LinearProject: 'project',
   LinearRoadmap: 'roadmap',
+  LinearState: 'state',
   LinearTeam: 'team',
   LinearUser: 'user',
 };
@@ -380,6 +385,14 @@ export function linearProjectsIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/projects/_index.json`;
 }
 
+export function linearStatePath(stateId: string): string {
+  return `${LINEAR_PATH_ROOT}/states/${encodeLinearPathSegment(stateId)}.json`;
+}
+
+export function linearStatesIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/states/_index.json`;
+}
+
 export function linearCyclePath(cycleId: string): string {
   return `${LINEAR_PATH_ROOT}/cycles/${encodeLinearPathSegment(cycleId)}.json`;
 }
@@ -470,6 +483,8 @@ export function computeLinearPath(objectType: string, objectId: string, humanRea
       return linearCommentPath(normalizedId, humanReadable);
     case 'project':
       return linearProjectPath(normalizedId);
+    case 'state':
+      return linearStatePath(normalizedId);
     case 'cycle':
       return linearCyclePath(normalizedId);
     case 'team':

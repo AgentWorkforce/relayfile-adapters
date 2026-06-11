@@ -37,6 +37,7 @@ import {
   linearMilestoneIndexRow,
   linearProjectIndexRow,
   linearRoadmapIndexRow,
+  linearStateIndexRow,
   linearTeamIndexRow,
   linearUserIndexRow,
 } from './queries.js';
@@ -1057,17 +1058,21 @@ function buildIndexRow(
       return linearProjectIndexRow(payload as unknown as Parameters<typeof linearProjectIndexRow>[0]);
     case 'roadmaps':
       return linearRoadmapIndexRow(payload as unknown as Parameters<typeof linearRoadmapIndexRow>[0]);
+    case 'states':
+      return linearStateIndexRow(payload as unknown as Parameters<typeof linearStateIndexRow>[0]);
     case 'teams':
       return linearTeamIndexRow(payload as unknown as Parameters<typeof linearTeamIndexRow>[0]);
     case 'users':
       return linearUserIndexRow(payload as unknown as Parameters<typeof linearUserIndexRow>[0]);
+    default:
+      throw new Error(`Unsupported Linear index bucket: ${bucket satisfies never}`);
   }
 }
 
 function buildIndexFileForBucket(
   bucket: LinearIndexBucket,
   rows: Array<LinearBaseIndexRow | LinearIssueIndexRow>,
-) {
+): ReturnType<typeof buildLinearIndexFile> {
   switch (bucket) {
     case 'issues':
       return buildLinearIndexFile('issues', rows as LinearIssueIndexRow[]);
@@ -1081,10 +1086,14 @@ function buildIndexFileForBucket(
       return buildLinearIndexFile('projects', rows as LinearBaseIndexRow[]);
     case 'roadmaps':
       return buildLinearIndexFile('roadmaps', rows as LinearBaseIndexRow[]);
+    case 'states':
+      return buildLinearIndexFile('states', rows as LinearBaseIndexRow[]);
     case 'teams':
       return buildLinearIndexFile('teams', rows as LinearBaseIndexRow[]);
     case 'users':
       return buildLinearIndexFile('users', rows as LinearBaseIndexRow[]);
+    default:
+      throw new Error(`Unsupported Linear index bucket: ${bucket satisfies never}`);
   }
 }
 

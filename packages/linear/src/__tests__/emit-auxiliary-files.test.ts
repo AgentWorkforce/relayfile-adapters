@@ -27,6 +27,8 @@ import {
   linearProjectsIndexPath,
   linearProjectPath,
   linearRootIndexPath,
+  linearStatesIndexPath,
+  linearStatePath,
   linearTeamPath,
   linearTeamsIndexPath,
   linearUserPath,
@@ -104,6 +106,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       { id: 'teams', title: 'Teams' },
       { id: 'users', title: 'Users' },
       { id: 'projects', title: 'Projects' },
+      { id: 'states', title: 'Workflow States' },
       { id: 'cycles', title: 'Cycles' },
       { id: 'milestones', title: 'Milestones' },
       { id: 'roadmaps', title: 'Roadmaps' },
@@ -217,6 +220,35 @@ describe('emitLinearAuxiliaryFiles', () => {
       [linearRootIndexPath(), linearCyclesIndexPath()],
     );
     assert.deepEqual(JSON.parse(client.files.get(linearCyclesIndexPath())!), []);
+  });
+
+  it('materializes Linear workflow states as canonical files plus a stable index', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      states: [{
+        id: 'state-1',
+        name: 'In Progress',
+        type: 'started',
+        color: '#f97316',
+        team_id: 'team-1',
+        team_key: 'ENG',
+        team_name: 'Engineering',
+        created_at: '2026-05-01T00:00:00.000Z',
+        updated_at: '2026-05-02T00:00:00.000Z',
+      }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearStatePath('state-1')));
+    assert.ok(client.files.has(linearStatesIndexPath()));
+    assert.deepEqual(JSON.parse(client.files.get(linearStatesIndexPath())!), [
+      {
+        id: 'state-1',
+        title: 'In Progress',
+        updated: '2026-05-02T00:00:00.000Z',
+      },
+    ]);
   });
 
   it('writes the canonical path plus by-uuid, by-id, by-title, by-state aliases plus index row for an issue', async () => {
