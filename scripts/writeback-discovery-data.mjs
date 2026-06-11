@@ -52,6 +52,50 @@ export const adapters = [
     ],
   },
   {
+    slug: 'calendly',
+    title: 'Calendly adapter',
+    overview:
+      'The Calendly adapter exposes scheduled events, event types, and invitees under `/calendly`, with writeback routes for creating scheduled event invitees, creating event types, updating event types, and canceling scheduled events.',
+    readPaths: [
+      ['/calendly/scheduled-events/<eventId>.json', 'Scheduled event records.'],
+      ['/calendly/scheduled-events/<eventId>/cancel.json', 'Scheduled event cancellation writeback sidecar.'],
+      ['/calendly/event-types/<eventTypeId>.json', 'Event type records.'],
+      ['/calendly/invitees/<inviteeId>.json', 'Invitee records. Invitee writes are not supported by the public API.'],
+    ],
+    endpoints: [
+      endpoint('/calendly/scheduled-events/new.json', 'Create Calendly scheduled event invitee', 'Schedules an invitee for a Calendly event type at the requested start time.', ['event_type', 'start_time', 'invitee'], {
+        event_type: str('Calendly event type URI.'),
+        start_time: str('Requested event start time in ISO 8601 form.', 'date-time'),
+        invitee: obj('Invitee details.', {
+          email: str('Invitee email address.', 'email'),
+          name: str('Invitee display name.'),
+        }, { required: ['email', 'name'] }),
+        location: obj('Calendly location object.'),
+        timezone: str('IANA timezone for the invitee.'),
+        questions_and_answers: arr(obj('Question answer entry.'), 'Invitee question answers.'),
+        tracking: obj('Calendly tracking fields.'),
+      }, {
+        event_type: 'https://api.calendly.com/event_types/replace-event-type-id',
+        start_time: '2026-05-12T09:00:00Z',
+        invitee: { email: 'ada@example.com', name: 'Ada Lovelace' },
+      }),
+      endpoint('/calendly/event-types/new.json', 'Create Calendly event type', 'Creates a Calendly event type for the supplied owner.', ['name', 'owner'], {
+        name: str('Event type name.'),
+        owner: str('Calendly user or organization owner URI.'),
+        duration: int('Event duration in minutes.', { minimum: 1 }),
+        slug: str('Event type slug.'),
+        active: bool('Whether the event type is active.'),
+        color: str('Display color as a hex string.'),
+        description_plain: str('Plain-text event type description.'),
+        internal_note: str('Internal event type note.'),
+      }, {
+        name: 'Discovery call',
+        owner: 'https://api.calendly.com/users/replace-user-id',
+        duration: 30,
+      }),
+    ],
+  },
+  {
     slug: 'clickup',
     title: 'ClickUp adapter',
     overview:
@@ -595,6 +639,96 @@ export const adapters = [
     ],
   },
   {
+    slug: 'mailgun',
+    title: 'Mailgun adapter',
+    overview:
+      'The Mailgun adapter exposes domains, messages, mailing lists, and list members under `/mailgun`, with writeback routes for sending messages, creating and updating lists, and upserting list members.',
+    readPaths: [
+      ['/mailgun/domains/<domain>/messages/<messageId>.json', 'Message records.'],
+      ['/mailgun/lists/<listAddress>.json', 'Mailing list records.'],
+      ['/mailgun/lists/<listAddress>/members/<memberAddress>.json', 'Mailing list member records.'],
+    ],
+    endpoints: [
+      endpoint('/mailgun/domains/{domain}/messages/new.json', 'Send Mailgun message', 'Sends a message through the domain named by the path.', ['from', 'to', 'subject'], {
+        from: str('Sender email address.'),
+        to: arr(str('Recipient email address.'), 'Recipient email addresses. A single string is also accepted by the resolver.'),
+        subject: str('Message subject.'),
+        text: str('Plain-text message body. Required when `html` is omitted.'),
+        html: str('HTML message body. Required when `text` is omitted.'),
+        cc: str('CC recipients.'),
+        bcc: str('BCC recipients.'),
+        'reply-to': str('Reply-To address.'),
+        'o:tag': str('Mailgun tag.'),
+        'o:campaign': str('Mailgun campaign id.'),
+        'o:tracking': str('Tracking setting.'),
+        'o:tracking-clicks': str('Click tracking setting.'),
+        'o:tracking-opens': str('Open tracking setting.'),
+        variables: obj('User variable map copied as Mailgun `v:*` fields.'),
+      }, {
+        from: 'ops@example.com',
+        to: ['ada@example.com'],
+        subject: 'Welcome',
+        text: 'Hello from Mailgun.',
+      }, { anyOf: [{ required: ['text'] }, { required: ['html'] }] }),
+      endpoint('/mailgun/lists/new.json', 'Create Mailgun list', 'Creates a Mailgun mailing list.', ['address'], mailgunListProps(), {
+        address: 'team@example.com',
+        name: 'Team',
+      }),
+      endpoint('/mailgun/lists/{listAddress}/members/new.json', 'Upsert Mailgun list member', 'Adds or updates a member in the mailing list named by the path.', ['address'], {
+        address: str('Member email address.'),
+        name: str('Member display name.'),
+        vars: obj('Mailgun member variables.'),
+        subscribed: bool('Whether the member is subscribed.'),
+        upsert: bool('Whether Mailgun should upsert an existing member. Defaults to true.'),
+      }, {
+        address: 'ada@example.com',
+        name: 'Ada Lovelace',
+      }),
+    ],
+  },
+  {
+    slug: 'mixpanel',
+    title: 'Mixpanel adapter',
+    overview:
+      'The Mixpanel adapter exposes events, profiles, and cohorts under `/mixpanel`, with writeback routes for tracking/importing events, setting/deleting profiles, and updating cohorts.',
+    readPaths: [
+      ['/mixpanel/events/<eventId>.json', 'Event records.'],
+      ['/mixpanel/events/<eventName>/import.json', 'Historical event import writeback sidecar.'],
+      ['/mixpanel/profiles/<distinctId>.json', 'Profile records.'],
+      ['/mixpanel/profiles/<distinctId>/delete.json', 'Profile delete writeback sidecar.'],
+      ['/mixpanel/cohorts/<cohortId>.json', 'Cohort records.'],
+    ],
+    endpoints: [
+      endpoint('/mixpanel/events/new.json', 'Track Mixpanel event', 'Tracks a Mixpanel event.', ['event'], {
+        event: str('Event name. The resolver also accepts `name`.'),
+        name: str('Event name alias.'),
+        distinct_id: str('Profile distinct id. Copied into `properties.distinct_id`.'),
+        time: num('Event time as a Unix timestamp.'),
+        properties: obj('Mixpanel event properties.'),
+      }, {
+        event: 'Signup',
+        distinct_id: 'user-1',
+        properties: { plan: 'pro' },
+      }),
+      endpoint('/mixpanel/profiles/new.json', 'Set Mixpanel profile', 'Sets profile properties for a Mixpanel distinct id.', ['distinct_id'], {
+        distinct_id: str('Profile distinct id. `$distinct_id` is also accepted by the resolver.'),
+        '$distinct_id': str('Profile distinct id.'),
+        properties: obj('Profile properties.'),
+        '$set': obj('Profile properties to set.'),
+        '$properties': obj('Profile properties to set.'),
+      }, {
+        distinct_id: 'user-1',
+        properties: { plan: 'pro' },
+      }),
+      endpoint('/mixpanel/cohorts/new.json', 'Update Mixpanel cohort', 'Updates a Mixpanel cohort record.', ['name'], {
+        name: str('Cohort name.'),
+        description: str('Cohort description.'),
+      }, {
+        name: 'Active customers',
+      }),
+    ],
+  },
+  {
     slug: 'onedrive',
     title: 'OneDrive adapter',
     overview: 'The OneDrive adapter exposes drive items and Graph subscriptions with file-native writeback discovery.',
@@ -632,6 +766,45 @@ export const adapters = [
     endpoints: [
       endpoint('/s3/objects/new.json', 'Create S3 object', 'Uploads an S3 object.', ['Bucket', 'Key'], { Bucket: str('Bucket.'), Key: str('Object key.'), BodyBase64: str('Base64 body.') }, { Bucket: 'rf-bucket', Key: 'logs/app.log' }),
       endpoint('/s3/queues/new.json', 'Create S3 queue notification', 'Creates an S3 queue notification config.', ['QueueUrl'], { QueueUrl: str('SQS Queue URL.'), Bucket: str('Bucket.') }, { QueueUrl: 'https://sqs.us-east-1.amazonaws.com/123/queue', Bucket: 'rf-bucket' }),
+    ],
+  },
+  {
+    slug: 'sendgrid',
+    title: 'SendGrid adapter',
+    overview:
+      'The SendGrid adapter exposes sent mail and marketing contacts under `/sendgrid`, with writeback routes for sending mail and upserting or updating contacts.',
+    readPaths: [
+      ['/sendgrid/mail/<messageId>.json', 'Mail send records.'],
+      ['/sendgrid/contacts/<contactId>.json', 'Marketing contact records.'],
+    ],
+    endpoints: [
+      endpoint('/sendgrid/mail/new.json', 'Send SendGrid mail', 'Sends an email through SendGrid Mail Send.', ['from', 'personalizations'], {
+        from: obj('Sender address.', {
+          email: str('Sender email address.', 'email'),
+          name: str('Sender display name.'),
+        }, { required: ['email'] }),
+        personalizations: arr(obj('Personalization entry with recipients and substitutions.'), 'SendGrid personalization entries.'),
+        subject: str('Message subject.'),
+        template_id: str('Dynamic template id.'),
+        categories: arr(str('Category.'), 'Message categories.'),
+        custom_args: obj('Custom argument map.'),
+        mail_settings: obj('SendGrid mail settings.'),
+        tracking_settings: obj('SendGrid tracking settings.'),
+        send_at: int('Unix timestamp for scheduled send.'),
+        content: arr(obj('Content block.'), 'Message content blocks.'),
+        reply_to: obj('Reply-To address.', {
+          email: str('Reply-To email address.', 'email'),
+          name: str('Reply-To display name.'),
+        }),
+      }, {
+        from: { email: 'ops@example.com' },
+        personalizations: [{ to: [{ email: 'ada@example.com' }] }],
+        subject: 'Receipt',
+      }),
+      endpoint('/sendgrid/contacts/new.json', 'Upsert SendGrid contacts', 'Upserts one or more SendGrid marketing contacts.', ['email'], sendGridContactProps(), {
+        email: 'ada@example.com',
+        first_name: 'Ada',
+      }),
     ],
   },
   {
@@ -950,6 +1123,39 @@ function googleCalendarContentRequirement() {
       { required: ['recurrence'] },
       { required: ['conferenceData'] },
     ],
+  };
+}
+
+function mailgunListProps() {
+  return {
+    address: str('Mailgun list email address.'),
+    name: str('List display name.'),
+    description: str('List description.'),
+    access_level: en(['readonly', 'members', 'everyone'], 'Mailgun posting access level.'),
+    reply_preference: en(['list', 'sender'], 'Mailgun reply preference.'),
+  };
+}
+
+function sendGridContactProps() {
+  return {
+    email: str('Contact email address.', 'email'),
+    contacts: arr(obj('Contact entry. Used for bulk upsert payloads.'), 'Contacts to upsert.'),
+    list_ids: arr(str('SendGrid list id.'), 'Marketing list ids.'),
+    first_name: str('Contact first name.'),
+    last_name: str('Contact last name.'),
+    address_line_1: str('Contact address line 1.'),
+    address_line_2: str('Contact address line 2.'),
+    city: str('Contact city.'),
+    state_province_region: str('Contact state, province, or region.'),
+    postal_code: str('Contact postal code.'),
+    country: str('Contact country.'),
+    phone_number: str('Contact phone number.'),
+    whatsapp: str('WhatsApp contact value.'),
+    line: str('LINE contact value.'),
+    facebook: str('Facebook contact value.'),
+    unique_name: str('Provider unique contact name.'),
+    alternate_emails: arr(str('Alternate email address.', 'email'), 'Alternate email addresses.'),
+    custom_fields: obj('SendGrid custom field map.'),
   };
 }
 

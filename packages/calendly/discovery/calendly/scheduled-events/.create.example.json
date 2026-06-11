@@ -1,0 +1,8 @@
+{
+  "event_type": "https://api.calendly.com/event_types/replace-event-type-id",
+  "start_time": "2026-05-12T09:00:00Z",
+  "invitee": {
+    "email": "ada@example.com",
+    "name": "Ada Lovelace"
+  }
+}

@@ -69,12 +69,6 @@ export const WRITEBACK_PATH_CATALOG = {
         "params": []
       }
     ],
-    "invitees": [
-      {
-        "path": "/calendly/invitees",
-        "params": []
-      }
-    ],
     "scheduled-events": [
       {
         "path": "/calendly/scheduled-events",

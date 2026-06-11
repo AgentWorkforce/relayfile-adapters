@@ -1,0 +1,8 @@
+{
+  "from": "ops@example.com",
+  "to": [
+    "ada@example.com"
+  ],
+  "subject": "Welcome",
+  "text": "Hello from Mailgun."
+}

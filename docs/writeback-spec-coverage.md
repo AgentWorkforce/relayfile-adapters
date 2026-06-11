@@ -12,6 +12,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | asana | None | 0 | 4 | Inline JS schemas. |
 | azure-blob | None | 0 | 2 | Inline JS schemas. |
 | box | None | 0 | 2 | Inline JS schemas. |
+| calendly | None | 0 | 2 | Inline JS schemas; invitee records are read-only because Calendly does not support invitee writes through the public API. |
 | clickup | None | 0 | 5 | Inline JS schemas. |
 | confluence | None | 0 | 2 | Inline JS schemas. |
 | docker-hub | None | 0 | 0 | Read-only Composio bridge adapter for repositories, tags, and webhooks; writeback actions are tracked for a later cloud-side integration. |
@@ -27,6 +28,8 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | intercom | None | 0 | 3 | Inline JS schemas. |
 | jira | None | 0 | 4 | Inline JS schemas. |
 | linear | None | 0 | 2 | Inline JS schemas; provider source is GraphQL, not OpenAPI. |
+| mailgun | None | 0 | 3 | Inline JS schemas. |
+| mixpanel | None | 0 | 3 | Inline JS schemas. |
 | notion | None | 0 | 9 | Inline JS schemas cover database page creates, page property updates, content replacement, and comments. |
 | onedrive | None | 0 | 2 | Inline JS schemas. |
 | pipedrive | None | 0 | 4 | Inline JS schemas. |
@@ -35,6 +38,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | reddit | None | 0 | 2 | Inline JS schemas. |
 | s3 | None | 0 | 2 | Inline JS schemas. |
 | salesforce | None | 0 | 5 | Inline JS schemas. |
+| sendgrid | None | 0 | 2 | Inline JS schemas. |
 | sharepoint | None | 0 | 2 | Inline JS schemas. |
 | slack | None | 0 | 4 | Inline JS schemas. |
 | teams | None | 0 | 3 | Inline JS schemas. |

@@ -5,29 +5,28 @@ export interface AdapterResourceConfig {
   readonly idPattern: RegExp;
   readonly schema: string;
   readonly createExample: string;
-  readonly sampleIndexPath?: string;
 }
 
 export const resources = [
   {
-    name: 'subreddits',
-    path: '/reddit/subreddits',
-    pathPattern: /^\/reddit\/subreddits\/(?!_index\.json$)[^/]+\.json$/,
+    name: "subreddits",
+    path: "/reddit/subreddits",
+    pathPattern: /^\/reddit\/subreddits(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[A-Za-z0-9_][A-Za-z0-9_-]{1,63}$/,
-    schema: 'discovery/reddit/subreddits/.schema.json',
-    createExample: 'discovery/reddit/subreddits/.create.example.json',
+    schema: "discovery/reddit/subreddits/.schema.json",
+    createExample: "discovery/reddit/subreddits/.create.example.json",
   },
   {
-    name: 'posts',
-    path: '/reddit/subreddits/{subreddit}/posts',
-    sampleIndexPath: '/reddit/posts',
-    pathPattern: /^\/reddit\/subreddits\/[^/]+\/posts\/(?!_index\.json$)[^/]+\.json$/,
+    name: "posts",
+    path: "/reddit/subreddits/{subreddit}/posts",
+    pathPattern: /^\/reddit\/subreddits\/[^\/]+\/posts(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[A-Za-z0-9_\/-]+$/,
-    schema: 'discovery/reddit/subreddits/{subreddit}/posts/.schema.json',
-    createExample: 'discovery/reddit/subreddits/{subreddit}/posts/.create.example.json',
+    schema: "discovery/reddit/subreddits/{subreddit}/posts/.schema.json",
+    createExample: "discovery/reddit/subreddits/{subreddit}/posts/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  return resources.find((resource) => resource.pathPattern.test(path));
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
+  return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

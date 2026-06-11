@@ -38,7 +38,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "discovery"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Upsert SendGrid contacts",
+  "type": "object",
+  "required": [
+    "email"
+  ],
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Contact email address."
+    },
+    "contacts": {
+      "type": "array",
+      "description": "Contacts to upsert.",
+      "items": {
+        "type": "object",
+        "description": "Contact entry. Used for bulk upsert payloads.",
+        "additionalProperties": true
+      }
+    },
+    "list_ids": {
+      "type": "array",
+      "description": "Marketing list ids.",
+      "items": {
+        "type": "string",
+        "description": "SendGrid list id."
+      }
+    },
+    "first_name": {
+      "type": "string",
+      "description": "Contact first name."
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Contact last name."
+    },
+    "address_line_1": {
+      "type": "string",
+      "description": "Contact address line 1."
+    },
+    "address_line_2": {
+      "type": "string",
+      "description": "Contact address line 2."
+    },
+    "city": {
+      "type": "string",
+      "description": "Contact city."
+    },
+    "state_province_region": {
+      "type": "string",
+      "description": "Contact state, province, or region."
+    },
+    "postal_code": {
+      "type": "string",
+      "description": "Contact postal code."
+    },
+    "country": {
+      "type": "string",
+      "description": "Contact country."
+    },
+    "phone_number": {
+      "type": "string",
+      "description": "Contact phone number."
+    },
+    "whatsapp": {
+      "type": "string",
+      "description": "WhatsApp contact value."
+    },
+    "line": {
+      "type": "string",
+      "description": "LINE contact value."
+    },
+    "facebook": {
+      "type": "string",
+      "description": "Facebook contact value."
+    },
+    "unique_name": {
+      "type": "string",
+      "description": "Provider unique contact name."
+    },
+    "alternate_emails": {
+      "type": "array",
+      "description": "Alternate email addresses.",
+      "items": {
+        "type": "string",
+        "format": "email",
+        "description": "Alternate email address."
+      }
+    },
+    "custom_fields": {
+      "type": "object",
+      "description": "SendGrid custom field map.",
+      "additionalProperties": true
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

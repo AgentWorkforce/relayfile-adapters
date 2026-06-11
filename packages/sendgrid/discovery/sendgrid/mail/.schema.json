@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Send SendGrid mail",
+  "type": "object",
+  "required": [
+    "from",
+    "personalizations"
+  ],
+  "properties": {
+    "from": {
+      "type": "object",
+      "description": "Sender address.",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Sender email address."
+        },
+        "name": {
+          "type": "string",
+          "description": "Sender display name."
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "email"
+      ]
+    },
+    "personalizations": {
+      "type": "array",
+      "description": "SendGrid personalization entries.",
+      "items": {
+        "type": "object",
+        "description": "Personalization entry with recipients and substitutions.",
+        "additionalProperties": true
+      }
+    },
+    "subject": {
+      "type": "string",
+      "description": "Message subject."
+    },
+    "template_id": {
+      "type": "string",
+      "description": "Dynamic template id."
+    },
+    "categories": {
+      "type": "array",
+      "description": "Message categories.",
+      "items": {
+        "type": "string",
+        "description": "Category."
+      }
+    },
+    "custom_args": {
+      "type": "object",
+      "description": "Custom argument map.",
+      "additionalProperties": true
+    },
+    "mail_settings": {
+      "type": "object",
+      "description": "SendGrid mail settings.",
+      "additionalProperties": true
+    },
+    "tracking_settings": {
+      "type": "object",
+      "description": "SendGrid tracking settings.",
+      "additionalProperties": true
+    },
+    "send_at": {
+      "type": "integer",
+      "description": "Unix timestamp for scheduled send."
+    },
+    "content": {
+      "type": "array",
+      "description": "Message content blocks.",
+      "items": {
+        "type": "object",
+        "description": "Content block.",
+        "additionalProperties": true
+      }
+    },
+    "reply_to": {
+      "type": "object",
+      "description": "Reply-To address.",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Reply-To email address."
+        },
+        "name": {
+          "type": "string",
+          "description": "Reply-To display name."
+        }
+      },
+      "additionalProperties": true
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider URL for the record.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}

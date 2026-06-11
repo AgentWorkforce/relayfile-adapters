@@ -234,7 +234,13 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/merge_requests/{mergeRequestIid}__{slug}/discussions')) {
-    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$';
+    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?|/[^/]+/notes/[^/]+\\.json)?$';
+  }
+  if (adapterSlug === 'mixpanel' && resourcePath === '/mixpanel/events') {
+    return '^/mixpanel/events(?:/[^/]+(?:\\.json|/import\\.json)?)?$';
+  }
+  if (adapterSlug === 'mixpanel' && resourcePath === '/mixpanel/profiles') {
+    return '^/mixpanel/profiles(?:/[^/]+(?:\\.json|/delete\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/issues/{issueIid}__{slug}/comments')) {
     return '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$';
@@ -352,6 +358,27 @@ function idPatternFor(adapterSlug, resourcePath) {
   }
   if (adapterSlug === 'google-calendar') {
     return pattern('^[a-v0-9]{5,1024}$');
+  }
+  if (adapterSlug === 'calendly') {
+    return resourcePath.endsWith('/event-types')
+      ? pattern('^type_[A-Za-z0-9_-]+$')
+      : pattern('^event_[A-Za-z0-9_-]+$');
+  }
+  if (adapterSlug === 'mailgun') {
+    return resourcePath.endsWith('/messages')
+      ? pattern('^[A-Za-z0-9_.:-]+$')
+      : pattern('^[^@\\s]+@[^@\\s]+$');
+  }
+  if (adapterSlug === 'mixpanel') {
+    if (resourcePath.endsWith('/events')) {
+      return pattern('^(?!(?:new|create|draft|track)(?:[-_\\s].*)?$)[A-Za-z0-9_.:-]+$', 'i');
+    }
+    if (resourcePath.endsWith('/profiles')) {
+      return pattern('^(?!(?:new|create|draft|track)(?:[-_\\s].*)?$)[A-Za-z0-9_.:-]+$', 'i');
+    }
+  }
+  if (adapterSlug === 'sendgrid') {
+    return pattern('^(?!(?:new|create|draft|send)(?:[-_\\s].*)?$)[A-Za-z0-9_.:-]+$', 'i');
   }
   return pattern('^[A-Za-z0-9_.:-]+$');
 }
