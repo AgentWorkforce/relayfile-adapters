@@ -496,6 +496,14 @@
       }
     ]
   },
+  "recall": {
+    "recordings": [
+      {
+        "path": "/recall/recordings",
+        "params": []
+      }
+    ]
+  },
   "reddit": {
     "posts": [
       {

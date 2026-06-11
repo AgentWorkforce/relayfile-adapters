@@ -174,6 +174,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
+    "packageName": "@relayfile/adapter-recall",
+    "packagePath": "packages/recall",
+    "provider": "recall",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
     "packageName": "@relayfile/adapter-reddit",
     "packagePath": "packages/reddit",
     "provider": "reddit",

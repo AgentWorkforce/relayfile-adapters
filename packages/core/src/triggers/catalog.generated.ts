@@ -314,6 +314,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "person.deleted",
     "person.updated"
   ],
+  "recall": [
+    "file.created",
+    "recording.created",
+    "transcript.done"
+  ],
   "salesforce": [
     "Account.created",
     "Account.deleted",

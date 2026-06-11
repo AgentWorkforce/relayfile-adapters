@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recall recording",
+  "type": "object",
+  "required": [
+    "id"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable Recall recording id.",
+      "readOnly": true
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Human-readable recording title when available.",
+      "readOnly": true
+    },
+    "status": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Recall recording processing status.",
+      "readOnly": true
+    },
+    "created_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Provider update timestamp.",
+      "readOnly": true
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Timestamp when Recall finished processing the recording.",
+      "readOnly": true
+    },
+    "transcript_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Flattened transcript text derived from Recall transcript payloads.",
+      "readOnly": true
+    }
+  }
+}
