@@ -399,7 +399,7 @@ export const adapters = [
     readPaths: [
       ['/slack/channels/<channelId>.json', 'Channel records.'],
       ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
-      ['/slack/channels/<channelId>/threads/<threadTs>/replies/<replyTs>/meta.json', 'Thread reply records (directory records; legacy flat `/messages/<messageTs>/replies/<replyTs>.json` writeback paths still route for edits/deletes).'],
+      ['/slack/channels/<channelId>/threads/<threadTs>/replies/<replyTs>/meta.json', 'Thread reply records (directory records; legacy flat `/threads/<threadTs>/replies/<replyTs>.json` paths still read during migration).'],
       ['/slack/users/<userId>.json', 'User records.'],
       ['/slack/users/<userId>/messages/<messageTs>/meta.json', '1:1 direct message records addressed by bare Slack user id.'],
       ['/slack/users/<userId>/messages/<messageTs>/replies/<replyTs>/meta.json', 'Threaded replies in a 1:1 direct message (directory records; legacy flat `<replyTs>.json` still readable).'],
