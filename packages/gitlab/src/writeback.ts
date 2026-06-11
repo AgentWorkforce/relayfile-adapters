@@ -1,7 +1,7 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import type { ConnectionProvider, WritebackPathTarget, WritebackResult } from './types.js';
-import { parseGitLabPath } from './path-mapper.js';
+import { decodeProjectPath, parseGitLabPath } from './path-mapper.js';
 import { resources } from './resources.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -140,26 +140,24 @@ export class GitLabWritebackHandler {
 }
 
 export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
+  const mergeRequestDiscussionNote = parseMergeRequestDiscussionNoteDeletePath(path);
+  if (mergeRequestDiscussionNote) {
+    const projectId = encodeURIComponent(mergeRequestDiscussionNote.projectPath);
+    return {
+      action: 'delete_merge_request_discussion',
+      method: 'DELETE',
+      endpoint: `/api/v4/projects/${projectId}/merge_requests/${mergeRequestDiscussionNote.mergeRequestIid}/discussions/${encodeURIComponent(
+        mergeRequestDiscussionNote.discussionId,
+      )}/notes/${encodeURIComponent(mergeRequestDiscussionNote.noteId)}`,
+    };
+  }
+
   const parsed = parseGitLabPath(path);
   if (!parsed) {
     throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
   }
   const route = classifyWrite(path, resources, { fsEvent: 'delete' });
   const projectId = encodeURIComponent(parsed.projectPath);
-
-  if (
-    route?.resource.name === 'discussions' &&
-    route.kind === 'delete' &&
-    parsed.objectType === 'merge_requests' &&
-    parsed.subResource === 'discussions' &&
-    parsed.subResourceId
-  ) {
-    return {
-      action: 'delete_merge_request_discussion',
-      method: 'DELETE',
-      endpoint: `/api/v4/projects/${projectId}/merge_requests/${parsed.objectId}/discussions/${encodeURIComponent(parsed.subResourceId)}`,
-    };
-  }
 
   if (
     route?.resource.name === 'comments' &&
@@ -176,6 +174,54 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
   }
 
   throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
+}
+
+interface MergeRequestDiscussionNoteDeletePath {
+  discussionId: string;
+  mergeRequestIid: string;
+  noteId: string;
+  projectPath: string;
+}
+
+function parseMergeRequestDiscussionNoteDeletePath(path: string): MergeRequestDiscussionNoteDeletePath | null {
+  const segments = path.split('/').filter(Boolean);
+  const mergeRequestIndex = segments.lastIndexOf('merge_requests');
+  if (
+    segments[0] !== 'gitlab' ||
+    segments[1] !== 'projects' ||
+    mergeRequestIndex < 3 ||
+    segments[mergeRequestIndex + 2] !== 'discussions' ||
+    segments[mergeRequestIndex + 4] !== 'notes' ||
+    mergeRequestIndex + 6 !== segments.length
+  ) {
+    return null;
+  }
+
+  const noteSegment = segments[mergeRequestIndex + 5];
+  if (!noteSegment?.endsWith('.json')) {
+    return null;
+  }
+
+  const projectPath = decodeProjectPath(segments.slice(2, mergeRequestIndex).join('/'));
+  const mergeRequestIid = decodeDirectoryObjectId(segments[mergeRequestIndex + 1] ?? '');
+  const discussionId = decodeURIComponent(segments[mergeRequestIndex + 3] ?? '');
+  const noteId = decodeURIComponent(noteSegment.slice(0, -5));
+  if (!projectPath || !mergeRequestIid || !discussionId || !noteId) {
+    return null;
+  }
+
+  return {
+    discussionId,
+    mergeRequestIid,
+    noteId,
+    projectPath,
+  };
+}
+
+function decodeDirectoryObjectId(segment: string): string {
+  const decoded = decodeURIComponent(segment);
+  const separatorIndex = decoded.indexOf('__');
+  return separatorIndex > 0 ? decoded.slice(0, separatorIndex) : decoded;
 }
 
 const READ_ONLY_FIELDS = new Set([

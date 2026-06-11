@@ -17,6 +17,9 @@ export const azureBlobClient = (opts?: IntegrationClientOptions): ProviderClient
 export const boxClient = (opts?: IntegrationClientOptions): ProviderClient<'box'> =>
   providerClient('box', opts);
 
+export const calendlyClient = (opts?: IntegrationClientOptions): ProviderClient<'calendly'> =>
+  providerClient('calendly', opts);
+
 export const clickupClient = (opts?: IntegrationClientOptions): ProviderClient<'clickup'> =>
   providerClient('clickup', opts);
 
@@ -53,6 +56,12 @@ export const intercomClient = (opts?: IntegrationClientOptions): ProviderClient<
 export const jiraClient = (opts?: IntegrationClientOptions): ProviderClient<'jira'> =>
   providerClient('jira', opts);
 
+export const mailgunClient = (opts?: IntegrationClientOptions): ProviderClient<'mailgun'> =>
+  providerClient('mailgun', opts);
+
+export const mixpanelClient = (opts?: IntegrationClientOptions): ProviderClient<'mixpanel'> =>
+  providerClient('mixpanel', opts);
+
 export const notionClient = (opts?: IntegrationClientOptions): ProviderClient<'notion'> =>
   providerClient('notion', opts);
 
@@ -76,6 +85,9 @@ export const s3Client = (opts?: IntegrationClientOptions): ProviderClient<'s3'> 
 
 export const salesforceClient = (opts?: IntegrationClientOptions): ProviderClient<'salesforce'> =>
   providerClient('salesforce', opts);
+
+export const sendgridClient = (opts?: IntegrationClientOptions): ProviderClient<'sendgrid'> =>
+  providerClient('sendgrid', opts);
 
 export const sharepointClient = (opts?: IntegrationClientOptions): ProviderClient<'sharepoint'> =>
   providerClient('sharepoint', opts);

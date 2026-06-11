@@ -30,8 +30,17 @@ test('redis rejects read-only writeback fields', () => {
 });
 
 test('redis resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/redis/{db}/draft.json", JSON.stringify({"db":0,"key":"settings:theme","type":"string","value":"dark"}));
-  assert.equal(request.operation, 'create');
+  const body = {"db":0,"key":"settings:theme","type":"string","value":"dark"};
+  const request = resolveWritebackRequest("/redis/{db}/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'redis.keys.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: 'SET',
+    resource: 'keys',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new RedisAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.throws(() => adapter.mapNangoSyncRecord({ id: 'nango_1' }), /does not declare/);
 });

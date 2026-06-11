@@ -3,7 +3,7 @@ import type { StripeWritebackRequest } from './types.js';
 export function resolveWritebackRequest(path: string, content: string): StripeWritebackRequest {
   const payload = parseJsonObject(content);
 
-  if (path === '/stripe/customers/new.json') {
+  if (isDraftCreatePath(path, 'customers', /^cus_/u)) {
     return {
       action: 'create_customer',
       method: 'POST',
@@ -12,7 +12,7 @@ export function resolveWritebackRequest(path: string, content: string): StripeWr
     };
   }
 
-  if (path === '/stripe/invoices/new.json') {
+  if (isDraftCreatePath(path, 'invoices', /^in_/u)) {
     return {
       action: 'create_invoice',
       method: 'POST',
@@ -203,6 +203,19 @@ function pickDefined(
     }
   }
   return output;
+}
+
+function isDraftCreatePath(path: string, resource: 'customers' | 'invoices', canonicalIdPattern: RegExp): boolean {
+  const match = new RegExp(`^/stripe/${resource}/([^/]+)\\.json$`, 'u').exec(path);
+  const encodedFilename = match?.[1];
+  if (!encodedFilename) {
+    return false;
+  }
+  const filename = decodeURIComponent(encodedFilename);
+  if (filename === '_index') {
+    return false;
+  }
+  return !canonicalIdPattern.test(filename);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
