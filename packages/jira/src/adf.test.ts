@@ -81,6 +81,14 @@ describe('markdownToAdf', () => {
     assert.deepStrictEqual(doc.content[1]?.content, [{ type: 'text', text: 'second para' }]);
   });
 
+  it('does not infinite loop on block starts that do not match block parsers', () => {
+    const doc = markdownToAdf('```ts {1-5}');
+    assert.deepStrictEqual(doc.content[0], {
+      type: 'paragraph',
+      content: [{ type: 'text', text: '```ts {1-5}' }],
+    });
+  });
+
   it('yields a valid empty doc for empty input', () => {
     assert.deepStrictEqual(markdownToAdf(''), {
       type: 'doc',

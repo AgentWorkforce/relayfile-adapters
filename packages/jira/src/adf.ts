@@ -138,7 +138,8 @@ function parseBlocks(markdown: string): AdfNode[] {
     }
 
     // Paragraph: gather soft-wrapped lines until a blank line or a new block.
-    const para: string[] = [];
+    const para: string[] = [(lines[i] ?? '').trim()];
+    i++;
     while (i < lines.length && (lines[i] ?? '').trim() !== '' && !isBlockStart(lines[i] ?? '')) {
       para.push((lines[i] ?? '').trim());
       i++;
