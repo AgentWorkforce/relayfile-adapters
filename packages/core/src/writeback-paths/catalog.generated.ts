@@ -116,6 +116,14 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "daytona": {
+    "usage": [
+      {
+        "path": "/daytona/usage",
+        "params": []
+      }
+    ]
+  },
   "dropbox": {
     "files": [
       {

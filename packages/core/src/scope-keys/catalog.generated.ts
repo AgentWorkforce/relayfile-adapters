@@ -60,6 +60,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
+    "packageName": "@relayfile/adapter-daytona",
+    "packagePath": "packages/daytona",
+    "provider": "daytona",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
     "packageName": "@relayfile/adapter-docker-hub",
     "packagePath": "packages/docker-hub",
     "provider": "docker-hub",

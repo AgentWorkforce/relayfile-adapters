@@ -23,6 +23,9 @@ export const clickupClient = (opts?: IntegrationClientOptions): ProviderClient<'
 export const confluenceClient = (opts?: IntegrationClientOptions): ProviderClient<'confluence'> =>
   providerClient('confluence', opts);
 
+export const daytonaClient = (opts?: IntegrationClientOptions): ProviderClient<'daytona'> =>
+  providerClient('daytona', opts);
+
 export const dropboxClient = (opts?: IntegrationClientOptions): ProviderClient<'dropbox'> =>
   providerClient('dropbox', opts);
 
