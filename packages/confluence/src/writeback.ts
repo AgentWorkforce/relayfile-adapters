@@ -60,7 +60,12 @@ function buildPageCreate(content: string, pathSpaceId?: string): ConfluenceWrite
     throw new Error('page create writeback requires title');
   }
 
-  const spaceId = pathSpaceId ?? readString(payload, 'spaceId') ?? readString(payload, 'space_id');
+  // Confluence v2 POST /pages requires the numeric spaceId (Long). The path
+  // only carries the space *key* (e.g. "OPS"), so a caller that has resolved the
+  // numeric id supplies it explicitly in the payload; that takes precedence over
+  // the path-derived value.
+  const spaceId =
+    readString(payload, 'spaceId') ?? readString(payload, 'space_id') ?? pathSpaceId;
   if (!spaceId) {
     throw new Error('page create writeback requires spaceId');
   }
