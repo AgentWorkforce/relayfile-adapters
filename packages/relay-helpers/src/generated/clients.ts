@@ -74,6 +74,9 @@ export const pipedriveClient = (opts?: IntegrationClientOptions): ProviderClient
 export const postgresClient = (opts?: IntegrationClientOptions): ProviderClient<'postgres'> =>
   providerClient('postgres', opts);
 
+export const recallClient = (opts?: IntegrationClientOptions): ProviderClient<'recall'> =>
+  providerClient('recall', opts);
+
 export const redditClient = (opts?: IntegrationClientOptions): ProviderClient<'reddit'> =>
   providerClient('reddit', opts);
 
