@@ -8,7 +8,7 @@ const CALENDLY_INVITEES_ROUTE = '/invitees';
 export function resolveCalendlyWritebackRequest(path: string, content: string): CalendlyWritebackRequest {
   const normalizedPath = normalizePath(path);
 
-  if (normalizedPath === '/calendly/scheduled-events/new.json' || normalizedPath === '/calendly/scheduled-events/') {
+  if (normalizedPath === '/calendly/scheduled-events/' || isDraftJsonPath(normalizedPath, 'scheduled-events', /^event_/u)) {
     return buildScheduledEventCreate(content);
   }
 
@@ -32,7 +32,7 @@ export function resolveCalendlyWritebackRequest(path: string, content: string): 
     throw new Error('Calendly does not support updating invitees through the public API; use the invitee reschedule_url when available');
   }
 
-  if (normalizedPath === '/calendly/event-types/new.json' || normalizedPath === '/calendly/event-types/') {
+  if (normalizedPath === '/calendly/event-types/' || isDraftJsonPath(normalizedPath, 'event-types', /^type_/u)) {
     return buildEventTypeCreate(content);
   }
 
@@ -93,12 +93,17 @@ function buildScheduledEventCancel(eventId: string, content: string): CalendlyWr
 function buildEventTypeCreate(content: string): CalendlyWritebackRequest {
   const payload = unwrapEnvelope(parseJsonObject(content));
   const name = readString(payload, 'name');
+  const owner = readString(payload, 'owner');
   if (!name) {
     throw new Error('event-types/new.json writeback requires a non-empty `name`');
+  }
+  if (!owner) {
+    throw new Error('event-types/new.json writeback requires `owner`');
   }
 
   const body = pickAllowed(payload, [
     'name',
+    'owner',
     'duration',
     'slug',
     'active',
@@ -141,6 +146,14 @@ function buildEventTypeUpdate(eventTypeId: string, content: string): CalendlyWri
 function normalizePath(path: string): string {
   const trimmed = path.trim();
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function isDraftJsonPath(path: string, resource: 'event-types' | 'scheduled-events', canonicalIdPattern: RegExp): boolean {
+  const match = new RegExp(`^/calendly/${resource}/([^/]+)\\.json$`, 'u').exec(path);
+  const encodedFilename = match?.[1];
+  if (!encodedFilename) return false;
+  const filename = decodeURIComponent(encodedFilename);
+  return filename !== '_index' && !canonicalIdPattern.test(filename);
 }
 
 function parseJsonObject(content: string): Record<string, unknown> {

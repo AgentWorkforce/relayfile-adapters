@@ -11,11 +11,13 @@ const SENDGRID_MAIL_SEND_ENDPOINT = '/v3/mail/send';
 const SENDGRID_CONTACTS_ENDPOINT = '/v3/marketing/contacts';
 
 export function resolveSendGridWritebackRequest(path: string, content: string): SendGridWritebackRequest {
-  if (path === '/sendgrid/mail/new.json' || path === '/sendgrid/mail/') {
+  const mailCreateMatch = path.match(/^\/sendgrid\/mail\/([^/]+)\.json$/);
+  if (path === '/sendgrid/mail/' || (mailCreateMatch?.[1] && isDraftFilename(mailCreateMatch[1]))) {
     return buildMailSend(content);
   }
 
-  if (path === '/sendgrid/contacts/new.json' || path === '/sendgrid/contacts/') {
+  const contactCreateMatch = path.match(/^\/sendgrid\/contacts\/([^/]+)\.json$/);
+  if (path === '/sendgrid/contacts/' || (contactCreateMatch?.[1] && isDraftFilename(contactCreateMatch[1]))) {
     return buildContactUpsert(content);
   }
 
@@ -209,6 +211,11 @@ function parseJsonObject(content: string): Record<string, unknown> {
     throw new Error('Expected JSON object payload');
   }
   return parsed;
+}
+
+function isDraftFilename(encodedFilename: string): boolean {
+  const filename = decodeURIComponent(encodedFilename);
+  return /^(new|create|draft|send)(?:[-_\s].*)?$/iu.test(filename);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -30,8 +30,17 @@ test('s3 rejects read-only writeback fields', () => {
 });
 
 test('s3 resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/s3/{bucket}/objects/draft.json", JSON.stringify({"bucket":"reports","key":"q1/report.json","contentBase64":"e30=","contentType":"application/json"}));
-  assert.equal(request.operation, 'create');
+  const body = {"bucket":"reports","key":"q1/report.json","contentBase64":"e30=","contentType":"application/json"};
+  const request = resolveWritebackRequest("/s3/{bucket}/objects/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 's3.objects.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: 's3:PutObject',
+    resource: 'objects',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new S3Adapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.throws(() => adapter.mapNangoSyncRecord({ id: 'nango_1' }), /does not declare/);
 });

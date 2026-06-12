@@ -30,8 +30,17 @@ test('google-drive rejects read-only writeback fields', () => {
 });
 
 test('google-drive resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/google-drive/files/draft.json", JSON.stringify({"name":"Quarterly plan","mimeType":"application/vnd.google-apps.document","parents":["root"]}));
-  assert.equal(request.operation, 'create');
+  const body = {"name":"Quarterly plan","mimeType":"application/vnd.google-apps.document","parents":["root"]};
+  const request = resolveWritebackRequest("/google-drive/files/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'google-drive.files.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/drive/v3/files',
+    resource: 'files',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new GoogleDriveAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   const event = adapter.mapNangoSyncRecord({ id: 'nango_1', updatedAt: '2026-05-09T00:00:00.000Z' });
   assert.equal(event.source, "google-drive");

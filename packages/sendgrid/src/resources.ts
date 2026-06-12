@@ -5,17 +5,24 @@ export interface AdapterResourceConfig {
   readonly idPattern: RegExp;
   readonly schema: string;
   readonly createExample: string;
-  readonly sampleIndexPath?: string;
 }
 
 export const resources = [
   {
-    name: 'recordings',
-    path: '/recall/recordings',
-    pathPattern: /^\/recall\/recordings(?:\/[^/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_-]+$/,
-    schema: 'discovery/recall/recordings/.schema.json',
-    createExample: 'discovery/recall/recordings/.create.example.json',
+    name: 'mail',
+    path: '/sendgrid/mail',
+    pathPattern: /^\/sendgrid\/mail(?:\/[^/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    schema: 'discovery/sendgrid/mail/.schema.json',
+    createExample: 'discovery/sendgrid/mail/.create.example.json',
+  },
+  {
+    name: 'contacts',
+    path: '/sendgrid/contacts',
+    pathPattern: /^\/sendgrid\/contacts(?:\/[^/]+(?:\.json)?)?$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    schema: 'discovery/sendgrid/contacts/.schema.json',
+    createExample: 'discovery/sendgrid/contacts/.create.example.json',
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

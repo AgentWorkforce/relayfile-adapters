@@ -258,11 +258,47 @@ test('path mapper, read routes, and writeback routes cover primary Asana objects
     endpoint: '/api/1.0/tasks',
     body: { data: { name: 'New task', workspace: 'workspace_1' } },
   });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/tasks/12001.json', '{"name":"Renamed","completed":true}'), {
+    action: 'update_task',
+    method: 'PUT',
+    endpoint: '/api/1.0/tasks/12001',
+    body: { data: { completed: true, name: 'Renamed' } },
+  });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/projects/draft-project.json', '{"name":"Migration","workspace":"workspace_1"}'), {
+    action: 'create_project',
+    method: 'POST',
+    endpoint: '/api/1.0/projects',
+    body: { data: { name: 'Migration', workspace: 'workspace_1' } },
+  });
   assert.deepEqual(resolveAsanaWritebackRequest('/asana/projects/12002.json', '{"name":"Renamed"}'), {
     action: 'update_project',
     method: 'PUT',
     endpoint: '/api/1.0/projects/12002',
     body: { data: { name: 'Renamed' } },
+  });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/projects/project_1/sections/draft-section.json', '{"name":"Backlog"}'), {
+    action: 'create_section',
+    method: 'POST',
+    endpoint: '/api/1.0/projects/project_1/sections',
+    body: { data: { name: 'Backlog' } },
+  });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/sections/draft-section.json', '{"name":"Backlog","project":"project_1"}'), {
+    action: 'create_section',
+    method: 'POST',
+    endpoint: '/api/1.0/projects/project_1/sections',
+    body: { data: { name: 'Backlog' } },
+  });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/sections/12003.json', '{"name":"In Progress"}'), {
+    action: 'update_section',
+    method: 'PUT',
+    endpoint: '/api/1.0/sections/12003',
+    body: { data: { name: 'In Progress' } },
+  });
+  assert.deepEqual(resolveAsanaWritebackRequest('/asana/tasks/12001/projects/project_1.json', '{"section":"section_1"}'), {
+    action: 'add_task_to_project',
+    method: 'POST',
+    endpoint: '/api/1.0/tasks/12001/addProject',
+    body: { data: { project: 'project_1', section: 'section_1' } },
   });
   assert.throws(
     () => resolveAsanaWritebackRequest('/asana/tasks/12001.json', '{"id":"12001","name":"Renamed"}'),
@@ -276,6 +312,16 @@ test('path mapper, read routes, and writeback routes cover primary Asana objects
     action: 'delete_task',
     method: 'DELETE',
     endpoint: '/api/1.0/tasks/12001',
+  });
+  assert.deepEqual(resolveAsanaDeleteRequest('/asana/projects/12002.json'), {
+    action: 'delete_project',
+    method: 'DELETE',
+    endpoint: '/api/1.0/projects/12002',
+  });
+  assert.deepEqual(resolveAsanaDeleteRequest('/asana/sections/12003.json'), {
+    action: 'delete_section',
+    method: 'DELETE',
+    endpoint: '/api/1.0/sections/12003',
   });
   assert.throws(
     () => resolveAsanaDeleteRequest('/asana/tasks/draft-task.json'),

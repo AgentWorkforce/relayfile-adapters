@@ -30,8 +30,17 @@ test('dropbox rejects read-only writeback fields', () => {
 });
 
 test('dropbox resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/dropbox/{accountId}/files/draft.json", JSON.stringify({"accountId":"dbx-account","path":"/Reports/q1.txt","contentBase64":"SGVsbG8="}));
-  assert.equal(request.operation, 'create');
+  const body = {"accountId":"dbx-account","path":"/Reports/q1.txt","contentBase64":"SGVsbG8="};
+  const request = resolveWritebackRequest("/dropbox/{accountId}/files/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'dropbox.files.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/2/files/upload',
+    resource: 'files',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new DropboxAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.deepEqual(adapter.supportedEvents(), ['file.changed']);
   const event = adapter.mapNangoSyncRecord({ id: 'nango_1', updatedAt: '2026-05-09T00:00:00.000Z' });

@@ -30,8 +30,17 @@ test('sharepoint rejects read-only writeback fields', () => {
 });
 
 test('sharepoint resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/sharepoint/{siteId}/{driveId}/items/draft.json", JSON.stringify({"siteId":"contoso.sharepoint.com,site-id,web-id","driveId":"drive-id","name":"Planning.docx","contentBase64":"VGVzdA=="}));
-  assert.equal(request.operation, 'create');
+  const body = {"siteId":"contoso.sharepoint.com,site-id,web-id","driveId":"drive-id","name":"Planning.docx","contentBase64":"VGVzdA=="};
+  const request = resolveWritebackRequest("/sharepoint/{siteId}/{driveId}/items/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'sharepoint.items.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/v1.0/sites/{siteId}/drives/{driveId}/items/{itemId}',
+    resource: 'items',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new SharepointAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   const event = adapter.mapNangoSyncRecord({ id: 'nango_1', updatedAt: '2026-05-09T00:00:00.000Z' });
   assert.equal(event.source, "sharepoint");

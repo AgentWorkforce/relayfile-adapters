@@ -262,6 +262,58 @@ test('read routes include Shopify REST endpoints and required route anchors', ()
 });
 
 test('writeback routes map VFS writes to Shopify REST mutations', () => {
+  assert.deepEqual(
+    resolveShopifyWritebackRequest('/shopify/orders/new.json', JSON.stringify({ line_items: [{ variant_id: 1, quantity: 1 }], email: 'ada@example.com' })),
+    {
+      action: 'create_order',
+      method: 'POST',
+      endpoint: '/admin/api/2026-04/orders.json',
+      body: {
+        order: {
+          email: 'ada@example.com',
+          line_items: [{ variant_id: 1, quantity: 1 }],
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(resolveShopifyWritebackRequest('/shopify/orders/450789469.json', JSON.stringify({ note: 'Updated' })), {
+    action: 'update_order',
+    method: 'PUT',
+    endpoint: '/admin/api/2026-04/orders/450789469.json',
+    body: {
+      order: {
+        note: 'Updated',
+        id: '450789469',
+      },
+    },
+  });
+
+  assert.deepEqual(resolveShopifyWritebackRequest('/shopify/orders/450789469/cancel.json', JSON.stringify({ reason: 'customer', email: true })), {
+    action: 'cancel_order',
+    method: 'POST',
+    endpoint: '/admin/api/2026-04/orders/450789469/cancel.json',
+    body: {
+      reason: 'customer',
+      email: true,
+    },
+  });
+
+  assert.deepEqual(
+    resolveShopifyWritebackRequest('/shopify/orders/450789469/fulfillments/new.json', JSON.stringify({ location_id: 123, tracking_info: { number: '1Z' } })),
+    {
+      action: 'create_fulfillment',
+      method: 'POST',
+      endpoint: '/admin/api/2026-04/orders/450789469/fulfillments.json',
+      body: {
+        fulfillment: {
+          location_id: 123,
+          tracking_info: { number: '1Z' },
+        },
+      },
+    },
+  );
+
   assert.deepEqual(resolveShopifyWritebackRequest('/shopify/products/new.json', JSON.stringify({ title: 'Relay Tee', vendor: 'Relayfile' })), {
     action: 'create_product',
     method: 'POST',
@@ -270,6 +322,30 @@ test('writeback routes map VFS writes to Shopify REST mutations', () => {
       product: {
         title: 'Relay Tee',
         vendor: 'Relayfile',
+      },
+    },
+  });
+
+  assert.deepEqual(resolveShopifyWritebackRequest('/shopify/products/632910392.json', JSON.stringify({ title: 'Relay Tee 2' })), {
+    action: 'update_product',
+    method: 'PUT',
+    endpoint: '/admin/api/2026-04/products/632910392.json',
+    body: {
+      product: {
+        title: 'Relay Tee 2',
+        id: '632910392',
+      },
+    },
+  });
+
+  assert.deepEqual(resolveShopifyWritebackRequest('/shopify/customers/new.json', JSON.stringify({ email: 'ada@example.com', first_name: 'Ada' })), {
+    action: 'create_customer',
+    method: 'POST',
+    endpoint: '/admin/api/2026-04/customers.json',
+    body: {
+      customer: {
+        email: 'ada@example.com',
+        first_name: 'Ada',
       },
     },
   });

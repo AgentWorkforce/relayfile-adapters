@@ -62,6 +62,26 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "calendly": {
+    "event-types": [
+      {
+        "path": "/calendly/event-types",
+        "params": []
+      }
+    ],
+    "invitees": [
+      {
+        "path": "/calendly/invitees",
+        "params": []
+      }
+    ],
+    "scheduled-events": [
+      {
+        "path": "/calendly/scheduled-events",
+        "params": []
+      }
+    ]
+  },
   "clickup": {
     "comments": [
       {
@@ -383,6 +403,50 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "mailgun": {
+    "lists": [
+      {
+        "path": "/mailgun/lists",
+        "params": []
+      }
+    ],
+    "members": [
+      {
+        "path": "/mailgun/lists/{listAddress}/members",
+        "params": [
+          "listAddress"
+        ]
+      }
+    ],
+    "messages": [
+      {
+        "path": "/mailgun/domains/{domain}/messages",
+        "params": [
+          "domain"
+        ]
+      }
+    ]
+  },
+  "mixpanel": {
+    "cohorts": [
+      {
+        "path": "/mixpanel/cohorts",
+        "params": []
+      }
+    ],
+    "events": [
+      {
+        "path": "/mixpanel/events",
+        "params": []
+      }
+    ],
+    "profiles": [
+      {
+        "path": "/mixpanel/profiles",
+        "params": []
+      }
+    ]
+  },
   "notion": {
     "comments": [
       {
@@ -505,6 +569,14 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "recall": {
+    "recordings": [
+      {
+        "path": "/recall/recordings",
+        "params": []
+      }
+    ]
+  },
   "reddit": {
     "posts": [
       {
@@ -577,6 +649,20 @@ export const WRITEBACK_PATH_CATALOG = {
     "opportunities": [
       {
         "path": "/salesforce/opportunities",
+        "params": []
+      }
+    ]
+  },
+  "sendgrid": {
+    "contacts": [
+      {
+        "path": "/sendgrid/contacts",
+        "params": []
+      }
+    ],
+    "mail": [
+      {
+        "path": "/sendgrid/mail",
         "params": []
       }
     ]
@@ -693,12 +779,6 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "reason": "No resources.ts with writeback path templates"
   },
   {
-    "packageName": "@relayfile/adapter-calendly",
-    "packagePath": "packages/calendly",
-    "provider": "calendly",
-    "reason": "No resources.ts with writeback path templates"
-  },
-  {
     "packageName": "@relayfile/adapter-docker-hub",
     "packagePath": "packages/docker-hub",
     "provider": "docker-hub",
@@ -711,33 +791,9 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "reason": "No resources.ts with writeback path templates"
   },
   {
-    "packageName": "@relayfile/adapter-mailgun",
-    "packagePath": "packages/mailgun",
-    "provider": "mailgun",
-    "reason": "No resources.ts with writeback path templates"
-  },
-  {
-    "packageName": "@relayfile/adapter-mixpanel",
-    "packagePath": "packages/mixpanel",
-    "provider": "mixpanel",
-    "reason": "No resources.ts with writeback path templates"
-  },
-  {
-    "packageName": "@relayfile/adapter-recall",
-    "packagePath": "packages/recall",
-    "provider": "recall",
-    "reason": "No resources.ts with writeback path templates"
-  },
-  {
     "packageName": "@relayfile/adapter-segment",
     "packagePath": "packages/segment",
     "provider": "segment",
-    "reason": "No resources.ts with writeback path templates"
-  },
-  {
-    "packageName": "@relayfile/adapter-sendgrid",
-    "packagePath": "packages/sendgrid",
-    "provider": "sendgrid",
     "reason": "No resources.ts with writeback path templates"
   },
   {

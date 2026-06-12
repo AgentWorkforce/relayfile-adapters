@@ -30,8 +30,17 @@ test('azure-blob rejects read-only writeback fields', () => {
 });
 
 test('azure-blob resolves writeback and nango behavior', () => {
-  const request = resolveWritebackRequest("/azure/{account}/{container}/blobs/draft.json", JSON.stringify({"account":"acct","container":"docs","name":"report.json","contentBase64":"e30=","contentType":"application/json"}));
-  assert.equal(request.operation, 'create');
+  const body = {"account":"acct","container":"docs","name":"report.json","contentBase64":"e30=","contentType":"application/json"};
+  const request = resolveWritebackRequest("/azure/{account}/{container}/blobs/draft.json", JSON.stringify(body));
+  assert.deepEqual(request, {
+    action: 'azure-blob.blobs.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: '/{container}/{name}',
+    resource: 'blobs',
+    resourceId: 'draft',
+    body,
+  });
   const adapter = new AzureBlobAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.throws(() => adapter.mapNangoSyncRecord({ id: 'nango_1' }), /does not declare/);
 });

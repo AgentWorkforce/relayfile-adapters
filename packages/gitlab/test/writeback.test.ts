@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { classifyWrite } from '@relayfile/adapter-core';
 
 import { GitLabWritebackHandler, resolveDeleteRequest } from '../src/writeback.js';
+import { resources } from '../src/resources.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabWritebackHandler', () => {
@@ -88,6 +90,8 @@ describe('GitLabWritebackHandler', () => {
   });
 
   it('maps canonical discussion and note paths to DELETE requests', () => {
+    const discussionNotePath = '/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1/notes/99.json';
+
     assert.deepStrictEqual(
       resolveDeleteRequest('/gitlab/projects/acme/api/issues/7__fix-bug/comments/11.json'),
       {
@@ -97,12 +101,19 @@ describe('GitLabWritebackHandler', () => {
       },
     );
     assert.deepStrictEqual(
-      resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json'),
+      resolveDeleteRequest(discussionNotePath),
       {
         action: 'delete_merge_request_discussion',
         method: 'DELETE',
-        endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42/discussions/discussion-1',
+        endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42/discussions/discussion-1/notes/99',
       },
+    );
+    const route = classifyWrite(discussionNotePath, resources, { fsEvent: 'delete' });
+    assert.strictEqual(route?.kind, 'delete');
+    assert.strictEqual(route?.resource.name, 'discussions');
+    assert.throws(
+      () => resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json'),
+      /Unsupported GitLab delete writeback path/,
     );
     assert.throws(
       () => resolveDeleteRequest('/gitlab/projects/acme/api/issues/7__fix-bug/comments/draft@note.json'),

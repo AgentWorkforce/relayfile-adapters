@@ -42,7 +42,23 @@ test('postgres writeback rejects unsafe SQL identifiers', () => {
 
 test('postgres resolves writeback and nango behavior', () => {
   const request = resolveWritebackRequest("/postgres/app/public/documents/draft.json", JSON.stringify({"primaryKey":"id","row":{"title":"Roadmap"}}));
-  assert.equal(request.operation, 'create');
+  assert.deepEqual(request, {
+    action: 'postgres.rows.create',
+    operation: 'create',
+    method: 'POST',
+    endpoint: 'parameterized CREATE on "public"."documents"',
+    resource: 'rows',
+    resourceId: 'draft',
+    body: {
+      db: 'app',
+      schema: 'public',
+      table: 'documents',
+      primaryKey: 'draft',
+      primaryKeyColumn: 'id',
+      row: { title: 'Roadmap' },
+    },
+    parameters: ['Roadmap'],
+  });
   const adapter = new PostgresAdapter({ workspaceId: 'ws_1', connectionId: 'conn_1' });
   assert.throws(() => adapter.mapNangoSyncRecord({ id: 'nango_1' }), /does not declare/);
 });

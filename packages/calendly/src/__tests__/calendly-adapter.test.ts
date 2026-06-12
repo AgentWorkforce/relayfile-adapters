@@ -315,6 +315,47 @@ test('writeback resolves supported create, update, and cancellation paths', () =
       },
     },
   );
+  assert.deepEqual(
+    resolveCalendlyWritebackRequest(
+      '/calendly/scheduled-events/create%20invitee.json',
+      '{"event_type":"https://api.calendly.com/event_types/type_123","start_time":"2026-04-11T10:00:00Z","invitee":{"email":"ada@example.com","name":"Ada"}}',
+    ),
+    {
+      action: 'create_event_invitee',
+      method: 'POST',
+      endpoint: '/invitees',
+      body: {
+        event_type: 'https://api.calendly.com/event_types/type_123',
+        start_time: '2026-04-11T10:00:00Z',
+        invitee: {
+          email: 'ada@example.com',
+          name: 'Ada',
+        },
+      },
+    },
+  );
+  assert.deepEqual(
+    resolveCalendlyWritebackRequest(
+      '/calendly/event-types/draft-discovery-call.json',
+      '{"name":"Discovery call","owner":"https://api.calendly.com/users/AAAAAAAAAAAAAAAA","duration":30,"active":true,"color":"#8247f5"}',
+    ),
+    {
+      action: 'create_event_type',
+      method: 'POST',
+      endpoint: '/event_types',
+      body: {
+        name: 'Discovery call',
+        owner: 'https://api.calendly.com/users/AAAAAAAAAAAAAAAA',
+        duration: 30,
+        active: true,
+        color: '#8247f5',
+      },
+    },
+  );
+  assert.throws(
+    () => resolveCalendlyWritebackRequest('/calendly/event-types/draft-discovery-call.json', '{"name":"Discovery call","duration":30}'),
+    /requires `owner`/,
+  );
   assert.deepEqual(resolveCalendlyWritebackRequest('/calendly/event-types/type_123.json', '{"name":"Demo","duration":30}'), {
     action: 'update_event_type',
     method: 'PATCH',

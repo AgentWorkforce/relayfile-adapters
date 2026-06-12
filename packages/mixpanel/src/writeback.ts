@@ -4,7 +4,8 @@ export const MIXPANEL_TRACK_ENDPOINT = '/track';
 export const MIXPANEL_ENGAGE_ENDPOINT = '/engage';
 
 export function resolveWritebackRequest(path: string, content: string): MixpanelWritebackRequest {
-  if (path === '/mixpanel/events/new.json' || path === '/mixpanel/events/') {
+  const eventCreateMatch = path.match(/^\/mixpanel\/events\/([^/]+)\.json$/);
+  if (path === '/mixpanel/events/' || (eventCreateMatch?.[1] && isDraftFilename(eventCreateMatch[1]))) {
     return buildTrackEvent(content);
   }
 
@@ -13,7 +14,8 @@ export function resolveWritebackRequest(path: string, content: string): Mixpanel
     return buildImportEvent(extractEventName(eventImportMatch[1]), content);
   }
 
-  if (path === '/mixpanel/profiles/new.json' || path === '/mixpanel/profiles/') {
+  const profileCreateMatch = path.match(/^\/mixpanel\/profiles\/([^/]+)\.json$/);
+  if (path === '/mixpanel/profiles/' || (profileCreateMatch?.[1] && isDraftFilename(profileCreateMatch[1]))) {
     return buildProfileSet(undefined, content);
   }
 
@@ -141,6 +143,11 @@ function extractEventName(segment: string): string {
     return decoded;
   }
   return slugged[1].replace(/-/g, ' ');
+}
+
+function isDraftFilename(encodedFilename: string): boolean {
+  const filename = decodeURIComponent(encodedFilename);
+  return /^(new|create|draft|track)(?:[-_\s].*)?$/iu.test(filename);
 }
 
 function parseJsonObject(content: string): Record<string, unknown> {
