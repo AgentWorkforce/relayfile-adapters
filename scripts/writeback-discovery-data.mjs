@@ -86,7 +86,7 @@ export const adapters = [
     ],
     endpoints: [
       endpoint('/confluence/pages/new.json', 'Create Confluence page', 'Creates a Confluence page when `spaceId` is supplied in the document.', ['title', 'spaceId', 'body'], confluencePageProps(), { title: 'Replace example page title', spaceId: '12345', body: '<p>Replace example page body.</p>' }),
-      endpoint('/confluence/spaces/{spaceIdOrKey}/pages/new.json', 'Create Confluence space page', 'Creates a Confluence page in the space named by the path.', ['title', 'body'], confluencePageProps({ includeSpaceId: false }), { title: 'Replace example page title', body: '<p>Replace example page body.</p>' }),
+      endpoint('/confluence/spaces/{spaceIdOrKey}/pages/new.json', 'Create Confluence space page', 'Creates a Confluence page in the space named by the path.', ['title', 'body'], confluencePageProps(), { title: 'Replace example page title', body: '<p>Replace example page body.</p>' }),
     ],
   },
   {
@@ -812,10 +812,10 @@ function clickupListProps() {
   };
 }
 
-function confluencePageProps(options = {}) {
+function confluencePageProps() {
   return {
     title: str('Page title.', undefined, { minLength: 1 }),
-    ...(options.includeSpaceId === false ? {} : { spaceId: str('Confluence space id.') }),
+    spaceId: confluenceSpaceIdProp(),
     status: en(['current', 'draft'], 'Page status. Defaults to current.'),
     parentId: str('Optional parent page id.'),
     body: {
@@ -854,6 +854,16 @@ function confluencePageProps(options = {}) {
       message: str('Version message.'),
       minorEdit: bool('Whether the update is a minor edit.'),
     }),
+  };
+}
+
+function confluenceSpaceIdProp() {
+  return {
+    description: 'Confluence space id.',
+    oneOf: [
+      { type: 'string', minLength: 1 },
+      { type: 'integer' },
+    ],
   };
 }
 

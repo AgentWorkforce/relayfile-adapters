@@ -455,11 +455,23 @@ describe('ConfluenceAdapter', () => {
     // Confluence v2 POST /pages requires the numeric spaceId; the path only
     // carries the space key, so a caller that resolved the numeric id supplies
     // it in the payload and it must win over the path value.
-    const req = resolveConfluenceWritebackRequest(
+    const stringReq = resolveConfluenceWritebackRequest(
       '/confluence/spaces/OPS/pages/draft.json',
       JSON.stringify({ spaceId: '688132', title: 'Notes', body: '<p>x</p>' }),
     );
-    assert.equal((req.body as { spaceId: string }).spaceId, '688132');
+    assert.equal((stringReq.body as { spaceId: string }).spaceId, '688132');
+
+    const numberReq = resolveConfluenceWritebackRequest(
+      '/confluence/spaces/OPS/pages/draft.json',
+      JSON.stringify({ spaceId: 688132, title: 'Notes', body: '<p>x</p>' }),
+    );
+    assert.equal((numberReq.body as { spaceId: string }).spaceId, '688132');
+
+    const snakeCaseReq = resolveConfluenceWritebackRequest(
+      '/confluence/spaces/OPS/pages/draft.json',
+      JSON.stringify({ space_id: 688132, title: 'Notes', body: '<p>x</p>' }),
+    );
+    assert.equal((snakeCaseReq.body as { spaceId: string }).spaceId, '688132');
   });
 
   it('resolves page updates and increments synced version numbers', () => {

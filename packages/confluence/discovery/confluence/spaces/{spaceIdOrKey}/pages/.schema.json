@@ -12,6 +12,18 @@
       "description": "Page title.",
       "minLength": 1
     },
+    "spaceId": {
+      "description": "Confluence space id.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "integer"
+        }
+      ]
+    },
     "status": {
       "enum": [
         "current",

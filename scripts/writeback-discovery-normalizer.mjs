@@ -234,7 +234,7 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/merge_requests/{mergeRequestIid}__{slug}/discussions')) {
-    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$';
+    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?|/[^/]+/notes/[^/]+\\.json)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/issues/{issueIid}__{slug}/comments')) {
     return '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$';

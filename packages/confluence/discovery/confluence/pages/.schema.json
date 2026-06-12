@@ -14,8 +14,16 @@
       "minLength": 1
     },
     "spaceId": {
-      "type": "string",
-      "description": "Confluence space id."
+      "description": "Confluence space id.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "integer"
+        }
+      ]
     },
     "status": {
       "enum": [

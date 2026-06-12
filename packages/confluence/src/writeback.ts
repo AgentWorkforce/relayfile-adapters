@@ -65,7 +65,7 @@ function buildPageCreate(content: string, pathSpaceId?: string): ConfluenceWrite
   // numeric id supplies it explicitly in the payload; that takes precedence over
   // the path-derived value.
   const spaceId =
-    readString(payload, 'spaceId') ?? readString(payload, 'space_id') ?? pathSpaceId;
+    readSpaceId(payload, 'spaceId') ?? readSpaceId(payload, 'space_id') ?? pathSpaceId;
   if (!spaceId) {
     throw new Error('page create writeback requires spaceId');
   }
@@ -228,6 +228,14 @@ function safeParseJson(content: string): unknown {
 function readString(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function readSpaceId(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return readString(record, key);
 }
 
 function readNumber(record: Record<string, unknown>, key: string): number | undefined {
