@@ -73,6 +73,15 @@ export const KNOWN_TRIGGER_CATALOG = {
     "space.deleted",
     "space.updated"
   ],
+  "daytona": [
+    "sandbox.created",
+    "sandbox.state.updated",
+    "snapshot.created",
+    "snapshot.removed",
+    "snapshot.state.updated",
+    "volume.created",
+    "volume.state.updated"
+  ],
   "dropbox": [
     "file.changed"
   ],

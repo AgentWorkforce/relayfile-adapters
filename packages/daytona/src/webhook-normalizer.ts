@@ -11,6 +11,7 @@ export interface NormalizedDaytonaWebhook {
   organizationId: string;
   timestamp: string;
   state?: string;
+  errorReason?: string;
   payload: Record<string, unknown>;
   fileEventType: "file.created" | "file.updated" | "file.deleted";
   shouldDelete: boolean;
@@ -80,6 +81,19 @@ function readState(payload: Record<string, unknown>): string | undefined {
   );
 }
 
+function readErrorReason(payload: Record<string, unknown>): string | undefined {
+  return (
+    readString(payload.errorReason) ??
+    readString(payload.error_reason) ??
+    readString(readNestedRecord(payload, "sandbox")?.errorReason) ??
+    readString(readNestedRecord(payload, "sandbox")?.error_reason) ??
+    readString(readNestedRecord(payload, "snapshot")?.errorReason) ??
+    readString(readNestedRecord(payload, "snapshot")?.error_reason) ??
+    readString(readNestedRecord(payload, "volume")?.errorReason) ??
+    readString(readNestedRecord(payload, "volume")?.error_reason)
+  );
+}
+
 function readEvent(payload: Record<string, unknown>): DaytonaWebhookEvent | null {
   const candidate = readString(payload.event) ?? readString(payload.eventType);
   if (!candidate) {
@@ -111,6 +125,7 @@ export function normalizeDaytonaWebhook(
   }
 
   const state = readState(body);
+  const errorReason = readErrorReason(body);
   const shouldDelete = eventType === "snapshot.removed";
   const fileEventType = shouldDelete
     ? "file.deleted"
@@ -126,6 +141,7 @@ export function normalizeDaytonaWebhook(
     organizationId,
     timestamp: readTimestamp(body),
     ...(state ? { state } : {}),
+    ...(errorReason ? { errorReason } : {}),
     payload: body,
     fileEventType,
     shouldDelete,
