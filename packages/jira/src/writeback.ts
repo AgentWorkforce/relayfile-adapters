@@ -2,6 +2,15 @@ import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { extractJiraIdFromPathSegment } from './path-mapper.js';
 import { resources } from './resources.js';
 import type { JiraWritebackRequest } from './types.js';
+import { isAdfDoc, markdownToAdf } from './adf.js';
+
+// Jira Cloud REST v3 comment bodies must be ADF. Author content is Markdown, so
+// string bodies are converted; an already-structured ADF doc passes through.
+function toCommentBody(raw: unknown): unknown {
+  if (typeof raw === 'string') return markdownToAdf(raw);
+  if (isAdfDoc(raw)) return raw;
+  return raw;
+}
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -124,7 +133,7 @@ function buildCommentCreate(issueIdOrKey: string, content: string): JiraWritebac
     action: 'create_comment',
     method: 'POST',
     endpoint: `${JIRA_REST_ISSUE_ROUTE}/${issueIdOrKey}/comment`,
-    body: { body },
+    body: { body: toCommentBody(body) },
   };
 }
 
@@ -142,7 +151,7 @@ function buildCommentUpdate(
     action: 'update_comment',
     method: 'PUT',
     endpoint: `${JIRA_REST_ISSUE_ROUTE}/${issueIdOrKey}/comment/${commentId}`,
-    body: { body },
+    body: { body: toCommentBody(body) },
   };
 }
 
