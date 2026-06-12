@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Daytona organization usage",
+  "description": "Per-organization usage + quota overview, polled hourly from Daytona's GET /organizations/{organizationId}/usage (usage has no webhook). One record per organization, keyed by organizationId. Read-only.",
+  "type": "object",
+  "required": [
+    "organizationId",
+    "totalSnapshotQuota",
+    "currentSnapshotUsage",
+    "totalVolumeQuota",
+    "currentVolumeUsage"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Record id; equals organizationId."
+    },
+    "organizationId": {
+      "type": "string",
+      "description": "Daytona organization id this usage snapshot belongs to.",
+      "minLength": 1
+    },
+    "totalSnapshotQuota": {
+      "type": "number",
+      "description": "Snapshot quota limit for the organization."
+    },
+    "currentSnapshotUsage": {
+      "type": "number",
+      "description": "Snapshots currently in use."
+    },
+    "totalVolumeQuota": {
+      "type": "number",
+      "description": "Volume quota limit for the organization."
+    },
+    "currentVolumeUsage": {
+      "type": "number",
+      "description": "Volumes currently in use."
+    },
+    "regionUsage": {
+      "type": "array",
+      "description": "Per-region CPU/memory/disk/GPU quota and usage.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "regionId": { "type": "string" },
+          "sandboxClass": { "type": ["string", "null"] },
+          "totalCpuQuota": { "type": "number" },
+          "currentCpuUsage": { "type": "number" },
+          "totalMemoryQuota": { "type": "number" },
+          "currentMemoryUsage": { "type": "number" },
+          "totalDiskQuota": { "type": "number" },
+          "currentDiskUsage": { "type": "number" },
+          "totalGpuQuota": { "type": "number" },
+          "currentGpuUsage": { "type": "number" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the usage snapshot was polled."
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Alias of capturedAt; the snapshot's effective timestamp."
+    }
+  },
+  "additionalProperties": true
+}

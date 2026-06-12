@@ -43,6 +43,7 @@
         "@relayfile/adapter-calendly#build",
         "@relayfile/adapter-clickup#build",
         "@relayfile/adapter-confluence#build",
+        "@relayfile/adapter-daytona#build",
         "@relayfile/adapter-docker-hub#build",
         "@relayfile/adapter-dropbox#build",
         "@relayfile/adapter-fathom#build",

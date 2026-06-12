@@ -127,6 +127,14 @@
       }
     ]
   },
+  "daytona": {
+    "usage": [
+      {
+        "path": "/daytona/usage",
+        "params": []
+      }
+    ]
+  },
   "dropbox": {
     "cursors": [
       {
