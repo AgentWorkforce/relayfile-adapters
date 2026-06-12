@@ -58,6 +58,7 @@
         "@relayfile/adapter-mixpanel#build",
         "@relayfile/adapter-notion#build",
         "@relayfile/adapter-pipedrive#build",
+        "@relayfile/adapter-recall#build",
         "@relayfile/adapter-reddit#build",
         "@relayfile/adapter-salesforce#build",
         "@relayfile/adapter-segment#build",

@@ -569,6 +569,14 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "recall": {
+    "recordings": [
+      {
+        "path": "/recall/recordings",
+        "params": []
+      }
+    ]
+  },
   "reddit": {
     "posts": [
       {
