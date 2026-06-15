@@ -11,6 +11,7 @@ const CANONICAL_ALIAS_SEGMENTS = new Set([
   'by-name',
   'by-priority',
   'by-state',
+  'by-team',
   'by-title',
   'by-uuid',
 ]);
@@ -28,6 +29,7 @@ test('layoutManifest exposes Linear resources with canonical aliases and writeba
     'by-priority',
     'by-title',
     'by-state',
+    'by-team',
     'by-uuid',
   ]);
   assert.ok(manifest.resources.length > 0);

@@ -119,8 +119,12 @@ export const LINEAR_ISSUE_FIELDS = `
         project {
           id
           name
+          slugId
           state
           url
+          lead {
+            id
+          }
         }
         cycle {
           id
@@ -141,9 +145,12 @@ export const LINEAR_PROJECT_FIELDS = `
         name
         description
         state
+        slugId
         progress
         startDate
         targetDate
+        color
+        icon
         url
         createdAt
         updatedAt
@@ -407,7 +414,9 @@ export interface LinearTeamReferenceNode {
 export interface LinearProjectReferenceNode {
   id?: string | null;
   name?: string | null;
+  slugId?: string | null;
   state?: string | null;
+  lead?: { id?: string | null } | null;
   url?: string | null;
 }
 
@@ -459,9 +468,12 @@ export interface LinearProjectNode {
   name?: string | null;
   description?: string | null;
   state?: string | null;
+  slugId?: string | null;
   progress?: number | null;
   startDate?: string | null;
   targetDate?: string | null;
+  color?: string | null;
+  icon?: string | null;
   lead?: { id?: string | null; name?: string | null; email?: string | null } | null;
   status?: { id?: string | null; name?: string | null; type?: string | null; color?: string | null } | null;
   teams?: { nodes?: Array<{ id?: string | null; key?: string | null; name?: string | null }> } | null;

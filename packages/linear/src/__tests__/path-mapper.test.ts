@@ -6,12 +6,18 @@ import {
   linearAgentWebhookEventPath,
   linearAgentWebhookTriggerGlob,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
   linearCommentLegacyPath,
   linearCommentPath,
   linearCommentReadCandidatePaths,
   linearIssueByEditedPath,
+  linearProjectAddIssuesPath,
+  linearProjectByStatePath,
+  linearProjectByTeamPath,
+  linearProjectLegacyPath,
+  linearProjectPath,
   normalizeLinearObjectType,
   normalizeNangoLinearModel,
   tryNormalizeLinearObjectType,
@@ -105,6 +111,30 @@ describe('linear path-mapper', () => {
       assert.equal(
         linearIssueByEditedPath('2026-05-12', 'issue-123'),
         '/linear/issues/by-edited/2026-05-12/issue-123.json',
+      );
+      assert.equal(
+        linearProjectPath('project-123'),
+        '/linear/projects/project-123/meta.json',
+      );
+      assert.equal(
+        linearProjectLegacyPath('project-123'),
+        '/linear/projects/project-123.json',
+      );
+      assert.equal(
+        linearByNameAliasPath('/linear/projects', 'Factory Launch', 'project-123'),
+        '/linear/projects/by-name/factory-launch.json',
+      );
+      assert.equal(
+        linearProjectByStatePath('backlog', 'project-123'),
+        '/linear/projects/by-state/backlog/project-123.json',
+      );
+      assert.equal(
+        linearProjectByTeamPath('team/eng', 'project-123'),
+        '/linear/projects/by-team/team%2Feng/project-123.json',
+      );
+      assert.equal(
+        linearProjectAddIssuesPath('project-123'),
+        '/linear/projects/project-123/add-issues.json',
       );
       const leaf = linearIssueByEditedPath('2026-05-12', 'issue/123').split('/').pop()!.replace(/\.json$/u, '');
       assert.equal(decodeURIComponent(leaf), 'issue/123');

@@ -3,7 +3,13 @@ import { describe, it } from 'node:test';
 
 import { aliasCollisionSuffix, slugifyAlias } from '../alias-slug.js';
 import { LinearAdapter, type ConnectionProvider, type ProxyRequest, type ProxyResponse, type RelayFileClientLike } from '../index.js';
-import { linearByIdAliasPath, linearByTitleAliasPath, linearIssuePath } from '../path-mapper.js';
+import {
+  linearByIdAliasPath,
+  linearByNameAliasPath,
+  linearByTitleAliasPath,
+  linearIssuePath,
+  linearProjectPath,
+} from '../path-mapper.js';
 
 function createAdapter() {
   const files = new Map<string, string>();
@@ -91,7 +97,7 @@ describe('linear aliases', () => {
     assert.deepStrictEqual(index.map((row) => row.id), ['issue-123']);
   });
 
-  it('writes project by-id aliases from the UUID and disambiguates by-title collisions with an 8-char hash', async () => {
+  it('writes project by-id aliases from the UUID and disambiguates by-name collisions with an 8-char hash', async () => {
     const { adapter, client } = createAdapter();
 
     await adapter.ingestWebhook('ws-linear', {
@@ -115,10 +121,10 @@ describe('linear aliases', () => {
       },
     });
 
-    const firstCanonicalPath = '/linear/projects/project-1.json';
-    const secondCanonicalPath = '/linear/projects/project-2.json';
+    const firstCanonicalPath = linearProjectPath('project-1');
+    const secondCanonicalPath = linearProjectPath('project-2');
     const byIdPath = linearByIdAliasPath('/linear/projects', 'project-1');
-    const collisionAliasPath = linearByTitleAliasPath('/linear/projects', 'Roadmap!!!', 'project-2', true);
+    const collisionAliasPath = linearByNameAliasPath('/linear/projects', 'Roadmap!!!', 'project-2', true);
 
     assert.strictEqual(client.readFile(byIdPath), client.readFile(firstCanonicalPath));
     assert.strictEqual(client.readFile(collisionAliasPath), client.readFile(secondCanonicalPath));
@@ -265,9 +271,9 @@ describe('linear aliases', () => {
       payload: { id: objectId, name: 'New project name' },
     });
 
-    const canonicalPath = '/linear/projects/project-106.json';
-    const oldAliasPath = linearByTitleAliasPath('/linear/projects', 'Old project name', objectId);
-    const newAliasPath = linearByTitleAliasPath('/linear/projects', 'New project name', objectId);
+    const canonicalPath = linearProjectPath(objectId);
+    const oldAliasPath = linearByNameAliasPath('/linear/projects', 'Old project name', objectId);
+    const newAliasPath = linearByNameAliasPath('/linear/projects', 'New project name', objectId);
 
     assert.strictEqual(client.readFile(newAliasPath), client.readFile(canonicalPath));
     assert.strictEqual(files.has(oldAliasPath), false);

@@ -32,17 +32,28 @@ export type JsonArray = JsonValue[];
 export type JsonObject = { [key: string]: JsonValue };
 
 /**
- * Describes a Linear write the cloud writeback engine should execute via the
- * provider proxy. Linear's API is GraphQL, so every writeback is a POST to
- * `/graphql` with `{ query, variables }`.
+ * Describes a Linear write the cloud writeback engine should execute. Issue,
+ * comment, and agent activity writes still proxy Linear GraphQL directly;
+ * project writes use the companion linear-relay Nango actions because those
+ * actions own ProjectStatusType resolution and archive semantics.
  */
 export interface LinearWritebackRequest {
-  action: 'create_agent_activity' | 'create_comment' | 'create_issue' | 'delete_issue' | 'update_issue';
-  method: 'POST';
-  endpoint: '/graphql';
+  action:
+    | 'add-issues-to-project'
+    | 'archive-project'
+    | 'create_agent_activity'
+    | 'create_comment'
+    | 'create_issue'
+    | 'create-project'
+    | 'delete_issue'
+    | 'update_issue'
+    | 'update-project';
+  method: 'PATCH' | 'POST';
+  endpoint: string;
   body: {
-    query: string;
-    variables: Record<string, unknown>;
+    query?: string;
+    variables?: Record<string, unknown>;
+    [key: string]: unknown;
   };
 }
 
@@ -126,7 +137,11 @@ export interface LinearLabel {
 export interface LinearProjectReference {
   id: string;
   name?: string;
+  slug?: string;
+  slugId?: string;
   state?: string;
+  lead?: { id?: string | null } | null;
+  leadId?: string | null;
   url?: string;
 }
 
@@ -154,7 +169,11 @@ export interface LinearProject {
   name: string;
   description?: string | null;
   state?: string;
+  slug?: string | null;
+  slugId?: string | null;
   progress?: number | null;
+  startDate?: string | null;
+  start_date?: string | null;
   targetDate?: string | null;
   target_date?: string | null;
   startedAt?: string | null;
@@ -165,6 +184,11 @@ export interface LinearProject {
   created_at?: string;
   updatedAt?: string;
   updated_at?: string;
+  lead?: LinearUser | null;
+  leadId?: string | null;
+  lead_id?: string | null;
+  color?: string | null;
+  icon?: string | null;
   team_ids?: string[];
   teams?: LinearTeam[];
   url?: string;

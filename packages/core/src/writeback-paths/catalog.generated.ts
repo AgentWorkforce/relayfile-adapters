@@ -409,6 +409,26 @@ export const WRITEBACK_PATH_CATALOG = {
         "path": "/linear/issues",
         "params": []
       }
+    ],
+    "project-issue-assignments": [
+      {
+        "path": "/linear/projects/{projectId}/add-issues.json",
+        "params": [
+          "projectId"
+        ]
+      }
+    ],
+    "projects": [
+      {
+        "path": "/linear/projects",
+        "params": []
+      },
+      {
+        "path": "/linear/projects/{projectId}/meta.json",
+        "params": [
+          "projectId"
+        ]
+      }
     ]
   },
   "mailgun": {

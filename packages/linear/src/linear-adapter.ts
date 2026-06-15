@@ -13,11 +13,14 @@ import {
   LINEAR_PATH_ROOT,
   linearAgentWebhookEventPath,
   linearByIdAliasPath,
+  linearByNameAliasPath,
   linearByTitleAliasPath,
   linearCyclePath,
   linearIssueByStatePath,
   linearIssuePath,
   linearMilestonePath,
+  linearProjectByStatePath,
+  linearProjectByTeamPath,
   linearProjectPath,
   linearRoadmapPath,
   linearTeamPath,
@@ -696,7 +699,9 @@ function applyIssueSemantics(
     relations.add(linearProjectPath(issue.project.id));
     addStringProperty(properties, 'linear.project_id', issue.project.id);
     addStringProperty(properties, 'linear.project_name', issue.project.name);
+    addFirstStringProperty(properties, 'linear.project_slug', issue.project.slug, issue.project.slugId);
     addStringProperty(properties, 'linear.project_state', issue.project.state);
+    addFirstStringProperty(properties, 'linear.project_lead_id', issue.project.lead?.id, issue.project.leadId);
     addStringProperty(properties, 'linear.project_url', issue.project.url);
   }
   const projectId = asString(issue.project_id);
@@ -828,12 +833,17 @@ function applyProjectSemantics(
 
   addStringProperty(properties, 'linear.name', project.name);
   addStringProperty(properties, 'linear.state', project.state);
+  addFirstStringProperty(properties, 'linear.slug', project.slug, project.slugId);
   addFirstStringProperty(properties, 'linear.description', project.description);
+  addFirstStringProperty(properties, 'linear.start_date', project.startDate, project.start_date);
   addFirstStringProperty(properties, 'linear.target_date', project.targetDate, project.target_date);
   addFirstStringProperty(properties, 'linear.started_at', project.startedAt, project.started_at);
   addFirstStringProperty(properties, 'linear.completed_at', project.completedAt, project.completed_at);
   addFirstStringProperty(properties, 'linear.created_at', project.createdAt, project.created_at);
   addFirstStringProperty(properties, 'linear.updated_at', project.updatedAt, project.updated_at);
+  addFirstStringProperty(properties, 'linear.lead_id', project.lead?.id, project.leadId, project.lead_id);
+  addFirstStringProperty(properties, 'linear.color', project.color);
+  addFirstStringProperty(properties, 'linear.icon', project.icon);
 
   const progress = asNumber(project.progress);
   if (progress !== undefined) {
@@ -851,6 +861,13 @@ function applyProjectSemantics(
       relations.add(linearTeamPath(teamId));
     }
   }
+}
+
+function readProjectTeamIdsFromPayload(payload: LinearRecord): string[] {
+  return uniqueStrings([
+    ...asStringArray(payload.team_ids),
+    ...asLinearReferenceIds(payload.teams),
+  ]);
 }
 
 function buildLinearIssueReferencePath(issue: {
@@ -1341,12 +1358,14 @@ async function writeLinearAliases(
   // Snapshot the previous record version before the by-id alias is
   // overwritten — it carries the prior title/name for stale alias cleanup.
   const previousContent = await readLinearFile(client, byIdAliasPath, workspaceId);
-  await writeLinearIndex(client, workspaceId, scope);
+  await writeLinearIndex(client, workspaceId, scope, { objectType: normalizedType });
   await writeLinearFile(client, workspaceId, byIdAliasPath, content, semantics);
 
   let writtenAliasPath: string | undefined;
   if (title) {
-    const baseAliasPath = linearByTitleAliasPath(scope, title, event.objectId);
+    const baseAliasPath = normalizedType === 'issue'
+      ? linearByTitleAliasPath(scope, title, event.objectId)
+      : linearByNameAliasPath(scope, title, event.objectId);
     const existingBaseContent = await readLinearFile(client, baseAliasPath, workspaceId);
     // A base alias holding this record's previous bytes is ours — overwrite
     // it in place instead of forking to the collision variant.
@@ -1354,11 +1373,23 @@ async function writeLinearAliases(
       existingBaseContent !== undefined && existingBaseContent === previousContent;
     const aliasPath =
       existingBaseContent !== undefined && existingBaseContent !== content && !ownsBaseAlias
-        ? linearByTitleAliasPath(scope, title, event.objectId, true)
+        ? normalizedType === 'issue'
+          ? linearByTitleAliasPath(scope, title, event.objectId, true)
+          : linearByNameAliasPath(scope, title, event.objectId, true)
         : baseAliasPath;
 
     await writeLinearFile(client, workspaceId, aliasPath, content, semantics);
     writtenAliasPath = aliasPath;
+  }
+
+  if (normalizedType === 'project') {
+    const state = asString(event.payload.state);
+    if (state) {
+      await writeLinearFile(client, workspaceId, linearProjectByStatePath(state, event.objectId), content, semantics);
+    }
+    for (const teamId of readProjectTeamIdsFromPayload(event.payload)) {
+      await writeLinearFile(client, workspaceId, linearProjectByTeamPath(teamId, event.objectId), content, semantics);
+    }
   }
 
   // Stale alias lifecycle (issue #106): delete the previous by-title alias
@@ -1374,7 +1405,7 @@ async function writeLinearAliases(
 }
 
 /**
- * Removes the stale `by-title` alias left behind when an issue title or
+ * Removes the stale human-readable alias left behind when an issue title or
  * project name changes between ingests (issue #106).
  *
  * Prior state comes from the mirror itself: the title-independent `by-id`
@@ -1426,8 +1457,12 @@ async function cleanupStaleLinearTitleAliases(
   const candidatePaths: string[] = [];
   try {
     candidatePaths.push(
-      linearByTitleAliasPath(scope, previousTitle, objectId),
-      linearByTitleAliasPath(scope, previousTitle, objectId, true),
+      objectType === 'issue'
+        ? linearByTitleAliasPath(scope, previousTitle, objectId)
+        : linearByNameAliasPath(scope, previousTitle, objectId),
+      objectType === 'issue'
+        ? linearByTitleAliasPath(scope, previousTitle, objectId, true)
+        : linearByNameAliasPath(scope, previousTitle, objectId, true),
     );
   } catch {
     // Previous title slugs to an empty string — no alias was emitted for it.
@@ -1451,7 +1486,7 @@ async function writeLinearIndex(
   client: RelayFileClientLike,
   workspaceId: string,
   scope: string,
-  options?: AtomicUpsertOptions,
+  options?: AtomicUpsertOptions & { objectType?: 'issue' | 'project' },
 ): Promise<void> {
   const indexPath = `${scope}/_index.json`;
   const vfs = linearClientToVfs(client, workspaceId);
@@ -1460,14 +1495,25 @@ async function writeLinearIndex(
     vfs,
     indexPath,
     parseLinearIndexRows,
-    (rows) =>
-      mergeLinearIndexRowsList(rows, [
-        { title: 'by-id', file: 'by-id/' },
-        { title: 'by-title', file: 'by-title/' },
-      ]),
+    (rows) => mergeLinearIndexRowsList(rows, indexAliasRows(options?.objectType)),
     (rows) => stableJson({ rows }),
     options,
   );
+}
+
+function indexAliasRows(objectType: 'issue' | 'project' | undefined): LinearIndexRow[] {
+  if (objectType === 'project') {
+    return [
+      { title: 'by-id', file: 'by-id/' },
+      { title: 'by-name', file: 'by-name/' },
+      { title: 'by-state', file: 'by-state/' },
+      { title: 'by-team', file: 'by-team/' },
+    ];
+  }
+  return [
+    { title: 'by-id', file: 'by-id/' },
+    { title: 'by-title', file: 'by-title/' },
+  ];
 }
 
 /**

@@ -431,7 +431,7 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
 
   assert.equal(linearIssuePath('issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(linearCommentPath('comment:42'), '/linear/comments/comment%3A42/meta.json');
-  assert.equal(linearProjectPath('project#7'), '/linear/projects/project%237.json');
+  assert.equal(linearProjectPath('project#7'), '/linear/projects/project%237/meta.json');
   assert.equal(linearCyclePath('cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(linearTeamPath('team eng'), '/linear/teams/team%20eng.json');
   assert.equal(linearUserPath('user@example.com'), '/linear/users/user%40example.com.json');
@@ -442,7 +442,7 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
   assert.equal(computeLinearPath('comments', 'comment:42'), '/linear/comments/comment%3A42/meta.json');
   assert.equal(computeLinearPath('Issue', 'issue_123', 'AGE-8'), '/linear/issues/AGE-8__issue_123.json');
   assert.equal(computeLinearPath('comment', 'comment_123', 'AGE-8'), '/linear/comments/AGE-8__comment_123/meta.json');
-  assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237.json');
+  assert.equal(computeLinearPath('project', 'project#7'), '/linear/projects/project%237/meta.json');
   assert.equal(computeLinearPath('Cycles', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(computeLinearPath('teams', 'team eng'), '/linear/teams/team%20eng.json');
   assert.equal(computeLinearPath('users', 'user@example.com'), '/linear/users/user%40example.com.json');
@@ -451,7 +451,7 @@ test('path mapping stays deterministic for supported Linear VFS objects', () => 
 
   assert.equal(adapter.computePath('issues', 'issue 1/2'), '/linear/issues/issue%201%2F2.json');
   assert.equal(adapter.computePath('comment', 'comment:42'), '/linear/comments/comment%3A42/meta.json');
-  assert.equal(adapter.computePath('projects', 'project#7'), '/linear/projects/project%237.json');
+  assert.equal(adapter.computePath('projects', 'project#7'), '/linear/projects/project%237/meta.json');
   assert.equal(adapter.computePath('cycle', 'cycle Q2'), '/linear/cycles/cycle%20Q2.json');
   assert.equal(adapter.computePath('team', 'team eng'), '/linear/teams/team%20eng.json');
   assert.equal(adapter.computePath('user', 'user@example.com'), '/linear/users/user%40example.com.json');
@@ -598,7 +598,7 @@ test('computeSemantics extracts issue priority, state, labels, and relations det
     '/linear/issues/ENG-125__issue_child_a.json',
     '/linear/issues/issue_child_a.json',
     '/linear/issues/issue_related_z.json',
-    '/linear/projects/project_alpha.json',
+    '/linear/projects/project_alpha/meta.json',
     '/linear/teams/team_eng.json',
   ]);
   assert.equal(semantics.comments, undefined);
@@ -671,7 +671,7 @@ test('computeSemantics extracts synced Linear project, milestone, and roadmap re
     'linear.project_id': 'project_alpha',
     'linear.project_name': 'Alpha',
   });
-  assert.deepEqual(milestoneSemantics.relations, ['/linear/projects/project_alpha.json']);
+  assert.deepEqual(milestoneSemantics.relations, ['/linear/projects/project_alpha/meta.json']);
 
   const roadmapSemantics = adapter.computeSemantics('roadmap', 'roadmap_2026', {
     id: 'roadmap_2026',
@@ -693,8 +693,8 @@ test('computeSemantics extracts synced Linear project, milestone, and roadmap re
     'linear.team_count': '1',
   });
   assert.deepEqual(roadmapSemantics.relations, [
-    '/linear/projects/project_alpha.json',
-    '/linear/projects/project_beta.json',
+    '/linear/projects/project_alpha/meta.json',
+    '/linear/projects/project_beta/meta.json',
     '/linear/teams/team_eng.json',
   ]);
 });
