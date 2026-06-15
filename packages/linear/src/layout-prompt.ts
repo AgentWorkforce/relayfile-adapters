@@ -13,7 +13,7 @@ Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (alwa
 
 Project lookups: \`/linear/projects/by-id/<uuid>.json\` is the stable project id lookup, \`/linear/projects/by-name/<slug>.json\` resolves a project by name, \`/linear/projects/by-state/<backlog|planned|started|paused|completed|canceled>/<uuid>.json\` groups by Linear project state, and \`/linear/projects/by-team/<team-uuid>/<project-uuid>.json\` is emitted once per team on multi-team projects.
 
-Writable resources advertise sibling schemas and create examples at \`discovery/linear/issues/.schema.json\`, \`discovery/linear/issues/.create.example.json\`, \`discovery/linear/issues/{issueId}/comments/.schema.json\`, \`discovery/linear/issues/{issueId}/comments/.create.example.json\`, \`discovery/linear/projects/.schema.json\`, \`discovery/linear/projects/.create.example.json\`, \`discovery/linear/projects/{projectId}/add-issues.json/.schema.json\`, and \`discovery/linear/projects/{projectId}/add-issues.json/.create.example.json\`.
+Writable resources advertise sibling schemas and create examples at \`discovery/linear/issues/.schema.json\`, \`discovery/linear/issues/.create.example.json\`, \`discovery/linear/issues/{issueId}/comments/.schema.json\`, \`discovery/linear/issues/{issueId}/comments/.create.example.json\`, \`discovery/linear/projects/.schema.json\`, \`discovery/linear/projects/.create.example.json\`, \`discovery/linear/projects/{projectId}/meta.json/.schema.json\`, \`discovery/linear/projects/{projectId}/meta.json/.create.example.json\`, \`discovery/linear/projects/{projectId}/add-issues.json/.schema.json\`, and \`discovery/linear/projects/{projectId}/add-issues.json/.create.example.json\`.
 
 ## Indexes
 
