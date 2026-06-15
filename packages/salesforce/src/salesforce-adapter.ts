@@ -10,6 +10,7 @@ import {
   salesforceLeadPath,
   salesforceOpportunityPath,
 } from './path-mapper.js';
+import { SalesforceApiClient } from './api.js';
 import { SALESFORCE_OBJECT_TYPES } from './types.js';
 import type {
   SalesforceAccount,
@@ -71,9 +72,19 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content?: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  readFile?(input: ReadFileInput): Promise<ReadFileResult | string | null | undefined> | ReadFileResult | string | null | undefined;
 }
 
 export abstract class IntegrationAdapter {
@@ -113,6 +124,7 @@ export class SalesforceAdapter extends IntegrationAdapter {
   override readonly version = '0.1.0';
 
   readonly config: SalesforceAdapterConfig;
+  private readonly api: SalesforceApiClient;
 
   constructor(
     client: RelayFileClientLike,
@@ -121,6 +133,7 @@ export class SalesforceAdapter extends IntegrationAdapter {
   ) {
     super(client, provider);
     this.config = config;
+    this.api = new SalesforceApiClient(provider, config);
   }
 
   override supportedEvents(): string[] {
@@ -177,15 +190,21 @@ export class SalesforceAdapter extends IntegrationAdapter {
         };
       }
 
+      const reconciledPayload = await this.reconcileWebhookPayload(workspaceId, path, normalized);
+      const reconciled: NormalizedWebhook = {
+        ...normalized,
+        payload: reconciledPayload,
+      };
+
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, false),
+        content: this.renderContent(workspaceId, reconciled, false),
         contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+        semantics: this.computeSemantics(reconciled.objectType, reconciled.objectId, reconciled.payload),
       });
 
-      const counts = inferWriteCounts(normalized, writeResult, false);
+      const counts = inferWriteCounts(reconciled, writeResult, false);
       return {
         filesWritten: counts.filesWritten,
         filesUpdated: counts.filesUpdated,
@@ -320,6 +339,51 @@ export class SalesforceAdapter extends IntegrationAdapter {
   private isDeleteEvent(event: NormalizedWebhook): boolean {
     const action = getWebhookAction(event.payload) ?? getEventAction(event.eventType);
     return action === 'deleted' || action === 'delete';
+  }
+
+  private async reconcileWebhookPayload(
+    workspaceId: string,
+    path: string,
+    event: NormalizedWebhook,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const fetchOptions: { connectionId?: string; providerConfigKey?: string } = {};
+      if (event.connectionId) {
+        fetchOptions.connectionId = event.connectionId;
+      }
+      const providerConfigKey = readProviderConfigKey(event.payload);
+      if (providerConfigKey) {
+        fetchOptions.providerConfigKey = providerConfigKey;
+      }
+      const fetched = await this.api.fetchSObject(event.objectType, event.objectId, fetchOptions);
+      return mergeFetchedPayload(fetched, event.payload);
+    } catch {
+      return mergeFallbackPayload(await this.readExistingPayload(workspaceId, path), event.payload);
+    }
+  }
+
+  private async readExistingPayload(
+    workspaceId: string,
+    path: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    if (!this.client.readFile) {
+      return undefined;
+    }
+
+    try {
+      const result = await this.client.readFile({ workspaceId, path });
+      const content = typeof result === 'string' ? result : result?.content;
+      if (!content) {
+        return undefined;
+      }
+      const parsed = JSON.parse(content) as unknown;
+      if (!isRecord(parsed)) {
+        return undefined;
+      }
+      return isRecord(parsed.payload) ? parsed.payload : parsed;
+    } catch {
+      return undefined;
+    }
   }
 
   private renderContent(workspaceId: string, event: NormalizedWebhook, deleted: boolean): string {
@@ -628,6 +692,42 @@ function mergeSalesforcePayload(
       webhookId: asString(event.webhookId),
     }),
   };
+}
+
+function mergeFetchedPayload(
+  fetched: Record<string, unknown>,
+  webhookPayload: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...fetched,
+    ...pickWebhookMetadata(webhookPayload),
+  };
+}
+
+function mergeFallbackPayload(
+  existingPayload: Record<string, unknown> | undefined,
+  webhookPayload: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(existingPayload ?? {}),
+    ...webhookPayload,
+  };
+}
+
+function pickWebhookMetadata(payload: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+  if (isRecord(payload._connection)) {
+    metadata._connection = payload._connection;
+  }
+  if (isRecord(payload._webhook)) {
+    metadata._webhook = payload._webhook;
+  }
+  return metadata;
+}
+
+function readProviderConfigKey(payload: Record<string, unknown>): string | undefined {
+  const connection = getRecord(payload._connection);
+  return asString(connection?.providerConfigKey) ?? asString(connection?.provider_config_key);
 }
 
 function inferWriteCounts(

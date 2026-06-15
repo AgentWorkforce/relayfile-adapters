@@ -15,6 +15,7 @@ import {
   type ConnectionProvider,
   type ProxyRequest,
   type ProxyResponse,
+  type ReadFileResult,
   type RelayFileClientLike,
   type SalesforceAdapterConfig,
   type WriteFileInput,
@@ -23,16 +24,23 @@ import { ReadOnlyFieldError } from '../writeback.js';
 
 interface CapturingClient extends RelayFileClientLike {
   deleted: string[];
+  files: Map<string, string>;
   writes: WriteFileInput[];
 }
 
 function createClient(): CapturingClient {
   return {
     deleted: [],
+    files: new Map(),
     writes: [],
     async writeFile(input: WriteFileInput) {
       this.writes.push(input);
+      this.files.set(input.path, input.content);
       return { created: true };
+    },
+    async readFile(input): Promise<ReadFileResult | undefined> {
+      const content = this.files.get(input.path);
+      return content ? { content } : undefined;
     },
     async deleteFile(input) {
       this.deleted.push(input.path);
@@ -40,20 +48,29 @@ function createClient(): CapturingClient {
   };
 }
 
-function createAdapter(config: SalesforceAdapterConfig = {}, client = createClient()): SalesforceAdapter {
+function createProvider(
+  proxy: (request: ProxyRequest) => Promise<ProxyResponse> = async () => ({
+    status: 200,
+    headers: {},
+    data: null,
+  }),
+): ConnectionProvider & { requests: ProxyRequest[] } {
+  const requests: ProxyRequest[] = [];
   const provider: ConnectionProvider = {
     name: 'relayfile-test-provider',
-    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
-      return {
-        status: 200,
-        headers: {},
-        data: null as never,
-      };
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+      requests.push(request);
+      return proxy(request) as Promise<ProxyResponse<T>>;
     },
     async healthCheck() {
       return true;
     },
   };
+  return Object.assign(provider, { requests });
+}
+
+function createAdapter(config: SalesforceAdapterConfig = {}, client = createClient()): SalesforceAdapter {
+  const provider = createProvider();
   return new SalesforceAdapter(client, provider, config);
 }
 
@@ -175,6 +192,111 @@ test('ingestWebhook writes Opportunity payloads with revenue and stage semantics
   assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.stage'], 'Negotiation/Review');
   assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.amount'], '50000');
   assert.deepEqual(client.writes[0]?.semantics?.relations, ['/salesforce/accounts/001A.json']);
+});
+
+test('ingestWebhook re-fetches a full Salesforce SObject before writing update records', async () => {
+  const client = createClient();
+  const provider = createProvider(async (request) => {
+    assert.equal(request.method, 'GET');
+    assert.equal(request.baseUrl, 'https://acme.my.salesforce.com');
+    assert.equal(request.connectionId, 'conn-salesforce');
+    assert.deepEqual(request.headers, { 'Provider-Config-Key': 'salesforce-prod' });
+    assert.equal(request.endpoint, '/services/data/v61.0/sobjects/Opportunity/006A');
+    return {
+      status: 200,
+      headers: {},
+      data: {
+        Id: '006A',
+        Name: 'Expansion',
+        StageName: 'Closed Won',
+        Amount: 125000,
+        OwnerId: '005OWNER',
+        Custom_Field__c: 'authoritative',
+        LastModifiedDate: '2026-06-15T20:00:00.000+0000',
+      },
+    };
+  });
+  const adapter = new SalesforceAdapter(client, provider, {
+    apiVersion: 'v61.0',
+    connectionId: 'conn-salesforce',
+    instanceUrl: 'https://acme.my.salesforce.com',
+  });
+
+  const result = await adapter.ingestWebhook('workspace_1', {
+    provider: 'salesforce',
+    eventType: 'Opportunity.updated',
+    objectType: 'Opportunity',
+    objectId: '006A',
+    payload: {
+      Id: '006A',
+      StageName: 'Closed Won',
+      _connection: { providerConfigKey: 'salesforce-prod' },
+      _webhook: { action: 'updated', eventType: 'Opportunity.updated' },
+    },
+  });
+
+  assert.equal(result.filesWritten, 1);
+  assert.equal(provider.requests.length, 1);
+  assert.equal(provider.requests[0]?.endpoint, '/services/data/v61.0/sobjects/Opportunity/006A');
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  assert.equal(payload.Name, 'Expansion');
+  assert.equal(payload.Amount, 125000);
+  assert.equal(payload.OwnerId, '005OWNER');
+  assert.equal(payload.Custom_Field__c, 'authoritative');
+  assert.deepEqual(payload._webhook, { action: 'updated', eventType: 'Opportunity.updated' });
+  assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.stage'], 'Closed Won');
+  assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.owner_id'], '005OWNER');
+});
+
+test('ingestWebhook falls back to merging CDC deltas onto the existing record when re-fetch fails', async () => {
+  const client = createClient();
+  const path = '/salesforce/opportunities/006A.json';
+  client.files.set(
+    path,
+    JSON.stringify({
+      provider: 'salesforce',
+      payload: {
+        Id: '006A',
+        Name: 'Expansion',
+        StageName: 'Prospecting',
+        Amount: 50000,
+        OwnerId: '005OLD',
+      },
+    }),
+  );
+  const provider = createProvider(async () => ({
+    status: 503,
+    headers: {},
+    data: { message: 'Service unavailable' },
+  }));
+  const adapter = new SalesforceAdapter(client, provider, {
+    connectionId: 'conn-salesforce',
+  });
+
+  await adapter.ingestWebhook('workspace_1', {
+    provider: 'salesforce',
+    eventType: 'Opportunity.updated',
+    objectType: 'Opportunity',
+    objectId: '006A',
+    payload: {
+      Id: '006A',
+      StageName: 'Negotiation/Review',
+      _webhook: { action: 'updated', eventType: 'Opportunity.updated' },
+    },
+  });
+
+  assert.ok(provider.requests.length >= 1);
+  assert.equal(provider.requests[0]?.endpoint, '/services/data/v62.0/sobjects/Opportunity/006A');
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  assert.equal(payload.Name, 'Expansion');
+  assert.equal(payload.StageName, 'Negotiation/Review');
+  assert.equal(payload.Amount, 50000);
+  assert.equal(payload.OwnerId, '005OLD');
+  assert.deepEqual(payload._webhook, { action: 'updated', eventType: 'Opportunity.updated' });
+  assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.stage'], 'Negotiation/Review');
+  assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.amount'], '50000');
 });
 
 test('ingestWebhook writes Lead payloads and records conversion relations', async () => {
