@@ -24,6 +24,9 @@ import {
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearProjectByStatePath,
+  linearProjectByTeamPath,
+  linearProjectLegacyPath,
   linearProjectsIndexPath,
   linearProjectPath,
   linearRootIndexPath,
@@ -135,7 +138,8 @@ describe('emitLinearAuxiliaryFiles', () => {
           objectId: 'project-1',
           payload: { id: 'project-1', name: 'Old Project' },
         }),
-        [linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')]: '{}',
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')]: '{}',
+        [linearProjectLegacyPath('project-1')]: '{}',
         [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')]: JSON.stringify({
           provider: 'linear',
           objectType: 'team',
@@ -148,19 +152,46 @@ describe('emitLinearAuxiliaryFiles', () => {
 
     const result = await emitLinearAuxiliaryFiles(client, {
       workspaceId: 'ws-1',
-      projects: [{ id: 'project-1', name: 'New Project', updatedAt: '2026-05-12T00:00:00Z' }],
+      projects: [{
+        id: 'project-1',
+        name: 'New Project',
+        state: 'started',
+        team_ids: ['team-1', 'team-2'],
+        updatedAt: '2026-05-12T00:00:00Z',
+      }],
       teams: [{ id: 'team-1', name: 'New Team', key: 'CORE', updatedAt: '2026-05-12T00:00:00Z' }],
     });
 
     assert.deepEqual(result.errors, []);
     assert.ok(client.files.has(linearProjectPath('project-1')));
     assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-1')));
-    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'New Project', 'project-1')));
-    assert.ok(!client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'New Project', 'project-1')));
+    assert.ok(client.files.has(linearProjectByStatePath('started', 'project-1')));
+    assert.ok(client.files.has(linearProjectByTeamPath('team-1', 'project-1')));
+    assert.ok(client.files.has(linearProjectByTeamPath('team-2', 'project-1')));
+    assert.ok(!client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Old Project', 'project-1')));
+    assert.ok(!client.files.has(linearProjectLegacyPath('project-1')));
     assert.ok(client.files.has(linearTeamPath('team-1')));
     assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'team-1')));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'New Team', 'team-1')));
     assert.ok(!client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')));
+  });
+
+  it('materializes backlog projects under the read-down by-state alias', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{
+        id: 'project-backlog',
+        name: 'Backlog Project',
+        state: 'backlog',
+        updatedAt: '2026-05-12T00:00:00Z',
+      }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearProjectPath('project-backlog')));
+    assert.ok(client.files.has(linearProjectByStatePath('backlog', 'project-backlog')));
   });
 
   it('disambiguates project and team alias slug collisions', async () => {
@@ -178,8 +209,8 @@ describe('emitLinearAuxiliaryFiles', () => {
     });
 
     assert.deepEqual(result.errors, []);
-    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
-    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
   });
@@ -199,8 +230,8 @@ describe('emitLinearAuxiliaryFiles', () => {
     });
 
     assert.deepEqual(result.errors, []);
-    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
-    assert.ok(client.files.has(linearByTitleAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap', 'project-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
   });
@@ -310,6 +341,39 @@ describe('emitLinearAuxiliaryFiles', () => {
       if (path === linearIssuesIndexPath()) continue;
       assert.equal(client.files.get(path), canonicalBytes, `bytes mismatch at ${path}`);
     }
+  });
+
+  it('populates issue project payloads from nested project fields', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{
+        id: 'issue-123',
+        identifier: 'AGE-8',
+        title: 'Release Plan',
+        project: {
+          id: 'project-1',
+          name: 'Factory',
+          slugId: 'factory-5c10a007b4b4',
+          state: 'started',
+          lead: { id: 'user-lead' },
+        },
+        updatedAt: '2026-05-12T00:00:00Z',
+      } as never],
+    });
+
+    const canonical = JSON.parse(client.files.get(linearIssuePath('issue-123', 'AGE-8'))!) as {
+      payload: { project: Record<string, unknown> };
+    };
+    assert.deepEqual(canonical.payload.project, {
+      id: 'project-1',
+      name: 'Factory',
+      slugId: 'factory-5c10a007b4b4',
+      state: 'started',
+      lead: { id: 'user-lead' },
+      slug: 'factory-5c10a007b4b4',
+      leadId: 'user-lead',
+    });
   });
 
   it('reconciles prior by-title alias and canonical path on issue rename via the by-id anchor', async () => {
@@ -591,6 +655,62 @@ describe('emitLinearAuxiliaryFiles', () => {
       ['issue-456'],
       'deleted issue id should no longer appear in the index',
     );
+    assert.equal(result.deleted, expectedDeletes.length);
+  });
+
+  it('delete tombstone for a project removes canonical + every prior alias and drops the index row', async () => {
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'project',
+      objectId: 'project-123',
+      payload: {
+        id: 'project-123',
+        name: 'Factory',
+        state: 'started',
+        team_ids: ['team-1', 'team-2'],
+        updatedAt: '2026-05-11T00:00:00Z',
+      },
+    };
+    const priorIndex = [
+      { id: 'project-123', title: 'Factory', updated: '2026-05-12T00:00:00Z' },
+      { id: 'project-456', title: 'Pear Launch', updated: '2026-05-11T00:00:00Z' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [linearProjectPath('project-123')]: JSON.stringify(priorPayload),
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-123')]: JSON.stringify(priorPayload),
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Factory', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByStatePath('started', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByTeamPath('team-1', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByTeamPath('team-2', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectLegacyPath('project-123')]: JSON.stringify(priorPayload),
+        [linearProjectsIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{ id: 'project-123', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    const expectedDeletes = [
+      linearProjectPath('project-123'),
+      linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-123'),
+      linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Factory', 'project-123'),
+      linearProjectByStatePath('started', 'project-123'),
+      linearProjectByTeamPath('team-1', 'project-123'),
+      linearProjectByTeamPath('team-2', 'project-123'),
+      linearProjectLegacyPath('project-123'),
+    ];
+    for (const path of expectedDeletes) {
+      assert.ok(deletedPaths.has(path), `expected delete at ${path}`);
+    }
+
+    const indexWrite = client.writes.find((w) => w.path === linearProjectsIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(writtenRows.map((r) => r.id), ['project-456']);
     assert.equal(result.deleted, expectedDeletes.length);
   });
 

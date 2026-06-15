@@ -5,13 +5,16 @@ import type { JsonValue, LinearAgentActivity, LinearAgentActivityType, LinearWri
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 /**
- * Resolve a relayfile writeback into a Linear GraphQL mutation request.
+ * Resolve a relayfile writeback into a Linear mutation or action request.
  *
  * Supported routes (today):
  *   POST /linear/issues/<slug>--<uuid>/comments/<draft>.json → commentCreate
  *   POST /linear/agent-sessions/<id>/activities/<draft>.json  → agentActivityCreate
  *   POST /linear/issues/<draft>.json                         → issueCreate
  *   PATCH/PUT /linear/issues/<slug>--<uuid>.json             → issueUpdate
+ *   POST /linear/projects/<draft>.json                       → create-project action
+ *   PATCH/PUT /linear/projects/<uuid>/meta.json              → update-project/archive-project action
+ *   POST /linear/projects/<uuid>/add-issues.json             → add-issues-to-project action
  *
  * The path-mapper emits issue paths as `<slug>__<uuid>` and older mounts may
  * still have `<slug>--<32-hex>`. We reverse the suffix to recover the
@@ -46,6 +49,24 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
   // Update an existing issue's metadata.
   if (issueFileMatch?.[1] && route?.resource.name === 'issues' && route.kind === 'patch') {
     return buildIssueUpdate(extractLinearId(issueFileMatch[1]), content);
+  }
+
+  const projectFileMatch = path.match(/^\/linear\/projects\/([^/]+)\.json$/);
+  if (projectFileMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'create') {
+    return buildProjectCreate(content);
+  }
+  if (projectFileMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'patch') {
+    return buildProjectUpdate(extractLinearId(projectFileMatch[1]), content);
+  }
+
+  const projectMetaMatch = path.match(/^\/linear\/projects\/([^/]+)\/meta\.json$/);
+  if (projectMetaMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'patch') {
+    return buildProjectUpdate(extractLinearId(projectMetaMatch[1]), content);
+  }
+
+  const projectAssignMatch = path.match(/^\/linear\/projects\/([^/]+)\/add-issues\.json$/);
+  if (projectAssignMatch?.[1] && route?.resource.name === 'project-issue-assignments') {
+    return buildProjectAddIssues(extractLinearId(projectAssignMatch[1]), content);
   }
 
   throw new Error(`No Linear writeback rule matched ${path}`);
@@ -161,6 +182,8 @@ const ISSUE_DELETE_MUTATION = `mutation RelayfileIssueDelete($id: String!) {
     success
   }
 }`;
+
+const LINEAR_PROJECT_STATES = new Set(['planned', 'started', 'paused', 'completed', 'canceled']);
 
 /**
  * Build a `commentCreate` mutation request for the writeback engine.
@@ -399,11 +422,11 @@ const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
  */
 function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequest {
   const parsed = parseJsonObject(content);
-  rejectReadOnlyFields(parsed);
-  const source = looksLikeSyncedEnvelope(parsed)
-    ? (parsed.payload as Record<string, unknown>)
-    : parsed;
-  rejectReadOnlyFields(source);
+  const isSyncedEnvelope = looksLikeSyncedEnvelope(parsed);
+  if (!isSyncedEnvelope) {
+    rejectReadOnlyFields(parsed);
+  }
+  const source = isSyncedEnvelope ? (parsed.payload as Record<string, unknown>) : parsed;
 
   const input: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
@@ -423,6 +446,143 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
     endpoint: '/graphql',
     body: { query: ISSUE_UPDATE_MUTATION, variables: { id: issueId, input } },
   };
+}
+
+const PROJECT_CREATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'name',
+  'description',
+  'teamIds',
+  'state',
+  'leadId',
+  'startDate',
+  'targetDate',
+  'color',
+  'icon',
+]);
+
+const PROJECT_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'name',
+  'description',
+  'state',
+  'leadId',
+  'startDate',
+  'targetDate',
+  'color',
+  'icon',
+]);
+
+function buildProjectCreate(content: string): LinearWritebackRequest {
+  const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
+  const name = readString(payload, 'name');
+  if (!name) {
+    throw new Error('projects/<draft>.json writeback requires a `name`');
+  }
+  const teamIds = readProjectTeamIds(payload);
+  if (!teamIds || teamIds.length === 0) {
+    throw new Error('projects/<draft>.json writeback requires `teamId` or `teamIds`');
+  }
+
+  const input = copyAllowedFields(payload, PROJECT_CREATE_ALLOWLIST);
+  input.name = name;
+  input.teamIds = teamIds;
+  validateProjectState(input.state);
+
+  return {
+    action: 'create-project',
+    method: 'POST',
+    endpoint: '/linear/projects',
+    body: input,
+  };
+}
+
+function buildProjectUpdate(projectId: string, content: string): LinearWritebackRequest {
+  const parsed = parseJsonObject(content);
+  const isSyncedEnvelope = looksLikeSyncedEnvelope(parsed);
+  if (!isSyncedEnvelope) {
+    rejectReadOnlyFields(parsed);
+  }
+  const source = isSyncedEnvelope ? (parsed.payload as Record<string, unknown>) : parsed;
+
+  const archive = readBoolean(source, 'archived');
+  const input = copyAllowedFields(source, PROJECT_UPDATE_ALLOWLIST);
+  validateProjectState(input.state);
+  if (archive !== undefined) {
+    if (archive !== true) {
+      throw new Error('projects/<id>/meta.json archive writeback only supports `archived: true`');
+    }
+    if (Object.keys(input).length > 0) {
+      throw new Error('projects/<id>/meta.json archive writeback cannot be mixed with other project updates');
+    }
+    return {
+      action: 'archive-project',
+      method: 'POST',
+      endpoint: `/linear/projects/${encodeURIComponent(projectId)}/archive`,
+      body: { id: projectId, trash: false },
+    };
+  }
+  if (Object.keys(input).length === 0) {
+    throw new Error(
+      'projects/<id>/meta.json update writeback requires at least one mutable field ' +
+        '(name, description, state, leadId, startDate, targetDate, color, icon)',
+    );
+  }
+
+  return {
+    action: 'update-project',
+    method: 'PATCH',
+    endpoint: `/linear/projects/${encodeURIComponent(projectId)}`,
+    body: { id: projectId, ...input },
+  };
+}
+
+function validateProjectState(value: unknown): void {
+  if (value === undefined) return;
+  if (typeof value === 'string' && LINEAR_PROJECT_STATES.has(value)) return;
+  throw new Error(
+    'Linear project `state` must be one of planned, started, paused, completed, canceled. ' +
+      '`backlog` is a Linear-internal starter state and cannot be set via writeback; ' +
+      'change state via Linear UI or transition forward.',
+  );
+}
+
+function buildProjectAddIssues(projectId: string, content: string): LinearWritebackRequest {
+  const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
+  const issueIds = readStringArray(payload, 'issueIds');
+  if (!issueIds || issueIds.length === 0) {
+    throw new Error('projects/<id>/add-issues.json writeback requires a non-empty `issueIds` array');
+  }
+  if (new Set(issueIds).size !== issueIds.length) {
+    throw new Error('projects/<id>/add-issues.json writeback requires unique `issueIds` values');
+  }
+
+  return {
+    action: 'add-issues-to-project',
+    method: 'POST',
+    endpoint: `/linear/projects/${encodeURIComponent(projectId)}/add-issues`,
+    body: { projectId, issueIds },
+  };
+}
+
+function copyAllowedFields(
+  source: Record<string, unknown>,
+  allowlist: ReadonlySet<string>,
+): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (!allowlist.has(key)) continue;
+    input[key] = value;
+  }
+  return input;
+}
+
+function readProjectTeamIds(payload: Record<string, unknown>): string[] | undefined {
+  const teamIds = readStringArray(payload, 'teamIds') ?? [];
+  const teamId = readString(payload, 'teamId');
+  const ids = [...teamIds, ...(teamId ? [teamId] : [])];
+  const unique = [...new Set(ids)];
+  return unique.length > 0 ? unique : undefined;
 }
 
 function rejectReadOnlyFields(payload: Record<string, unknown>): void {

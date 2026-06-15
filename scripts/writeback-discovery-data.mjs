@@ -306,10 +306,11 @@ export const adapters = [
     slug: 'linear',
     title: 'Linear adapter',
     overview:
-      'The Linear adapter exposes teams, issues, users, comments, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments.',
+      'The Linear adapter exposes teams, issues, users, comments, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments plus creating, updating, archiving, and grouping issues into Linear projects. Companion cloud actions use slugs `create-project`, `update-project`, `add-issues-to-project`, and `archive-project` at `POST /linear/projects`, `PATCH /linear/projects/:id`, `POST /linear/projects/:id/add-issues`, and `POST /linear/projects/:id/archive` with Linear OAuth scope `write`.',
     readPaths: [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
+      ['/linear/projects/<projectId>/meta.json', 'Project records. Projects also expose by-id, by-name, by-state, and by-team aliases; multi-team projects appear under every team.'],
       ['/linear/users/<userId>.json', 'User records.'],
       ['/linear/comments/<name>__<commentId>/meta.json', 'Comment records (directory records so per-comment children can nest without a file/dir collision).'],
     ],
@@ -333,6 +334,47 @@ export const adapters = [
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
       }, { body: 'Replace example comment body.' }),
+      endpoint('/linear/projects/new.json', 'Create Linear project', 'Creates a Linear project. The draft filename (for example `factory-create-<uuid>.json`) is an operator-supplied idempotency key; the created Linear UUID is returned as `id` by the companion action. Payloads must provide `teamId` or `teamIds`.', ['name'], {
+        name: str('Project name.', undefined, { minLength: 1 }),
+        description: str('Markdown project description.'),
+        teamId: str('Single Linear team UUID convenience input. The adapter forwards this as `teamIds`.', 'uuid'),
+        teamIds: arr(str('Linear team UUID.', 'uuid'), 'Linear team UUIDs.', { minItems: 1, uniqueItems: true }),
+        state: en(['planned', 'started', 'paused', 'completed', 'canceled'], 'Linear project state.'),
+        leadId: str('Linear user UUID for the project lead.', 'uuid'),
+        startDate: str('Project start date in YYYY-MM-DD form.', 'date'),
+        targetDate: str('Project target date in YYYY-MM-DD form.', 'date'),
+        color: str('Linear project color.'),
+        icon: str('Linear project icon.'),
+      }, { name: 'Replace example project name', teamIds: ['00000000-0000-0000-0000-000000000000'] }, {
+        anyOf: [
+          { required: ['teamId'] },
+          { required: ['teamIds'] },
+        ],
+      }),
+      endpoint('/linear/projects/{projectId}/meta.json', 'Update Linear project', 'Updates mutable Linear project fields. Archive is represented by writing `{ "archived": true }`, which the adapter maps to Linear `projectArchive` with soft archive semantics only; it never sets `trash`, and hard-trash requires the Linear UI. Hard delete is out of scope.', [], {
+        name: str('Project name.', undefined, { minLength: 1 }),
+        description: str('Markdown project description.'),
+        state: en(['planned', 'started', 'paused', 'completed', 'canceled'], 'Linear project state.'),
+        leadId: str('Linear user UUID for the project lead.', 'uuid'),
+        startDate: str('Project start date in YYYY-MM-DD form.', 'date'),
+        targetDate: str('Project target date in YYYY-MM-DD form.', 'date'),
+        color: str('Linear project color.'),
+        icon: str('Linear project icon.'),
+        archived: bool('When true, archive the project via Linear projectArchive. Soft archive only; the adapter never sets `trash`, and hard-trash requires the Linear UI. Unarchive and hard-delete are out of scope.'),
+      }, { state: 'started' }),
+      endpoint(
+        '/linear/projects/{projectId}/add-issues.json',
+        'Add Linear issues to project',
+        'Moves existing Linear issues into the project. The companion cloud action endpoint is `POST /linear/projects/:id/add-issues` and returns per-issue partial-success results.',
+        ['issueIds'],
+        {
+          issueIds: arr(str('Linear issue UUID.', 'uuid'), 'Linear issue UUIDs to move into the project.', {
+            minItems: 1,
+            uniqueItems: true,
+          }),
+        },
+        { issueIds: ['00000000-0000-0000-0000-000000000000'] },
+      ),
       endpoint('/linear/agent-sessions/{sessionId}/activities/new.json', 'Create Linear agent activity', 'Creates an activity on a Linear agent session.', ['type'], {
         type: en(['action', 'elicitation', 'error', 'response', 'thought'], 'Linear agent activity content type.'),
         body: str('Response, thought, elicitation, or error body.'),
@@ -694,8 +736,8 @@ function num(description) {
   return { type: 'number', description };
 }
 
-function arr(items, description) {
-  return { type: 'array', description, items };
+function arr(items, description, extra = {}) {
+  return { type: 'array', description, items, ...extra };
 }
 
 function obj(description, properties, extra = {}) {

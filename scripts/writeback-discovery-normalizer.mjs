@@ -213,6 +213,12 @@ function resourceNameFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'linear' && resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
     return 'agent-activities';
   }
+  if (adapterSlug === 'linear' && resourcePath === '/linear/projects/{projectId}/meta.json') {
+    return 'projects';
+  }
+  if (adapterSlug === 'linear' && resourcePath === '/linear/projects/{projectId}/add-issues.json') {
+    return 'project-issue-assignments';
+  }
   const last = resourcePath.split('/').filter(Boolean).at(-1);
   if (!last) return adapterSlug;
   if (/^\{[^}]+\}\.json$/u.test(last)) {
@@ -271,6 +277,12 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'linear') {
     if (resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
       return pattern('^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
+    }
+    if (
+      resourcePath === '/linear/projects/{projectId}/meta.json' ||
+      resourcePath === '/linear/projects/{projectId}/add-issues.json'
+    ) {
+      return pattern('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', 'i');
     }
     return pattern('^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
   }

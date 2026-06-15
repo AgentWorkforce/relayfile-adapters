@@ -13,8 +13,9 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   filenameConvention: '<identifier>__<uuid>.json',
   // Top-level aliasSegments is the union of every resource's alias segments
   // so consumers that inspect only the manifest root can discover all
-  // lookup keys. `by-name` belongs here because `linear/teams` exposes it.
-  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-name', 'by-priority', 'by-title', 'by-state', 'by-uuid'],
+  // lookup keys. `by-name` belongs here because `linear/teams` and
+  // `linear/projects` expose it.
+  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-name', 'by-priority', 'by-title', 'by-state', 'by-team', 'by-uuid'],
   resources: [
     {
       path: 'linear/issues',
@@ -30,8 +31,12 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       path: 'linear/projects',
       title: 'Projects',
       materialization: 'eager',
-      aliasSegments: ['by-id', 'by-title'],
-      writebackResources: [],
+      aliasSegments: ['by-id', 'by-name', 'by-state', 'by-team'],
+      writebackResources: [
+        { path: 'linear/projects', schemaId: 'linear/project' },
+        { path: 'linear/projects/*/meta.json', schemaId: 'linear/project-update' },
+        { path: 'linear/projects/*/add-issues.json', schemaId: 'linear/project-issue-assignment' },
+      ],
     },
     {
       path: 'linear/states',

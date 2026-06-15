@@ -84,7 +84,7 @@ describe('linear writeback', () => {
       assert.strictEqual(req.action, 'create_agent_activity');
       assert.strictEqual(req.method, 'POST');
       assert.strictEqual(req.endpoint, '/graphql');
-      assert.match(req.body.query, /agentActivityCreate/);
+      assert.match(String(req.body.query), /agentActivityCreate/);
       assert.deepStrictEqual(req.body.variables, {
         input: {
           agentSessionId: 'session_linear_123',
@@ -233,22 +233,32 @@ describe('linear writeback', () => {
       });
     });
 
-    it('rejects synced envelopes because their metadata fields are read-only', () => {
-      assert.throws(
-        () =>
-          resolveWritebackRequest(
-            `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
-            JSON.stringify({
-              provider: 'linear',
-              connectionId: 'conn-1',
-              workspaceId: 'wks-1',
-              payload: {
-                title: 'Edited title',
-              },
-            }),
-          ),
-        (error) => error instanceof ReadOnlyFieldError && error.field === 'provider',
+    it('updates an issue from a synced envelope while dropping read-only metadata', () => {
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+        JSON.stringify({
+          provider: 'linear',
+          objectType: 'issue',
+          objectId: PAGE_UUID,
+          connectionId: 'conn-1',
+          workspaceId: 'wks-1',
+          payload: {
+            id: PAGE_UUID,
+            url: 'https://linear.app/example/issue/AR-1/example',
+            title: 'Edited title',
+            projectId: 'project-1',
+            updatedAt: '2026-06-15T00:00:00Z',
+          },
+        }),
       );
+
+      assert.strictEqual(req.action, 'update_issue');
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, {
+        title: 'Edited title',
+        projectId: 'project-1',
+      });
     });
   });
 
@@ -270,10 +280,173 @@ describe('linear writeback', () => {
     });
   });
 
+  describe('project create/update/assign', () => {
+    const PROJECT_UUID = 'f97660a3-a08c-4157-998f-e2d91951f3e7';
+    const ISSUE_A = '11111111-1111-4111-8111-111111111111';
+    const ISSUE_B = '22222222-2222-4222-8222-222222222222';
+
+    it('creates a project from a factory-create draft and forwards teamId as teamIds', () => {
+      const req = resolveWritebackRequest(
+        '/linear/projects/factory-create-operator-key.json',
+        JSON.stringify({
+          name: 'Factory',
+          teamId: 'team-1',
+          state: 'planned',
+          leadId: 'user-1',
+        }),
+      );
+
+      assert.strictEqual(req.action, 'create-project');
+      assert.strictEqual(req.endpoint, '/linear/projects');
+      assert.deepStrictEqual(req.body, {
+        name: 'Factory',
+        state: 'planned',
+        leadId: 'user-1',
+        teamIds: ['team-1'],
+      });
+    });
+
+    it('dedupes teamIds on project create and rejects invalid states', () => {
+      const req = resolveWritebackRequest(
+        '/linear/projects/factory-create-operator-key.json',
+        JSON.stringify({
+          name: 'Factory',
+          teamId: 'team-1',
+          teamIds: ['team-1', 'team-2'],
+        }),
+      );
+      assert.deepStrictEqual((req.body as { teamIds: string[] }).teamIds, ['team-1', 'team-2']);
+
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/linear/projects/factory-create-operator-key.json',
+            JSON.stringify({ name: 'Factory', teamIds: ['team-1'], state: 'backlog' }),
+          ),
+        /backlog` is a Linear-internal starter state/,
+      );
+    });
+
+    it('updates a project through its meta.json directory record', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}/meta.json`,
+        JSON.stringify({
+          state: 'started',
+          targetDate: '2026-06-30',
+          leadId: 'user-1',
+        }),
+      );
+
+      assert.strictEqual(req.action, 'update-project');
+      assert.strictEqual(req.method, 'PATCH');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}`);
+      assert.deepStrictEqual(req.body, {
+        id: PROJECT_UUID,
+        state: 'started',
+        targetDate: '2026-06-30',
+        leadId: 'user-1',
+      });
+    });
+
+    it('updates legacy flat project records during the migration window', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}.json`,
+        JSON.stringify({
+          name: 'Factory',
+          state: 'started',
+        }),
+      );
+
+      assert.strictEqual(req.action, 'update-project');
+      assert.strictEqual(req.method, 'PATCH');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}`);
+      assert.deepStrictEqual(req.body, {
+        id: PROJECT_UUID,
+        name: 'Factory',
+        state: 'started',
+      });
+    });
+
+    it('updates a project from a synced meta.json envelope', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}/meta.json`,
+        JSON.stringify({
+          provider: 'linear',
+          objectType: 'project',
+          objectId: PROJECT_UUID,
+          workspaceId: 'workspace-1',
+          payload: {
+            id: PROJECT_UUID,
+            name: 'Factory',
+            url: 'https://linear.app/agent-relay/project/factory',
+            state: 'paused',
+            targetDate: '2026-07-31',
+            updatedAt: '2026-06-15T00:00:00Z',
+          },
+        }),
+      );
+
+      assert.strictEqual(req.action, 'update-project');
+      assert.strictEqual(req.method, 'PATCH');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}`);
+      assert.deepStrictEqual(req.body, {
+        id: PROJECT_UUID,
+        name: 'Factory',
+        state: 'paused',
+        targetDate: '2026-07-31',
+      });
+    });
+
+    it('archives a project via projectArchive and rejects mixed archive/update payloads', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}/meta.json`,
+        JSON.stringify({ archived: true }),
+      );
+
+      assert.strictEqual(req.action, 'archive-project');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}/archive`);
+      assert.deepStrictEqual(req.body, { id: PROJECT_UUID, trash: false });
+
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/projects/${PROJECT_UUID}/meta.json`,
+            JSON.stringify({ archived: true, state: 'started' }),
+          ),
+        /cannot be mixed/,
+      );
+    });
+
+    it('builds a multi-issue project assignment request from add-issues.json', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}/add-issues.json`,
+        JSON.stringify({ issueIds: [ISSUE_A, ISSUE_B] }),
+      );
+
+      assert.strictEqual(req.action, 'add-issues-to-project');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}/add-issues`);
+      assert.deepStrictEqual(req.body, {
+        projectId: PROJECT_UUID,
+        issueIds: [ISSUE_A, ISSUE_B],
+      });
+    });
+
+    it('rejects duplicate issue ids in a project assignment request', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/projects/${PROJECT_UUID}/add-issues.json`,
+            JSON.stringify({ issueIds: [ISSUE_A, ISSUE_A] }),
+          ),
+        /unique `issueIds`/,
+      );
+    });
+  });
+
   describe('unmatched paths', () => {
     it('throws for unrecognized paths', () => {
       assert.throws(
-        () => resolveWritebackRequest('/linear/projects/foo.json', '{}'),
+        () => resolveWritebackRequest('/linear/projects/foo/bar.json', '{}'),
         /No Linear writeback rule matched/,
       );
     });

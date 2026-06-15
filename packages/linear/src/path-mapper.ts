@@ -377,12 +377,43 @@ export function linearCommentsIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/comments/_index.json`;
 }
 
+export function linearProjectDirectoryPath(projectId: string): string {
+  return `${LINEAR_PATH_ROOT}/projects/${encodeLinearPathSegment(projectId)}`;
+}
+
 export function linearProjectPath(projectId: string): string {
+  return `${linearProjectDirectoryPath(projectId)}/meta.json`;
+}
+
+/**
+ * @deprecated Pre-project-writeback mirrors emitted projects as flat
+ * `/linear/projects/<id>.json` leaf files. New mirrors use
+ * `/linear/projects/<id>/meta.json` so project child writebacks such as
+ * `add-issues.json` can coexist without a POSIX file/dir collision.
+ */
+export function linearProjectLegacyPath(projectId: string): string {
   return `${LINEAR_PATH_ROOT}/projects/${encodeLinearPathSegment(projectId)}.json`;
 }
 
 export function linearProjectsIndexPath(): string {
   return `${LINEAR_PATH_ROOT}/projects/_index.json`;
+}
+
+export function linearProjectByStatePath(state: string, projectId: string): string {
+  const slug = slugifyAlias(assertNonEmptySegment(state, 'project state'));
+  if (!slug) {
+    throw new Error('Linear project state must slug to a non-empty string');
+  }
+  return `${LINEAR_PATH_ROOT}/projects/by-state/${encodeLinearPathSegment(slug)}/${encodeLinearPathSegment(projectId)}.json`;
+}
+
+export function linearProjectByTeamPath(teamId: string, projectId: string): string {
+  return `${LINEAR_PATH_ROOT}/projects/by-team/${encodeLinearPathSegment(teamId)}/${encodeLinearPathSegment(projectId)}.json`;
+}
+
+/** Local writeback path for grouping existing issues into a project. */
+export function linearProjectAddIssuesPath(projectId: string): string {
+  return `${linearProjectDirectoryPath(projectId)}/add-issues.json`;
 }
 
 export function linearStatePath(stateId: string): string {

@@ -29,8 +29,11 @@
  *   * **user**, **team** — canonical `/linear/users/<id>.json` /
  *     `/linear/teams/<id>.json`, index row `{ id, title, updated }`.
  *
- *   * **project** — canonical `/linear/projects/<id>.json`, plus
- *     `_index.json` and read aliases keyed by project id/title.
+ *   * **project** — canonical `/linear/projects/<id>/meta.json`, plus
+ *     `_index.json` and read aliases keyed by project id, name, state, and
+ *     every team id on the project. The legacy flat
+ *     `/linear/projects/<id>.json` path is deleted during reconciliation but
+ *     never written.
  *
  *   * **state** — canonical `/linear/states/<id>.json`, no subtree aliases.
  *     Index row `{ id, title, updated }`.
@@ -89,6 +92,9 @@ import {
   linearIssuesIndexPath,
   linearMilestonesIndexPath,
   linearMilestonePath,
+  linearProjectByStatePath,
+  linearProjectByTeamPath,
+  linearProjectLegacyPath,
   linearProjectsIndexPath,
   linearProjectPath,
   linearRoadmapsIndexPath,
@@ -677,6 +683,7 @@ async function emitProjects(
     connectionId,
     aliasAnchorPath: (id) => linearByIdAliasPath(PROJECTS_SCOPE, id),
     aliasPaths: projectAliasPaths,
+    staleCanonicalPaths: (id) => [linearProjectLegacyPath(id)],
   });
 }
 
@@ -748,6 +755,7 @@ interface FlatResourceOptions<TRecord extends { id: string }> {
   connectionId: string | undefined;
   aliasAnchorPath?: (id: string) => string;
   aliasPaths?: (record: Record<string, unknown>, id: string) => FlatAliasPath[];
+  staleCanonicalPaths?: (id: string) => string[];
 }
 
 type FlatAliasPath =
@@ -785,6 +793,7 @@ async function emitFlatResource<TRecord extends { id: string }>(
       indexReconciler.remove(record.id);
       const prior = await readFlatPrior(record.id, priorReader, opts);
       const paths = await flatResourcePaths(record.id, prior, opts, priorReader);
+      paths.push(...(opts.staleCanonicalPaths?.(record.id) ?? []));
       return { deletes: paths.map((path) => ({ path })) };
     }
     const id = readNonEmptyString(record.id);
@@ -793,7 +802,10 @@ async function emitFlatResource<TRecord extends { id: string }>(
     const prior = await readFlatPrior(id, priorReader, opts);
     const paths = await flatResourcePaths(id, record, opts, priorReader, aliasReservations);
     const priorPaths = prior ? await flatResourcePaths(id, prior, opts, priorReader) : [];
-    const stalePaths = diffPaths(priorPaths, paths);
+    const stalePaths = diffPaths([
+      ...priorPaths,
+      ...(opts.staleCanonicalPaths?.(id) ?? []),
+    ], paths);
     const content = renderContent(opts.objectType, record, opts.connectionId, false);
     return {
       writes: paths.map((path) => ({
@@ -866,11 +878,37 @@ function projectAliasPaths(record: Record<string, unknown>, id: string): FlatAli
   const name = readNonEmptyString(record.name);
   if (name && slugifies(name)) {
     paths.push({
-      path: linearByTitleAliasPath(PROJECTS_SCOPE, name, id),
-      collisionPath: linearByTitleAliasPath(PROJECTS_SCOPE, name, id, true),
+      path: linearByNameAliasPath(PROJECTS_SCOPE, name, id),
+      collisionPath: linearByNameAliasPath(PROJECTS_SCOPE, name, id, true),
     });
   }
+  const state = readNonEmptyString(record.state);
+  if (state && slugifies(state)) {
+    paths.push(linearProjectByStatePath(state, id));
+  }
+  for (const teamId of projectTeamIds(record)) {
+    paths.push(linearProjectByTeamPath(teamId, id));
+  }
   return paths;
+}
+
+function projectTeamIds(record: Record<string, unknown>): string[] {
+  const ids = new Set<string>();
+  const teamIds = record.team_ids;
+  if (Array.isArray(teamIds)) {
+    for (const teamId of teamIds) {
+      const normalized = readNonEmptyString(teamId);
+      if (normalized) ids.add(normalized);
+    }
+  }
+  const teams = record.teams;
+  if (Array.isArray(teams)) {
+    for (const team of teams) {
+      const normalized = isRecord(team) ? readNonEmptyString(team.id) : undefined;
+      if (normalized) ids.add(normalized);
+    }
+  }
+  return [...ids].sort((left, right) => left.localeCompare(right));
 }
 
 function teamAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
@@ -893,18 +931,73 @@ function renderContent(
   connectionId: string | undefined,
   deleted: boolean,
 ): string {
+  const normalizedPayload = normalizeContentPayload(objectType, payload);
   return JSON.stringify(
     {
       provider: LINEAR_PROVIDER_NAME,
       objectType,
-      objectId: (payload as { id: string }).id,
+      objectId: (normalizedPayload as { id: string }).id,
       deleted,
-      payload,
+      payload: normalizedPayload,
       ...(connectionId ? { connectionId } : {}),
     },
     null,
     2,
   );
+}
+
+function normalizeContentPayload(
+  objectType: string,
+  payload: Record<string, unknown> | { id: string },
+): Record<string, unknown> | { id: string } {
+  if (objectType !== 'issue' || !isRecord(payload)) {
+    return payload;
+  }
+  const project = normalizeIssueProject(payload);
+  return project ? { ...payload, project } : payload;
+}
+
+function normalizeIssueProject(issue: Record<string, unknown>): Record<string, unknown> | null {
+  const nestedProject = isRecord(issue.project) ? issue.project : undefined;
+  const id = readNonEmptyString(nestedProject?.id) ?? readNonEmptyString(issue.project_id);
+  if (!id) return null;
+  const lead = isRecord(nestedProject?.lead) ? nestedProject.lead : undefined;
+  return {
+    ...nestedProject,
+    id,
+    ...(readNonEmptyString(nestedProject?.name) ?? readNonEmptyString(issue.project_name)
+      ? { name: readNonEmptyString(nestedProject?.name) ?? readNonEmptyString(issue.project_name) }
+      : {}),
+    ...(readNonEmptyString(nestedProject?.slug) ??
+      readNonEmptyString(nestedProject?.slugId) ??
+      readNonEmptyString(issue.project_slug) ??
+      readNonEmptyString(issue.project_slug_id)
+      ? {
+          slug:
+            readNonEmptyString(nestedProject?.slug) ??
+            readNonEmptyString(nestedProject?.slugId) ??
+            readNonEmptyString(issue.project_slug) ??
+            readNonEmptyString(issue.project_slug_id),
+        }
+      : {}),
+    ...(readNonEmptyString(nestedProject?.slugId) ?? readNonEmptyString(issue.project_slug_id)
+      ? { slugId: readNonEmptyString(nestedProject?.slugId) ?? readNonEmptyString(issue.project_slug_id) }
+      : {}),
+    ...(readNonEmptyString(nestedProject?.state) ?? readNonEmptyString(issue.project_state)
+      ? { state: readNonEmptyString(nestedProject?.state) ?? readNonEmptyString(issue.project_state) }
+      : {}),
+    ...(readNonEmptyString(nestedProject?.leadId) ?? readNonEmptyString(lead?.id) ?? readNonEmptyString(issue.project_lead_id)
+      ? {
+          leadId:
+            readNonEmptyString(nestedProject?.leadId) ??
+            readNonEmptyString(lead?.id) ??
+            readNonEmptyString(issue.project_lead_id),
+        }
+      : {}),
+    ...(readNonEmptyString(nestedProject?.url) ?? readNonEmptyString(issue.project_url)
+      ? { url: readNonEmptyString(nestedProject?.url) ?? readNonEmptyString(issue.project_url) }
+      : {}),
+  };
 }
 
 function compareIndexRows(
