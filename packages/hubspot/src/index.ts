@@ -1,4 +1,5 @@
 // Public barrel for HubSpot adapter runtime helpers, route resolvers, and types.
+export * from './api.js';
 export * from './digest.js';
 export * from './hubspot-adapter.js';
 export * from './layout-prompt.js';

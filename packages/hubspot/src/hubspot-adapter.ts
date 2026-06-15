@@ -13,6 +13,7 @@ import {
   normalizeHubSpotWebhook,
   normalizeHubSpotWebhookBatch,
 } from './webhook-normalizer.js';
+import { HubSpotApiClient } from './api.js';
 import { HUBSPOT_OBJECT_TYPES } from './types.js';
 import type {
   HubSpotAdapterConfig,
@@ -76,9 +77,19 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content?: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  readFile?(input: ReadFileInput): Promise<ReadFileResult | string | null | undefined> | ReadFileResult | string | null | undefined;
 }
 
 export abstract class IntegrationAdapter {
@@ -117,6 +128,7 @@ export class HubSpotAdapter extends IntegrationAdapter {
   override readonly version = '0.1.0';
 
   readonly config: HubSpotAdapterConfig;
+  private readonly api: HubSpotApiClient;
 
   constructor(
     client: RelayFileClientLike,
@@ -125,6 +137,7 @@ export class HubSpotAdapter extends IntegrationAdapter {
   ) {
     super(client, provider);
     this.config = config;
+    this.api = new HubSpotApiClient(provider, config);
   }
 
   override supportedEvents(): string[] {
@@ -228,15 +241,26 @@ export class HubSpotAdapter extends IntegrationAdapter {
         return await this.deleteOrTombstone(workspaceId, path, normalized);
       }
 
+      // HubSpot webhooks are notification-only: they carry objectId +
+      // subscriptionType + a single changed property. Re-fetch the full CRM
+      // record before writing so consumers get authoritative data. On fetch
+      // failure, fall back to merging the incoming delta onto the existing
+      // stored file.
+      const reconciledPayload = await this.reconcileWebhookPayload(workspaceId, path, normalized);
+      const reconciled: NormalizedWebhook = {
+        ...normalized,
+        payload: reconciledPayload,
+      };
+
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
-        content: this.renderContent(workspaceId, normalized, false),
+        content: this.renderContent(workspaceId, reconciled, false),
         contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(objectType, objectId, normalized.payload),
+        semantics: this.computeSemantics(objectType, objectId, reconciled.payload),
       });
 
-      const counts = inferWriteCounts(writeResult, false, normalized);
+      const counts = inferWriteCounts(writeResult, false, reconciled);
       return {
         errors: [],
         filesDeleted: 0,
@@ -258,6 +282,50 @@ export class HubSpotAdapter extends IntegrationAdapter {
         filesWritten: 0,
         paths: fallbackPath ? [fallbackPath] : [],
       };
+    }
+  }
+
+  private async reconcileWebhookPayload(
+    workspaceId: string,
+    path: string,
+    event: NormalizedWebhook,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const fetchOptions: { connectionId?: string; providerConfigKey?: string } = {};
+      if (event.connectionId) {
+        fetchOptions.connectionId = event.connectionId;
+      }
+      const providerConfigKey = readProviderConfigKey(event.payload);
+      if (providerConfigKey) {
+        fetchOptions.providerConfigKey = providerConfigKey;
+      }
+      const fetched = await this.api.fetchCrmObject(event.objectType, event.objectId, fetchOptions);
+      return mergeFetchedPayload(fetched, event.payload);
+    } catch {
+      return mergeFallbackPayload(await this.readExistingPayload(workspaceId, path), event.payload);
+    }
+  }
+
+  private async readExistingPayload(
+    workspaceId: string,
+    path: string,
+  ): Promise<HubSpotRecord | undefined> {
+    if (!this.client.readFile) {
+      return undefined;
+    }
+    try {
+      const result = await this.client.readFile({ workspaceId, path });
+      const content = typeof result === 'string' ? result : result?.content;
+      if (!content) {
+        return undefined;
+      }
+      const parsed = JSON.parse(content) as unknown;
+      if (!isPlainObject(parsed)) {
+        return undefined;
+      }
+      return isPlainObject(parsed.payload) ? parsed.payload : parsed;
+    } catch {
+      return undefined;
     }
   }
 
@@ -884,6 +952,47 @@ function getRecord(value: unknown): HubSpotRecord | undefined {
 
 function isPlainObject(value: unknown): value is HubSpotRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeFetchedPayload(
+  fetched: HubSpotRecord,
+  webhookPayload: HubSpotRecord,
+): HubSpotRecord {
+  // Prefer the authoritative fetched record, but preserve webhook metadata
+  // (_webhook, _connection) from the incoming payload.
+  return {
+    ...fetched,
+    ...pickWebhookMetadata(webhookPayload),
+  };
+}
+
+function mergeFallbackPayload(
+  existingPayload: HubSpotRecord | undefined,
+  webhookPayload: HubSpotRecord,
+): HubSpotRecord {
+  // Strip stale _webhook from the existing payload so the current event's
+  // metadata wins and inferWriteCounts never reads a previous action.
+  const { _webhook: _discarded, ...existingWithoutWebhook } = existingPayload ?? {};
+  return {
+    ...existingWithoutWebhook,
+    ...webhookPayload,
+  };
+}
+
+function pickWebhookMetadata(payload: HubSpotRecord): HubSpotRecord {
+  const metadata: HubSpotRecord = {};
+  if (isPlainObject(payload._connection)) {
+    metadata._connection = payload._connection;
+  }
+  if (isPlainObject(payload._webhook)) {
+    metadata._webhook = payload._webhook;
+  }
+  return metadata;
+}
+
+function readProviderConfigKey(payload: HubSpotRecord): string | undefined {
+  const connection = getRecord(payload._connection);
+  return asString(connection?.providerConfigKey) ?? asString(connection?.provider_config_key);
 }
 
 function toErrorMessage(error: unknown): string {
