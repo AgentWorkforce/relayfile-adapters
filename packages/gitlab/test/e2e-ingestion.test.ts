@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GitLabAdapter } from '../src/adapter.js';
 import { renderMergeRequestPatch } from '../src/mr/diff-parser.js';
-import type { GitLabMergeRequestWebhook, GitLabTagPushWebhook } from '../src/types.js';
+import type { GitLabNoteWebhook, GitLabMergeRequestWebhook, GitLabTagPushWebhook } from '../src/types.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabAdapter e2e ingestion', () => {
@@ -123,6 +123,123 @@ describe('GitLabAdapter e2e ingestion', () => {
         },
       ]),
     );
+  });
+
+  it('backfills the parent issue meta (with labels) on an issue comment webhook (#176)', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn',
+      projectPath: 'acme/api',
+    });
+
+    // The authoritative issue, re-fetched during comment ingestion, carries the
+    // `factory` label that the webhook envelope alone would not have surfaced.
+    provider.register(
+      'GET',
+      '/api/v4/projects/acme%2Fapi/issues/7',
+      ok({
+        id: 700,
+        iid: 7,
+        title: 'Fix the thing',
+        description: 'body',
+        state: 'opened',
+        author: { id: 2, username: 'dev', name: 'Dev' },
+        labels: ['factory'],
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-02T00:00:00Z',
+      }),
+    );
+
+    const payload = {
+      object_kind: 'note',
+      project: {
+        id: 1,
+        name: 'api',
+        path: 'api',
+        path_with_namespace: 'acme/api',
+      },
+      issue: {
+        id: 700,
+        iid: 7,
+        title: 'Fix the thing',
+        description: 'body',
+        state: 'opened',
+        author: { id: 2, username: 'dev', name: 'Dev' },
+        labels: ['factory'],
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-02T00:00:00Z',
+      },
+      object_attributes: {
+        id: 99,
+        body: 'A comment',
+        author: { id: 2, username: 'dev', name: 'Dev' },
+        noteable_type: 'Issue',
+        noteable_iid: 7,
+        created_at: '2024-01-03T00:00:00Z',
+        updated_at: '2024-01-03T00:00:00Z',
+      },
+    } as GitLabNoteWebhook;
+
+    const result = await adapter.routeWebhook(payload, 'note.Issue');
+
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.paths, [
+      '/gitlab/projects/acme/api/issues/7__fix-the-thing/comments/99.json',
+      '/gitlab/projects/acme/api/issues/7__fix-the-thing/meta.json',
+    ]);
+
+    const metaOperation = result.operations.find((operation) => operation.path.endsWith('/meta.json'));
+    assert.ok(metaOperation, 'expected an issue meta.json operation');
+    const meta = JSON.parse(metaOperation.content ?? '{}');
+    assert.deepStrictEqual(meta.labels, ['factory']);
+    assert.strictEqual(meta.iid, 7);
+  });
+
+  it('still records the comment when the parent issue re-fetch fails (#176)', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn',
+      projectPath: 'acme/api',
+    });
+
+    // No handler registered for the issue fetch -> the API call throws. The
+    // comment must still be ingested.
+    const payload = {
+      object_kind: 'note',
+      project: {
+        id: 1,
+        name: 'api',
+        path: 'api',
+        path_with_namespace: 'acme/api',
+      },
+      issue: {
+        id: 700,
+        iid: 7,
+        title: 'Fix the thing',
+        description: 'body',
+        state: 'opened',
+        author: { id: 2, username: 'dev', name: 'Dev' },
+        labels: ['factory'],
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-02T00:00:00Z',
+      },
+      object_attributes: {
+        id: 99,
+        body: 'A comment',
+        author: { id: 2, username: 'dev', name: 'Dev' },
+        noteable_type: 'Issue',
+        noteable_iid: 7,
+        created_at: '2024-01-03T00:00:00Z',
+        updated_at: '2024-01-03T00:00:00Z',
+      },
+    } as GitLabNoteWebhook;
+
+    const result = await adapter.routeWebhook(payload, 'note.Issue');
+
+    assert.deepStrictEqual(result.paths, [
+      '/gitlab/projects/acme/api/issues/7__fix-the-thing/comments/99.json',
+    ]);
+    assert.strictEqual(result.filesWritten, 1);
   });
 
   it('maps tag deletion webhooks to delete operations', async () => {

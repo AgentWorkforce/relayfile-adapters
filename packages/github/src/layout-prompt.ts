@@ -24,8 +24,10 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 \`issues/_index.json\` and \`pulls/_index.json\` rows use:
 
 \`\`\`json
-{ "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "number": 42, "state": "open" }
+{ "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "number": 42, "state": "open", "labels": ["factory"] }
 \`\`\`
+
+\`labels\` carries the issue's label names inline so you can filter on the index without opening every \`meta.json\` (e.g. \`jq '.[] | select(.labels | index("factory"))'\`). It is present on issue rows; pull rows may omit it.
 
 ## JSONL And Querying
 
@@ -37,6 +39,7 @@ Examples:
 ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
+jq '.[] | select(.labels | index("factory"))' /github/repos/octocat/hello-world/issues/_index.json
 ls /github/repos/octocat__hello-world/issues/by-state/open
 ls /github/repos/octocat__hello-world/issues/by-assignee/octocat
 ls /github/repos/octocat__hello-world/issues/by-priority/high

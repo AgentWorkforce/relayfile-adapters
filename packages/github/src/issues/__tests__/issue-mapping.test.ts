@@ -276,12 +276,12 @@ describe('issue mapping', () => {
       '/github/repos/octocat__hello-world/issues/_index.json',
       '/github/repos/octocat__hello-world/issues/by-id/10.json',
       '/github/repos/octocat__hello-world/issues/by-title/track-adapter-issue-ingestion-coverage__10.json',
-      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
-      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
       '/github/repos/octocat/hello-world/issues/_index.json',
       '/github/repos/octocat/hello-world/pulls/_index.json',
       '/github/repos/_index.json',
       '/github/LAYOUT.md',
+      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
+      '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
     ]);
     assert.deepStrictEqual(
       JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'),
@@ -291,6 +291,7 @@ describe('issue mapping', () => {
         updated: '2026-03-28T07:45:00Z',
         number: 10,
         state: 'open',
+        labels: ['bug'],
       }],
     );
     assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]'), []);
@@ -310,12 +311,12 @@ describe('issue mapping', () => {
       filesDeleted: 0,
       paths: [
         '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/meta.json',
-        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
-        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
         '/github/repos/octocat/hello-world/issues/_index.json',
         '/github/repos/octocat/hello-world/pulls/_index.json',
         '/github/repos/_index.json',
         '/github/LAYOUT.md',
+        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7001/meta.json',
+        '/github/repos/octocat/hello-world/issues/10__track-adapter-issue-ingestion-coverage/comments/7002/meta.json',
       ],
       errors: [],
     });
@@ -381,6 +382,7 @@ describe('issue mapping', () => {
           updated: '2026-03-29T07:45:00Z',
           number: 11,
           state: 'open',
+          labels: ['bug'],
         },
         {
           id: '10',
@@ -388,6 +390,7 @@ describe('issue mapping', () => {
           updated: '2026-03-28T07:45:00Z',
           number: 10,
           state: 'open',
+          labels: ['bug'],
         },
       ],
     );

@@ -3,13 +3,27 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
+import type { VfsLike } from './files/content-fetcher.js';
+import { mergeIngestResults, vfsPathExists } from './ingest-utils.js';
+import { isActualIssue } from './issues/fetcher.js';
+import {
+  persistIssueRecordFromObject,
+  reconcileIssueRecord,
+} from './issues/issue-mapper.js';
 import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from './lazy.js';
-import { githubDeploymentStatusPath, githubIssuePath, githubPullRequestPath } from './path-mapper.js';
+import {
+  githubByIdAliasPath,
+  githubDeploymentStatusPath,
+  githubIssuePath,
+  githubPullRequestPath,
+} from './path-mapper.js';
 import {
   type FileSemantics,
   type GitHubAdapterConfig,
+  type GitHubRequestProvider,
   type IngestResult,
   IntegrationAdapter as LocalIntegrationAdapter,
+  type JsonObject,
   type MaterializeResult,
   type NormalizedWebhook,
   type SyncOptions,
@@ -215,12 +229,20 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestIssueComment(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult(
+    const result = await this.createIngestResult(
       'issue_comment.created',
       'issue_comment',
       payload,
       'write',
     );
+
+    // A comment event materializes `issues/<n>/comments/...`, but if the parent
+    // issue's `issues.opened` webhook was missed the issue itself has no
+    // `meta.json` (labels/state), leaving a "comments-only" dir that is
+    // invisible to label-gated consumers. Backfill the issue record lazily.
+    // See issue #176.
+    const backfill = await this.backfillIssueIfMissing(payload);
+    return backfill ? mergeIngestResults(result, backfill) : result;
   }
 
   async ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -228,21 +250,20 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestIssue(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult('issues.opened', 'issue', payload, 'write');
+    return this.reconcileIssue('issues.opened', payload, 'write');
   }
 
   async updateIssue(payload: Record<string, unknown>): Promise<IngestResult> {
     const action = readString(payload.action);
-    return this.createIngestResult(
+    return this.reconcileIssue(
       action ? `issues.${action}` : 'issues.updated',
-      'issue',
       payload,
       'update',
     );
   }
 
   async closeIssue(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult('issues.closed', 'issue', payload, 'update');
+    return this.reconcileIssue('issues.closed', payload, 'update');
   }
 
   async ingestCheckRun(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -275,6 +296,114 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
   async writeBack(workspaceId: string, path: string, content: string) {
     return this.writebackHandler.writeBack(workspaceId, path, content);
+  }
+
+  /**
+   * Reconcile an issue record on an `issues.*` webhook rather than trusting the
+   * envelope. When the provider can write to the mount we re-fetch the issue
+   * (authoritative labels/state) and write a complete `meta.json` + aliases +
+   * indexes; on a fetch failure we fall back to mapping the envelope's `issue`
+   * object so the labels it carried are still persisted. When the provider is
+   * not VFS-capable (e.g. unit tests) we keep the legacy path-only behaviour so
+   * the upstream materializer writes the envelope. See issue #176.
+   */
+  private async reconcileIssue(
+    eventType: string,
+    payload: Record<string, unknown>,
+    mode: 'update' | 'write',
+  ): Promise<IngestResult> {
+    const target = this.resolveIssueTarget(payload);
+    const vfs = this.tryGetVfsProvider();
+
+    if (vfs && target) {
+      try {
+        return await reconcileIssueRecord(
+          this.provider as unknown as GitHubRequestProvider,
+          target.owner,
+          target.repo,
+          target.number,
+          vfs,
+          this.config.connectionId,
+        );
+      } catch {
+        // Re-fetch failed (network/auth/rate-limit). Persist what the envelope
+        // carried so labels are not silently dropped.
+        const envelopeIssue = asRecord(payload.issue);
+        if (envelopeIssue && isActualIssue(envelopeIssue as JsonObject)) {
+          try {
+            return await persistIssueRecordFromObject(
+              vfs,
+              target.owner,
+              target.repo,
+              envelopeIssue as JsonObject,
+            );
+          } catch {
+            // Fall through to the path-only result below.
+          }
+        }
+      }
+    }
+
+    return this.createIngestResult(eventType, 'issue', payload, mode);
+  }
+
+  /**
+   * Materialize an issue's canonical record if no `meta.json` exists yet. Driven
+   * by `issue_comment.created` so a comment can no longer leave a labels-less,
+   * meta-less issue directory behind. See issue #176.
+   */
+  private async backfillIssueIfMissing(
+    payload: Record<string, unknown>,
+  ): Promise<IngestResult | undefined> {
+    const target = this.resolveIssueTarget(payload);
+    const vfs = this.tryGetVfsProvider();
+    if (!vfs || !target) {
+      return undefined;
+    }
+
+    const byIdAliasPath = githubByIdAliasPath(target.owner, target.repo, 'issues', target.number);
+    if (await vfsPathExists(vfs, byIdAliasPath)) {
+      return undefined;
+    }
+
+    try {
+      return await reconcileIssueRecord(
+        this.provider as unknown as GitHubRequestProvider,
+        target.owner,
+        target.repo,
+        target.number,
+        vfs,
+        this.config.connectionId,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolveIssueTarget(
+    payload: Record<string, unknown>,
+  ): { owner: string; repo: string; number: number } | undefined {
+    const repoInfo = extractRepoInfo(payload);
+    const owner = repoInfo.owner || this.config.owner;
+    const repo = repoInfo.repo || this.config.repo;
+    const number = repoInfo.number;
+    if (!owner || !repo || typeof number !== 'number' || !Number.isInteger(number) || number < 1) {
+      return undefined;
+    }
+    return { owner, repo, number };
+  }
+
+  /**
+   * Return the provider as a VFS writer when it exposes a write method,
+   * otherwise `undefined`. Mirrors the lazy-sync VFS check but never throws so
+   * non-VFS providers (unit tests, dry runs) cleanly fall back.
+   */
+  private tryGetVfsProvider(): VfsLike | undefined {
+    const candidate = this.provider as unknown as VfsLike;
+    const hasWriter = Boolean(
+      candidate.writeFile ?? candidate.write ?? candidate.put ?? candidate.set ?? candidate.upsert,
+    );
+    return hasWriter ? candidate : undefined;
   }
 
   private async createIngestResult(

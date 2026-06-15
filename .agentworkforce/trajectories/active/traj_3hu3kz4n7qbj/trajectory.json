@@ -1,0 +1,19 @@
+{
+  "id": "traj_3hu3kz4n7qbj",
+  "version": 1,
+  "task": {
+    "title": "Review PR #177 in AgentWorkforce/relayfile-adapters"
+  },
+  "status": "active",
+  "startedAt": "2026-06-15T12:40:32.439Z",
+  "agents": [],
+  "chapters": [],
+  "commits": [],
+  "filesChanged": [],
+  "projectId": "AgentWorkforce/relayfile-adapters",
+  "tags": [],
+  "_trace": {
+    "startRef": "24d42e92a2b0611522a5bc553df1730ae7fd7706",
+    "endRef": "24d42e92a2b0611522a5bc553df1730ae7fd7706"
+  }
+}

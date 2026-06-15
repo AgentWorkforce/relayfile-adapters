@@ -1,4 +1,5 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { createEmptyIngestResult, mergeIngestResults, vfsPathExists } from '../ingest-utils.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
 import { ingestIssueComments } from './comment-mapper.js';
 import {
@@ -90,12 +91,7 @@ export async function ingestIssue(
   }
 
   const mapped = mapIssue(issue, owner, repo);
-  const metaResult = await writeMappedFile(
-    vfs,
-    buildAbsoluteVfsPath(owner, repo, mapped.vfsPath),
-    mapped.content,
-  );
-  await writeIssueAliases(vfs, owner, repo, number, mapped.title, mapped.content);
+  const recordResult = await persistIssueRecord(vfs, owner, repo, number, mapped);
   const commentResult = await ingestIssueComments(
     provider,
     owner,
@@ -105,8 +101,67 @@ export async function ingestIssue(
     mapped.title ?? undefined,
   );
 
+  return mergeIngestResults(recordResult, commentResult);
+}
+
+/**
+ * Re-fetch a single issue from the GitHub API and write its canonical record,
+ * aliases, and indexes (no comments). This is the reconciliation primitive the
+ * webhook handlers use so that label/state changes — or a missed `issues.opened`
+ * delivery — always converge to a complete `meta.json` with authoritative
+ * `labels`, rather than trusting whatever the webhook envelope happened to
+ * carry. See issue #176.
+ */
+export async function reconcileIssueRecord(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  number: number,
+  vfs: VfsLike,
+  connectionId?: string,
+): Promise<IngestResult> {
+  const issue = await fetchIssue(provider, owner, repo, number, connectionId);
+  if (!isActualIssue(issue)) {
+    throw new Error(
+      `Expected ${owner}/${repo}#${number} to be an issue, but GitHub returned a pull request`,
+    );
+  }
+
+  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo));
+}
+
+/**
+ * Map a raw GitHub issue object (from an API fetch or a webhook envelope) and
+ * write its canonical record, aliases, and indexes — without fetching comments.
+ * Used as the envelope-fallback path when an API re-fetch is unavailable so the
+ * labels the envelope carried are still persisted.
+ */
+export async function persistIssueRecordFromObject(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  issue: JsonObject,
+): Promise<IngestResult> {
+  const number = readPositiveInteger(issue, 'number');
+  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo));
+}
+
+async function persistIssueRecord(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  number: number,
+  mapped: IssueMapping,
+): Promise<IngestResult> {
+  const metaResult = await writeMappedFile(
+    vfs,
+    buildAbsoluteVfsPath(owner, repo, mapped.vfsPath),
+    mapped.content,
+  );
+  await writeIssueAliases(vfs, owner, repo, number, mapped.title, mapped.content);
+
   if (metaResult.errors.length > 0) {
-    return mergeIngestResults(metaResult, commentResult);
+    return metaResult;
   }
 
   // Write indexes after the canonical record write resolves so failed writes
@@ -126,6 +181,7 @@ export async function ingestIssue(
         updated,
         number,
         state: mappedMetaField(mapped.content, 'state'),
+        labels: mappedLabels(mapped.content),
       }),
     (rows) => buildRepoIssuesIndexFile(owner, repo, rows).content,
   );
@@ -147,7 +203,7 @@ export async function ingestIssue(
   const layoutFile = githubLayoutPromptFile();
   const layoutResult = await writeMappedFile(vfs, layoutFile.path, layoutFile.content);
 
-  return mergeIngestResults(metaResult, commentResult, issueIndexResult, pullIndexResult, repoIndexResult, layoutResult);
+  return mergeIngestResults(metaResult, issueIndexResult, pullIndexResult, repoIndexResult, layoutResult);
 }
 
 function asRecord(value: JsonValue | undefined): JsonObject {
@@ -162,70 +218,6 @@ function buildAbsoluteVfsPath(owner: string, repo: string, relativePath: string)
 
 function buildIssueHtmlUrl(owner: string, repo: string, number: number): string {
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`;
-}
-
-function createEmptyIngestResult(): IngestResult {
-  return {
-    filesDeleted: 0,
-    filesUpdated: 0,
-    filesWritten: 0,
-    paths: [],
-    errors: [],
-  };
-}
-
-function mergeIngestResults(...results: IngestResult[]): IngestResult {
-  return results.reduce<IngestResult>((combined, result) => {
-    combined.filesWritten += result.filesWritten;
-    combined.filesUpdated += result.filesUpdated;
-    combined.filesDeleted += result.filesDeleted;
-    combined.paths.push(...result.paths);
-    combined.errors.push(...result.errors);
-    return combined;
-  }, createEmptyIngestResult());
-}
-
-async function pathExists(vfs: VfsLike, path: string): Promise<boolean | undefined> {
-  if (typeof vfs.exists === 'function') {
-    return Boolean(await vfs.exists(path));
-  }
-  if (typeof vfs.has === 'function') {
-    return Boolean(await vfs.has(path));
-  }
-  if (typeof vfs.stat === 'function') {
-    try {
-      const value = await vfs.stat(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.readFile === 'function') {
-    try {
-      const value = await vfs.readFile(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.read === 'function') {
-    try {
-      const value = await vfs.read(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.get === 'function') {
-    try {
-      const value = await vfs.get(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-
-  return undefined;
 }
 
 function readLabelNames(value: JsonValue | undefined): string[] {
@@ -276,6 +268,13 @@ function mappedMetaField(content: string, key: keyof IssueMeta): string {
   return typeof value === 'string' ? value : '';
 }
 
+function mappedLabels(content: string): string[] {
+  const parsed = JSON.parse(content) as IssueMeta;
+  return Array.isArray(parsed.labels)
+    ? parsed.labels.filter((label): label is string => typeof label === 'string')
+    : [];
+}
+
 async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise<void> {
   const writer =
     vfs.writeFile ??
@@ -297,7 +296,7 @@ async function writeMappedFile(vfs: VfsLike, path: string, content: string): Pro
   const result = createEmptyIngestResult();
 
   try {
-    const existed = await pathExists(vfs, path);
+    const existed = await vfsPathExists(vfs, path);
     await runVfsWrite(vfs, path, content);
     result.paths.push(path);
 
@@ -415,7 +414,7 @@ async function resolveAliasPath(
   content: string,
   previousContent?: string,
 ): Promise<string> {
-  const exists = await pathExists(vfs, baseAliasPath);
+  const exists = await vfsPathExists(vfs, baseAliasPath);
   if (!exists) {
     return baseAliasPath;
   }
