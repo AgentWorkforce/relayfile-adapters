@@ -15,6 +15,7 @@ import {
   resolveDeleteRequest,
   resolveReadRequest,
   resolveWritebackRequest,
+  type ClickUpAdapterConfig,
   type ConnectionProvider,
   type ProxyRequest,
   type ProxyResponse,
@@ -25,6 +26,31 @@ import { ReadOnlyFieldError } from '../writeback.js';
 
 interface RecordingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
+}
+
+function createCapturingAdapter(
+  proxy: (request: ProxyRequest) => Promise<ProxyResponse>,
+  config: ClickUpAdapterConfig = { connectionId: 'conn-clickup' },
+): { adapter: ClickUpAdapter; client: RecordingClient; requests: ProxyRequest[] } {
+  const client: RecordingClient = {
+    writes: [],
+    async writeFile(input) {
+      this.writes.push(input);
+      return { created: true };
+    },
+  };
+  const requests: ProxyRequest[] = [];
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+      requests.push(request);
+      return proxy(request) as Promise<ProxyResponse<T>>;
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+  return { adapter: new ClickUpAdapter(client, provider, config), client, requests };
 }
 
 function createAdapter(): { adapter: ClickUpAdapter; client: RecordingClient } {
@@ -108,6 +134,85 @@ test('ingestWebhook writes task payloads with semantics and deterministic path',
     '/clickup/spaces/space_123.json',
     'clickup:tag:adapter',
   ]);
+});
+
+test('ingestWebhook re-fetches the full ClickUp task before writing update records', async () => {
+  const { adapter, client, requests } = createCapturingAdapter(async (request) => {
+    assert.equal(request.method, 'GET');
+    assert.equal(request.endpoint, '/api/v2/task/task_123');
+    assert.equal(request.connectionId, 'conn-clickup');
+    return {
+      status: 200,
+      headers: {},
+      data: {
+        id: 'task_123',
+        name: 'Ship ClickUp adapter',
+        status: { status: 'in progress', type: 'custom' },
+        priority: { priority: 'high' },
+        assignees: [{ id: '42', username: 'ada' }],
+        tags: [{ name: 'adapter' }],
+        list: { id: 'list_123', name: 'Adapters' },
+      },
+    };
+  });
+
+  // Thin notification webhook: no name/status/assignees in the envelope.
+  const result = await adapter.ingestWebhook('workspace_1', {
+    event: 'taskUpdated',
+    task_id: 'task_123',
+    data: { id: 'task_123' },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(result.filesWritten >= 1, true);
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  assert.equal(payload.name, 'Ship ClickUp adapter');
+  assert.deepEqual(payload.assignees, [{ id: '42', username: 'ada' }]);
+  // semantics derive from the authoritative record, not the thin envelope
+  assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status'], 'in progress');
+  assert.equal(client.writes[0]?.semantics?.properties?.['clickup.priority'], 'high');
+  // webhook envelope metadata is preserved alongside the authoritative fields
+  assert.equal((payload._webhook as Record<string, unknown>)?.event, 'taskUpdated');
+});
+
+test('ingestWebhook falls back to the webhook delta when task re-fetch fails', async () => {
+  const { adapter, client, requests } = createCapturingAdapter(async () => ({
+    status: 503,
+    headers: {},
+    data: { err: 'Service unavailable' },
+  }));
+
+  const result = await adapter.ingestWebhook('workspace_1', {
+    event: 'taskUpdated',
+    task_id: 'task_123',
+    data: { id: 'task_123', name: 'Partial delta', status: { status: 'review' } },
+  });
+
+  assert.ok(requests.length >= 1);
+  assert.equal(requests[0]?.endpoint, '/api/v2/task/task_123');
+  assert.equal(result.filesWritten >= 1, true);
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  // fell back to the thin webhook data rather than dropping the write
+  assert.equal(payload.name, 'Partial delta');
+  assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status'], 'review');
+});
+
+test('ingestWebhook does not re-fetch non-task objects (lists/folders/spaces)', async () => {
+  const { adapter, requests } = createCapturingAdapter(async () => ({
+    status: 200,
+    headers: {},
+    data: { id: 'list_123', name: 'Should not be fetched' },
+  }));
+
+  await adapter.ingestWebhook('workspace_1', {
+    event: 'listUpdated',
+    list_id: 'list_123',
+    data: { id: 'list_123', name: 'Adapters' },
+  });
+
+  assert.equal(requests.length, 0);
 });
 
 test('ingestWebhook writes list payloads', async () => {

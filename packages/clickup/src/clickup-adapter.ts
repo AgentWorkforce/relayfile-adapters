@@ -15,6 +15,7 @@ import {
   normalizeClickUpObjectType,
 } from './path-mapper.js';
 import { emitClickUpAuxiliaryFiles } from './emit-auxiliary-files.js';
+import { ClickUpApiClient, type ClickUpFetchOptions } from './api.js';
 import { CLICKUP_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   ClickUpAdapterConfig,
@@ -119,6 +120,7 @@ export class ClickUpAdapter extends IntegrationAdapter {
   override readonly version = '0.1.0';
 
   readonly config: ClickUpAdapterConfig;
+  private readonly api: ClickUpApiClient;
 
   constructor(
     client: RelayFileClientLike,
@@ -127,6 +129,7 @@ export class ClickUpAdapter extends IntegrationAdapter {
   ) {
     super(client, provider);
     this.config = config;
+    this.api = new ClickUpApiClient(provider, config);
   }
 
   override supportedEvents(): string[] {
@@ -178,17 +181,20 @@ export class ClickUpAdapter extends IntegrationAdapter {
         };
       }
 
-      const content = this.renderContent(workspaceId, normalized, false);
+      const reconciledPayload = await this.reconcileWebhookPayload(normalized);
+      const reconciled: NormalizedWebhook = { ...normalized, payload: reconciledPayload };
+
+      const content = this.renderContent(workspaceId, reconciled, false);
       const writeResult = await this.client.writeFile({
         workspaceId,
         path,
         content,
         contentType: JSON_CONTENT_TYPE,
-        semantics: this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload),
+        semantics: this.computeSemantics(reconciled.objectType, reconciled.objectId, reconciled.payload),
       });
 
-      const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, normalized, content, false);
-      const counts = inferWriteCounts(normalized, writeResult, false);
+      const auxiliary = await this.writeTaskAuxiliaryFiles(workspaceId, reconciled, content, false);
+      const counts = inferWriteCounts(reconciled, writeResult, false);
       return {
         filesWritten: counts.filesWritten + auxiliary.filesWritten,
         filesUpdated: counts.filesUpdated,
@@ -319,6 +325,36 @@ export class ClickUpAdapter extends IntegrationAdapter {
   private isDeleteEvent(event: NormalizedWebhook): boolean {
     const action = getWebhookAction(event.payload) ?? getEventAction(event.eventType);
     return action === 'deleted';
+  }
+
+  /**
+   * ClickUp webhooks are notification-style — `{ event, task_id, history_items }`
+   * with almost none of the record. Before writing a non-delete task event we
+   * re-fetch the authoritative task from the ClickUp REST API so consumers get
+   * the full `name`/`status`/`assignees`/`tags`/`priority`/`custom_fields`. If
+   * the re-fetch fails (network/permission), fall back to the webhook delta so
+   * ingestion still records what little the notification carried. Only tasks
+   * are re-fetchable; lists/folders/spaces keep their normalized payload.
+   */
+  private async reconcileWebhookPayload(event: NormalizedWebhook): Promise<Record<string, unknown>> {
+    if (normalizeClickUpObjectType(event.objectType) !== 'task') {
+      return event.payload;
+    }
+
+    try {
+      const fetchOptions: ClickUpFetchOptions = {};
+      if (event.connectionId) {
+        fetchOptions.connectionId = event.connectionId;
+      }
+      const providerConfigKey = readProviderConfigKey(event.payload);
+      if (providerConfigKey) {
+        fetchOptions.providerConfigKey = providerConfigKey;
+      }
+      const fetched = await this.api.fetchTask(event.objectId, fetchOptions);
+      return mergeFetchedPayload(fetched, event.payload);
+    } catch {
+      return event.payload;
+    }
   }
 
   private renderContent(workspaceId: string, event: NormalizedWebhook, deleted: boolean): string {
@@ -665,6 +701,37 @@ function applySpaceSemantics(
   if (space.archived === true) {
     permissions.add('state:archived');
   }
+}
+
+/**
+ * Overlays the webhook notification metadata (`_webhook`/`_connection`) onto the
+ * authoritative re-fetched task so the persisted record keeps the full provider
+ * fields while still carrying the event/connection envelope consumers rely on.
+ */
+function mergeFetchedPayload(
+  fetched: Record<string, unknown>,
+  webhookPayload: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...fetched,
+    ...pickWebhookMetadata(webhookPayload),
+  };
+}
+
+function pickWebhookMetadata(payload: Record<string, unknown>): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {};
+  if (isRecord(payload._connection)) {
+    metadata._connection = payload._connection;
+  }
+  if (isRecord(payload._webhook)) {
+    metadata._webhook = payload._webhook;
+  }
+  return metadata;
+}
+
+function readProviderConfigKey(payload: Record<string, unknown>): string | undefined {
+  const connection = getRecord(payload._connection);
+  return asString(connection?.providerConfigKey) ?? asString(connection?.provider_config_key);
 }
 
 function mergeClickUpPayload(
