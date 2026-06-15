@@ -19,7 +19,7 @@ test('loads GitHub writeback operations from a local OpenAPI contract', () => {
   const github = contracts.get('github');
 
   assert.ok(github);
-  assert.deepEqual([...github.operations.keys()], ['issues/create', 'issues/create-comment', 'pulls/create-review', 'pulls/merge']);
+  assert.deepEqual([...github.operations.keys()], ['issues/create', 'issues/create-comment', 'pulls/create-review', 'pulls/merge', 'pulls/create-reply-for-review-comment']);
   assert.equal(github.operations.get('issues/create').requestSchema.required[0], 'title');
   assert.deepEqual(github.operations.get('pulls/create-review').requestSchema.properties.event.enum, ['APPROVE', 'REQUEST_CHANGES', 'COMMENT']);
 });

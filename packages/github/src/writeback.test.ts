@@ -426,4 +426,49 @@ describe('writeback', () => {
       (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
     );
   });
+
+  it('resolves PR review comment reply writebacks to GitHub replies endpoint', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42/comments/999/replies/reply-draft.json',
+      JSON.stringify({ body: 'Thanks for the feedback!' }),
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.baseUrl, 'https://api.github.com');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/42/comments/999/replies');
+    assert.strictEqual(request.connectionId, '');
+    assert.deepStrictEqual(request.body, { body: 'Thanks for the feedback!' });
+  });
+
+  it('resolves PR review comment reply with plain-text body', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/7/comments/123/replies/new-reply.json',
+      'Acknowledged, will update.',
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/7/comments/123/replies');
+    assert.deepStrictEqual(request.body, { body: 'Acknowledged, will update.' });
+  });
+
+  it('resolves PR review comment reply on PR with slug segment', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42__fix-bug/comments/999/replies/draft.json',
+      JSON.stringify({ body: 'Reply to slugged PR comment.' }),
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/42/comments/999/replies');
+  });
+
+  it('rejects PR review comment reply with empty body', () => {
+    assert.throws(
+      () =>
+        resolveWritebackRequest(
+          '/github/repos/acme/widgets/pulls/42/comments/999/replies/draft.json',
+          JSON.stringify({ body: '   ' }),
+        ),
+      /body must be a non-empty string/,
+    );
+  });
 });

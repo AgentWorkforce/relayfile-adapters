@@ -40,6 +40,9 @@ const ISSUE_WRITEBACK_PATH =
 // continue to match via the bare `<segment>.json` alternative.
 const ISSUE_COMMENT_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)(?:__[^/]+)?\/comments\/([^/]+?)(?:\.json|\/meta\.json)?$/;
+// PR review comment reply — `POST /repos/{owner}/{repo}/pulls/{n}/comments/{comment_id}/replies`
+const PR_COMMENT_REPLY_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/comments\/([1-9]\d*)\/replies(?:\/[^/]+(?:\.json)?)?$/;
 
 interface GitHubReviewResponse {
   id: number;
@@ -401,8 +404,20 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
     }
   }
 
+  if (route?.resource.name === 'replies') {
+    const match = path.match(PR_COMMENT_REPLY_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2] || !match[3] || !match[4]) {
+      throw new Error(`Unsupported GitHub PR comment reply writeback path: ${path}`);
+    }
+    const owner = decodeGitHubPathSegment(match[1], 'owner');
+    const repo = decodeGitHubPathSegment(match[2], 'repo');
+    const prNumber = Number.parseInt(match[3], 10);
+    const commentId = Number.parseInt(match[4], 10);
+    return buildPrCommentReplyRequest(owner, repo, prNumber, commentId, content);
+  }
+
   throw new Error(
-    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request review, or pull request merge file.`,
+    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request review, pull request merge file, or pull request review comment reply.`,
   );
 }
 
@@ -501,6 +516,24 @@ function buildIssueCommentUpdateRequest(
     method: 'PATCH',
     baseUrl: GITHUB_API_BASE_URL,
     endpoint: `/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: payload,
+  };
+}
+
+function buildPrCommentReplyRequest(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  content: string,
+): ProxyRequest {
+  const payload = parseIssueCommentPayload(content, 'GitHub PR comment reply payload');
+  return {
+    method: 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
     connectionId: '',
     headers: githubJsonHeaders(),
     body: payload,

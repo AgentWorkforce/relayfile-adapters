@@ -8,7 +8,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 
 | Adapter | Contract source | Contract-backed endpoints | Inline endpoints | Notes |
 |---|---|---:|---:|---|
-| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 3 | 0 | `issues/create`, `issues/create-comment`, and `pulls/create-review` are spec-backed with small relayfile overlays. |
+| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 4 | 0 | `issues/create`, `issues/create-comment`, `pulls/create-review`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. |
 | asana | None | 0 | 4 | Inline JS schemas. |
 | azure-blob | None | 0 | 2 | Inline JS schemas. |
 | box | None | 0 | 2 | Inline JS schemas. |
