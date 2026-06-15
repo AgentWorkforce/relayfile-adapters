@@ -15,6 +15,10 @@ export interface GitHubRepoIndexRow {
 export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   number: number;
   state: string;
+  // Label names carried inline so label-gated consumers (e.g. the factory's
+  // `factory`-label gate) can filter on the index without reading every
+  // `meta.json`. Additive field — older readers ignore it. See issue #176.
+  labels?: string[];
   assigneeKeys?: string[];
   creatorKey?: string;
   priority?: string;
