@@ -2,5 +2,9 @@
   "github": [
     "owner",
     "repo"
+  ],
+  "salesforce": [
+    "connectionId",
+    "providerConfigKey"
   ]
 }
