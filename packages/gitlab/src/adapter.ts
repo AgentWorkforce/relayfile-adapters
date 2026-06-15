@@ -210,10 +210,27 @@ export class GitLabAdapter extends IntegrationAdapter {
     switch (notePayload.object_attributes.noteable_type) {
       case 'MergeRequest':
         return fromOperations([mapDiscussionWebhookToOperation(projectPath, notePayload)]);
-      case 'Issue':
-        return fromOperations([
-          mapIssueNoteToOperation(projectPath, notePayload.issue?.iid ?? notePayload.object_attributes.noteable_iid ?? 0, notePayload),
-        ]);
+      case 'Issue': {
+        const issueIid = notePayload.issue?.iid ?? notePayload.object_attributes.noteable_iid ?? 0;
+        const operations: IngestOperation[] = [
+          mapIssueNoteToOperation(projectPath, issueIid, notePayload),
+        ];
+
+        // Reconcile the parent issue alongside the comment so a `note.Issue`
+        // event can no longer leave a labels-less, meta-less issue directory
+        // behind when the issue's own events were missed. Mirrors the GitHub
+        // comment backfill (issue #176). The comment is preserved even if the
+        // issue re-fetch fails.
+        if (issueIid > 0) {
+          try {
+            operations.push(...(await ingestIssue(this.api, projectPath, issueIid, 'update')));
+          } catch {
+            // Keep the comment operation; the next issue.* event will heal meta.
+          }
+        }
+
+        return fromOperations(operations);
+      }
       case 'Commit':
         return fromOperations([
           mapCommitNoteToOperation(projectPath, notePayload.commit?.id ?? '', notePayload),
