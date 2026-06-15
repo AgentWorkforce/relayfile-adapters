@@ -159,9 +159,17 @@ export async function writeTriggerCatalog(
     }
     if (mismatches.length > 0) {
       throw new Error(
-        `Trigger catalog is out of sync. Run \`adapter-core triggers generate\`. Stale files: ${mismatches.join(
-          ", "
-        )}`
+        [
+          "Trigger catalog is out of sync.",
+          "To fix, run the following command from the repo root:",
+          "",
+          "  npx adapter-core triggers generate",
+          "",
+          "  # or, if the package is built locally:",
+          "  node packages/core/dist/src/cli.js triggers generate",
+          "",
+          `Stale files: ${mismatches.join(", ")}`,
+        ].join("\n")
       );
     }
     return generation;
