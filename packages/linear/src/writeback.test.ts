@@ -311,9 +311,9 @@ describe('linear writeback', () => {
         () =>
           resolveWritebackRequest(
             '/linear/projects/factory-create-operator-key.json',
-            JSON.stringify({ name: 'Factory', teamIds: ['team-1'], state: 'maybe' }),
+            JSON.stringify({ name: 'Factory', teamIds: ['team-1'], state: 'backlog' }),
           ),
-        /state` must be one of planned/,
+        /backlog` is a Linear-internal starter state/,
       );
     });
 
@@ -335,6 +335,36 @@ describe('linear writeback', () => {
         state: 'started',
         targetDate: '2026-06-30',
         leadId: 'user-1',
+      });
+    });
+
+    it('updates a project from a synced meta.json envelope', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}/meta.json`,
+        JSON.stringify({
+          provider: 'linear',
+          objectType: 'project',
+          objectId: PROJECT_UUID,
+          workspaceId: 'workspace-1',
+          payload: {
+            id: PROJECT_UUID,
+            name: 'Factory',
+            url: 'https://linear.app/agent-relay/project/factory',
+            state: 'paused',
+            targetDate: '2026-07-31',
+            updatedAt: '2026-06-15T00:00:00Z',
+          },
+        }),
+      );
+
+      assert.strictEqual(req.action, 'update-project');
+      assert.strictEqual(req.method, 'PATCH');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}`);
+      assert.deepStrictEqual(req.body, {
+        id: PROJECT_UUID,
+        name: 'Factory',
+        state: 'paused',
+        targetDate: '2026-07-31',
       });
     });
 

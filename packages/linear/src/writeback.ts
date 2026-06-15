@@ -495,11 +495,11 @@ function buildProjectCreate(content: string): LinearWritebackRequest {
 
 function buildProjectUpdate(projectId: string, content: string): LinearWritebackRequest {
   const parsed = parseJsonObject(content);
-  rejectReadOnlyFields(parsed);
-  const source = looksLikeSyncedEnvelope(parsed)
-    ? (parsed.payload as Record<string, unknown>)
-    : parsed;
-  rejectReadOnlyFields(source);
+  const isSyncedEnvelope = looksLikeSyncedEnvelope(parsed);
+  if (!isSyncedEnvelope) {
+    rejectReadOnlyFields(parsed);
+  }
+  const source = isSyncedEnvelope ? (parsed.payload as Record<string, unknown>) : parsed;
 
   const archive = readBoolean(source, 'archived');
   const input = copyAllowedFields(source, PROJECT_UPDATE_ALLOWLIST);
@@ -536,7 +536,11 @@ function buildProjectUpdate(projectId: string, content: string): LinearWriteback
 function validateProjectState(value: unknown): void {
   if (value === undefined) return;
   if (typeof value === 'string' && LINEAR_PROJECT_STATES.has(value)) return;
-  throw new Error('Linear project `state` must be one of planned, started, paused, completed, canceled');
+  throw new Error(
+    'Linear project `state` must be one of planned, started, paused, completed, canceled. ' +
+      '`backlog` is a Linear-internal starter state and cannot be set via writeback; ' +
+      'change state via Linear UI or transition forward.',
+  );
 }
 
 function buildProjectAddIssues(projectId: string, content: string): LinearWritebackRequest {

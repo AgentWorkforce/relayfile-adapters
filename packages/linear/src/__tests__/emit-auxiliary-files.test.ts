@@ -177,6 +177,23 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(!client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Old Team', 'team-1')));
   });
 
+  it('materializes backlog projects under the read-down by-state alias', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{
+        id: 'project-backlog',
+        name: 'Backlog Project',
+        state: 'backlog',
+        updatedAt: '2026-05-12T00:00:00Z',
+      }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearProjectPath('project-backlog')));
+    assert.ok(client.files.has(linearProjectByStatePath('backlog', 'project-backlog')));
+  });
+
   it('disambiguates project and team alias slug collisions', async () => {
     const client = createClient();
     const result = await emitLinearAuxiliaryFiles(client, {
@@ -638,6 +655,62 @@ describe('emitLinearAuxiliaryFiles', () => {
       ['issue-456'],
       'deleted issue id should no longer appear in the index',
     );
+    assert.equal(result.deleted, expectedDeletes.length);
+  });
+
+  it('delete tombstone for a project removes canonical + every prior alias and drops the index row', async () => {
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'project',
+      objectId: 'project-123',
+      payload: {
+        id: 'project-123',
+        name: 'Factory',
+        state: 'started',
+        team_ids: ['team-1', 'team-2'],
+        updatedAt: '2026-05-11T00:00:00Z',
+      },
+    };
+    const priorIndex = [
+      { id: 'project-123', title: 'Factory', updated: '2026-05-12T00:00:00Z' },
+      { id: 'project-456', title: 'Pear Launch', updated: '2026-05-11T00:00:00Z' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [linearProjectPath('project-123')]: JSON.stringify(priorPayload),
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-123')]: JSON.stringify(priorPayload),
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Factory', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByStatePath('started', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByTeamPath('team-1', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectByTeamPath('team-2', 'project-123')]: JSON.stringify(priorPayload),
+        [linearProjectLegacyPath('project-123')]: JSON.stringify(priorPayload),
+        [linearProjectsIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      projects: [{ id: 'project-123', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    const expectedDeletes = [
+      linearProjectPath('project-123'),
+      linearByIdAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'project-123'),
+      linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Factory', 'project-123'),
+      linearProjectByStatePath('started', 'project-123'),
+      linearProjectByTeamPath('team-1', 'project-123'),
+      linearProjectByTeamPath('team-2', 'project-123'),
+      linearProjectLegacyPath('project-123'),
+    ];
+    for (const path of expectedDeletes) {
+      assert.ok(deletedPaths.has(path), `expected delete at ${path}`);
+    }
+
+    const indexWrite = client.writes.find((w) => w.path === linearProjectsIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(writtenRows.map((r) => r.id), ['project-456']);
     assert.equal(result.deleted, expectedDeletes.length);
   });
 
