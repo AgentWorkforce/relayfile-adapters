@@ -1,5 +1,6 @@
 // Public barrel for runtime helpers, normalizers, and exported types.
 export * from './digest.js';
+export * from './api.js';
 export * from './salesforce-adapter.js';
 export * from './path-mapper.js';
 export * from './summary.js';

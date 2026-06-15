@@ -10,6 +10,10 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
   "github": [
     "owner",
     "repo"
+  ],
+  "salesforce": [
+    "connectionId",
+    "providerConfigKey"
   ]
 } as const satisfies Record<
   string,
@@ -201,12 +205,6 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "packageName": "@relayfile/s3",
     "packagePath": "packages/s3",
     "provider": "s3",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
-    "packageName": "@relayfile/adapter-salesforce",
-    "packagePath": "packages/salesforce",
-    "provider": "salesforce",
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {

@@ -186,12 +186,6 @@
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
-    "packageName": "@relayfile/adapter-salesforce",
-    "packagePath": "packages/salesforce",
-    "provider": "salesforce",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
     "packageName": "@relayfile/adapter-segment",
     "packagePath": "packages/segment",
     "provider": "segment",
