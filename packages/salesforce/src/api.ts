@@ -23,9 +23,15 @@ export class SalesforceApiClient {
     const normalizedType = normalizeSalesforceObjectType(objectType);
     const endpoint = `/services/data/${this.config.apiVersion ?? 'v62.0'}/sobjects/${normalizedType}/${encodeURIComponent(objectId)}`;
     const providerConfigKey = resolveProviderConfigKey(this.provider, this.config, options);
+    const instanceUrl = this.config.instanceUrl;
+    if (!instanceUrl) {
+      throw new Error(
+        'SalesforceAdapterConfig.instanceUrl is required for SObject API calls; set it in the adapter config',
+      );
+    }
     const response = await withProxyRetry(this.provider).proxy<Record<string, unknown>>({
       method: 'GET',
-      baseUrl: this.config.instanceUrl ?? '',
+      baseUrl: instanceUrl,
       endpoint,
       connectionId: await resolveConnectionId(this.provider, this.config, options),
       ...(providerConfigKey ? { headers: { 'Provider-Config-Key': providerConfigKey } } : {}),

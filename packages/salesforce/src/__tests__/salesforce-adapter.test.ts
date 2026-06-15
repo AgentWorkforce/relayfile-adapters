@@ -272,6 +272,7 @@ test('ingestWebhook falls back to merging CDC deltas onto the existing record wh
   }));
   const adapter = new SalesforceAdapter(client, provider, {
     connectionId: 'conn-salesforce',
+    instanceUrl: 'https://acme.my.salesforce.com',
   });
 
   await adapter.ingestWebhook('workspace_1', {
@@ -297,6 +298,53 @@ test('ingestWebhook falls back to merging CDC deltas onto the existing record wh
   assert.deepEqual(payload._webhook, { action: 'updated', eventType: 'Opportunity.updated' });
   assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.stage'], 'Negotiation/Review');
   assert.equal(client.writes[0]?.semantics?.properties?.['salesforce.opportunity.amount'], '50000');
+});
+
+test('ingestWebhook strips stale _webhook from existing record during fallback merge', async () => {
+  const client = createClient();
+  const path = '/salesforce/opportunities/006A.json';
+  client.files.set(
+    path,
+    JSON.stringify({
+      provider: 'salesforce',
+      payload: {
+        Id: '006A',
+        Name: 'Expansion',
+        StageName: 'Prospecting',
+        Amount: 50000,
+        // stale _webhook from a previous create event
+        _webhook: { action: 'created', eventType: 'Opportunity.created' },
+      },
+    }),
+  );
+  const provider = createProvider(async () => ({
+    status: 503,
+    headers: {},
+    data: { message: 'Service unavailable' },
+  }));
+  const adapter = new SalesforceAdapter(client, provider, {
+    connectionId: 'conn-salesforce',
+    instanceUrl: 'https://acme.my.salesforce.com',
+  });
+
+  // incoming update webhook — no _webhook key in the payload
+  await adapter.ingestWebhook('workspace_1', {
+    provider: 'salesforce',
+    eventType: 'Opportunity.updated',
+    objectType: 'Opportunity',
+    objectId: '006A',
+    payload: {
+      Id: '006A',
+      StageName: 'Negotiation/Review',
+    },
+  });
+
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  assert.equal(payload.Name, 'Expansion');
+  assert.equal(payload.StageName, 'Negotiation/Review');
+  // stale _webhook must NOT survive into the merged payload
+  assert.equal(payload._webhook, undefined);
 });
 
 test('ingestWebhook writes Lead payloads and records conversion relations', async () => {

@@ -110,6 +110,7 @@ export abstract class IntegrationAdapter {
   ): FileSemantics;
 
   supportedEvents?(): string[];
+  supportedScopeKeys?(): string[];
 }
 
 type SalesforceRecord = Record<string, unknown>;
@@ -134,6 +135,10 @@ export class SalesforceAdapter extends IntegrationAdapter {
     super(client, provider);
     this.config = config;
     this.api = new SalesforceApiClient(provider, config);
+  }
+
+  override supportedScopeKeys(): string[] {
+    return ['connectionId', 'providerConfigKey'];
   }
 
   override supportedEvents(): string[] {
@@ -708,8 +713,11 @@ function mergeFallbackPayload(
   existingPayload: Record<string, unknown> | undefined,
   webhookPayload: Record<string, unknown>,
 ): Record<string, unknown> {
+  // Strip stale _webhook from the existing payload so the current event's
+  // metadata wins and inferWriteCounts never reads a previous action.
+  const { _webhook: _discarded, ...existingWithoutWebhook } = existingPayload ?? {};
   return {
-    ...(existingPayload ?? {}),
+    ...existingWithoutWebhook,
     ...webhookPayload,
   };
 }
