@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new file or folder was created in OneDrive.
+  file.updated:
+    description: An existing file or folder was updated in OneDrive.
+  file.deleted:
+    description: A file or folder was deleted from OneDrive.

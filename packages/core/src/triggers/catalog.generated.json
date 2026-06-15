@@ -29,6 +29,16 @@
     "workspace.deleted",
     "workspace.removed"
   ],
+  "azure-blob": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
+  "box": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "calendly": [
     "event_type.canceled",
     "event_type.created",
@@ -74,11 +84,19 @@
     "volume.created",
     "volume.state.updated"
   ],
+  "docker-hub": [
+    "push"
+  ],
   "dropbox": [
     "file.changed"
   ],
   "fathom": [
     "new-meeting-content-ready"
+  ],
+  "gcs": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "github": [
     "check_run.completed",
@@ -160,6 +178,11 @@
     "calendar.exists",
     "calendar.not_exists",
     "calendar.sync"
+  ],
+  "google-drive": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "granola": [
     "file.created",
@@ -299,6 +322,11 @@
     "page.undeleted",
     "page.unlocked"
   ],
+  "onedrive": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "pipedrive": [
     "activity.created",
     "activity.deleted",
@@ -315,10 +343,25 @@
     "person.deleted",
     "person.updated"
   ],
+  "postgres": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "recall": [
     "file.created",
     "recording.created",
     "transcript.done"
+  ],
+  "redis": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
+  "s3": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "salesforce": [
     "Account.created",
@@ -376,6 +419,11 @@
     "mail.create",
     "mail.delete",
     "mail.update"
+  ],
+  "sharepoint": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "shopify": [
     "customer.cancel",

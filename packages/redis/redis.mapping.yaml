@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new key was created in the Redis instance.
+  file.updated:
+    description: An existing key was updated in the Redis instance.
+  file.deleted:
+    description: A key was deleted from the Redis instance.

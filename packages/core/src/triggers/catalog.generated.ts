@@ -37,6 +37,16 @@ export const KNOWN_TRIGGER_CATALOG = {
     "workspace.deleted",
     "workspace.removed"
   ],
+  "azure-blob": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
+  "box": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "calendly": [
     "event_type.canceled",
     "event_type.created",
@@ -82,11 +92,19 @@ export const KNOWN_TRIGGER_CATALOG = {
     "volume.created",
     "volume.state.updated"
   ],
+  "docker-hub": [
+    "push"
+  ],
   "dropbox": [
     "file.changed"
   ],
   "fathom": [
     "new-meeting-content-ready"
+  ],
+  "gcs": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "github": [
     "check_run.completed",
@@ -168,6 +186,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "calendar.exists",
     "calendar.not_exists",
     "calendar.sync"
+  ],
+  "google-drive": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "granola": [
     "file.created",
@@ -307,6 +330,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "page.undeleted",
     "page.unlocked"
   ],
+  "onedrive": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "pipedrive": [
     "activity.created",
     "activity.deleted",
@@ -323,10 +351,25 @@ export const KNOWN_TRIGGER_CATALOG = {
     "person.deleted",
     "person.updated"
   ],
+  "postgres": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
   "recall": [
     "file.created",
     "recording.created",
     "transcript.done"
+  ],
+  "redis": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
+  ],
+  "s3": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "salesforce": [
     "Account.created",
@@ -384,6 +427,11 @@ export const KNOWN_TRIGGER_CATALOG = {
     "mail.create",
     "mail.delete",
     "mail.update"
+  ],
+  "sharepoint": [
+    "file.created",
+    "file.deleted",
+    "file.updated"
   ],
   "shopify": [
     "customer.cancel",
@@ -496,69 +544,9 @@ export const KNOWN_TRIGGER_CATALOG = {
 
 export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
   {
-    "packageName": "@relayfile/azure-blob",
-    "packagePath": "packages/azure-blob",
-    "provider": "azure-blob",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/box",
-    "packagePath": "packages/box",
-    "provider": "box",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/adapter-docker-hub",
-    "packagePath": "packages/docker-hub",
-    "provider": "docker-hub",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/gcs",
-    "packagePath": "packages/gcs",
-    "provider": "gcs",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/google-drive",
-    "packagePath": "packages/google-drive",
-    "provider": "google-drive",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/onedrive",
-    "packagePath": "packages/onedrive",
-    "provider": "onedrive",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/postgres",
-    "packagePath": "packages/postgres",
-    "provider": "postgres",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
     "packageName": "@relayfile/adapter-reddit",
     "packagePath": "packages/reddit",
     "provider": "reddit",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/redis",
-    "packagePath": "packages/redis",
-    "provider": "redis",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/s3",
-    "packagePath": "packages/s3",
-    "provider": "s3",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
-  {
-    "packageName": "@relayfile/sharepoint",
-    "packagePath": "packages/sharepoint",
-    "provider": "sharepoint",
     "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
   },
   {

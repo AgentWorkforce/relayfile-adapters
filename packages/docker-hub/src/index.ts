@@ -1,3 +1,4 @@
+export * from './adapter.js';
 export * from './alias-slug.js';
 export * from './digest.js';
 export * from './emit-auxiliary-files.js';
