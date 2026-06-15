@@ -292,7 +292,7 @@ test('path mapper, read routes, and writeback routes cover primary Airtable obje
   );
 });
 
-test('ingestWebhook re-fetches full payloads when given an AirtableWebhookNotification', async () => {
+test('ingestWebhook materializes the re-fetched record from a real changedTablesById payload', async () => {
   const client = createCapturingClient();
   const adapter = createAdapterWithProvider(
     { connectionId: 'conn_airtable_1' },
@@ -307,27 +307,27 @@ test('ingestWebhook re-fetches full payloads when given an AirtableWebhookNotifi
         data: {
           cursor: 5,
           mightHaveMore: false,
+          // Shape Airtable's payloads API actually returns: no top-level
+          // objectType/objectId — only changedTablesById with the re-fetched
+          // cellValuesByFieldId.
           payloads: [
             {
+              timestamp: '2026-06-15T12:00:00.000Z',
+              baseTransactionNumber: 42,
               changedTablesById: {
                 tbl_tasks: {
                   changedRecordsById: {
                     rec_1: {
                       current: {
                         cellValuesByFieldId: {
-                          fld_name: 'Build webhook refetch',
-                          fld_status: 'Done',
+                          Name: 'Build webhook refetch',
+                          Status: 'Done',
                         },
                       },
                     },
                   },
                 },
               },
-              timestamp: '2026-06-15T12:00:00.000Z',
-              objectType: 'record',
-              objectId: 'rec_1',
-              tableId: 'tbl_tasks',
-              action: 'update',
             },
           ],
         },
@@ -343,11 +343,59 @@ test('ingestWebhook re-fetches full payloads when given an AirtableWebhookNotifi
   });
 
   assert.equal(adapter.requests.length, 1);
-  assert.ok(adapter.requests[0]?.endpoint.includes('app_base'));
-  assert.ok(adapter.requests[0]?.endpoint.includes('ach_webhook_1'));
-  // Result should reflect the ingested payloads
-  assert.ok(result.filesWritten >= 0);
   assert.equal(result.errors.length, 0);
+  // The authoritative record is materialized — not the empty envelope.
+  assert.equal(result.filesWritten, 1);
+  const recordPath = '/airtable/bases/app_base/tables/tbl_tasks/records/rec_1.json';
+  assert.deepEqual(result.paths, [recordPath]);
+  const written = client.files.get(recordPath);
+  assert.ok(written, 'expected the re-fetched record file to be written');
+  const parsed = JSON.parse(written ?? '{}') as { payload?: { fields?: Record<string, unknown> } };
+  assert.equal(parsed.payload?.fields?.Name, 'Build webhook refetch');
+  assert.equal(parsed.payload?.fields?.Status, 'Done');
+});
+
+test('ingestWebhook expands created and destroyed records from a changedTablesById payload', async () => {
+  const client = createCapturingClient();
+  const adapter = createAdapterWithProvider(
+    { connectionId: 'conn_airtable_1' },
+    client,
+    async () => ({
+      status: 200,
+      headers: {},
+      data: {
+        cursor: 6,
+        mightHaveMore: false,
+        payloads: [
+          {
+            timestamp: '2026-06-15T12:05:00.000Z',
+            changedTablesById: {
+              tbl_tasks: {
+                createdRecordsById: {
+                  rec_new: { cellValuesByFieldId: { Name: 'Fresh row' } },
+                },
+                destroyedRecordIds: ['rec_gone'],
+              },
+            },
+          },
+        ],
+      },
+    }),
+  );
+
+  const result = await adapter.ingestWebhook('ws_relay', {
+    baseId: 'app_base',
+    webhookId: 'ach_webhook_1',
+    timestamp: '2026-06-15T12:05:00.000Z',
+    connectionId: 'conn_airtable_1',
+  });
+
+  assert.equal(result.errors.length, 0);
+  // created record materialized, destroyed record deleted
+  assert.equal(result.filesWritten, 1);
+  assert.equal(result.filesDeleted, 1);
+  assert.ok(client.files.has('/airtable/bases/app_base/tables/tbl_tasks/records/rec_new.json'));
+  assert.deepEqual(client.deleted, ['/airtable/bases/app_base/tables/tbl_tasks/records/rec_gone.json']);
 });
 
 test('ingestWebhook returns error result when notification fetch fails', async () => {

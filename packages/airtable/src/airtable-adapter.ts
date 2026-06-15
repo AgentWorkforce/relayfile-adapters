@@ -271,16 +271,21 @@ export class AirtableAdapter extends IntegrationAdapter {
     };
 
     for (const rawPayload of materialized.payloads) {
-      const event: AirtableWebhookPayload = {
-        ...rawPayload,
-        baseId: materialized.baseId,
-      };
-      const result = await this.ingestPayload(workspaceId, event);
-      aggregate.filesWritten += result.filesWritten;
-      aggregate.filesUpdated += result.filesUpdated;
-      aggregate.filesDeleted += result.filesDeleted;
-      aggregate.paths.push(...result.paths);
-      aggregate.errors.push(...result.errors);
+      // Airtable's payloads API returns change descriptors shaped as
+      // `changedTablesById.<tableId>.{changed,created}RecordsById.<recordId>`
+      // with the re-fetched `cellValuesByFieldId`. Expand each into a per-record
+      // event the normalizer understands, rather than handing the raw envelope
+      // to ingestPayload (which would throw "missing object type"). Payloads that
+      // are already record-shaped (objectType/objectId present) pass through.
+      const events = expandMaterializedPayload(rawPayload, materialized.baseId);
+      for (const event of events) {
+        const result = await this.ingestPayload(workspaceId, event);
+        aggregate.filesWritten += result.filesWritten;
+        aggregate.filesUpdated += result.filesUpdated;
+        aggregate.filesDeleted += result.filesDeleted;
+        aggregate.paths.push(...result.paths);
+        aggregate.errors.push(...result.errors);
+      }
     }
 
     return aggregate;
@@ -772,6 +777,92 @@ function isNormalizedWebhook(event: NormalizedWebhook | AirtableWebhookPayload):
     typeof (event as NormalizedWebhook).objectId === 'string' &&
     isRecord((event as NormalizedWebhook).payload)
   );
+}
+
+/**
+ * Expands one Airtable payloads-API change descriptor into per-record events.
+ *
+ * Airtable returns changes as
+ * `changedTablesById.<tableId>.{changedRecordsById,createdRecordsById}.<recordId>`
+ * (with the re-fetched `cellValuesByFieldId`) and `destroyedRecordIds[]`. Each
+ * becomes a normalized record event the rest of the pipeline can materialize.
+ * If the payload is already record-shaped (carries `objectType`/`objectId`, e.g.
+ * a payload format that pre-normalizes), it is passed through unchanged.
+ */
+function expandMaterializedPayload(
+  rawPayload: Record<string, unknown>,
+  fallbackBaseId: string,
+): Array<NormalizedWebhook | AirtableWebhookPayload> {
+  const record = getRecord(rawPayload) ?? {};
+  const baseId = asString(record.baseId) ?? asString(record.base_id) ?? fallbackBaseId;
+  const changedTablesById = getRecord(record.changedTablesById);
+
+  if (!changedTablesById) {
+    // Already record-shaped, or some other pre-normalized payload. Preserve the
+    // prior pass-through behavior so non-CDC formats keep working.
+    return [{ ...rawPayload, baseId } as AirtableWebhookPayload];
+  }
+
+  const events: NormalizedWebhook[] = [];
+  for (const [tableId, tableChangeRaw] of Object.entries(changedTablesById)) {
+    const tableChange = getRecord(tableChangeRaw);
+    if (!tableChange) {
+      continue;
+    }
+
+    const upsert = (recordId: string, fields: Record<string, unknown>, action: 'create' | 'update'): void => {
+      events.push({
+        provider: AIRTABLE_PROVIDER_NAME,
+        eventType: `record.${action}`,
+        objectType: 'record',
+        objectId: recordId,
+        payload: { baseId, tableId, id: recordId, fields },
+      });
+    };
+
+    const createdRecordsById = getRecord(tableChange.createdRecordsById);
+    if (createdRecordsById) {
+      for (const [recordId, changeRaw] of Object.entries(createdRecordsById)) {
+        const change = getRecord(changeRaw);
+        const fields =
+          getRecord(getRecord(change?.current)?.cellValuesByFieldId) ??
+          getRecord(change?.cellValuesByFieldId) ??
+          {};
+        upsert(recordId, fields, 'create');
+      }
+    }
+
+    const changedRecordsById = getRecord(tableChange.changedRecordsById);
+    if (changedRecordsById) {
+      for (const [recordId, changeRaw] of Object.entries(changedRecordsById)) {
+        const change = getRecord(changeRaw);
+        const fields =
+          getRecord(getRecord(change?.current)?.cellValuesByFieldId) ??
+          getRecord(change?.cellValuesByFieldId) ??
+          {};
+        upsert(recordId, fields, 'update');
+      }
+    }
+
+    const destroyedRecordIds = Array.isArray(tableChange.destroyedRecordIds)
+      ? tableChange.destroyedRecordIds
+      : [];
+    for (const destroyed of destroyedRecordIds) {
+      const recordId = asString(destroyed);
+      if (!recordId) {
+        continue;
+      }
+      events.push({
+        provider: AIRTABLE_PROVIDER_NAME,
+        eventType: 'record.delete',
+        objectType: 'record',
+        objectId: recordId,
+        payload: { baseId, tableId, id: recordId, _webhook: { action: 'delete' } },
+      });
+    }
+  }
+
+  return events;
 }
 
 function isAirtableWebhookNotification(
