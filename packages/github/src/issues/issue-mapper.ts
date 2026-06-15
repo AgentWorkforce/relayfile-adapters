@@ -1,4 +1,5 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
+import { createEmptyIngestResult, mergeIngestResults, vfsPathExists } from '../ingest-utils.js';
 import { fetchIssue, isActualIssue } from './fetcher.js';
 import { ingestIssueComments } from './comment-mapper.js';
 import {
@@ -219,70 +220,6 @@ function buildIssueHtmlUrl(owner: string, repo: string, number: number): string 
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`;
 }
 
-function createEmptyIngestResult(): IngestResult {
-  return {
-    filesDeleted: 0,
-    filesUpdated: 0,
-    filesWritten: 0,
-    paths: [],
-    errors: [],
-  };
-}
-
-function mergeIngestResults(...results: IngestResult[]): IngestResult {
-  return results.reduce<IngestResult>((combined, result) => {
-    combined.filesWritten += result.filesWritten;
-    combined.filesUpdated += result.filesUpdated;
-    combined.filesDeleted += result.filesDeleted;
-    combined.paths.push(...result.paths);
-    combined.errors.push(...result.errors);
-    return combined;
-  }, createEmptyIngestResult());
-}
-
-async function pathExists(vfs: VfsLike, path: string): Promise<boolean | undefined> {
-  if (typeof vfs.exists === 'function') {
-    return Boolean(await vfs.exists(path));
-  }
-  if (typeof vfs.has === 'function') {
-    return Boolean(await vfs.has(path));
-  }
-  if (typeof vfs.stat === 'function') {
-    try {
-      const value = await vfs.stat(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.readFile === 'function') {
-    try {
-      const value = await vfs.readFile(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.read === 'function') {
-    try {
-      const value = await vfs.read(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  if (typeof vfs.get === 'function') {
-    try {
-      const value = await vfs.get(path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-
-  return undefined;
-}
-
 function readLabelNames(value: JsonValue | undefined): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -359,7 +296,7 @@ async function writeMappedFile(vfs: VfsLike, path: string, content: string): Pro
   const result = createEmptyIngestResult();
 
   try {
-    const existed = await pathExists(vfs, path);
+    const existed = await vfsPathExists(vfs, path);
     await runVfsWrite(vfs, path, content);
     result.paths.push(path);
 
@@ -477,7 +414,7 @@ async function resolveAliasPath(
   content: string,
   previousContent?: string,
 ): Promise<string> {
-  const exists = await pathExists(vfs, baseAliasPath);
+  const exists = await vfsPathExists(vfs, baseAliasPath);
   if (!exists) {
     return baseAliasPath;
   }

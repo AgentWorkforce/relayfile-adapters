@@ -4,6 +4,7 @@ import type { ConnectionProvider } from '@relayfile/sdk';
 import { createGitHubSchemaAdapter } from './adapter.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
+import { mergeIngestResults, vfsPathExists } from './ingest-utils.js';
 import { isActualIssue } from './issues/fetcher.js';
 import {
   persistIssueRecordFromObject,
@@ -540,41 +541,6 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     }
     return undefined;
   }
-}
-
-function mergeIngestResults(...results: IngestResult[]): IngestResult {
-  return results.reduce<IngestResult>(
-    (combined, result) => {
-      combined.filesWritten += result.filesWritten;
-      combined.filesUpdated += result.filesUpdated;
-      combined.filesDeleted += result.filesDeleted;
-      combined.paths.push(...result.paths);
-      combined.errors.push(...result.errors);
-      return combined;
-    },
-    { filesWritten: 0, filesUpdated: 0, filesDeleted: 0, paths: [], errors: [] },
-  );
-}
-
-async function vfsPathExists(vfs: VfsLike, path: string): Promise<boolean> {
-  if (typeof vfs.exists === 'function') {
-    return Boolean(await vfs.exists(path));
-  }
-  if (typeof vfs.has === 'function') {
-    return Boolean(await vfs.has(path));
-  }
-  for (const reader of [vfs.readFile, vfs.read, vfs.get]) {
-    if (!reader) {
-      continue;
-    }
-    try {
-      const value = await reader.call(vfs, path);
-      return value !== null && value !== undefined;
-    } catch {
-      return false;
-    }
-  }
-  return false;
 }
 
 function readString(value: unknown): string | undefined {
