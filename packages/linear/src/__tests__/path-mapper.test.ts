@@ -16,6 +16,7 @@ import {
   linearProjectAddIssuesPath,
   linearProjectByStatePath,
   linearProjectByTeamPath,
+  linearProjectDirectoryPath,
   linearProjectLegacyPath,
   linearProjectPath,
   normalizeLinearObjectType,
@@ -111,6 +112,14 @@ describe('linear path-mapper', () => {
       assert.equal(
         linearIssueByEditedPath('2026-05-12', 'issue-123'),
         '/linear/issues/by-edited/2026-05-12/issue-123.json',
+      );
+      assert.equal(
+        computeLinearPath('LinearProject', 'project-123'),
+        '/linear/projects/project-123/meta.json',
+      );
+      assert.equal(
+        linearProjectDirectoryPath('project-123'),
+        '/linear/projects/project-123',
       );
       assert.equal(
         linearProjectPath('project-123'),

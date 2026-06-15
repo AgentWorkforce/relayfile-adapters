@@ -233,22 +233,32 @@ describe('linear writeback', () => {
       });
     });
 
-    it('rejects synced envelopes because their metadata fields are read-only', () => {
-      assert.throws(
-        () =>
-          resolveWritebackRequest(
-            `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
-            JSON.stringify({
-              provider: 'linear',
-              connectionId: 'conn-1',
-              workspaceId: 'wks-1',
-              payload: {
-                title: 'Edited title',
-              },
-            }),
-          ),
-        (error) => error instanceof ReadOnlyFieldError && error.field === 'provider',
+    it('updates an issue from a synced envelope while dropping read-only metadata', () => {
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+        JSON.stringify({
+          provider: 'linear',
+          objectType: 'issue',
+          objectId: PAGE_UUID,
+          connectionId: 'conn-1',
+          workspaceId: 'wks-1',
+          payload: {
+            id: PAGE_UUID,
+            url: 'https://linear.app/example/issue/AR-1/example',
+            title: 'Edited title',
+            projectId: 'project-1',
+            updatedAt: '2026-06-15T00:00:00Z',
+          },
+        }),
       );
+
+      assert.strictEqual(req.action, 'update_issue');
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, {
+        title: 'Edited title',
+        projectId: 'project-1',
+      });
     });
   });
 
@@ -338,6 +348,25 @@ describe('linear writeback', () => {
       });
     });
 
+    it('updates legacy flat project records during the migration window', () => {
+      const req = resolveWritebackRequest(
+        `/linear/projects/${PROJECT_UUID}.json`,
+        JSON.stringify({
+          name: 'Factory',
+          state: 'started',
+        }),
+      );
+
+      assert.strictEqual(req.action, 'update-project');
+      assert.strictEqual(req.method, 'PATCH');
+      assert.strictEqual(req.endpoint, `/linear/projects/${PROJECT_UUID}`);
+      assert.deepStrictEqual(req.body, {
+        id: PROJECT_UUID,
+        name: 'Factory',
+        state: 'started',
+      });
+    });
+
     it('updates a project from a synced meta.json envelope', () => {
       const req = resolveWritebackRequest(
         `/linear/projects/${PROJECT_UUID}/meta.json`,
@@ -400,6 +429,17 @@ describe('linear writeback', () => {
         projectId: PROJECT_UUID,
         issueIds: [ISSUE_A, ISSUE_B],
       });
+    });
+
+    it('rejects duplicate issue ids in a project assignment request', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/projects/${PROJECT_UUID}/add-issues.json`,
+            JSON.stringify({ issueIds: [ISSUE_A, ISSUE_A] }),
+          ),
+        /unique `issueIds`/,
+      );
     });
   });
 

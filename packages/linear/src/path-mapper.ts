@@ -411,7 +411,7 @@ export function linearProjectByTeamPath(teamId: string, projectId: string): stri
   return `${LINEAR_PATH_ROOT}/projects/by-team/${encodeLinearPathSegment(teamId)}/${encodeLinearPathSegment(projectId)}.json`;
 }
 
-/** AR-275 local writeback path for grouping existing issues into a project. */
+/** Local writeback path for grouping existing issues into a project. */
 export function linearProjectAddIssuesPath(projectId: string): string {
   return `${linearProjectDirectoryPath(projectId)}/add-issues.json`;
 }

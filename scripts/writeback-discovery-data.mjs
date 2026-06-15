@@ -338,14 +338,19 @@ export const adapters = [
         name: str('Project name.', undefined, { minLength: 1 }),
         description: str('Markdown project description.'),
         teamId: str('Single Linear team UUID convenience input. The adapter forwards this as `teamIds`.', 'uuid'),
-        teamIds: arr(str('Linear team UUID.', 'uuid'), 'Linear team UUIDs.'),
+        teamIds: arr(str('Linear team UUID.', 'uuid'), 'Linear team UUIDs.', { minItems: 1, uniqueItems: true }),
         state: en(['planned', 'started', 'paused', 'completed', 'canceled'], 'Linear project state.'),
         leadId: str('Linear user UUID for the project lead.', 'uuid'),
         startDate: str('Project start date in YYYY-MM-DD form.', 'date'),
         targetDate: str('Project target date in YYYY-MM-DD form.', 'date'),
         color: str('Linear project color.'),
         icon: str('Linear project icon.'),
-      }, { name: 'Replace example project name', teamIds: ['00000000-0000-0000-0000-000000000000'] }),
+      }, { name: 'Replace example project name', teamIds: ['00000000-0000-0000-0000-000000000000'] }, {
+        anyOf: [
+          { required: ['teamId'] },
+          { required: ['teamIds'] },
+        ],
+      }),
       endpoint('/linear/projects/{projectId}/meta.json', 'Update Linear project', 'Updates mutable Linear project fields. Archive is represented by writing `{ "archived": true }`, which the adapter maps to Linear `projectArchive` with soft archive semantics only; it never sets `trash`, and hard-trash requires the Linear UI. Hard delete is out of scope.', [], {
         name: str('Project name.', undefined, { minLength: 1 }),
         description: str('Markdown project description.'),
@@ -363,7 +368,10 @@ export const adapters = [
         'Moves existing Linear issues into the project. The companion cloud action endpoint is `POST /linear/projects/:id/add-issues` and returns per-issue partial-success results.',
         ['issueIds'],
         {
-          issueIds: arr(str('Linear issue UUID.', 'uuid'), 'Linear issue UUIDs to move into the project.'),
+          issueIds: arr(str('Linear issue UUID.', 'uuid'), 'Linear issue UUIDs to move into the project.', {
+            minItems: 1,
+            uniqueItems: true,
+          }),
         },
         { issueIds: ['00000000-0000-0000-0000-000000000000'] },
       ),
@@ -728,8 +736,8 @@ function num(description) {
   return { type: 'number', description };
 }
 
-function arr(items, description) {
-  return { type: 'array', description, items };
+function arr(items, description, extra = {}) {
+  return { type: 'array', description, items, ...extra };
 }
 
 function obj(description, properties, extra = {}) {

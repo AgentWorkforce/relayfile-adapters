@@ -5,6 +5,18 @@
   "required": [
     "name"
   ],
+  "anyOf": [
+    {
+      "required": [
+        "teamId"
+      ]
+    },
+    {
+      "required": [
+        "teamIds"
+      ]
+    }
+  ],
   "properties": {
     "name": {
       "type": "string",
@@ -27,7 +39,9 @@
         "type": "string",
         "format": "uuid",
         "description": "Linear team UUID."
-      }
+      },
+      "minItems": 1,
+      "uniqueItems": true
     },
     "state": {
       "enum": [

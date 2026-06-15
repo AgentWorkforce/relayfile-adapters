@@ -55,6 +55,9 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
   if (projectFileMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'create') {
     return buildProjectCreate(content);
   }
+  if (projectFileMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'patch') {
+    return buildProjectUpdate(extractLinearId(projectFileMatch[1]), content);
+  }
 
   const projectMetaMatch = path.match(/^\/linear\/projects\/([^/]+)\/meta\.json$/);
   if (projectMetaMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'patch') {
@@ -419,11 +422,11 @@ const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
  */
 function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequest {
   const parsed = parseJsonObject(content);
-  rejectReadOnlyFields(parsed);
-  const source = looksLikeSyncedEnvelope(parsed)
-    ? (parsed.payload as Record<string, unknown>)
-    : parsed;
-  rejectReadOnlyFields(source);
+  const isSyncedEnvelope = looksLikeSyncedEnvelope(parsed);
+  if (!isSyncedEnvelope) {
+    rejectReadOnlyFields(parsed);
+  }
+  const source = isSyncedEnvelope ? (parsed.payload as Record<string, unknown>) : parsed;
 
   const input: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
@@ -549,6 +552,9 @@ function buildProjectAddIssues(projectId: string, content: string): LinearWriteb
   const issueIds = readStringArray(payload, 'issueIds');
   if (!issueIds || issueIds.length === 0) {
     throw new Error('projects/<id>/add-issues.json writeback requires a non-empty `issueIds` array');
+  }
+  if (new Set(issueIds).size !== issueIds.length) {
+    throw new Error('projects/<id>/add-issues.json writeback requires unique `issueIds` values');
   }
 
   return {
