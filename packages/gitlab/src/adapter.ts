@@ -117,6 +117,10 @@ export class GitLabAdapter extends IntegrationAdapter {
     return [...this.config.supportedEvents];
   }
 
+  supportedScopeKeys(): string[] {
+    return ['projectPath'];
+  }
+
   async ingestWebhook(_workspaceId: string, event: WebhookInput): Promise<IngestResult> {
     return this.routeWebhook(event.payload as unknown as GitLabWebhookPayload, event.eventType as GitLabSupportedEvent);
   }

@@ -175,4 +175,44 @@ describe('bulkIngestProject', () => {
       per_page: '50',
     });
   });
+
+  it('only sends endpoint-supported materialization states to GitLab', async () => {
+    const provider = new MockProvider();
+    provider.register('GET', `/api/v4/projects/${PROJECT_ID}/merge_requests`, ok([]));
+    provider.register('GET', `/api/v4/projects/${PROJECT_ID}/issues`, ok([]));
+
+    const result = await bulkIngestProject(makeClient(provider), {
+      projectPath: PROJECT,
+      materialization: resolveProjectMaterialization(
+        {
+          ...DEFAULT_CONFIG,
+          materialization: {
+            default: 'lazy',
+            rules: [
+              {
+                projects: ['acme/*'],
+                merge_requests: { mode: 'eager', filter: { state: 'merged' } },
+                issues: { mode: 'eager', filter: { state: 'merged', labels: ['triage'] } },
+              },
+            ],
+          },
+        },
+        PROJECT,
+      ),
+    });
+
+    assert.deepStrictEqual(result.syncedObjectTypes, []);
+
+    assert.deepStrictEqual(provider.requests[0]?.query, {
+      state: 'merged',
+      page: '1',
+      per_page: '50',
+    });
+    assert.deepStrictEqual(provider.requests[1]?.query, {
+      state: 'all',
+      labels: 'triage',
+      page: '1',
+      per_page: '50',
+    });
+  });
 });

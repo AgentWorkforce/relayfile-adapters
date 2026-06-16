@@ -121,11 +121,51 @@ describe('materialization policy utilities', () => {
     );
   });
 
+  it('lets resource-level incremental false override rule-level incremental true', () => {
+    const policy = normalizeMaterializationPolicy(
+      {
+        default: 'lazy',
+        rules: [
+          {
+            projects: ['acme/api'],
+            incremental: true,
+            issues: { mode: 'eager', incremental: false },
+            merge_requests: { mode: 'eager' },
+          },
+        ],
+      },
+      {
+        defaultMode: 'lazy',
+        resources: RESOURCES,
+        stateValues: STATES,
+        targetKey: 'projects',
+      },
+    );
+
+    const plan = resolveTargetMaterialization(policy, 'acme/api', { cursor: '2026-06-01T00:00:00Z' }, {
+      resources: RESOURCES,
+      targetKey: 'projects',
+    });
+
+    assert.deepEqual(plan.issues, {
+      mode: 'eager',
+      filter: undefined,
+      since: undefined,
+    });
+    assert.deepEqual(plan.merge_requests, {
+      mode: 'eager',
+      filter: undefined,
+      since: '2026-06-01T00:00:00Z',
+    });
+  });
+
   it('matches exact and glob targets case-insensitively', () => {
     assert.equal(matchesMaterializationTarget('Acme/API', 'acme/api'), true);
     assert.equal(matchesMaterializationTarget('acme/*', 'acme/web'), true);
     assert.equal(matchesMaterializationTarget('acme/app?', 'acme/app1'), true);
     assert.equal(matchesMaterializationTarget('acme/app?', 'acme/app10'), false);
+    assert.equal(matchesMaterializationTarget('acme/*/app-*', 'acme/team/app-api'), true);
+    assert.equal(matchesMaterializationTarget('acme/*/app-?', 'acme/team/app-api'), false);
   });
 
   it('gates webhook writes only when lazy target writes are disabled', () => {

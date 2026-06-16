@@ -34,6 +34,8 @@ function accumulate(result: SyncResult, objectType: string, operations: IngestOp
 }
 
 const DEFAULT_OBJECT_TYPES: GitLabSyncObjectType[] = ['merge_requests', 'issues', 'pipelines', 'commits'];
+const ISSUE_STATES = new Set(['opened', 'closed', 'all']);
+const MERGE_REQUEST_STATES = new Set(['opened', 'closed', 'locked', 'merged', 'all']);
 
 function wantedObjectTypes(options: SyncOptions): Set<GitLabSyncObjectType> {
   const explicit = new Set(options.objectTypes ?? DEFAULT_OBJECT_TYPES);
@@ -43,7 +45,7 @@ function wantedObjectTypes(options: SyncOptions): Set<GitLabSyncObjectType> {
 
   return new Set(
     DEFAULT_OBJECT_TYPES.filter(
-      (objectType) => explicit.has(objectType) && options.materialization?.[objectType].mode === 'eager',
+      (objectType) => explicit.has(objectType) && options.materialization?.[objectType]?.mode === 'eager',
     ),
   );
 }
@@ -59,11 +61,12 @@ function queryForMaterialization(
     return query;
   }
 
-  if (
-    (objectType === 'issues' || objectType === 'merge_requests')
-    && materialization.filter?.state
-  ) {
-    query.state = materialization.filter.state;
+  const state = materialization.filter?.state;
+  if (state && objectType === 'issues' && ISSUE_STATES.has(state)) {
+    query.state = state;
+  }
+  if (state && objectType === 'merge_requests' && MERGE_REQUEST_STATES.has(state)) {
+    query.state = state;
   }
 
   if (

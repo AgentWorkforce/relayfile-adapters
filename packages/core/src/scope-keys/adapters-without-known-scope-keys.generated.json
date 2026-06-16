@@ -72,12 +72,6 @@
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
-    "packageName": "@relayfile/adapter-gitlab",
-    "packagePath": "packages/gitlab",
-    "provider": "gitlab",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
     "packageName": "@relayfile/gmail",
     "packagePath": "packages/gmail",
     "provider": "gmail",

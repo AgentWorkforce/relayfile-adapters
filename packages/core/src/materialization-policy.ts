@@ -150,13 +150,47 @@ export function matchesMaterializationTarget(pattern: string, target: string): b
   }
 
   const normalizedTarget = target.toLowerCase();
-  if (!normalizedPattern.includes('*') && !normalizedPattern.includes('?')) {
-    return normalizedPattern === normalizedTarget;
+  return matchesGlob(normalizedPattern, normalizedTarget);
+}
+
+function matchesGlob(pattern: string, target: string): boolean {
+  let patternIndex = 0;
+  let targetIndex = 0;
+  let starIndex = -1;
+  let targetAfterStar = 0;
+
+  while (targetIndex < target.length) {
+    if (
+      patternIndex < pattern.length
+      && (pattern[patternIndex] === '?' || pattern[patternIndex] === target[targetIndex])
+    ) {
+      patternIndex += 1;
+      targetIndex += 1;
+      continue;
+    }
+
+    if (patternIndex < pattern.length && pattern[patternIndex] === '*') {
+      starIndex = patternIndex;
+      patternIndex += 1;
+      targetAfterStar = targetIndex;
+      continue;
+    }
+
+    if (starIndex !== -1) {
+      patternIndex = starIndex + 1;
+      targetAfterStar += 1;
+      targetIndex = targetAfterStar;
+      continue;
+    }
+
+    return false;
   }
 
-  const escaped = normalizedPattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
-  return regex.test(normalizedTarget);
+  while (patternIndex < pattern.length && pattern[patternIndex] === '*') {
+    patternIndex += 1;
+  }
+
+  return patternIndex === pattern.length;
 }
 
 function requireMaterializationRules<
@@ -322,10 +356,11 @@ function resolveResourceMaterialization<
     modeFromResourceList(rule, resource) ??
     (typeof rule.eager === 'boolean' ? (rule.eager ? 'eager' : 'lazy') : defaultMode);
   const filter = resourcePolicy?.filter ?? rule.filter;
+  const isIncremental = resourcePolicy?.incremental ?? rule.incremental;
   const since = resourcePolicy?.since
     ?? filter?.since
     ?? rule.since
-    ?? (resourcePolicy?.incremental || rule.incremental ? syncOptions.cursor : undefined);
+    ?? (isIncremental ? syncOptions.cursor : undefined);
 
   return {
     mode,

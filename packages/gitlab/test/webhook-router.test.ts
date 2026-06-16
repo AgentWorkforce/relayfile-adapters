@@ -14,6 +14,14 @@ const project = {
 };
 
 describe('webhook router', () => {
+  it('declares persona scope keys', () => {
+    const adapter = new GitLabAdapter(new MockProvider(), {
+      connectionId: 'conn-1',
+    });
+
+    assert.deepStrictEqual(adapter.supportedScopeKeys(), ['projectPath']);
+  });
+
   it('extracts supported pipeline and job statuses', () => {
     assert.strictEqual(
       extractEventKey({
