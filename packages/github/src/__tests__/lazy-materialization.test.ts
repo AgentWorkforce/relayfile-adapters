@@ -8,6 +8,8 @@ type RepoName = 'repo-a' | 'repo-b';
 
 interface RecordingProviderOptions {
   delayMs?: number;
+  issues?: Partial<Record<RepoName, ReturnType<typeof createIssue>[]>>;
+  pulls?: Partial<Record<RepoName, ReturnType<typeof createPull>[]>>;
   repos?: RepoName[];
 }
 
@@ -38,19 +40,19 @@ class RecordingProvider {
     }
 
     if (request.endpoint === '/repos/octocat/repo-a/issues') {
-      return this.json([createIssue('repo-a', 10, 'repo-a issue')]) as ProxyResponse<T>;
+      return this.json(this.filterIssues('repo-a', request)) as ProxyResponse<T>;
     }
 
     if (request.endpoint === '/repos/octocat/repo-b/issues') {
-      return this.json([]) as ProxyResponse<T>;
+      return this.json(this.filterIssues('repo-b', request)) as ProxyResponse<T>;
     }
 
     if (request.endpoint === '/repos/octocat/repo-a/issues/10') {
-      return this.json(createIssue('repo-a', 10, 'repo-a issue')) as ProxyResponse<T>;
+      return this.json(this.findIssue('repo-a', 10)) as ProxyResponse<T>;
     }
 
     if (request.endpoint === '/repos/octocat/repo-b/issues/20') {
-      return this.json(createIssue('repo-b', 20, 'repo-b issue')) as ProxyResponse<T>;
+      return this.json(this.findIssue('repo-b', 20)) as ProxyResponse<T>;
     }
 
     if (request.endpoint === '/repos/octocat/repo-a/issues/10/comments?per_page=100') {
@@ -62,14 +64,15 @@ class RecordingProvider {
     }
 
     if (request.endpoint === '/repos/octocat/repo-a/pulls') {
-      return this.json([createPull('repo-a', 42, 'repo-a pull')]) as ProxyResponse<T>;
+      return this.json(this.options.pulls?.['repo-a'] ?? defaultPulls('repo-a')) as ProxyResponse<T>;
     }
 
     if (request.endpoint === '/repos/octocat/repo-b/pulls') {
-      return this.json([]) as ProxyResponse<T>;
+      return this.json(this.options.pulls?.['repo-b'] ?? defaultPulls('repo-b')) as ProxyResponse<T>;
     }
 
-    if (request.endpoint === '/repos/octocat/repo-a/pulls/42/files') {
+    const pullFilesMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/pulls\/(\d+)\/files$/);
+    if (pullFilesMatch) {
       return this.json([
         {
           sha: '1234567890abcdef1234567890abcdef12345678',
@@ -81,7 +84,10 @@ class RecordingProvider {
       ]) as ProxyResponse<T>;
     }
 
-    if (request.endpoint === '/repos/octocat/repo-a/pulls/42') {
+    const pullMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/pulls\/(\d+)$/);
+    if (pullMatch) {
+      const repo = pullMatch[1] as RepoName;
+      const number = Number(pullMatch[2]);
       if (request.headers?.Accept === 'application/vnd.github.diff') {
         return {
           status: 200,
@@ -90,7 +96,7 @@ class RecordingProvider {
         };
       }
 
-      return this.json(createPull('repo-a', 42, 'repo-a pull')) as ProxyResponse<T>;
+      return this.json(this.findPull(repo, number)) as ProxyResponse<T>;
     }
 
     throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
@@ -120,6 +126,32 @@ class RecordingProvider {
     return this.requests.filter((request) => request.endpoint === endpoint).length;
   }
 
+  private filterIssues(repo: RepoName, request: ProxyRequest): ReturnType<typeof createIssue>[] {
+    const state = typeof request.query?.state === 'string' ? request.query.state : 'all';
+    const labels = typeof request.query?.labels === 'string'
+      ? request.query.labels.split(',').filter(Boolean)
+      : [];
+    const issues = this.options.issues?.[repo] ?? defaultIssues(repo);
+
+    return issues.filter((issue) => {
+      const issueLabels = issue.labels.map((label) => label.name);
+      return (
+        (state === 'all' || issue.state === state) &&
+        labels.every((label) => issueLabels.includes(label))
+      );
+    });
+  }
+
+  private findIssue(repo: RepoName, number: number): ReturnType<typeof createIssue> {
+    return (this.options.issues?.[repo] ?? defaultIssues(repo)).find((issue) => issue.number === number)
+      ?? createIssue(repo, number, `${repo} issue`);
+  }
+
+  private findPull(repo: RepoName, number: number): ReturnType<typeof createPull> {
+    return (this.options.pulls?.[repo] ?? defaultPulls(repo)).find((pull) => pull.number === number)
+      ?? createPull(repo, number, `${repo} pull`);
+  }
+
   private json<T>(data: T): ProxyResponse<T> {
     return {
       status: 200,
@@ -135,37 +167,68 @@ function createRepository(repo: RepoName) {
     name: repo,
     full_name: `octocat/${repo}`,
     html_url: `https://github.com/octocat/${repo}`,
+    private: false,
     owner: { login: 'octocat' },
   };
 }
 
-function createIssue(repo: RepoName, number: number, title: string) {
+function defaultIssues(repo: RepoName): ReturnType<typeof createIssue>[] {
+  return repo === 'repo-a'
+    ? [createIssue('repo-a', 10, 'repo-a issue')]
+    : [];
+}
+
+function createIssue(
+  repo: RepoName,
+  number: number,
+  title: string,
+  options: { labels?: string[]; state?: string; updatedAt?: string } = {},
+) {
   return {
     number,
     title,
-    state: 'open',
+    state: options.state ?? 'open',
     body: `${title} body`,
     html_url: `https://github.com/octocat/${repo}/issues/${number}`,
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: options.updatedAt ?? '2026-05-02T00:00:00Z',
     user: {
       login: 'octocat',
       avatar_url: 'https://avatars.githubusercontent.com/u/1',
     },
-    labels: [],
+    labels: (options.labels ?? []).map((name, index) => ({
+      id: index + 1,
+      name,
+      color: 'ededed',
+      default: false,
+      description: null,
+    })),
     assignees: [],
   };
 }
 
-function createPull(repo: RepoName, number: number, title: string) {
+function defaultPulls(repo: RepoName): ReturnType<typeof createPull>[] {
+  return repo === 'repo-a'
+    ? [createPull('repo-a', 42, 'repo-a pull')]
+    : [];
+}
+
+function createPull(
+  repo: RepoName,
+  number: number,
+  title: string,
+  options: { labels?: string[]; state?: string; updatedAt?: string } = {},
+) {
   return {
     number,
     title,
-    state: 'open',
+    state: options.state ?? 'open',
     body: `${title} body`,
     html_url: `https://github.com/octocat/${repo}/pull/${number}`,
     diff_url: `https://github.com/octocat/${repo}/pull/${number}.diff`,
     patch_url: `https://github.com/octocat/${repo}/pull/${number}.patch`,
     created_at: '2026-05-01T00:00:00Z',
-    updated_at: '2026-05-02T00:00:00Z',
+    updated_at: options.updatedAt ?? '2026-05-02T00:00:00Z',
     closed_at: null,
     merged_at: null,
     draft: false,
@@ -177,7 +240,13 @@ function createPull(repo: RepoName, number: number, title: string) {
       avatar_url: 'https://avatars.githubusercontent.com/u/1',
       html_url: 'https://github.com/octocat',
     },
-    labels: [],
+    labels: (options.labels ?? []).map((name, index) => ({
+      id: index + 1,
+      name,
+      color: 'ededed',
+      default: false,
+      description: null,
+    })),
     head: {
       label: 'octocat:feature',
       ref: 'feature',
@@ -295,6 +364,146 @@ describe('GitHub lazy materialization', () => {
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
   });
 
+  it('materialization rules eagerly sync only selected resources with issue filters', async () => {
+    const provider = new RecordingProvider({
+      issues: {
+        'repo-a': [
+          createIssue('repo-a', 10, 'factory issue', { labels: ['factory'], state: 'open' }),
+          createIssue('repo-a', 11, 'support issue', { labels: ['support'], state: 'open' }),
+        ],
+      },
+    });
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'lazy',
+        rules: [
+          {
+            repos: ['octocat/repo-a'],
+            resources: ['issues'],
+            filter: {
+              state: 'open',
+              labels: ['factory'],
+            },
+            since: '2026-06-01T00:00:00Z',
+          },
+        ],
+      },
+    });
+
+    await adapter.sync('workspace-1');
+
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
+    assert.deepStrictEqual(
+      JSON.parse(await provider.readFile('/github/repos/octocat/repo-a/pulls/_index.json')),
+      [],
+    );
+    assert.strictEqual(
+      Array.from(provider.writes.keys()).some((path) => path.startsWith('/github/repos/octocat/repo-b/')),
+      false,
+    );
+    assert.deepStrictEqual(
+      JSON.parse(await provider.readFile('/github/repos/octocat/repo-a/issues/_index.json')),
+      [
+        {
+          id: '10',
+          title: 'factory issue',
+          updated: '2026-05-02T00:00:00Z',
+          number: 10,
+          state: 'open',
+          labels: ['factory'],
+        },
+      ],
+    );
+
+    const issuesRequest = provider.requests.find((request) => request.endpoint === '/repos/octocat/repo-a/issues');
+    assert.deepStrictEqual(issuesRequest?.query, {
+      state: 'open',
+      labels: 'factory',
+      since: '2026-06-01T00:00:00Z',
+      per_page: '100',
+      page: '1',
+    });
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 0);
+  });
+
+  it('materialization repo globs match multiple repositories deterministically', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'lazy',
+        rules: [
+          {
+            repos: ['octocat/*'],
+            resources: ['issues'],
+          },
+        ],
+      },
+    });
+
+    await adapter.sync('workspace-1');
+
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-b/issues/_index.json'));
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 0);
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-b/pulls'), 0);
+  });
+
+  it('materialization pull rules apply label and since filters before ingesting pull details', async () => {
+    const provider = new RecordingProvider({
+      pulls: {
+        'repo-a': [
+          createPull('repo-a', 42, 'factory pull', {
+            labels: ['factory'],
+            updatedAt: '2026-06-10T00:00:00Z',
+          }),
+          createPull('repo-a', 43, 'old factory pull', {
+            labels: ['factory'],
+            updatedAt: '2026-05-01T00:00:00Z',
+          }),
+          createPull('repo-a', 44, 'support pull', {
+            labels: ['support'],
+            updatedAt: '2026-06-10T00:00:00Z',
+          }),
+        ],
+      },
+    });
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'lazy',
+        rules: [
+          {
+            repos: ['octocat/repo-a'],
+            pulls: {
+              mode: 'eager',
+              filter: {
+                labels: ['factory'],
+              },
+              since: '2026-06-01T00:00:00Z',
+            },
+          },
+        ],
+      },
+    });
+
+    await adapter.sync('workspace-1');
+
+    const writtenPaths = Array.from(provider.writes.keys());
+    assert.ok(writtenPaths.some((path) => path.startsWith('/github/repos/octocat/repo-a/pulls/42__') && path.endsWith('/meta.json')));
+    assert.strictEqual(writtenPaths.some((path) => path.startsWith('/github/repos/octocat/repo-a/pulls/43__')), false);
+    assert.strictEqual(writtenPaths.some((path) => path.startsWith('/github/repos/octocat/repo-a/pulls/44__')), false);
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls/42/files'), 1);
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls/43/files'), 0);
+    assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls/44/files'), 0);
+
+    const pullsRequest = provider.requests.find((request) => request.endpoint === '/repos/octocat/repo-a/pulls');
+    assert.deepStrictEqual(pullsRequest?.query, {
+      state: 'all',
+      per_page: '100',
+      page: '1',
+    });
+  });
+
   it('lazy sync with zero accessible repos writes an empty root index', async () => {
     const provider = new RecordingProvider({ repos: [] });
     const adapter = createAdapter(provider, { lazy: true });
@@ -375,5 +584,56 @@ describe('GitHub lazy materialization', () => {
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/pulls/_index.json')),
       { pulls: [] },
     );
+  });
+
+  it('webhook reconciliation in a never-materialized lazy repo writes repo meta.json', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, { lazy: true });
+
+    await adapter.sync('workspace-1');
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'github',
+      connectionId: 'conn-lazy',
+      eventType: 'issues.labeled',
+      objectType: 'issue',
+      objectId: '10',
+      payload: {
+        action: 'labeled',
+        issue: createIssue('repo-a', 10, 'repo-a issue', { labels: ['factory'] }),
+        repository: createRepository('repo-a'),
+        label: { name: 'factory' },
+      },
+    });
+
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
+    assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/10__repo-a-issue/meta.json'));
+  });
+
+  it('webhook writes for fully lazy repos can be disabled explicitly', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'lazy',
+        webhookWritesForLazyRepos: false,
+      },
+    });
+
+    await adapter.sync('workspace-1');
+    const result = await adapter.ingestWebhook('workspace-1', {
+      provider: 'github',
+      connectionId: 'conn-lazy',
+      eventType: 'issues.labeled',
+      objectType: 'issue',
+      objectId: '10',
+      payload: {
+        action: 'labeled',
+        issue: createIssue('repo-a', 10, 'repo-a issue', { labels: ['factory'] }),
+        repository: createRepository('repo-a'),
+        label: { name: 'factory' },
+      },
+    });
+
+    assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-a/meta.json'), false);
+    assert.deepStrictEqual(result.paths, ['/github/repos/octocat/repo-a/issues/10__repo-a-issue/meta.json']);
   });
 });

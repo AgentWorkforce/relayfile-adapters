@@ -1,11 +1,12 @@
 import type { IngestResult, VfsLike } from '../files/content-fetcher.js';
 import { createEmptyIngestResult, mergeIngestResults, vfsPathExists } from '../ingest-utils.js';
-import { fetchIssue, isActualIssue } from './fetcher.js';
+import { fetchIssue, fetchRepository, isActualIssue } from './fetcher.js';
 import { ingestIssueComments } from './comment-mapper.js';
 import {
   githubByIdAliasPath,
   githubNumberSlug,
   githubNumberedByTitleAliasPath,
+  githubRepositoryMetaPath,
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
 } from '../path-mapper.js';
@@ -127,7 +128,13 @@ export async function reconcileIssueRecord(
     );
   }
 
-  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo));
+  let repository: JsonObject | undefined;
+  try {
+    repository = await fetchRepository(provider, owner, repo, connectionId);
+  } catch {
+    repository = undefined;
+  }
+  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo), repository);
 }
 
 /**
@@ -141,9 +148,10 @@ export async function persistIssueRecordFromObject(
   owner: string,
   repo: string,
   issue: JsonObject,
+  repository?: JsonObject,
 ): Promise<IngestResult> {
   const number = readPositiveInteger(issue, 'number');
-  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo));
+  return persistIssueRecord(vfs, owner, repo, number, mapIssue(issue, owner, repo), repository);
 }
 
 async function persistIssueRecord(
@@ -152,7 +160,11 @@ async function persistIssueRecord(
   repo: string,
   number: number,
   mapped: IssueMapping,
+  repository?: JsonObject,
 ): Promise<IngestResult> {
+  const repoResult = repository
+    ? await writeMappedFile(vfs, githubRepositoryMetaPath(owner, repo), `${JSON.stringify(repository, null, 2)}\n`)
+    : createEmptyIngestResult();
   const metaResult = await writeMappedFile(
     vfs,
     buildAbsoluteVfsPath(owner, repo, mapped.vfsPath),
@@ -161,7 +173,7 @@ async function persistIssueRecord(
   await writeIssueAliases(vfs, owner, repo, number, mapped.title, mapped.content);
 
   if (metaResult.errors.length > 0) {
-    return metaResult;
+    return mergeIngestResults(repoResult, metaResult);
   }
 
   // Write indexes after the canonical record write resolves so failed writes
@@ -203,7 +215,7 @@ async function persistIssueRecord(
   const layoutFile = githubLayoutPromptFile();
   const layoutResult = await writeMappedFile(vfs, layoutFile.path, layoutFile.content);
 
-  return mergeIngestResults(metaResult, issueIndexResult, pullIndexResult, repoIndexResult, layoutResult);
+  return mergeIngestResults(repoResult, metaResult, issueIndexResult, pullIndexResult, repoIndexResult, layoutResult);
 }
 
 function asRecord(value: JsonValue | undefined): JsonObject {
