@@ -3,6 +3,13 @@ import type {
   ProxyRequest as SharedProxyRequest,
   ProxyResponse as SharedProxyResponse,
 } from '@relayfile/sdk';
+import type {
+  AdapterMaterializationFilter,
+  AdapterMaterializationMode,
+  AdapterMaterializationPolicy,
+  AdapterMaterializationRule,
+  AdapterResourceMaterializationPolicy,
+} from '@relayfile/adapter-core';
 
 export type { ConnectionProvider } from '@relayfile/sdk';
 
@@ -201,41 +208,27 @@ export type GitHubWebhookEvent =
   | (GitHubWebhookEnvelope & { action: string })
   | (GitHubWebhookEnvelope & { action?: undefined });
 
-export type GitHubMaterializationMode = 'lazy' | 'eager';
+export type GitHubMaterializationMode = AdapterMaterializationMode;
 
 export type GitHubBulkMaterializationResource = 'issues' | 'pulls';
 
 export type GitHubMaterializationResource = GitHubBulkMaterializationResource;
 
-export interface GitHubMaterializationFilter {
-  state?: 'open' | 'closed' | 'all';
-  labels?: string[];
-  since?: string;
-}
+export type GitHubMaterializationFilter = AdapterMaterializationFilter<'open' | 'closed' | 'all'>;
 
-export interface GitHubResourceMaterializationPolicy {
-  mode?: GitHubMaterializationMode;
-  filter?: GitHubMaterializationFilter;
-  since?: string;
-  incremental?: boolean;
-}
+export type GitHubResourceMaterializationPolicy =
+  AdapterResourceMaterializationPolicy<'open' | 'closed' | 'all'>;
 
-export interface GitHubMaterializationRule {
-  repos?: string[];
-  resources?: GitHubMaterializationResource[];
-  filter?: GitHubMaterializationFilter;
-  since?: string;
-  incremental?: boolean;
-  eager?: boolean;
-  issues?: GitHubMaterializationMode | GitHubResourceMaterializationPolicy;
-  pulls?: GitHubMaterializationMode | GitHubResourceMaterializationPolicy;
-}
+export type GitHubMaterializationRule =
+  AdapterMaterializationRule<GitHubMaterializationResource, 'open' | 'closed' | 'all', 'repos'>;
 
-export interface GitHubMaterializationPolicy {
-  default?: GitHubMaterializationMode;
-  rules?: GitHubMaterializationRule[];
-  webhookWritesForLazyRepos?: boolean;
-}
+export type GitHubMaterializationPolicy =
+  AdapterMaterializationPolicy<
+    GitHubMaterializationResource,
+    'open' | 'closed' | 'all',
+    'repos',
+    'webhookWritesForLazyRepos'
+  >;
 
 export interface GitHubAdapterConfig {
   baseUrl: string;

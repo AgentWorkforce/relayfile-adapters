@@ -2,7 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { EVENT_MAP, extractEventKey } from '../src/webhook/router.js';
+import { GitLabAdapter } from '../src/adapter.js';
 import type { GitLabBuildWebhook, GitLabIssueWebhook, GitLabPipelineWebhook } from '../src/types.js';
+import { MockProvider } from './helpers.js';
 
 const project = {
   id: 1,
@@ -95,5 +97,46 @@ describe('webhook router', () => {
     );
 
     assert.strictEqual(called, 'updateIssue');
+  });
+
+  it('skips webhook materialization for fully lazy projects when disabled', async () => {
+    const provider = new MockProvider();
+    const adapter = new GitLabAdapter(provider, {
+      connectionId: 'conn-1',
+      materialization: {
+        default: 'lazy',
+        webhookWritesForLazyProjects: false,
+      },
+    });
+
+    const result = await adapter.routeWebhook(
+      {
+        object_kind: 'issue',
+        project,
+        object_attributes: {
+          id: 99,
+          iid: 7,
+          title: 'Issue',
+          description: null,
+          state: 'opened',
+          author: { id: 2, username: 'dev', name: 'Dev' },
+          labels: [],
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+          action: 'open',
+        },
+      } as GitLabIssueWebhook,
+      'issue.open',
+    );
+
+    assert.deepStrictEqual(result, {
+      filesDeleted: 0,
+      filesUpdated: 0,
+      filesWritten: 0,
+      paths: [],
+      errors: [],
+      operations: [],
+    });
+    assert.deepStrictEqual(provider.requests, []);
   });
 });

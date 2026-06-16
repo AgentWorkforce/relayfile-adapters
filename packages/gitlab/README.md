@@ -16,6 +16,39 @@ const adapter = new GitLabAdapter(provider, {
 const result = await adapter.routeWebhook(payload, undefined, headers);
 ```
 
+## Materialization policy
+
+Bulk project syncs are eager by default. Set `materialization.default` to
+`lazy` and add project rules when a persona or workspace should sync only a
+subset of GitLab records:
+
+```ts
+const adapter = new GitLabAdapter(provider, {
+  connectionId: 'gitlab-connection',
+  projectPath: 'acme/api',
+  materialization: {
+    default: 'lazy',
+    webhookWritesForLazyProjects: true,
+    rules: [
+      {
+        projects: ['acme/*'],
+        issues: {
+          mode: 'eager',
+          filter: { state: 'opened', labels: ['factory'] },
+          incremental: true,
+        },
+        merge_requests: 'lazy',
+      },
+    ],
+  },
+});
+```
+
+Rules are first-match, project patterns accept `*` and `?`, and resource modes
+accept `lazy`/`eager` plus legacy aliases `none`/`all`. `since` or
+`incremental: true` is applied to GitLab list queries where the resource API
+supports it.
+
 ## Supported webhook events
 
 - `merge_request.open`
