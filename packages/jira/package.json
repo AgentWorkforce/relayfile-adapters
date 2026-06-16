@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-jira",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "description": "Jira adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-reddit",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Reddit adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",

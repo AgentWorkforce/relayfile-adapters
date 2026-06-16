@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/box",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Box storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
