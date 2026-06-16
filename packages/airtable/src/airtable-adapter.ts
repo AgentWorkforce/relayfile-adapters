@@ -8,15 +8,19 @@ import {
   computeAirtablePath,
   normalizeAirtableObjectType,
 } from './path-mapper.js';
+import { createAirtableFetchOnDemand } from './fetch-on-demand.js';
 import { AIRTABLE_WEBHOOK_OBJECT_TYPES } from './types.js';
 import type {
   AirtableAdapterConfig,
   AirtableBase,
   AirtableField,
+  AirtableFetchOnDemandOptions,
+  AirtableMaterializedChangePayload,
   AirtableRecord,
   AirtableReference,
   AirtableTable,
   AirtableView,
+  AirtableWebhookNotification,
   AirtableWebhookPayload,
 } from './types.js';
 
@@ -68,9 +72,19 @@ export interface DeleteFileInput {
   path: string;
 }
 
+export interface ReadFileInput {
+  workspaceId: string;
+  path: string;
+}
+
+export interface ReadFileResult {
+  content?: string;
+}
+
 export interface RelayFileClientLike {
   writeFile(input: WriteFileInput): Promise<WriteFileResult | void>;
   deleteFile?(input: DeleteFileInput): Promise<void> | void;
+  readFile?(input: ReadFileInput): Promise<ReadFileResult | string | null | undefined> | ReadFileResult | string | null | undefined;
 }
 
 export abstract class IntegrationAdapter {
@@ -85,7 +99,7 @@ export abstract class IntegrationAdapter {
     this.provider = provider;
   }
 
-  abstract ingestWebhook(workspaceId: string, event: NormalizedWebhook | AirtableWebhookPayload): Promise<IngestResult>;
+  abstract ingestWebhook(workspaceId: string, event: AirtableWebhookNotification | NormalizedWebhook | AirtableWebhookPayload): Promise<IngestResult>;
 
   abstract computePath(objectType: string, objectId: string): string;
 
@@ -129,81 +143,16 @@ export class AirtableAdapter extends IntegrationAdapter {
 
   override async ingestWebhook(
     workspaceId: string,
-    event: NormalizedWebhook | AirtableWebhookPayload,
+    event: AirtableWebhookNotification | NormalizedWebhook | AirtableWebhookPayload,
   ): Promise<IngestResult> {
-    try {
-      const normalized = this.normalizeEvent(event);
-      const context = this.resolveContext(normalized.payload);
-      const path = computeAirtablePath(
-        normalized.objectType,
-        normalized.objectId,
-        context,
-      );
-      const semantics = this.computeSemantics(
-        normalized.objectType,
-        normalized.objectId,
-        normalized.payload,
-      );
-
-      if (this.isDeleteEvent(normalized)) {
-        if (this.client.deleteFile) {
-          await this.client.deleteFile({ workspaceId, path });
-          return {
-            errors: [],
-            filesDeleted: 1,
-            filesUpdated: 0,
-            filesWritten: 0,
-            paths: [path],
-          };
-        }
-
-        const deleteResult = await this.client.writeFile({
-          workspaceId,
-          path,
-          content: this.renderContent(workspaceId, normalized, true),
-          contentType: JSON_CONTENT_TYPE,
-          semantics,
-        });
-        const counts = inferWriteCounts(deleteResult, true);
-        return {
-          errors: [],
-          filesDeleted: counts.filesDeleted,
-          filesUpdated: counts.filesUpdated,
-          filesWritten: counts.filesWritten,
-          paths: [path],
-        };
-      }
-
-      const writeResult = await this.client.writeFile({
-        workspaceId,
-        path,
-        content: this.renderContent(workspaceId, normalized, false),
-        contentType: JSON_CONTENT_TYPE,
-        semantics,
-      });
-      const counts = inferWriteCounts(writeResult, false);
-      return {
-        errors: [],
-        filesDeleted: 0,
-        filesUpdated: counts.filesUpdated,
-        filesWritten: counts.filesWritten,
-        paths: [path],
-      };
-    } catch (error) {
-      const fallbackPath = inferFallbackPath(event);
-      return {
-        errors: [
-          {
-            error: toErrorMessage(error),
-            path: fallbackPath,
-          },
-        ],
-        filesDeleted: 0,
-        filesUpdated: 0,
-        filesWritten: 0,
-        paths: fallbackPath ? [fallbackPath] : [],
-      };
+    // If this is a thin Airtable notification, re-fetch the full payloads via
+    // the Airtable webhook payloads API before writing, mirroring the Salesforce
+    // refetch pattern. This is the core fix for issue #181.
+    if (isAirtableWebhookNotification(event)) {
+      return this.ingestFromNotification(workspaceId, event);
     }
+
+    return this.ingestPayload(workspaceId, event);
   }
 
   override computePath(
@@ -272,6 +221,193 @@ export class AirtableAdapter extends IntegrationAdapter {
       semantics.comments = comments;
     }
     return compactSemantics(semantics);
+  }
+
+  private async ingestFromNotification(
+    workspaceId: string,
+    notification: AirtableWebhookNotification,
+  ): Promise<IngestResult> {
+    try {
+      const connectionId = notification.connectionId ?? this.config.connectionId;
+      const providerConfigKey = notification.providerConfigKey ?? this.config.providerConfigKey;
+      const fetchOptions: AirtableFetchOnDemandOptions = {
+        apiUrl: this.config.apiUrl ?? '',
+        ...(connectionId ? { connectionId } : {}),
+        ...(providerConfigKey ? { providerConfigKey } : {}),
+      };
+      if (notification.cursor !== undefined) {
+        fetchOptions.cursor = notification.cursor;
+      }
+      const fetchOnDemand = createAirtableFetchOnDemand(this.provider, fetchOptions);
+      const materialized = await fetchOnDemand(notification);
+      return this.ingestMaterializedPayloads(workspaceId, notification, materialized);
+    } catch (error) {
+      return {
+        errors: [
+          {
+            error: toErrorMessage(error),
+            path: `/airtable/bases/${notification.baseId}/_notifications/${notification.webhookId}.json`,
+          },
+        ],
+        filesDeleted: 0,
+        filesUpdated: 0,
+        filesWritten: 0,
+        paths: [],
+      };
+    }
+  }
+
+  private async ingestMaterializedPayloads(
+    workspaceId: string,
+    notification: AirtableWebhookNotification,
+    materialized: AirtableMaterializedChangePayload,
+  ): Promise<IngestResult> {
+    const aggregate: IngestResult = {
+      errors: [],
+      filesDeleted: 0,
+      filesUpdated: 0,
+      filesWritten: 0,
+      paths: [],
+    };
+
+    for (const rawPayload of materialized.payloads) {
+      // Airtable's payloads API returns change descriptors shaped as
+      // `changedTablesById.<tableId>.{changed,created}RecordsById.<recordId>`
+      // with the re-fetched `cellValuesByFieldId`. Expand each into a per-record
+      // event the normalizer understands, rather than handing the raw envelope
+      // to ingestPayload (which would throw "missing object type"). Payloads that
+      // are already record-shaped (objectType/objectId present) pass through.
+      const events = expandMaterializedPayload(rawPayload, materialized.baseId);
+      for (const event of events) {
+        const result = await this.ingestPayload(workspaceId, event);
+        aggregate.filesWritten += result.filesWritten;
+        aggregate.filesUpdated += result.filesUpdated;
+        aggregate.filesDeleted += result.filesDeleted;
+        aggregate.paths.push(...result.paths);
+        aggregate.errors.push(...result.errors);
+      }
+    }
+
+    return aggregate;
+  }
+
+  private async ingestPayload(
+    workspaceId: string,
+    event: NormalizedWebhook | AirtableWebhookPayload,
+  ): Promise<IngestResult> {
+    try {
+      const normalized = this.normalizeEvent(event);
+      const context = this.resolveContext(normalized.payload);
+      const path = computeAirtablePath(
+        normalized.objectType,
+        normalized.objectId,
+        context,
+      );
+      const semantics = this.computeSemantics(
+        normalized.objectType,
+        normalized.objectId,
+        normalized.payload,
+      );
+
+      if (this.isDeleteEvent(normalized)) {
+        if (this.client.deleteFile) {
+          await this.client.deleteFile({ workspaceId, path });
+          return {
+            errors: [],
+            filesDeleted: 1,
+            filesUpdated: 0,
+            filesWritten: 0,
+            paths: [path],
+          };
+        }
+
+        const deleteResult = await this.client.writeFile({
+          workspaceId,
+          path,
+          content: this.renderContent(workspaceId, normalized, true),
+          contentType: JSON_CONTENT_TYPE,
+          semantics,
+        });
+        const counts = inferWriteCounts(deleteResult, true);
+        return {
+          errors: [],
+          filesDeleted: counts.filesDeleted,
+          filesUpdated: counts.filesUpdated,
+          filesWritten: counts.filesWritten,
+          paths: [path],
+        };
+      }
+
+      const reconciledPayload = await this.reconcileWebhookPayload(workspaceId, path, normalized);
+      const reconciled: NormalizedWebhook = {
+        ...normalized,
+        payload: reconciledPayload,
+      };
+
+      const writeResult = await this.client.writeFile({
+        workspaceId,
+        path,
+        content: this.renderContent(workspaceId, reconciled, false),
+        contentType: JSON_CONTENT_TYPE,
+        semantics: this.computeSemantics(reconciled.objectType, reconciled.objectId, reconciled.payload),
+      });
+      const counts = inferWriteCounts(writeResult, false);
+      return {
+        errors: [],
+        filesDeleted: 0,
+        filesUpdated: counts.filesUpdated,
+        filesWritten: counts.filesWritten,
+        paths: [path],
+      };
+    } catch (error) {
+      const fallbackPath = inferFallbackPath(event);
+      return {
+        errors: [
+          {
+            error: toErrorMessage(error),
+            path: fallbackPath,
+          },
+        ],
+        filesDeleted: 0,
+        filesUpdated: 0,
+        filesWritten: 0,
+        paths: fallbackPath ? [fallbackPath] : [],
+      };
+    }
+  }
+
+  private async reconcileWebhookPayload(
+    workspaceId: string,
+    path: string,
+    event: NormalizedWebhook,
+  ): Promise<Record<string, unknown>> {
+    // Merge the incoming delta onto the existing stored file so that fields not
+    // included in the webhook are preserved. Strip stale _webhook from the
+    // existing payload so the current event's metadata wins.
+    return mergeFallbackPayload(await this.readExistingPayload(workspaceId, path), event.payload);
+  }
+
+  private async readExistingPayload(
+    workspaceId: string,
+    path: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    if (!this.client.readFile) {
+      return undefined;
+    }
+    try {
+      const result = await this.client.readFile({ workspaceId, path });
+      const content = typeof result === 'string' ? result : result?.content;
+      if (!content) {
+        return undefined;
+      }
+      const parsed = JSON.parse(content) as unknown;
+      if (!isRecord(parsed)) {
+        return undefined;
+      }
+      return isRecord(parsed.payload) ? parsed.payload : parsed;
+    } catch {
+      return undefined;
+    }
   }
 
   private normalizeEvent(event: NormalizedWebhook | AirtableWebhookPayload): NormalizedWebhook {
@@ -521,6 +657,39 @@ function collectFieldRelations(
   }
 }
 
+function mergeFallbackPayload(
+  existingPayload: Record<string, unknown> | undefined,
+  webhookPayload: Record<string, unknown>,
+): Record<string, unknown> {
+  // Strip stale _webhook from the existing payload so the current event's
+  // metadata wins.
+  const { _webhook: _discarded, ...existingWithoutWebhook } = existingPayload ?? {};
+  const merged: Record<string, unknown> = {
+    ...existingWithoutWebhook,
+    ...webhookPayload,
+  };
+  mergeRecordMap(merged, existingWithoutWebhook, webhookPayload, 'fields');
+  mergeRecordMap(merged, existingWithoutWebhook, webhookPayload, 'cellValuesByFieldId');
+  return merged;
+}
+
+function mergeRecordMap(
+  target: Record<string, unknown>,
+  existingPayload: Record<string, unknown>,
+  webhookPayload: Record<string, unknown>,
+  key: string,
+): void {
+  const existingMap = getRecord(existingPayload[key]);
+  const webhookMap = getRecord(webhookPayload[key]);
+  if (!existingMap || !webhookMap) {
+    return;
+  }
+  target[key] = {
+    ...existingMap,
+    ...webhookMap,
+  };
+}
+
 function mergeAirtablePayload(
   event: AirtableWebhookPayload,
   objectType: string,
@@ -627,6 +796,105 @@ function isNormalizedWebhook(event: NormalizedWebhook | AirtableWebhookPayload):
     typeof (event as NormalizedWebhook).objectType === 'string' &&
     typeof (event as NormalizedWebhook).objectId === 'string' &&
     isRecord((event as NormalizedWebhook).payload)
+  );
+}
+
+/**
+ * Expands one Airtable payloads-API change descriptor into per-record events.
+ *
+ * Airtable returns changes as
+ * `changedTablesById.<tableId>.{changedRecordsById,createdRecordsById}.<recordId>`
+ * (with the re-fetched `cellValuesByFieldId`) and `destroyedRecordIds[]`. Each
+ * becomes a normalized record event the rest of the pipeline can materialize.
+ * If the payload is already record-shaped (carries `objectType`/`objectId`, e.g.
+ * a payload format that pre-normalizes), it is passed through unchanged.
+ */
+function expandMaterializedPayload(
+  rawPayload: Record<string, unknown>,
+  fallbackBaseId: string,
+): Array<NormalizedWebhook | AirtableWebhookPayload> {
+  const record = getRecord(rawPayload) ?? {};
+  const baseId = asString(record.baseId) ?? asString(record.base_id) ?? fallbackBaseId;
+  const changedTablesById = getRecord(record.changedTablesById);
+
+  if (!changedTablesById) {
+    // Already record-shaped, or some other pre-normalized payload. Preserve the
+    // prior pass-through behavior so non-CDC formats keep working.
+    return [{ ...rawPayload, baseId } as AirtableWebhookPayload];
+  }
+
+  const events: NormalizedWebhook[] = [];
+  for (const [tableId, tableChangeRaw] of Object.entries(changedTablesById)) {
+    const tableChange = getRecord(tableChangeRaw);
+    if (!tableChange) {
+      continue;
+    }
+
+    const upsert = (recordId: string, fields: Record<string, unknown>, action: 'create' | 'update'): void => {
+      events.push({
+        provider: AIRTABLE_PROVIDER_NAME,
+        eventType: `record.${action}`,
+        objectType: 'record',
+        objectId: recordId,
+        payload: { baseId, tableId, id: recordId, fields },
+      });
+    };
+
+    const createdRecordsById = getRecord(tableChange.createdRecordsById);
+    if (createdRecordsById) {
+      for (const [recordId, changeRaw] of Object.entries(createdRecordsById)) {
+        const change = getRecord(changeRaw);
+        const fields =
+          getRecord(getRecord(change?.current)?.cellValuesByFieldId) ??
+          getRecord(change?.cellValuesByFieldId) ??
+          {};
+        upsert(recordId, fields, 'create');
+      }
+    }
+
+    const changedRecordsById = getRecord(tableChange.changedRecordsById);
+    if (changedRecordsById) {
+      for (const [recordId, changeRaw] of Object.entries(changedRecordsById)) {
+        const change = getRecord(changeRaw);
+        const fields =
+          getRecord(getRecord(change?.current)?.cellValuesByFieldId) ??
+          getRecord(change?.cellValuesByFieldId) ??
+          {};
+        upsert(recordId, fields, 'update');
+      }
+    }
+
+    const destroyedRecordIds = Array.isArray(tableChange.destroyedRecordIds)
+      ? tableChange.destroyedRecordIds
+      : [];
+    for (const destroyed of destroyedRecordIds) {
+      const recordId = asString(destroyed);
+      if (!recordId) {
+        continue;
+      }
+      events.push({
+        provider: AIRTABLE_PROVIDER_NAME,
+        eventType: 'record.delete',
+        objectType: 'record',
+        objectId: recordId,
+        payload: { baseId, tableId, id: recordId, _webhook: { action: 'delete' } },
+      });
+    }
+  }
+
+  return events;
+}
+
+function isAirtableWebhookNotification(
+  event: AirtableWebhookNotification | NormalizedWebhook | AirtableWebhookPayload,
+): event is AirtableWebhookNotification {
+  // A notification has baseId + webhookId + timestamp but no payload/objectType/objectId.
+  const record = event as Record<string, unknown>;
+  return (
+    typeof record.baseId === 'string' &&
+    typeof record.webhookId === 'string' &&
+    typeof record.timestamp === 'string' &&
+    !isNormalizedWebhook(event as NormalizedWebhook | AirtableWebhookPayload)
   );
 }
 

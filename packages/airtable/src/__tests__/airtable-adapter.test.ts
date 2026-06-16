@@ -13,9 +13,36 @@ import {
   type ConnectionProvider,
   type ProxyRequest,
   type ProxyResponse,
+  type ReadFileResult,
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
+
+interface CapturingClient extends RelayFileClientLike {
+  files: Map<string, string>;
+  writes: WriteFileInput[];
+  deleted: string[];
+}
+
+function createCapturingClient(): CapturingClient {
+  return {
+    files: new Map(),
+    writes: [],
+    deleted: [],
+    async writeFile(input) {
+      this.writes.push(input);
+      this.files.set(input.path, input.content);
+      return { created: true };
+    },
+    async readFile(input): Promise<ReadFileResult | undefined> {
+      const content = this.files.get(input.path);
+      return content ? { content } : undefined;
+    },
+    async deleteFile(input) {
+      this.deleted.push(input.path);
+    },
+  };
+}
 
 function createAdapter(config: AirtableAdapterConfig = {}, writes: WriteFileInput[] = []): AirtableAdapter {
   const client: RelayFileClientLike = {
@@ -43,6 +70,26 @@ function createAdapter(config: AirtableAdapterConfig = {}, writes: WriteFileInpu
   };
 
   return new AirtableAdapter(client, provider, config);
+}
+
+function createAdapterWithProvider(
+  config: AirtableAdapterConfig,
+  client: CapturingClient,
+  proxyFn: (request: ProxyRequest) => Promise<ProxyResponse>,
+): AirtableAdapter & { requests: ProxyRequest[] } {
+  const requests: ProxyRequest[] = [];
+  const provider: ConnectionProvider = {
+    name: 'relayfile-test-provider',
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+      requests.push(request);
+      return proxyFn(request) as Promise<ProxyResponse<T>>;
+    },
+    async healthCheck() {
+      return true;
+    },
+  };
+  const adapter = new AirtableAdapter(client, provider, config);
+  return Object.assign(adapter, { requests });
 }
 
 test('AirtableAdapter exposes provider name and supported Airtable webhook events', () => {
@@ -243,4 +290,197 @@ test('path mapper, read routes, and writeback routes cover primary Airtable obje
     () => resolveAirtableWritebackRequest('/airtable/bases/app_base/tables/tbl_tasks/records/rec_1.json', '{"fields":{}}'),
     /at least one field/,
   );
+});
+
+test('ingestWebhook materializes the re-fetched record from a real changedTablesById payload', async () => {
+  const client = createCapturingClient();
+  const adapter = createAdapterWithProvider(
+    { connectionId: 'conn_airtable_1' },
+    client,
+    async (request) => {
+      assert.equal(request.method, 'GET');
+      assert.equal(request.connectionId, 'conn_airtable_1');
+      assert.ok(request.endpoint.includes('/v0/bases/app_base/webhooks/ach_webhook_1/payloads'));
+      return {
+        status: 200,
+        headers: {},
+        data: {
+          cursor: 5,
+          mightHaveMore: false,
+          // Shape Airtable's payloads API actually returns: no top-level
+          // objectType/objectId — only changedTablesById with the re-fetched
+          // cellValuesByFieldId.
+          payloads: [
+            {
+              timestamp: '2026-06-15T12:00:00.000Z',
+              baseTransactionNumber: 42,
+              changedTablesById: {
+                tbl_tasks: {
+                  changedRecordsById: {
+                    rec_1: {
+                      current: {
+                        cellValuesByFieldId: {
+                          Name: 'Build webhook refetch',
+                          Status: 'Done',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      };
+    },
+  );
+
+  const result = await adapter.ingestWebhook('ws_relay', {
+    baseId: 'app_base',
+    webhookId: 'ach_webhook_1',
+    timestamp: '2026-06-15T12:00:00.000Z',
+    connectionId: 'conn_airtable_1',
+  });
+
+  assert.equal(adapter.requests.length, 1);
+  assert.equal(result.errors.length, 0);
+  // The authoritative record is materialized — not the empty envelope.
+  assert.equal(result.filesWritten, 1);
+  const recordPath = '/airtable/bases/app_base/tables/tbl_tasks/records/rec_1.json';
+  assert.deepEqual(result.paths, [recordPath]);
+  const written = client.files.get(recordPath);
+  assert.ok(written, 'expected the re-fetched record file to be written');
+  const parsed = JSON.parse(written ?? '{}') as { payload?: { fields?: Record<string, unknown> } };
+  assert.equal(parsed.payload?.fields?.Name, 'Build webhook refetch');
+  assert.equal(parsed.payload?.fields?.Status, 'Done');
+});
+
+test('ingestWebhook expands created and destroyed records from a changedTablesById payload', async () => {
+  const client = createCapturingClient();
+  const adapter = createAdapterWithProvider(
+    { connectionId: 'conn_airtable_1' },
+    client,
+    async () => ({
+      status: 200,
+      headers: {},
+      data: {
+        cursor: 6,
+        mightHaveMore: false,
+        payloads: [
+          {
+            timestamp: '2026-06-15T12:05:00.000Z',
+            changedTablesById: {
+              tbl_tasks: {
+                createdRecordsById: {
+                  rec_new: { cellValuesByFieldId: { Name: 'Fresh row' } },
+                },
+                destroyedRecordIds: ['rec_gone'],
+              },
+            },
+          },
+        ],
+      },
+    }),
+  );
+
+  const result = await adapter.ingestWebhook('ws_relay', {
+    baseId: 'app_base',
+    webhookId: 'ach_webhook_1',
+    timestamp: '2026-06-15T12:05:00.000Z',
+    connectionId: 'conn_airtable_1',
+  });
+
+  assert.equal(result.errors.length, 0);
+  // created record materialized, destroyed record deleted
+  assert.equal(result.filesWritten, 1);
+  assert.equal(result.filesDeleted, 1);
+  assert.ok(client.files.has('/airtable/bases/app_base/tables/tbl_tasks/records/rec_new.json'));
+  assert.deepEqual(client.deleted, ['/airtable/bases/app_base/tables/tbl_tasks/records/rec_gone.json']);
+});
+
+test('ingestWebhook returns error result when notification fetch fails', async () => {
+  const client = createCapturingClient();
+  const adapter = createAdapterWithProvider(
+    { connectionId: 'conn_airtable_1' },
+    client,
+    async () => ({
+      status: 503,
+      headers: {},
+      data: { message: 'Service unavailable' },
+    }),
+  );
+
+  const result = await adapter.ingestWebhook('ws_relay', {
+    baseId: 'app_base',
+    webhookId: 'ach_webhook_1',
+    timestamp: '2026-06-15T12:00:00.000Z',
+    connectionId: 'conn_airtable_1',
+  });
+
+  assert.equal(result.filesWritten, 0);
+  assert.equal(result.filesUpdated, 0);
+  assert.equal(result.filesDeleted, 0);
+  assert.equal(result.errors.length, 1);
+  assert.ok(result.errors[0]?.error.includes('503'));
+});
+
+test('ingestWebhook merges top-level payload fields from existing record during NormalizedWebhook ingestion', async () => {
+  const client = createCapturingClient();
+  const existingPath = '/airtable/bases/app_base/tables/tbl_tasks/records/rec_1.json';
+  client.files.set(
+    existingPath,
+    JSON.stringify({
+      provider: 'airtable',
+      payload: {
+        id: 'rec_1',
+        baseId: 'app_base',
+        tableId: 'tbl_tasks',
+        createdTime: '2026-01-01T00:00:00.000Z',
+        permissionLevel: 'create',
+        cellValuesByFieldId: {
+          fld_name: 'Existing row',
+          fld_status: 'In progress',
+        },
+        fields: {
+          Name: 'Existing row',
+          Status: 'In progress',
+        },
+        _webhook: { action: 'create', eventType: 'record.create' },
+      },
+    }),
+  );
+
+  const adapter = createAdapterWithProvider(
+    { connectionId: 'conn_airtable_1' },
+    client,
+    async () => ({ status: 200, headers: {}, data: null }),
+  );
+
+  await adapter.ingestWebhook('ws_relay', {
+    provider: 'airtable',
+    eventType: 'record.update',
+    objectType: 'record',
+    objectId: 'rec_1',
+    payload: {
+      id: 'rec_1',
+      baseId: 'app_base',
+      tableId: 'tbl_tasks',
+      cellValuesByFieldId: { fld_status: 'Done' },
+      fields: { Status: 'Done' },
+      _webhook: { action: 'update', eventType: 'record.update' },
+    },
+  });
+
+  assert.equal(client.writes.length, 1);
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  // Top-level fields from existing payload survive the merge
+  assert.equal(payload.createdTime, '2026-01-01T00:00:00.000Z');
+  assert.equal(payload.permissionLevel, 'create');
+  // Incoming delta fields take precedence
+  assert.deepEqual(payload.fields, { Name: 'Existing row', Status: 'Done' });
+  assert.deepEqual(payload.cellValuesByFieldId, { fld_name: 'Existing row', fld_status: 'Done' });
+  // Stale _webhook from existing record must not survive into the merged payload
+  const existingWebhook = (payload._webhook as Record<string, unknown> | undefined);
+  assert.notEqual(existingWebhook?.action, 'create');
 });
