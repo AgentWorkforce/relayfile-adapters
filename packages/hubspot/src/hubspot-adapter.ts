@@ -959,11 +959,15 @@ function mergeFetchedPayload(
   webhookPayload: HubSpotRecord,
 ): HubSpotRecord {
   // Prefer the authoritative fetched record, but preserve webhook metadata
-  // (_webhook, _connection) from the incoming payload.
-  return {
-    ...fetched,
-    ...pickWebhookMetadata(webhookPayload),
-  };
+  // (_webhook, _connection) and the changed property delta from the incoming
+  // payload.
+  return applyWebhookPropertyDelta(
+    {
+      ...fetched,
+      ...pickWebhookMetadata(webhookPayload),
+    },
+    webhookPayload,
+  );
 }
 
 function mergeFallbackPayload(
@@ -973,9 +977,30 @@ function mergeFallbackPayload(
   // Strip stale _webhook from the existing payload so the current event's
   // metadata wins and inferWriteCounts never reads a previous action.
   const { _webhook: _discarded, ...existingWithoutWebhook } = existingPayload ?? {};
+  return applyWebhookPropertyDelta(
+    {
+      ...existingWithoutWebhook,
+      ...webhookPayload,
+    },
+    webhookPayload,
+  );
+}
+
+function applyWebhookPropertyDelta(
+  payload: HubSpotRecord,
+  webhookPayload: HubSpotRecord,
+): HubSpotRecord {
+  const propertyName = asString(webhookPayload.propertyName);
+  if (!propertyName) {
+    return payload;
+  }
+
   return {
-    ...existingWithoutWebhook,
-    ...webhookPayload,
+    ...payload,
+    properties: {
+      ...(getRecord(payload.properties) ?? {}),
+      [propertyName]: asPropertyValue(webhookPayload.propertyValue),
+    },
   };
 }
 

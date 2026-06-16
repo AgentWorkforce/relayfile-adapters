@@ -322,7 +322,6 @@ test('ingestWebhook re-fetches full CRM contact record from HubSpot API before w
           email: 'ada@example.com',
           firstname: 'Ada',
           lastname: 'Lovelace',
-          jobtitle: 'CTO',
           phone: '+1-555-0100',
           lastmodifieddate: '2026-06-15T20:00:00.000Z',
         },
@@ -362,6 +361,8 @@ test('ingestWebhook re-fetches full CRM contact record from HubSpot API before w
   const props = (payload.properties ?? payload) as Record<string, unknown>;
   assert.equal(props.email ?? (payload as Record<string, unknown>).email, 'ada@example.com');
   assert.equal(props.firstname ?? (payload as Record<string, unknown>).firstname, 'Ada');
+  assert.equal(props.jobtitle, 'CTO');
+  assert.equal(client.writes[0]?.semantics?.properties?.['hubspot.contact.job_title'], 'CTO');
   // Webhook metadata preserved
   assert.ok(payload._webhook !== undefined);
 });
@@ -418,8 +419,11 @@ test('ingestWebhook falls back to merging delta onto existing record when re-fet
   // Fallback merge: existing fields survive, delta overrides
   const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
   const payload = written.payload as Record<string, unknown>;
+  const props = payload.properties as Record<string, unknown>;
   // propertyValue from webhook delta
   assert.equal(payload.propertyValue, 'CTO');
+  assert.equal(props.jobtitle, 'CTO');
+  assert.equal(client.writes[0]?.semantics?.properties?.['hubspot.contact.job_title'], 'CTO');
   // id from existing record
   assert.equal(payload.id, '101');
   // _webhook from incoming event (stale _webhook stripped)
