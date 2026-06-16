@@ -2,6 +2,7 @@ import {
   linearCyclesIndexPath,
   linearCommentsIndexPath,
   linearIssuesIndexPath,
+  linearLabelsIndexPath,
   linearMilestonesIndexPath,
   linearProjectsIndexPath,
   linearRootIndexPath,
@@ -16,6 +17,7 @@ export type LinearIndexBucket =
   | 'comments'
   | 'cycles'
   | 'issues'
+  | 'labels'
   | 'milestones'
   | 'projects'
   | 'roadmaps'
@@ -43,6 +45,7 @@ export function buildLinearRootIndexFile(
   rows: LinearRootIndexRow[] = [
     { id: 'issues', title: 'Issues' },
     { id: 'comments', title: 'Comments' },
+    { id: 'labels', title: 'Labels' },
     { id: 'teams', title: 'Teams' },
     { id: 'users', title: 'Users' },
     { id: 'projects', title: 'Projects' },
@@ -60,7 +63,7 @@ export function buildLinearRootIndexFile(
 }
 
 export function buildLinearIndexFile(
-  bucket: 'comments' | 'cycles' | 'milestones' | 'projects' | 'roadmaps' | 'teams' | 'users',
+  bucket: 'comments' | 'cycles' | 'labels' | 'milestones' | 'projects' | 'roadmaps' | 'teams' | 'users',
   rows: LinearBaseIndexRow[],
 ): LinearIndexFile;
 export function buildLinearIndexFile(
@@ -87,6 +90,8 @@ function indexPathForBucket(bucket: LinearIndexBucket): string {
   switch (bucket) {
     case 'issues':
       return linearIssuesIndexPath();
+    case 'labels':
+      return linearLabelsIndexPath();
     case 'comments':
       return linearCommentsIndexPath();
     case 'cycles':

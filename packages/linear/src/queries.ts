@@ -1,5 +1,6 @@
 import type {
   LinearCycle,
+  LinearLabel,
   LinearMilestone,
   LinearProject,
   LinearRoadmap,
@@ -605,6 +606,14 @@ export function linearProjectIndexRow(project: LinearProject): LinearBaseIndexRo
     id: project.id,
     title: normalizeIndexTitle(project.name),
     updated: normalizeUpdated(project.updatedAt, project.updated_at, project.createdAt, project.created_at),
+  };
+}
+
+export function linearLabelIndexRow(label: LinearLabel): LinearBaseIndexRow {
+  return {
+    id: label.id,
+    title: normalizeIndexTitle(label.name),
+    updated: normalizeUpdated(label.updatedAt, label.updated_at, label.createdAt, label.created_at),
   };
 }
 

@@ -13,8 +13,8 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   filenameConvention: '<identifier>__<uuid>.json',
   // Top-level aliasSegments is the union of every resource's alias segments
   // so consumers that inspect only the manifest root can discover all
-  // lookup keys. `by-name` belongs here because `linear/teams` and
-  // `linear/projects` expose it.
+  // lookup keys. `by-name` belongs here because `linear/teams`,
+  // `linear/labels`, and `linear/projects` expose it.
   aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-name', 'by-priority', 'by-title', 'by-state', 'by-team', 'by-uuid'],
   resources: [
     {
@@ -25,6 +25,15 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       writebackResources: [
         { path: 'linear/issues', schemaId: 'linear/issue' },
         { path: 'linear/issues/comments', schemaId: 'linear/comment' },
+      ],
+    },
+    {
+      path: 'linear/labels',
+      title: 'Labels',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-name', 'by-team'],
+      writebackResources: [
+        { path: 'linear/labels', schemaId: 'linear/label' },
       ],
     },
     {

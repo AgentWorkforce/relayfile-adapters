@@ -12,6 +12,8 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
  *   POST /linear/agent-sessions/<id>/activities/<draft>.json  → agentActivityCreate
  *   POST /linear/issues/<draft>.json                         → issueCreate
  *   PATCH/PUT /linear/issues/<slug>--<uuid>.json             → issueUpdate
+ *   POST /linear/labels/<draft>.json                         → issueLabelCreate
+ *   PATCH/PUT /linear/labels/<slug>__<uuid>.json             → issueLabelUpdate
  *   POST /linear/projects/<draft>.json                       → create-project action
  *   PATCH/PUT /linear/projects/<uuid>/meta.json              → update-project/archive-project action
  *   POST /linear/projects/<uuid>/add-issues.json             → add-issues-to-project action
@@ -51,6 +53,14 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
     return buildIssueUpdate(extractLinearId(issueFileMatch[1]), content);
   }
 
+  const labelFileMatch = path.match(/^\/linear\/labels\/([^/]+)\.json$/);
+  if (labelFileMatch?.[1] && route?.resource.name === 'labels' && route.kind === 'create') {
+    return buildLabelCreate(content);
+  }
+  if (labelFileMatch?.[1] && route?.resource.name === 'labels' && route.kind === 'patch') {
+    return buildLabelUpdate(extractLinearId(labelFileMatch[1]), content);
+  }
+
   const projectFileMatch = path.match(/^\/linear\/projects\/([^/]+)\.json$/);
   if (projectFileMatch?.[1] && route?.resource.name === 'projects' && route.kind === 'create') {
     return buildProjectCreate(content);
@@ -75,19 +85,32 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
 export function resolveDeleteRequest(path: string): LinearWritebackRequest {
   const route = classifyWrite(path, resources, { fsEvent: 'delete' });
   const issueFileMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
-  if (!issueFileMatch?.[1] || route?.resource.name !== 'issues' || route.kind !== 'delete') {
-    throw new Error(`No Linear delete writeback rule matched ${path}`);
+  if (issueFileMatch?.[1] && route?.resource.name === 'issues' && route.kind === 'delete') {
+    return {
+      action: 'delete_issue',
+      method: 'POST',
+      endpoint: '/graphql',
+      body: {
+        query: ISSUE_DELETE_MUTATION,
+        variables: { id: extractLinearId(issueFileMatch[1]) },
+      },
+    };
   }
 
-  return {
-    action: 'delete_issue',
-    method: 'POST',
-    endpoint: '/graphql',
-    body: {
-      query: ISSUE_DELETE_MUTATION,
-      variables: { id: extractLinearId(issueFileMatch[1]) },
-    },
-  };
+  const labelFileMatch = path.match(/^\/linear\/labels\/([^/]+)\.json$/);
+  if (labelFileMatch?.[1] && route?.resource.name === 'labels' && route.kind === 'delete') {
+    return {
+      action: 'delete_label',
+      method: 'POST',
+      endpoint: '/graphql',
+      body: {
+        query: LABEL_DELETE_MUTATION,
+        variables: { id: extractLinearId(labelFileMatch[1]) },
+      },
+    };
+  }
+
+  throw new Error(`No Linear delete writeback rule matched ${path}`);
 }
 
 /* ------------------------------------------------------------------ *
@@ -179,6 +202,26 @@ const ISSUE_UPDATE_MUTATION = `mutation RelayfileIssueUpdate($id: String!, $inpu
 
 const ISSUE_DELETE_MUTATION = `mutation RelayfileIssueDelete($id: String!) {
   issueDelete(id: $id) {
+    success
+  }
+}`;
+
+const LABEL_CREATE_MUTATION = `mutation RelayfileIssueLabelCreate($input: IssueLabelCreateInput!) {
+  issueLabelCreate(input: $input) {
+    success
+    issueLabel { id name }
+  }
+}`;
+
+const LABEL_UPDATE_MUTATION = `mutation RelayfileIssueLabelUpdate($id: String!, $input: IssueLabelUpdateInput!) {
+  issueLabelUpdate(id: $id, input: $input) {
+    success
+    issueLabel { id name }
+  }
+}`;
+
+const LABEL_DELETE_MUTATION = `mutation RelayfileIssueLabelDelete($id: String!) {
+  issueLabelDelete(id: $id) {
     success
   }
 }`;
@@ -387,9 +430,8 @@ function looksLikeSyncedEnvelope(payload: Record<string, unknown>): boolean {
  *   - `sortOrder`         — manual reordering
  *   - `descriptionData`   — Linear's prosemirror-doc form of `description`
  *
- * If you need to set a field not in this list (e.g. `addedLabelIds` /
- * `removedLabelIds` for incremental label changes), add it here and add a
- * regression test in `__tests__/writeback-allowlist.test.ts`.
+ * If you need to set a field not in this list, add it here and cover it in
+ * `writeback.test.ts`.
  */
 const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
   'title',
@@ -401,6 +443,8 @@ const ISSUE_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
   'projectId',
   'cycleId',
   'labelIds',
+  'addedLabelIds',
+  'removedLabelIds',
   'dueDate',
   'estimate',
   'parentId',
@@ -433,6 +477,7 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
     if (!ISSUE_UPDATE_ALLOWLIST.has(key)) continue;
     input[key] = value;
   }
+  validateIssueLabelUpdateInput(input);
   if (Object.keys(input).length === 0) {
     throw new Error(
       'issues/<id>.json update writeback requires at least one mutable field ' +
@@ -445,6 +490,68 @@ function buildIssueUpdate(issueId: string, content: string): LinearWritebackRequ
     method: 'POST',
     endpoint: '/graphql',
     body: { query: ISSUE_UPDATE_MUTATION, variables: { id: issueId, input } },
+  };
+}
+
+function validateIssueLabelUpdateInput(input: Record<string, unknown>): void {
+  const hasReplacement = 'labelIds' in input;
+  const hasDelta = 'addedLabelIds' in input || 'removedLabelIds' in input;
+  if (hasReplacement && hasDelta) {
+    throw new Error('issues/<id>.json update writeback cannot mix `labelIds` replacement with `addedLabelIds`/`removedLabelIds` deltas');
+  }
+}
+
+const LABEL_CREATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'name',
+  'description',
+  'color',
+  'teamId',
+  'parentId',
+]);
+
+const LABEL_UPDATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'name',
+  'description',
+  'color',
+  'parentId',
+]);
+
+function buildLabelCreate(content: string): LinearWritebackRequest {
+  const payload = parseJsonObject(content);
+  rejectReadOnlyFields(payload);
+  const name = readString(payload, 'name');
+  if (!name) {
+    throw new Error('labels/<draft>.json writeback requires a `name`');
+  }
+
+  const input = copyAllowedFields(payload, LABEL_CREATE_ALLOWLIST);
+  input.name = name;
+
+  return {
+    action: 'create_label',
+    method: 'POST',
+    endpoint: '/graphql',
+    body: { query: LABEL_CREATE_MUTATION, variables: { input } },
+  };
+}
+
+function buildLabelUpdate(labelId: string, content: string): LinearWritebackRequest {
+  const parsed = parseJsonObject(content);
+  const isSyncedEnvelope = looksLikeSyncedEnvelope(parsed);
+  if (!isSyncedEnvelope) {
+    rejectReadOnlyFields(parsed);
+  }
+  const source = isSyncedEnvelope ? (parsed.payload as Record<string, unknown>) : parsed;
+  const input = copyAllowedFields(source, LABEL_UPDATE_ALLOWLIST);
+  if (Object.keys(input).length === 0) {
+    throw new Error('labels/<id>.json update writeback requires at least one mutable field (name, description, color, parentId)');
+  }
+
+  return {
+    action: 'update_label',
+    method: 'POST',
+    endpoint: '/graphql',
+    body: { query: LABEL_UPDATE_MUTATION, variables: { id: labelId, input } },
   };
 }
 

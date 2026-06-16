@@ -13,6 +13,7 @@ test('exports supported Linear webhook object types', () => {
     'comment',
     'cycle',
     'issue',
+    'label',
     'milestone',
     'project',
     'roadmap',

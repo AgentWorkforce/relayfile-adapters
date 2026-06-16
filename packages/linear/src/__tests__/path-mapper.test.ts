@@ -13,6 +13,9 @@ import {
   linearCommentPath,
   linearCommentReadCandidatePaths,
   linearIssueByEditedPath,
+  linearLabelByTeamPath,
+  linearLabelPath,
+  linearLabelsIndexPath,
   linearProjectAddIssuesPath,
   linearProjectByStatePath,
   linearProjectByTeamPath,
@@ -40,12 +43,20 @@ describe('linear path-mapper', () => {
       assert.equal(normalizeLinearObjectType('LinearTeam'), 'team');
       assert.equal(normalizeLinearObjectType('LinearUser'), 'user');
       assert.equal(normalizeLinearObjectType('LinearIssue'), 'issue');
+      assert.equal(normalizeLinearObjectType('LinearLabel'), 'label');
+      assert.equal(normalizeLinearObjectType('LinearIssueLabel'), 'label');
+      assert.equal(normalizeLinearObjectType('IssueLabel'), 'label');
       assert.equal(normalizeLinearObjectType('LinearComment'), 'comment');
       assert.equal(normalizeLinearObjectType('LinearCycle'), 'cycle');
       assert.equal(normalizeLinearObjectType('LinearMilestone'), 'milestone');
       assert.equal(normalizeLinearObjectType('LinearProject'), 'project');
       assert.equal(normalizeLinearObjectType('LinearRoadmap'), 'roadmap');
       assert.equal(normalizeLinearObjectType('LinearState'), 'state');
+    });
+
+    it('accepts Linear label webhook type aliases', () => {
+      assert.equal(normalizeLinearObjectType('issue_label'), 'label');
+      assert.equal(normalizeLinearObjectType('issuelabel'), 'label');
     });
 
     it('throws on unknown types', () => {
@@ -71,6 +82,7 @@ describe('linear path-mapper', () => {
       assert.equal(normalizeNangoLinearModel('LinearComment'), 'comment');
       assert.equal(normalizeNangoLinearModel('LinearCycle'), 'cycle');
       assert.equal(normalizeNangoLinearModel('LinearIssue'), 'issue');
+      assert.equal(normalizeNangoLinearModel('LinearLabel'), 'label');
       assert.equal(normalizeNangoLinearModel('LinearMilestone'), 'milestone');
       assert.equal(normalizeNangoLinearModel('LinearProject'), 'project');
       assert.equal(normalizeNangoLinearModel('LinearRoadmap'), 'roadmap');
@@ -116,6 +128,22 @@ describe('linear path-mapper', () => {
       assert.equal(
         computeLinearPath('LinearProject', 'project-123'),
         '/linear/projects/project-123/meta.json',
+      );
+      assert.equal(
+        computeLinearPath('LinearLabel', 'label-123'),
+        '/linear/labels/label-123.json',
+      );
+      assert.equal(
+        linearLabelPath('label/123'),
+        '/linear/labels/label%2F123.json',
+      );
+      assert.equal(
+        linearLabelsIndexPath(),
+        '/linear/labels/_index.json',
+      );
+      assert.equal(
+        linearLabelByTeamPath('team/eng', 'label-123'),
+        '/linear/labels/by-team/team%2Feng/label-123.json',
       );
       assert.equal(
         linearProjectDirectoryPath('project-123'),

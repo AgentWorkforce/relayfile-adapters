@@ -421,6 +421,12 @@ export const WRITEBACK_PATH_CATALOG = {
         "params": []
       }
     ],
+    "labels": [
+      {
+        "path": "/linear/labels",
+        "params": []
+      }
+    ],
     "project-issue-assignments": [
       {
         "path": "/linear/projects/{projectId}/add-issues.json",

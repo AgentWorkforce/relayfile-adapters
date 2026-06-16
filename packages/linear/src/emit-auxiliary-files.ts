@@ -29,6 +29,9 @@
  *   * **user**, **team** — canonical `/linear/users/<id>.json` /
  *     `/linear/teams/<id>.json`, index row `{ id, title, updated }`.
  *
+ *   * **label** — canonical `/linear/labels/<id>.json`, plus `_index.json`
+ *     and read aliases keyed by label id, name, and team id when present.
+ *
  *   * **project** — canonical `/linear/projects/<id>/meta.json`, plus
  *     `_index.json` and read aliases keyed by project id, name, state, and
  *     every team id on the project. The legacy flat
@@ -90,6 +93,9 @@ import {
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearLabelByTeamPath,
+  linearLabelPath,
+  linearLabelsIndexPath,
   linearMilestonesIndexPath,
   linearMilestonePath,
   linearProjectByStatePath,
@@ -110,6 +116,7 @@ import {
   linearCommentIndexRow,
   linearCycleIndexRow,
   linearIssueIndexRow,
+  linearLabelIndexRow,
   linearMilestoneIndexRow,
   linearProjectIndexRow,
   linearRoadmapIndexRow,
@@ -125,6 +132,7 @@ import type {
   LinearComment,
   LinearCycle,
   LinearIssue,
+  LinearLabel,
   LinearMilestone,
   LinearProject,
   LinearRoadmap,
@@ -136,6 +144,7 @@ import type {
 const LINEAR_PROVIDER_NAME = 'linear';
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 const ISSUES_SCOPE = `${LINEAR_PATH_ROOT}/issues`;
+const LABELS_SCOPE = `${LINEAR_PATH_ROOT}/labels`;
 const PROJECTS_SCOPE = `${LINEAR_PATH_ROOT}/projects`;
 const TEAMS_SCOPE = `${LINEAR_PATH_ROOT}/teams`;
 
@@ -145,6 +154,7 @@ const TEAMS_SCOPE = `${LINEAR_PATH_ROOT}/teams`;
  * confluence shape so cloud's Phase 3 dispatcher routes uniformly.
  */
 export type LinearIssueEmitRecord = LinearIssue | { id: string; _deleted: true };
+export type LinearLabelEmitRecord = LinearLabel | { id: string; _deleted: true };
 export type LinearCommentEmitRecord = LinearComment | { id: string; _deleted: true };
 export type LinearUserEmitRecord = LinearUser | { id: string; _deleted: true };
 export type LinearTeamEmitRecord = LinearTeam | { id: string; _deleted: true };
@@ -157,6 +167,7 @@ export type LinearStateEmitRecord = LinearState | { id: string; _deleted: true }
 export interface LinearEmitAuxiliaryFilesInput {
   workspaceId: string;
   issues?: readonly LinearIssueEmitRecord[];
+  labels?: readonly LinearLabelEmitRecord[];
   comments?: readonly LinearCommentEmitRecord[];
   users?: readonly LinearUserEmitRecord[];
   teams?: readonly LinearTeamEmitRecord[];
@@ -187,6 +198,7 @@ export async function emitLinearAuxiliaryFiles(
   await writeRootIndex(client, workspaceId, aggregate);
 
   const issues = input.issues ?? [];
+  const labels = input.labels ?? [];
   const comments = input.comments ?? [];
   const users = input.users ?? [];
   const teams = input.teams ?? [];
@@ -196,6 +208,7 @@ export async function emitLinearAuxiliaryFiles(
   const milestones = input.milestones ?? [];
   const roadmaps = input.roadmaps ?? [];
   const hasIssues = hasOwn(input, 'issues');
+  const hasLabels = hasOwn(input, 'labels');
   const hasComments = hasOwn(input, 'comments');
   const hasUsers = hasOwn(input, 'users');
   const hasTeams = hasOwn(input, 'teams');
@@ -207,6 +220,7 @@ export async function emitLinearAuxiliaryFiles(
 
   if (
     !hasIssues &&
+    !hasLabels &&
     !hasComments &&
     !hasUsers &&
     !hasTeams &&
@@ -221,6 +235,9 @@ export async function emitLinearAuxiliaryFiles(
 
   if (hasIssues) {
     accumulate(aggregate, await emitIssues(client, workspaceId, issues, input.connectionId));
+  }
+  if (hasLabels) {
+    accumulate(aggregate, await emitLabels(client, workspaceId, labels, input.connectionId));
   }
   if (hasComments) {
     accumulate(aggregate, await emitComments(client, workspaceId, comments, input.connectionId));
@@ -635,7 +652,7 @@ function toCommentNode(comment: LinearComment): LinearCommentNode {
   } as LinearCommentNode;
 }
 
-// -- users / teams / projects / cycles / milestones / roadmaps -------------
+// -- users / teams / labels / projects / cycles / milestones / roadmaps ----
 
 async function emitUsers(
   client: AuxiliaryEmitterClient,
@@ -666,6 +683,23 @@ async function emitTeams(
     connectionId,
     aliasAnchorPath: (id) => linearByIdAliasPath(TEAMS_SCOPE, id),
     aliasPaths: teamAliasPaths,
+  });
+}
+
+async function emitLabels(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  records: readonly LinearLabelEmitRecord[],
+  connectionId: string | undefined,
+): Promise<EmitAuxiliaryFilesResult> {
+  return emitFlatResource(client, workspaceId, records, {
+    indexPath: linearLabelsIndexPath(),
+    canonicalPath: (id) => linearLabelPath(id),
+    indexRow: (record) => linearLabelIndexRow(record),
+    objectType: 'label',
+    connectionId,
+    aliasAnchorPath: (id) => linearByIdAliasPath(LABELS_SCOPE, id),
+    aliasPaths: labelAliasPaths,
   });
 }
 
@@ -921,6 +955,27 @@ function teamAliasPaths(record: Record<string, unknown>, id: string): FlatAliasP
     });
   }
   return paths;
+}
+
+function labelAliasPaths(record: Record<string, unknown>, id: string): FlatAliasPath[] {
+  const paths: FlatAliasPath[] = [linearByIdAliasPath(LABELS_SCOPE, id)];
+  const name = readNonEmptyString(record.name);
+  if (name && slugifies(name)) {
+    paths.push({
+      path: linearByNameAliasPath(LABELS_SCOPE, name, id),
+      collisionPath: linearByNameAliasPath(LABELS_SCOPE, name, id, true),
+    });
+  }
+  const teamId = labelTeamId(record);
+  if (teamId) {
+    paths.push(linearLabelByTeamPath(teamId, id));
+  }
+  return paths;
+}
+
+function labelTeamId(record: Record<string, unknown>): string | undefined {
+  const team = record.team;
+  return (isRecord(team) ? readNonEmptyString(team.id) : undefined) ?? readNonEmptyString(record.team_id);
 }
 
 // -- shared helpers ---------------------------------------------------------

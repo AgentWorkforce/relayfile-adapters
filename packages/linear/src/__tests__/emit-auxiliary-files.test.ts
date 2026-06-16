@@ -24,6 +24,9 @@ import {
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
+  linearLabelByTeamPath,
+  linearLabelPath,
+  linearLabelsIndexPath,
   linearProjectByStatePath,
   linearProjectByTeamPath,
   linearProjectLegacyPath,
@@ -106,6 +109,7 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.deepEqual(rows, [
       { id: 'issues', title: 'Issues' },
       { id: 'comments', title: 'Comments' },
+      { id: 'labels', title: 'Labels' },
       { id: 'teams', title: 'Teams' },
       { id: 'users', title: 'Users' },
       { id: 'projects', title: 'Projects' },
@@ -213,6 +217,40 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/projects`, 'Roadmap!!!', 'project-2', true)));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core', 'team-1')));
     assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/teams`, 'Core!!!', 'team-2', true)));
+  });
+
+  it('materializes label aliases and disambiguates by-name collisions', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      labels: [
+        {
+          id: 'label-1',
+          name: 'Bug',
+          color: '#d00',
+          team_id: 'team-1',
+          updatedAt: '2026-05-12T00:00:00Z',
+        },
+        {
+          id: 'label-2',
+          name: 'Bug!!!',
+          team: { id: 'team-1', name: 'Engineering' },
+          updatedAt: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.ok(client.files.has(linearLabelPath('label-1')));
+    assert.ok(client.files.has(linearByIdAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'label-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'Bug', 'label-1')));
+    assert.ok(client.files.has(linearByNameAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'Bug!!!', 'label-2', true)));
+    assert.ok(client.files.has(linearLabelByTeamPath('team-1', 'label-1')));
+    assert.ok(client.files.has(linearLabelByTeamPath('team-1', 'label-2')));
+
+    const rows = JSON.parse(client.files.get(linearLabelsIndexPath())!) as Array<{ id: string; title: string }>;
+    assert.deepEqual(rows.map((row) => row.id), ['label-2', 'label-1']);
+    assert.deepEqual(rows.map((row) => row.title), ['Bug!!!', 'Bug']);
   });
 
   it('disambiguates project and team alias slug collisions without readFile support', async () => {
@@ -711,6 +749,55 @@ describe('emitLinearAuxiliaryFiles', () => {
     assert.ok(indexWrite, 'expected an index write after delete to prune the row');
     const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
     assert.deepEqual(writtenRows.map((r) => r.id), ['project-456']);
+    assert.equal(result.deleted, expectedDeletes.length);
+  });
+
+  it('delete tombstone for a label removes canonical + aliases and drops the index row', async () => {
+    const priorPayload = {
+      provider: 'linear',
+      objectType: 'label',
+      objectId: 'label-123',
+      payload: {
+        id: 'label-123',
+        name: 'Bug',
+        team_id: 'team-1',
+        updatedAt: '2026-05-11T00:00:00Z',
+      },
+    };
+    const priorIndex = [
+      { id: 'label-123', title: 'Bug', updated: '2026-05-12T00:00:00Z' },
+      { id: 'label-456', title: 'Feature', updated: '2026-05-11T00:00:00Z' },
+    ];
+    const client = createClient({
+      initialFiles: {
+        [linearLabelPath('label-123')]: JSON.stringify(priorPayload),
+        [linearByIdAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'label-123')]: JSON.stringify(priorPayload),
+        [linearByNameAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'Bug', 'label-123')]: JSON.stringify(priorPayload),
+        [linearLabelByTeamPath('team-1', 'label-123')]: JSON.stringify(priorPayload),
+        [linearLabelsIndexPath()]: JSON.stringify(priorIndex),
+      },
+    });
+
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      labels: [{ id: 'label-123', _deleted: true }],
+    });
+
+    const deletedPaths = new Set(client.deletes.map((d) => d.path));
+    const expectedDeletes = [
+      linearLabelPath('label-123'),
+      linearByIdAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'label-123'),
+      linearByNameAliasPath(`${LINEAR_PATH_ROOT}/labels`, 'Bug', 'label-123'),
+      linearLabelByTeamPath('team-1', 'label-123'),
+    ];
+    for (const path of expectedDeletes) {
+      assert.ok(deletedPaths.has(path), `expected delete at ${path}`);
+    }
+
+    const indexWrite = client.writes.find((w) => w.path === linearLabelsIndexPath());
+    assert.ok(indexWrite, 'expected an index write after delete to prune the row');
+    const writtenRows = JSON.parse(indexWrite!.content) as Array<{ id: string }>;
+    assert.deepEqual(writtenRows.map((r) => r.id), ['label-456']);
     assert.equal(result.deleted, expectedDeletes.length);
   });
 

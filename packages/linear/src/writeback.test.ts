@@ -173,6 +173,38 @@ describe('linear writeback', () => {
       });
     });
 
+    it('builds an issueUpdate mutation with project, state, and label deltas', () => {
+      const req = resolveWritebackRequest(
+        `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+        JSON.stringify({
+          projectId: 'project-1',
+          stateId: 'state-1',
+          addedLabelIds: ['label-bug'],
+          removedLabelIds: ['label-triage'],
+        }),
+      );
+      assert.strictEqual(req.action, 'update_issue');
+      const variables = req.body.variables as { id: string; input: Record<string, unknown> };
+      assert.strictEqual(variables.id, PAGE_UUID);
+      assert.deepStrictEqual(variables.input, {
+        projectId: 'project-1',
+        stateId: 'state-1',
+        addedLabelIds: ['label-bug'],
+        removedLabelIds: ['label-triage'],
+      });
+    });
+
+    it('rejects mixing full label replacement with label deltas', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            `/linear/issues/auth-refactor--${PAGE_HEX}.json`,
+            JSON.stringify({ labelIds: ['label-a'], addedLabelIds: ['label-b'] }),
+          ),
+        /cannot mix `labelIds` replacement/,
+      );
+    });
+
     it('builds an issueUpdate mutation for the canonical __ separator emitted by path-mapper', () => {
       // Pins the merged convention from #49: nameWithId now emits
       // `<basename>__<id>` rather than the legacy `<slug>--<id>`. classifyWrite
@@ -275,6 +307,72 @@ describe('linear writeback', () => {
     it('rejects delete writebacks for draft filenames', () => {
       assert.throws(
         () => resolveDeleteRequest('/linear/issues/audit-log-export.json'),
+        /No Linear delete writeback rule matched/,
+      );
+    });
+  });
+
+  describe('label create/update/delete', () => {
+    const LABEL_UUID = '5fd6800c-1c90-80ea-9ec8-fe4a0daa66b8';
+    const LABEL_HEX = LABEL_UUID.replace(/-/g, '');
+
+    it('creates a Linear label from a non-canonical draft filename', () => {
+      const req = resolveWritebackRequest(
+        '/linear/labels/cleanup-label.json',
+        JSON.stringify({
+          name: 'Cleanup',
+          color: '#bec2c8',
+          teamId: 'team-1',
+          parentId: 'parent-label-1',
+        }),
+      );
+
+      assert.strictEqual(req.action, 'create_label');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.match(String(req.body.query), /issueLabelCreate/);
+      assert.deepStrictEqual(req.body.variables, {
+        input: {
+          name: 'Cleanup',
+          color: '#bec2c8',
+          teamId: 'team-1',
+          parentId: 'parent-label-1',
+        },
+      });
+    });
+
+    it('updates a Linear label from a canonical filename', () => {
+      const req = resolveWritebackRequest(
+        `/linear/labels/cleanup__${LABEL_HEX}.json`,
+        JSON.stringify({ name: 'Cleanup renamed', color: '#00ff00' }),
+      );
+
+      assert.strictEqual(req.action, 'update_label');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.match(String(req.body.query), /issueLabelUpdate/);
+      assert.deepStrictEqual(req.body.variables, {
+        id: LABEL_UUID,
+        input: {
+          name: 'Cleanup renamed',
+          color: '#00ff00',
+        },
+      });
+    });
+
+    it('deletes a Linear label from a canonical filename', () => {
+      const req = resolveDeleteRequest(`/linear/labels/cleanup--${LABEL_HEX}.json`);
+
+      assert.strictEqual(req.action, 'delete_label');
+      assert.strictEqual(req.method, 'POST');
+      assert.strictEqual(req.endpoint, '/graphql');
+      assert.match(String(req.body.query), /issueLabelDelete/);
+      assert.deepStrictEqual(req.body.variables, { id: LABEL_UUID });
+    });
+
+    it('rejects deleting label draft filenames', () => {
+      assert.throws(
+        () => resolveDeleteRequest('/linear/labels/cleanup-label.json'),
         /No Linear delete writeback rule matched/,
       );
     });
