@@ -10,6 +10,7 @@ export {
   type WriteFileInput,
   type WriteFileResult,
 } from './clickup-adapter.js';
+export { ClickUpApiClient, type ClickUpFetchOptions } from './api.js';
 export * from './emit-auxiliary-files.js';
 export * from './layout.js';
 export {
