@@ -176,6 +176,35 @@ test('ingestWebhook re-fetches the full ClickUp task before writing update recor
   assert.equal((payload._webhook as Record<string, unknown>)?.event, 'taskUpdated');
 });
 
+test('ingestWebhook classifies refetched terminal task status updates as completed', async () => {
+  const { adapter, client } = createCapturingAdapter(async (request) => {
+    assert.equal(request.method, 'GET');
+    assert.equal(request.endpoint, '/api/v2/task/task_123');
+    return {
+      status: 200,
+      headers: {},
+      data: {
+        id: 'task_123',
+        name: 'Finish ClickUp adapter',
+        status: { status: 'complete', type: 'closed' },
+      },
+    };
+  });
+
+  await adapter.ingestWebhook('workspace_1', {
+    event: 'taskUpdated',
+    task_id: 'task_123',
+    data: { id: 'task_123' },
+    history_items: [{ field: 'status' }],
+  });
+
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  assert.equal((payload._webhook as Record<string, unknown>)?.action, 'completed');
+  assert.equal(client.writes[0]?.semantics?.properties?.['clickup.webhook.action'], 'completed');
+  assert.equal(client.writes[0]?.semantics?.properties?.['clickup.status_type'], 'closed');
+});
+
 test('ingestWebhook falls back to the webhook delta when task re-fetch fails', async () => {
   const { adapter, client, requests } = createCapturingAdapter(async () => ({
     status: 503,

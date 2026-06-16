@@ -299,14 +299,8 @@ export class ClickUpAdapter extends IntegrationAdapter {
     let action = getEventAction(eventType) ?? 'updated';
     if (action === 'updated' && objectType === 'task') {
       const data = getRecord(event.data);
-      const statusType = asString(getRecord(data?.status)?.type)?.toLowerCase();
       const historyItems = Array.isArray(event.history_items) ? event.history_items as Record<string, unknown>[] : [];
-      const statusChanged = historyItems.some((item) => asString(item.field) === 'status');
-      if (statusChanged && (statusType === 'closed' || statusType === 'done')) {
-        action = 'completed';
-      } else if (data?.archived === true && historyItems.some((item) => asString(item.field) === 'archived')) {
-        action = 'archived';
-      }
+      action = classifyTaskWebhookAction(action, data ?? {}, historyItems);
     }
     const payload = mergeClickUpPayload(event, objectType, objectId, action);
     const normalized: NormalizedWebhook = {
@@ -712,10 +706,57 @@ function mergeFetchedPayload(
   fetched: Record<string, unknown>,
   webhookPayload: Record<string, unknown>,
 ): Record<string, unknown> {
-  return {
+  const merged = {
     ...fetched,
     ...pickWebhookMetadata(webhookPayload),
   };
+  const webhook = getRecord(merged._webhook);
+  const action = asString(webhook?.action)?.toLowerCase();
+  if (!webhook || !action) {
+    return merged;
+  }
+
+  const refinedAction = classifyTaskWebhookAction(action, merged, readWebhookHistoryItems(webhook));
+  return {
+    ...merged,
+    _webhook: {
+      ...webhook,
+      action: refinedAction,
+    },
+  };
+}
+
+function classifyTaskWebhookAction(
+  action: string,
+  task: Record<string, unknown>,
+  historyItems: Record<string, unknown>[],
+): string {
+  if (action !== 'updated') {
+    return action;
+  }
+
+  if (hasHistoryField(historyItems, 'status') && isTerminalTaskStatus(task.status)) {
+    return 'completed';
+  }
+  if (task.archived === true && hasHistoryField(historyItems, 'archived')) {
+    return 'archived';
+  }
+  return action;
+}
+
+function readWebhookHistoryItems(webhook: Record<string, unknown>): Record<string, unknown>[] {
+  const value = webhook.historyItems ?? webhook.history_items;
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function hasHistoryField(historyItems: Record<string, unknown>[], field: string): boolean {
+  return historyItems.some((item) => asString(item.field) === field);
+}
+
+function isTerminalTaskStatus(value: unknown): boolean {
+  const status = getRecord(value);
+  const statusType = asString(status?.type)?.toLowerCase();
+  return statusType === 'closed' || statusType === 'done';
 }
 
 function pickWebhookMetadata(payload: Record<string, unknown>): Record<string, unknown> {
