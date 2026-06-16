@@ -11,6 +11,9 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
     "owner",
     "repo"
   ],
+  "gitlab": [
+    "projectPath"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"
@@ -91,12 +94,6 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "packageName": "@relayfile/gcs",
     "packagePath": "packages/gcs",
     "provider": "gcs",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
-    "packageName": "@relayfile/adapter-gitlab",
-    "packagePath": "packages/gitlab",
-    "provider": "gitlab",
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {

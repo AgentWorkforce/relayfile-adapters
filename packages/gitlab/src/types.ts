@@ -6,6 +6,13 @@ import type {
   ProxyResponse,
   WebhookInput as RelayWebhookInput,
 } from '@relayfile/sdk';
+import type {
+  AdapterMaterializationFilter,
+  AdapterMaterializationMode,
+  AdapterMaterializationPolicy,
+  AdapterMaterializationRule,
+  AdapterResourceMaterializationPolicy,
+} from '@relayfile/adapter-core';
 
 export type WebhookInput = RelayWebhookInput;
 export type { ConnectionProvider, ProxyMethod, ProxyRequest, ProxyResponse } from '@relayfile/sdk';
@@ -23,6 +30,7 @@ export interface GitLabAdapterConfig {
   perPage: number;
   projectPath?: string;
   connectionId?: string;
+  materialization?: GitLabMaterializationPolicy;
   webhookSecret?: string;
   supportedEvents: GitLabSupportedEvent[];
 }
@@ -52,6 +60,7 @@ export interface IngestResult {
 export interface SyncOptions {
   cursor?: string;
   limit?: number;
+  materialization?: import('./materialization-policy.js').ResolvedProjectMaterialization;
   objectTypes?: GitLabSyncObjectType[];
   fullResync?: boolean;
   projectPath?: string;
@@ -68,6 +77,28 @@ export type GitLabSyncObjectType =
   | 'issues'
   | 'merge_requests'
   | 'pipelines';
+
+export type GitLabMaterializationMode = AdapterMaterializationMode;
+
+export type GitLabMaterializationResource = GitLabSyncObjectType;
+
+export type GitLabMaterializationState = 'opened' | 'closed' | 'locked' | 'merged' | 'all';
+
+export type GitLabMaterializationFilter = AdapterMaterializationFilter<GitLabMaterializationState>;
+
+export type GitLabResourceMaterializationPolicy =
+  AdapterResourceMaterializationPolicy<GitLabMaterializationState>;
+
+export type GitLabMaterializationRule =
+  AdapterMaterializationRule<GitLabMaterializationResource, GitLabMaterializationState, 'projects'>;
+
+export type GitLabMaterializationPolicy =
+  AdapterMaterializationPolicy<
+    GitLabMaterializationResource,
+    GitLabMaterializationState,
+    'projects',
+    'webhookWritesForLazyProjects'
+  >;
 
 export abstract class IntegrationAdapter {
   protected readonly provider: ConnectionProvider;

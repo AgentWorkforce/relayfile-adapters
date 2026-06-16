@@ -35,7 +35,7 @@ Every adapter exposes the same navigation primitives so an agent never has to me
 - **`<integration>/LAYOUT.md`** — markdown guide describing the integration's tree shape, written by the adapter itself.
 - **Alias trees** — `by-title/`, `by-id/`, `by-name/`, and `by-state/` mirror canonical entries under semantic keys for direct lookup without traversing the canonical hierarchy.
 
-GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces. The GitHub adapter also supports fine-grained eager materialization rules for issues and pulls so operators can keep the default lazy while syncing only a cheap subset, for example open `factory` issues in selected repos:
+GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces. The GitHub and GitLab adapters also support fine-grained eager materialization rules so operators can keep the default lazy while syncing only a cheap subset. GitHub rules target `repos` and the `issues`/`pulls` resources, for example open `factory` issues in selected repos:
 
 ```json
 {
@@ -56,6 +56,10 @@ GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-re
   }
 }
 ```
+
+GitLab uses the same policy shape with provider-specific names: rules target
+`projects`, can select `merge_requests`, `issues`, `pipelines`, and `commits`,
+and use `webhookWritesForLazyProjects` for the webhook opt-out knob.
 
 That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
 

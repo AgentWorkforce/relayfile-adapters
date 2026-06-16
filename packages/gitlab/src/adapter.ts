@@ -1,4 +1,5 @@
 import { computeCanonicalPath } from '@relayfile/sdk';
+import { normalizeMaterializationPolicy } from '@relayfile/adapter-core';
 import type { FileSemantics, WebhookInput } from '@relayfile/sdk';
 
 import { GitLabApiClient } from './api.js';
@@ -45,6 +46,12 @@ import { EVENT_MAP, extractEventKey } from './webhook/router.js';
 import { normalizeWebhook } from './webhook/normalizer.js';
 import { verifyWebhookToken } from './webhook/verify.js';
 import { GitLabWritebackHandler } from './writeback.js';
+import {
+  GITLAB_MATERIALIZATION_RESOURCES,
+  GITLAB_MATERIALIZATION_STATES,
+  resolveProjectMaterialization,
+  shouldWriteWebhookForProject,
+} from './materialization-policy.js';
 
 export const DEFAULT_CONFIG: GitLabAdapterConfig = {
   baseUrl: 'https://gitlab.com',
@@ -88,6 +95,14 @@ export class GitLabAdapter extends IntegrationAdapter {
     const mergedConfig = {
       ...DEFAULT_CONFIG,
       ...config,
+      materialization: normalizeMaterializationPolicy(config.materialization, {
+        defaultMode: 'eager',
+        fieldName: 'materialization',
+        resources: GITLAB_MATERIALIZATION_RESOURCES,
+        stateValues: GITLAB_MATERIALIZATION_STATES,
+        targetKey: 'projects',
+        webhookWritesKey: 'webhookWritesForLazyProjects',
+      }),
       supportedEvents: config.supportedEvents ?? [...DEFAULT_SUPPORTED_EVENTS],
     };
     super(provider, mergedConfig);
@@ -100,6 +115,10 @@ export class GitLabAdapter extends IntegrationAdapter {
 
   supportedEvents(): string[] {
     return [...this.config.supportedEvents];
+  }
+
+  supportedScopeKeys(): string[] {
+    return ['projectPath'];
   }
 
   async ingestWebhook(_workspaceId: string, event: WebhookInput): Promise<IngestResult> {
@@ -127,6 +146,13 @@ export class GitLabAdapter extends IntegrationAdapter {
     }
 
     const normalized = normalizeWebhook(payload, eventType);
+    const projectPath = normalized.metadata?.projectPath;
+    if (
+      typeof projectPath === 'string'
+      && !shouldWriteWebhookForProject(this.config, projectPath)
+    ) {
+      return emptyResult();
+    }
     return handler(this, normalized, payload);
   }
 
@@ -164,9 +190,13 @@ export class GitLabAdapter extends IntegrationAdapter {
   }
 
   async sync(_workspaceId: string, options: SyncOptions = {}): Promise<SyncResult> {
+    const projectPath = options.projectPath ?? this.config.projectPath;
     return bulkIngestProject(this.api, {
       ...options,
-      projectPath: options.projectPath ?? this.config.projectPath,
+      materialization: projectPath
+        ? resolveProjectMaterialization(this.config, projectPath, options)
+        : undefined,
+      projectPath,
     });
   }
 

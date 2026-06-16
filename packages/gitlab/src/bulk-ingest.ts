@@ -1,4 +1,4 @@
-import type { IngestOperation, SyncOptions, SyncResult } from './types.js';
+import type { GitLabSyncObjectType, IngestOperation, SyncOptions, SyncResult } from './types.js';
 import { GitLabApiClient } from './api.js';
 import { ingestCommit } from './commits/ingestion.js';
 import { ingestIssue } from './issues/ingestion.js';
@@ -33,6 +33,56 @@ function accumulate(result: SyncResult, objectType: string, operations: IngestOp
   }
 }
 
+const DEFAULT_OBJECT_TYPES: GitLabSyncObjectType[] = ['merge_requests', 'issues', 'pipelines', 'commits'];
+const ISSUE_STATES = new Set(['opened', 'closed', 'all']);
+const MERGE_REQUEST_STATES = new Set(['opened', 'closed', 'locked', 'merged', 'all']);
+
+function wantedObjectTypes(options: SyncOptions): Set<GitLabSyncObjectType> {
+  const explicit = new Set(options.objectTypes ?? DEFAULT_OBJECT_TYPES);
+  if (!options.materialization) {
+    return explicit;
+  }
+
+  return new Set(
+    DEFAULT_OBJECT_TYPES.filter(
+      (objectType) => explicit.has(objectType) && options.materialization?.[objectType]?.mode === 'eager',
+    ),
+  );
+}
+
+function queryForMaterialization(
+  objectType: GitLabSyncObjectType,
+  options: SyncOptions,
+): Record<string, string> {
+  const materialization = options.materialization?.[objectType];
+  const query: Record<string, string> = {};
+
+  if (!materialization) {
+    return query;
+  }
+
+  const state = materialization.filter?.state;
+  if (state && objectType === 'issues' && ISSUE_STATES.has(state)) {
+    query.state = state;
+  }
+  if (state && objectType === 'merge_requests' && MERGE_REQUEST_STATES.has(state)) {
+    query.state = state;
+  }
+
+  if (
+    (objectType === 'issues' || objectType === 'merge_requests')
+    && materialization.filter?.labels?.length
+  ) {
+    query.labels = materialization.filter.labels.join(',');
+  }
+
+  if (materialization.since) {
+    query[objectType === 'commits' ? 'since' : 'updated_after'] = materialization.since;
+  }
+
+  return query;
+}
+
 export async function bulkIngestProject(
   api: GitLabApiClient,
   options: SyncOptions,
@@ -44,13 +94,13 @@ export async function bulkIngestProject(
 
   const projectId = api.projectId(projectPath);
   const limit = options.limit;
-  const wantedTypes = new Set(options.objectTypes ?? ['merge_requests', 'issues', 'pipelines', 'commits']);
+  const wantedTypes = wantedObjectTypes(options);
   const result = emptySyncResult(options.cursor ?? null);
 
   if (wantedTypes.has('merge_requests')) {
     const mergeRequests = await api.paginate<Array<{ iid: number }>[number]>(
       `/api/v4/projects/${projectId}/merge_requests`,
-      { state: 'all' },
+      { state: 'all', ...queryForMaterialization('merge_requests', options) },
       { limit },
     );
     for (const mergeRequest of mergeRequests) {
@@ -61,7 +111,7 @@ export async function bulkIngestProject(
   if (wantedTypes.has('issues')) {
     const issues = await api.paginate<Array<{ iid: number }>[number]>(
       `/api/v4/projects/${projectId}/issues`,
-      { state: 'all' },
+      { state: 'all', ...queryForMaterialization('issues', options) },
       { limit },
     );
     for (const issue of issues) {
@@ -72,7 +122,7 @@ export async function bulkIngestProject(
   if (wantedTypes.has('pipelines')) {
     const pipelines = await api.paginate<Array<{ id: number }>[number]>(
       `/api/v4/projects/${projectId}/pipelines`,
-      {},
+      queryForMaterialization('pipelines', options),
       { limit },
     );
     for (const pipeline of pipelines) {
@@ -83,7 +133,7 @@ export async function bulkIngestProject(
   if (wantedTypes.has('commits')) {
     const commits = await api.paginate<Array<{ id: string }>[number]>(
       `/api/v4/projects/${projectId}/repository/commits`,
-      {},
+      queryForMaterialization('commits', options),
       { limit },
     );
     for (const commit of commits) {

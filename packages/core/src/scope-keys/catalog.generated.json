@@ -3,6 +3,9 @@
     "owner",
     "repo"
   ],
+  "gitlab": [
+    "projectPath"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

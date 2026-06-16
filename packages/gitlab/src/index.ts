@@ -3,6 +3,7 @@ export { GitLabAdapter, DEFAULT_CONFIG } from './adapter.js';
 export { bulkIngestProject } from './bulk-ingest.js';
 export { ingestCommit, mapCommitNoteToOperation } from './commits/ingestion.js';
 export { ingestIssue, mapIssueNoteToOperation } from './issues/ingestion.js';
+export * from './materialization-policy.js';
 export { mapApprovalsToOperation } from './mr/approvals.js';
 export { parseDiffEntries, renderMergeRequestPatch } from './mr/diff-parser.js';
 export { mapDiscussionToOperation, mapDiscussionWebhookToOperation, buildDiscussionCreateBody } from './mr/discussions.js';
@@ -68,6 +69,12 @@ export type {
   GitLabIssueWebhook,
   GitLabJob,
   GitLabLabel,
+  GitLabMaterializationFilter,
+  GitLabMaterializationMode,
+  GitLabMaterializationPolicy,
+  GitLabMaterializationResource,
+  GitLabMaterializationRule,
+  GitLabMaterializationState,
   GitLabMergeRequest,
   GitLabMergeRequestWebhook,
   GitLabNamespace,
