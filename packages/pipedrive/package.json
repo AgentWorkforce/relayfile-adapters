@@ -60,7 +60,7 @@
     "directory": "packages/pipedrive"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.50"
+    "@relayfile/adapter-core": "^0.3.51"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
