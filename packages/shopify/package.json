@@ -46,7 +46,7 @@
     "shopify",
     "adapter"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },
@@ -69,6 +69,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.47"
+    "@relayfile/adapter-core": "^0.3.48"
   }
 }

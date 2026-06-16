@@ -42,7 +42,7 @@
     "linear",
     "adapter"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },
@@ -55,7 +55,7 @@
     "directory": "packages/linear"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.47"
+    "@relayfile/adapter-core": "^0.3.48"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

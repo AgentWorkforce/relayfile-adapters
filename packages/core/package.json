@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-core",
-  "version": "0.3.47",
+  "version": "0.3.48",
   "description": "Schema-driven relayfile adapter generator and runtime",
   "type": "module",
   "main": "dist/src/index.js",
@@ -59,7 +59,6 @@
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@agent-relay/sdk": "^6.0.7",
     "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.5.2",
     "tsx": "^4.20.6",
@@ -69,7 +68,7 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
   },
