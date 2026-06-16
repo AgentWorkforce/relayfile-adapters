@@ -310,10 +310,11 @@ export const adapters = [
     slug: 'linear',
     title: 'Linear adapter',
     overview:
-      'The Linear adapter exposes teams, issues, users, comments, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments plus creating, updating, archiving, and grouping issues into Linear projects. Companion cloud actions use slugs `create-project`, `update-project`, `add-issues-to-project`, and `archive-project` at `POST /linear/projects`, `PATCH /linear/projects/:id`, `POST /linear/projects/:id/add-issues`, and `POST /linear/projects/:id/archive` with Linear OAuth scope `write`.',
+      'The Linear adapter exposes teams, issues, users, comments, labels, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments, creating/updating/deleting labels, and creating, updating, archiving, and grouping issues into Linear projects. Companion cloud actions use slugs `create-project`, `update-project`, `add-issues-to-project`, and `archive-project` at `POST /linear/projects`, `PATCH /linear/projects/:id`, `POST /linear/projects/:id/add-issues`, and `POST /linear/projects/:id/archive` with Linear OAuth scope `write`.',
     readPaths: [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
+      ['/linear/labels/<labelId>.json', 'Label records. Labels also expose by-id, by-name, and by-team aliases.'],
       ['/linear/projects/<projectId>/meta.json', 'Project records. Projects also expose by-id, by-name, by-state, and by-team aliases; multi-team projects appear under every team.'],
       ['/linear/users/<userId>.json', 'User records.'],
       ['/linear/comments/<name>__<commentId>/meta.json', 'Comment records (directory records so per-comment children can nest without a file/dir collision).'],
@@ -329,6 +330,8 @@ export const adapters = [
         projectId: str('Linear project UUID.', 'uuid'),
         cycleId: str('Linear cycle UUID.', 'uuid'),
         labelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs.'),
+        addedLabelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs to add without replacing the full label set. Do not combine with `labelIds`.'),
+        removedLabelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs to remove without replacing the full label set. Do not combine with `labelIds`.'),
         dueDate: str('Due date in YYYY-MM-DD form.', 'date'),
         estimate: num('Linear estimate value.'),
         parentId: str('Parent issue UUID.', 'uuid'),
@@ -338,6 +341,13 @@ export const adapters = [
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
       }, { body: 'Replace example comment body.' }),
+      endpoint('/linear/labels/new.json', 'Create Linear label', 'Creates a Linear issue label when written to a non-canonical draft filename, updates mutable label fields when written to `/linear/labels/{labelId}.json`, and deletes a label when the canonical file is removed.', ['name'], {
+        name: str('Label name.', undefined, { minLength: 1 }),
+        description: str('Label description.'),
+        color: str('Label color as a hex string.'),
+        teamId: str('Linear team UUID for a team-scoped label. Omit for a workspace-level label.', 'uuid'),
+        parentId: str('Parent label UUID for nested labels.', 'uuid'),
+      }, { name: 'Replace example label name', color: '#bec2c8' }),
       endpoint('/linear/projects/new.json', 'Create Linear project', 'Creates a Linear project. The draft filename (for example `factory-create-<uuid>.json`) is an operator-supplied idempotency key; the created Linear UUID is returned as `id` by the companion action. Payloads must provide `teamId` or `teamIds`.', ['name'], {
         name: str('Project name.', undefined, { minLength: 1 }),
         description: str('Markdown project description.'),

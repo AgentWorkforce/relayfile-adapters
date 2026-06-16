@@ -19,6 +19,27 @@ export interface LinearCreateIssueArgs {
   stateId?: string;
 }
 
+export interface LinearUpdateIssueArgs {
+  title?: string;
+  description?: string;
+  assigneeId?: string;
+  stateId?: string;
+  projectId?: string;
+  labelIds?: string[];
+  addedLabelIds?: string[];
+  removedLabelIds?: string[];
+}
+
+export interface LinearCreateLabelArgs {
+  name: string;
+  description?: string;
+  color?: string;
+  teamId?: string;
+  parentId?: string;
+}
+
+export type LinearUpdateLabelArgs = Partial<Pick<LinearCreateLabelArgs, 'name' | 'description' | 'color' | 'parentId'>>;
+
 export interface LinearClient extends ProviderClient<'linear'> {
   /** Post an activity to a Linear Agent Session. */
   agentActivity(sessionId: string, activity: LinearAgentActivity): Promise<{ id: string; url: string }>;
@@ -31,10 +52,11 @@ export interface LinearClient extends ProviderClient<'linear'> {
   /** Create an issue. */
   createIssue(args: LinearCreateIssueArgs): Promise<{ id: string; url: string }>;
   /** Patch an existing issue. */
-  updateIssue(
-    issueId: string,
-    args: { title?: string; description?: string; assigneeId?: string; stateId?: string }
-  ): Promise<void>;
+  updateIssue(issueId: string, args: LinearUpdateIssueArgs): Promise<void>;
+  /** Create a label. */
+  createLabel(args: LinearCreateLabelArgs): Promise<{ id: string; url: string }>;
+  /** Patch an existing label. */
+  updateLabel(labelId: string, args: LinearUpdateLabelArgs): Promise<void>;
   /** Read one issue by id. */
   getIssue<T = Record<string, unknown>>(issueId: string): Promise<T>;
   /** List issues. */
@@ -49,6 +71,7 @@ export interface LinearClient extends ProviderClient<'linear'> {
 export function linearClient(opts: IntegrationClientOptions = {}): LinearClient {
   const base = providerClient('linear', opts);
   const issuePath = (issueId: string) => `${base.issues.path()}/${encodeSegment(issueId)}.json`;
+  const labelPath = (labelId: string) => `${base.labels.path()}/${encodeSegment(labelId)}.json`;
   // Read lookup follows the adapter's stable UUID alias. Writeback keeps the
   // canonical issue item path until its contract is separately proven.
   const issueUuidPath = (issueId: string) => linearByUuidAliasPath(base.issues.path(), issueId);
@@ -70,6 +93,12 @@ export function linearClient(opts: IntegrationClientOptions = {}): LinearClient 
     },
     async updateIssue(issueId: string, args: Record<string, unknown>) {
       await writeJsonFile(opts, 'linear', 'updateIssue', issuePath(issueId), args);
+    },
+    async createLabel(args: LinearCreateLabelArgs) {
+      return created(await base.labels.write({}, args));
+    },
+    async updateLabel(labelId: string, args: Record<string, unknown>) {
+      await writeJsonFile(opts, 'linear', 'updateLabel', labelPath(labelId), args);
     },
     getIssue<T = Record<string, unknown>>(issueId: string): Promise<T> {
       return readJsonFile<T>(opts, 'linear', 'getIssue', issueUuidPath(issueId));

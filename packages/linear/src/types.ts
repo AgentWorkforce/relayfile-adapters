@@ -2,6 +2,7 @@ export const LINEAR_WEBHOOK_OBJECT_TYPES = [
   'comment',
   'cycle',
   'issue',
+  'label',
   'milestone',
   'project',
   'roadmap',
@@ -44,9 +45,12 @@ export interface LinearWritebackRequest {
     | 'create_agent_activity'
     | 'create_comment'
     | 'create_issue'
+    | 'create_label'
     | 'create-project'
     | 'delete_issue'
+    | 'delete_label'
     | 'update_issue'
+    | 'update_label'
     | 'update-project';
   method: 'PATCH' | 'POST';
   endpoint: string;
@@ -131,7 +135,25 @@ export interface LinearState {
 export interface LinearLabel {
   id: string;
   name: string;
+  description?: string | null;
   color?: string;
+  team?: LinearTeam | null;
+  team_id?: string | null;
+  team_name?: string | null;
+  parent?: LinearLabelReference | null;
+  parentId?: string | null;
+  parent_id?: string | null;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  url?: string;
+}
+
+export interface LinearLabelReference {
+  id: string;
+  name?: string | null;
+  color?: string | null;
 }
 
 export interface LinearProjectReference {

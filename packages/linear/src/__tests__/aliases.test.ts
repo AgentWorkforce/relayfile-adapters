@@ -8,6 +8,8 @@ import {
   linearByNameAliasPath,
   linearByTitleAliasPath,
   linearIssuePath,
+  linearLabelByTeamPath,
+  linearLabelPath,
   linearProjectPath,
 } from '../path-mapper.js';
 
@@ -129,6 +131,73 @@ describe('linear aliases', () => {
     assert.strictEqual(client.readFile(byIdPath), client.readFile(firstCanonicalPath));
     assert.strictEqual(client.readFile(collisionAliasPath), client.readFile(secondCanonicalPath));
     assert.ok(collisionAliasPath.endsWith(`${aliasCollisionSuffix('project-2')}.json`));
+  });
+
+  it('writes label by-id, by-name, and by-team aliases', async () => {
+    const { adapter, client } = createAdapter();
+
+    await adapter.ingestWebhook('ws-linear', {
+      provider: 'linear',
+      eventType: 'label.create',
+      objectType: 'label',
+      objectId: 'label-1',
+      payload: {
+        id: 'label-1',
+        name: 'Bug',
+        team_id: 'team-1',
+      },
+    });
+
+    const canonicalPath = linearLabelPath('label-1');
+    const byIdPath = linearByIdAliasPath('/linear/labels', 'label-1');
+    const byNamePath = linearByNameAliasPath('/linear/labels', 'Bug', 'label-1');
+    const byTeamPath = linearLabelByTeamPath('team-1', 'label-1');
+
+    assert.strictEqual(client.readFile(byIdPath), client.readFile(canonicalPath));
+    assert.strictEqual(client.readFile(byNamePath), client.readFile(canonicalPath));
+    assert.strictEqual(client.readFile(byTeamPath), client.readFile(canonicalPath));
+  });
+
+  it('normalizes IssueLabel webhooks and removes label aliases on delete', async () => {
+    const { adapter, files, deletedPaths } = createAdapter();
+
+    await adapter.ingestWebhook('ws-linear', {
+      type: 'IssueLabel',
+      action: 'create',
+      data: {
+        id: 'label-1',
+        name: 'Bug',
+        team: { id: 'team-1' },
+      },
+    });
+
+    const canonicalPath = linearLabelPath('label-1');
+    const byIdPath = linearByIdAliasPath('/linear/labels', 'label-1');
+    const byNamePath = linearByNameAliasPath('/linear/labels', 'Bug', 'label-1');
+    const byTeamPath = linearLabelByTeamPath('team-1', 'label-1');
+    assert.ok(files.has(canonicalPath));
+    assert.ok(files.has(byIdPath));
+    assert.ok(files.has(byNamePath));
+    assert.ok(files.has(byTeamPath));
+
+    await adapter.ingestWebhook('ws-linear', {
+      type: 'IssueLabel',
+      action: 'remove',
+      data: {
+        id: 'label-1',
+        name: 'Bug',
+        team: { id: 'team-1' },
+      },
+    });
+
+    assert.strictEqual(files.has(canonicalPath), false);
+    assert.strictEqual(files.has(byIdPath), false);
+    assert.strictEqual(files.has(byNamePath), false);
+    assert.strictEqual(files.has(byTeamPath), false);
+    assert.ok(deletedPaths.includes(canonicalPath));
+    assert.ok(deletedPaths.includes(byIdPath));
+    assert.ok(deletedPaths.includes(byNamePath));
+    assert.ok(deletedPaths.includes(byTeamPath));
   });
 
   it('falls back to the object id for issue by-id aliases when the public identifier is missing', async () => {

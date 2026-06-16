@@ -25,6 +25,14 @@ export const resources = [
     createExample: "discovery/linear/issues/{issueId}/comments/.create.example.json",
   },
   {
+    name: "labels",
+    path: "/linear/labels",
+    pathPattern: /^\/linear\/labels(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
+    schema: "discovery/linear/labels/.schema.json",
+    createExample: "discovery/linear/labels/.create.example.json",
+  },
+  {
     name: "projects",
     path: "/linear/projects",
     pathPattern: /^\/linear\/projects(?:\/[^\/]+(?:\.json)?)?$/,

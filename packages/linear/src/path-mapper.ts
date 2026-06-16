@@ -15,6 +15,7 @@ export const LINEAR_OBJECT_TYPES = [
   'comment',
   'cycle',
   'issue',
+  'label',
   'milestone',
   'project',
   'roadmap',
@@ -47,7 +48,13 @@ const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
   linearcycle: 'cycle',
   issue: 'issue',
   issues: 'issue',
+  issue_label: 'label',
+  issuelabel: 'label',
   linearissue: 'issue',
+  linearissuelabel: 'label',
+  label: 'label',
+  labels: 'label',
+  linearlabel: 'label',
   milestone: 'milestone',
   milestones: 'milestone',
   projectmilestone: 'milestone',
@@ -81,6 +88,8 @@ const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
   LinearComment: 'comment',
   LinearCycle: 'cycle',
   LinearIssue: 'issue',
+  LinearIssueLabel: 'label',
+  LinearLabel: 'label',
   LinearMilestone: 'milestone',
   LinearProject: 'project',
   LinearRoadmap: 'roadmap',
@@ -416,6 +425,18 @@ export function linearProjectAddIssuesPath(projectId: string): string {
   return `${linearProjectDirectoryPath(projectId)}/add-issues.json`;
 }
 
+export function linearLabelPath(labelId: string): string {
+  return `${LINEAR_PATH_ROOT}/labels/${encodeLinearPathSegment(labelId)}.json`;
+}
+
+export function linearLabelsIndexPath(): string {
+  return `${LINEAR_PATH_ROOT}/labels/_index.json`;
+}
+
+export function linearLabelByTeamPath(teamId: string, labelId: string): string {
+  return `${LINEAR_PATH_ROOT}/labels/by-team/${encodeLinearPathSegment(teamId)}/${encodeLinearPathSegment(labelId)}.json`;
+}
+
 export function linearStatePath(stateId: string): string {
   return `${LINEAR_PATH_ROOT}/states/${encodeLinearPathSegment(stateId)}.json`;
 }
@@ -510,6 +531,8 @@ export function computeLinearPath(objectType: string, objectId: string, humanRea
   switch (normalizedType) {
     case 'issue':
       return linearIssuePath(normalizedId, humanReadable);
+    case 'label':
+      return linearLabelPath(normalizedId);
     case 'comment':
       return linearCommentPath(normalizedId, humanReadable);
     case 'project':

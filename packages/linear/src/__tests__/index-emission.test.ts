@@ -6,6 +6,7 @@ import {
   linearCyclePath,
   linearCommentPath,
   linearIssuePath,
+  linearLabelPath,
   linearProjectPath,
   linearRoadmapPath,
   linearStatePath,
@@ -17,6 +18,7 @@ import {
   linearCommentIndexRow,
   linearCycleIndexRow,
   linearIssueIndexRow,
+  linearLabelIndexRow,
   linearMilestoneIndexRow,
   linearProjectIndexRow,
   linearRoadmapIndexRow,
@@ -95,6 +97,13 @@ describe('linear index emission', () => {
         updatedAt: '2026-04-03T13:00:00.000Z',
       }),
     ]);
+    const labelIndex = buildLinearIndexFile('labels', [
+      linearLabelIndexRow({
+        id: 'label-1',
+        name: 'Bug',
+        updatedAt: '2026-04-03T13:30:00.000Z',
+      }),
+    ]);
     const cycleIndex = buildLinearIndexFile('cycles', [
       linearCycleIndexRow({
         id: 'cycle-1',
@@ -130,6 +139,7 @@ describe('linear index emission', () => {
     assert.equal(commentIndex.path, '/linear/comments/_index.json');
     assert.equal(userIndex.path, '/linear/users/_index.json');
     assert.equal(teamIndex.path, '/linear/teams/_index.json');
+    assert.equal(labelIndex.path, '/linear/labels/_index.json');
     assert.equal(projectIndex.path, '/linear/projects/_index.json');
     assert.equal(stateIndex.path, '/linear/states/_index.json');
     assert.equal(cycleIndex.path, '/linear/cycles/_index.json');
@@ -168,9 +178,13 @@ describe('linear index emission', () => {
     assert.deepEqual(JSON.parse(stateIndex.content), [
       { id: 'state-1', title: 'In Progress', updated: '2026-04-03T17:00:00.000Z' },
     ]);
+    assert.deepEqual(JSON.parse(labelIndex.content), [
+      { id: 'label-1', title: 'Bug', updated: '2026-04-03T13:30:00.000Z' },
+    ]);
 
     assert.equal(linearIssuePath('issue-1'), '/linear/issues/issue-1.json');
     assert.equal(linearCommentPath('comment-1'), '/linear/comments/comment-1/meta.json');
+    assert.equal(linearLabelPath('label-1'), '/linear/labels/label-1.json');
     assert.equal(linearUserPath('user-1'), '/linear/users/user-1.json');
     assert.equal(linearTeamPath('team-1'), '/linear/teams/team-1.json');
     assert.equal(linearProjectPath('project-1'), '/linear/projects/project-1/meta.json');
