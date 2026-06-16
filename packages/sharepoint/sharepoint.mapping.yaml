@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new file or list item was created in SharePoint.
+  file.updated:
+    description: An existing file or list item was updated in SharePoint.
+  file.deleted:
+    description: A file or list item was deleted from SharePoint.

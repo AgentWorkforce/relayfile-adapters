@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new blob was created in the Azure Blob Storage container.
+  file.updated:
+    description: An existing blob was updated in the Azure Blob Storage container.
+  file.deleted:
+    description: A blob was deleted from the Azure Blob Storage container.
