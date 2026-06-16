@@ -11,6 +11,7 @@ import {
   reconcileIssueRecord,
 } from './issues/issue-mapper.js';
 import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from './lazy.js';
+import { shouldWriteWebhookForRepo } from './materialization-policy.js';
 import {
   githubByIdAliasPath,
   githubDeploymentStatusPath,
@@ -315,7 +316,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     const target = this.resolveIssueTarget(payload);
     const vfs = this.tryGetVfsProvider();
 
-    if (vfs && target) {
+    if (vfs && target && shouldWriteWebhookForRepo(this.config, target.owner, target.repo)) {
       try {
         return await reconcileIssueRecord(
           this.provider as unknown as GitHubRequestProvider,
@@ -331,11 +332,13 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
         const envelopeIssue = asRecord(payload.issue);
         if (envelopeIssue && isActualIssue(envelopeIssue as JsonObject)) {
           try {
+            const repository = asRecord(payload.repository);
             return await persistIssueRecordFromObject(
               vfs,
               target.owner,
               target.repo,
               envelopeIssue as JsonObject,
+              repository ? (repository as JsonObject) : undefined,
             );
           } catch {
             // Fall through to the path-only result below.
@@ -357,7 +360,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   ): Promise<IngestResult | undefined> {
     const target = this.resolveIssueTarget(payload);
     const vfs = this.tryGetVfsProvider();
-    if (!vfs || !target) {
+    if (!vfs || !target || !shouldWriteWebhookForRepo(this.config, target.owner, target.repo)) {
       return undefined;
     }
 

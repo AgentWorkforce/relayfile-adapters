@@ -201,11 +201,49 @@ export type GitHubWebhookEvent =
   | (GitHubWebhookEnvelope & { action: string })
   | (GitHubWebhookEnvelope & { action?: undefined });
 
+export type GitHubMaterializationMode = 'lazy' | 'eager';
+
+export type GitHubBulkMaterializationResource = 'issues' | 'pulls';
+
+export type GitHubMaterializationResource = GitHubBulkMaterializationResource;
+
+export interface GitHubMaterializationFilter {
+  state?: 'open' | 'closed' | 'all';
+  labels?: string[];
+  since?: string;
+}
+
+export interface GitHubResourceMaterializationPolicy {
+  mode?: GitHubMaterializationMode;
+  filter?: GitHubMaterializationFilter;
+  since?: string;
+  incremental?: boolean;
+}
+
+export interface GitHubMaterializationRule {
+  repos?: string[];
+  resources?: GitHubMaterializationResource[];
+  filter?: GitHubMaterializationFilter;
+  since?: string;
+  incremental?: boolean;
+  eager?: boolean;
+  issues?: GitHubMaterializationMode | GitHubResourceMaterializationPolicy;
+  pulls?: GitHubMaterializationMode | GitHubResourceMaterializationPolicy;
+}
+
+export interface GitHubMaterializationPolicy {
+  default?: GitHubMaterializationMode;
+  rules?: GitHubMaterializationRule[];
+  webhookWritesForLazyRepos?: boolean;
+}
+
 export interface GitHubAdapterConfig {
   baseUrl: string;
   defaultBranch: string;
   fetchFileContents: boolean;
+  /** @deprecated Use materialization.default instead. */
   lazy?: boolean;
+  materialization?: GitHubMaterializationPolicy;
   maxFileSizeBytes: number;
   supportedEvents: string[];
   owner?: string;

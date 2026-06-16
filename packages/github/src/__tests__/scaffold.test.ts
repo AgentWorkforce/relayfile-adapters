@@ -76,9 +76,75 @@ describe('GitHubAdapter scaffold', () => {
     assert.strictEqual(config.baseUrl, DEFAULT_CONFIG.baseUrl);
     assert.strictEqual(config.defaultBranch, DEFAULT_CONFIG.defaultBranch);
     assert.strictEqual(config.fetchFileContents, DEFAULT_CONFIG.fetchFileContents);
+    assert.deepStrictEqual(config.materialization, {
+      default: 'eager',
+      webhookWritesForLazyRepos: true,
+    });
     assert.strictEqual(config.maxFileSizeBytes, DEFAULT_CONFIG.maxFileSizeBytes);
     assert.deepStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
     assert.notStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
+  });
+
+  it('validateConfig maps legacy lazy into materialization defaults', () => {
+    assert.deepStrictEqual(validateConfig({ lazy: true }).materialization, {
+      default: 'lazy',
+      webhookWritesForLazyRepos: true,
+    });
+    assert.deepStrictEqual(validateConfig({ lazy: false }).materialization, {
+      default: 'eager',
+      webhookWritesForLazyRepos: true,
+    });
+  });
+
+  it('validateConfig normalizes materialization rules', () => {
+    const config = validateConfig({
+      lazy: true,
+      materialization: {
+        default: 'all',
+        webhookWritesForLazyRepos: false,
+        rules: [
+          {
+            repos: ['octocat/*'],
+            resources: ['issues'],
+            issues: {
+              mode: 'eager',
+              filter: {
+                state: 'open',
+                labels: ['factory'],
+              },
+              incremental: true,
+            },
+            pulls: 'none',
+          },
+        ],
+      },
+    });
+
+    assert.deepStrictEqual(config.materialization, {
+      default: 'eager',
+      webhookWritesForLazyRepos: false,
+      rules: [
+        {
+          repos: ['octocat/*'],
+          resources: ['issues'],
+          filter: undefined,
+          since: undefined,
+          incremental: undefined,
+          eager: undefined,
+          issues: {
+            mode: 'eager',
+            filter: {
+              state: 'open',
+              labels: ['factory'],
+              since: undefined,
+            },
+            since: undefined,
+            incremental: true,
+          },
+          pulls: 'lazy',
+        },
+      ],
+    });
   });
 
   it('validateConfig rejects invalid config', () => {
@@ -98,6 +164,14 @@ describe('GitHubAdapter scaffold', () => {
     assert.throws(
       () => validateConfig({ supportedEvents: 'pull_request.opened' as never }),
       /supportedEvents must be an array of strings/,
+    );
+    assert.throws(
+      () => validateConfig({ materialization: { default: 'sometimes' } as never }),
+      /materialization.default must be "lazy" or "eager"/,
+    );
+    assert.throws(
+      () => validateConfig({ materialization: { rules: [{ resources: ['unknown'] }] } as never }),
+      /materialization.rules\[0\].resources\[0\] must be "issues" or "pulls"/,
     );
   });
 

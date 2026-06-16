@@ -41,6 +41,24 @@ export async function fetchIssue(
   return expectObject(response.data, `GitHub issue ${owner}/${repo}#${number}`) as GitHubIssue;
 }
 
+export async function fetchRepository(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  connectionId?: string,
+): Promise<JsonObject> {
+  const response = await withProxyRetry(provider).proxy({
+    method: 'GET',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: buildRepositoryEndpoint(owner, repo),
+    connectionId: resolveConnectionId(provider, connectionId),
+    headers: buildGitHubHeaders(),
+  });
+
+  assertSuccessfulResponse(response, `Failed to fetch repository ${owner}/${repo}`);
+  return expectObject(response.data, `GitHub repository ${owner}/${repo}`);
+}
+
 export async function fetchIssueComments(
   provider: GitHubRequestProvider,
   owner: string,
@@ -78,6 +96,10 @@ export function isActualIssue(issue: GitHubIssue): boolean {
 
 function buildIssueEndpoint(owner: string, repo: string, number: number): string {
   return `/repos/${encodePathSegment(owner, 'owner')}/${encodePathSegment(repo, 'repo')}/issues/${formatIssueNumber(number)}`;
+}
+
+function buildRepositoryEndpoint(owner: string, repo: string): string {
+  return `/repos/${encodePathSegment(owner, 'owner')}/${encodePathSegment(repo, 'repo')}`;
 }
 
 function buildGitHubHeaders(): Record<string, string> {

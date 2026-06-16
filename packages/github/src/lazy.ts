@@ -3,6 +3,11 @@ import { GITHUB_API_BASE_URL } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
 import { ingestIssue } from './issues/issue-mapper.js';
 import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
+import {
+  resolveRepoMaterialization,
+  type ResolvedRepoMaterialization,
+  type ResolvedResourceMaterialization,
+} from './materialization-policy.js';
 import { githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
 import { ingestPullRequest } from './pr/diff-writer.js';
 import type {
@@ -25,9 +30,11 @@ interface RepoIndexEntry {
 }
 
 interface RepoListItem {
+  labels: string[];
   number: number;
   state: string | null;
   title: string | null;
+  updated: string | null;
   url: string | null;
 }
 
@@ -54,6 +61,10 @@ const JSON_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
 } as const;
+const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
+  issues: { mode: 'eager' },
+  pulls: { mode: 'eager' },
+};
 
 export async function syncGitHubWorkspace(
   workspaceId: string,
@@ -67,19 +78,31 @@ export async function syncGitHubWorkspace(
   const rootMarkerResult = await writeTextFile(vfs, ROOT_DIR_MARKER_PATH, '');
   const rootIndexResult = await writeJsonFile(vfs, ROOT_INDEX_PATH, { repos });
   const tracked = mergeTrackedResults(rootMarkerResult, rootIndexResult);
+  const syncedObjectTypes = new Set<string>(['repository']);
 
-  if (config.lazy) {
+  if (config.materialization?.default === 'lazy' && !config.materialization.rules?.length) {
     return toSyncResult(tracked, options.cursor, ['repository']);
   }
 
   for (const repo of repos) {
+    const plan = resolveRepoMaterialization(config, repo.owner, repo.repo, options);
+    if (plan.issues.mode !== 'eager' && plan.pulls.mode !== 'eager') {
+      continue;
+    }
+
     mergeIntoTracked(
       tracked,
-      await materializeRepo(workspaceId, provider, config, repo.owner, repo.repo, inFlight),
+      await materializeRepo(workspaceId, provider, config, repo.owner, repo.repo, inFlight, plan),
     );
+    if (plan.issues.mode === 'eager') {
+      syncedObjectTypes.add('issue');
+    }
+    if (plan.pulls.mode === 'eager') {
+      syncedObjectTypes.add('pull_request');
+    }
   }
 
-  return toSyncResult(tracked, options.cursor, ['repository', 'issue', 'pull_request']);
+  return toSyncResult(tracked, options.cursor, Array.from(syncedObjectTypes));
 }
 
 export async function materializeRepo(
@@ -89,15 +112,16 @@ export async function materializeRepo(
   owner: string,
   repo: string,
   inFlight: Map<string, Promise<MaterializeResult>> = new Map(),
+  plan: ResolvedRepoMaterialization = FULL_REPO_MATERIALIZATION,
 ): Promise<MaterializeResult> {
   void workspaceId;
-  const key = `${owner}/${repo}`.toLowerCase();
+  const key = `${owner}/${repo}:${JSON.stringify(plan)}`.toLowerCase();
   const existing = inFlight.get(key);
   if (existing) {
     return existing;
   }
 
-  const task = materializeRepoInternal(provider, config, owner, repo).finally(() => {
+  const task = materializeRepoInternal(provider, config, owner, repo, plan).finally(() => {
     inFlight.delete(key);
   });
   inFlight.set(key, task);
@@ -109,6 +133,7 @@ async function materializeRepoInternal(
   config: GitHubAdapterConfig,
   owner: string,
   repo: string,
+  plan: ResolvedRepoMaterialization,
 ): Promise<MaterializeResult> {
   const vfs = requireVfsProvider(provider);
   const tracked = createTrackedResult(owner, repo);
@@ -124,36 +149,40 @@ async function materializeRepoInternal(
 
   mergeIntoTracked(tracked, await writeJsonFile(vfs, githubRepositoryMetaPath(owner, repo), repoMetadata));
 
-  const issues = await fetchRepoIssues(provider, config, owner, repo);
-  mergeIntoTracked(
-    tracked,
-    await writeJsonFile(vfs, `${repoPrefix}/issues/_index.json`, {
-      issues: issues.map((issue) => ({
-        number: issue.number,
-        title: issue.title,
-        state: issue.state,
-        url: issue.url,
-      })),
-    }),
-  );
-  for (const issue of issues) {
-    mergeIntoTracked(tracked, await ingestIssue(provider, owner, repo, issue.number, vfs));
+  if (plan.issues.mode === 'eager') {
+    const issues = await fetchRepoIssues(provider, config, owner, repo, plan.issues);
+    mergeIntoTracked(
+      tracked,
+      await writeJsonFile(vfs, `${repoPrefix}/issues/_index.json`, {
+        issues: issues.map((issue) => ({
+          number: issue.number,
+          title: issue.title,
+          state: issue.state,
+          url: issue.url,
+        })),
+      }),
+    );
+    for (const issue of issues) {
+      mergeIntoTracked(tracked, await ingestIssue(provider, owner, repo, issue.number, vfs));
+    }
   }
 
-  const pulls = await fetchRepoPullRequests(provider, config, owner, repo);
-  mergeIntoTracked(
-    tracked,
-    await writeJsonFile(vfs, `${repoPrefix}/pulls/_index.json`, {
-      pulls: pulls.map((pull) => ({
-        number: pull.number,
-        title: pull.title,
-        state: pull.state,
-        url: pull.url,
-      })),
-    }),
-  );
-  for (const pull of pulls) {
-    mergeIntoTracked(tracked, await ingestPullRequest(provider, owner, repo, pull.number, vfs));
+  if (plan.pulls.mode === 'eager') {
+    const pulls = await fetchRepoPullRequests(provider, config, owner, repo, plan.pulls);
+    mergeIntoTracked(
+      tracked,
+      await writeJsonFile(vfs, `${repoPrefix}/pulls/_index.json`, {
+        pulls: pulls.map((pull) => ({
+          number: pull.number,
+          title: pull.title,
+          state: pull.state,
+          url: pull.url,
+        })),
+      }),
+    );
+    for (const pull of pulls) {
+      mergeIntoTracked(tracked, await ingestPullRequest(provider, owner, repo, pull.number, vfs));
+    }
   }
 
   return tracked;
@@ -213,6 +242,7 @@ async function fetchRepoIssues(
   config: GitHubAdapterConfig,
   owner: string,
   repo: string,
+  materialization: ResolvedResourceMaterialization,
 ): Promise<RepoListItem[]> {
   const issues: RepoListItem[] = [];
   let page = 1;
@@ -221,7 +251,9 @@ async function fetchRepoIssues(
     const operation = listIssues({
       owner,
       repo,
-      state: 'all',
+      state: materialization.filter?.state ?? 'all',
+      labels: materialization.filter?.labels,
+      since: materialization.since,
       page,
       per_page: 100,
     });
@@ -249,6 +281,7 @@ async function fetchRepoPullRequests(
   config: GitHubAdapterConfig,
   owner: string,
   repo: string,
+  materialization: ResolvedResourceMaterialization,
 ): Promise<RepoListItem[]> {
   const pulls: RepoListItem[] = [];
   let page = 1;
@@ -257,7 +290,7 @@ async function fetchRepoPullRequests(
     const operation = listPullRequests({
       owner,
       repo,
-      state: 'all',
+      state: materialization.filter?.state ?? 'all',
       page,
       per_page: 100,
     });
@@ -265,7 +298,10 @@ async function fetchRepoPullRequests(
     const pageItems = expectArray(response.data, `GitHub pull requests response for ${owner}/${repo}`);
 
     for (const [index, item] of pageItems.entries()) {
-      pulls.push(toRepoListItem(expectObject(item, `GitHub pull request response[${index}]`), `GitHub pull request ${owner}/${repo}`));
+      const pull = toRepoListItem(expectObject(item, `GitHub pull request response[${index}]`), `GitHub pull request ${owner}/${repo}`);
+      if (matchesRepoListFilter(pull, materialization)) {
+        pulls.push(pull);
+      }
     }
 
     if (pageItems.length < 100) {
@@ -515,11 +551,60 @@ async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise
 function toRepoListItem(value: JsonObject, context: string): RepoListItem {
   const number = readPositiveInteger(value, 'number', context);
   return {
+    labels: readLabelNames(value.labels),
     number,
     title: readString(value, 'title'),
     state: readString(value, 'state'),
+    updated: readString(value, 'updated_at'),
     url: readString(value, 'html_url') ?? readString(value, 'url'),
   };
+}
+
+function matchesRepoListFilter(
+  item: RepoListItem,
+  materialization: ResolvedResourceMaterialization,
+): boolean {
+  const labels = materialization.filter?.labels ?? [];
+  if (labels.length > 0 && !labels.every((label) => item.labels.includes(label))) {
+    return false;
+  }
+
+  if (materialization.since && !isAtOrAfterSince(item.updated, materialization.since)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAtOrAfterSince(updated: string | null, since: string): boolean {
+  if (!updated) {
+    return false;
+  }
+
+  const updatedTime = Date.parse(updated);
+  const sinceTime = Date.parse(since);
+  if (Number.isNaN(updatedTime) || Number.isNaN(sinceTime)) {
+    return updated >= since;
+  }
+
+  return updatedTime >= sinceTime;
+}
+
+function readLabelNames(value: JsonValue | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (typeof entry === 'string') {
+      return [entry];
+    }
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return [];
+    }
+    const name = readString(entry as JsonObject, 'name');
+    return name ? [name] : [];
+  });
 }
 
 function toRepoIndexEntry(

@@ -35,7 +35,27 @@ Every adapter exposes the same navigation primitives so an agent never has to me
 - **`<integration>/LAYOUT.md`** — markdown guide describing the integration's tree shape, written by the adapter itself.
 - **Alias trees** — `by-title/`, `by-id/`, `by-name/`, and `by-state/` mirror canonical entries under semantic keys for direct lookup without traversing the canonical hierarchy.
 
-GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces.
+GitHub repo subtrees can be materialized lazily (opt-in via relayfile `--lazy-repos`) for huge-org workspaces. The GitHub adapter also supports fine-grained eager materialization rules for issues and pulls so operators can keep the default lazy while syncing only a cheap subset, for example open `factory` issues in selected repos:
+
+```json
+{
+  "materialization": {
+    "default": "lazy",
+    "rules": [
+      {
+        "repos": ["AgentWorkforce/cloud", "AgentWorkforce/pear"],
+        "resources": ["issues"],
+        "filter": {
+          "state": "open",
+          "labels": ["factory"]
+        },
+        "since": "2026-06-01T00:00:00Z"
+      }
+    ],
+    "webhookWritesForLazyRepos": true
+  }
+}
+```
 
 That's the entire agent integration. No SDK. No OAuth. No GitHub API knowledge. The agent writes a file, and relayfile + the adapter + the provider handle everything else:
 
