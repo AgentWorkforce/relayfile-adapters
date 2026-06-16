@@ -137,7 +137,17 @@ export async function writeWritebackPathCatalog(
     }
     if (mismatches.length > 0) {
       throw new Error(
-        `Writeback-path catalog is out of sync. Run \`adapter-core writeback-paths generate\`. Stale files: ${mismatches.join(", ")}`
+        [
+          "Writeback-path catalog is out of sync.",
+          "To fix, run the following command from the repo root:",
+          "",
+          "  npx adapter-core writeback-paths generate",
+          "",
+          "  # or, if the package is built locally:",
+          "  node packages/core/dist/src/cli.js writeback-paths generate",
+          "",
+          `Stale files: ${mismatches.join(", ")}`,
+        ].join("\n")
       );
     }
     return generation;

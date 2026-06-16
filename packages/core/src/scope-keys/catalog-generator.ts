@@ -149,7 +149,17 @@ export async function writeScopeKeyCatalog(
     }
     if (mismatches.length > 0) {
       throw new Error(
-        `Scope-key catalog is out of sync. Run \`adapter-core scope-keys generate\`. Stale files: ${mismatches.join(", ")}`
+        [
+          "Scope-key catalog is out of sync.",
+          "To fix, run the following command from the repo root:",
+          "",
+          "  npx adapter-core scope-keys generate",
+          "",
+          "  # or, if the package is built locally:",
+          "  node packages/core/dist/src/cli.js scope-keys generate",
+          "",
+          `Stale files: ${mismatches.join(", ")}`,
+        ].join("\n")
       );
     }
     return generation;
