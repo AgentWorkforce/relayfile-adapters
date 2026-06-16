@@ -40,6 +40,14 @@ export const resources = [
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.create.example.json",
   },
+  {
+    name: "replies",
+    path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies",
+    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/pulls\/[^\/]+\/review-comments\/[^\/]+\/replies(?:\/[^\/]+(?:\.json)?)?$/,
+    idPattern: /^\d+$/,
+    schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.schema.json",
+    createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.create.example.json",
+  },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {

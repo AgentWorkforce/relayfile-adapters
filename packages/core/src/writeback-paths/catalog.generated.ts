@@ -220,6 +220,17 @@ export const WRITEBACK_PATH_CATALOG = {
         ]
       }
     ],
+    "replies": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber",
+          "commentId"
+        ]
+      }
+    ],
     "reviews": [
       {
         "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews",

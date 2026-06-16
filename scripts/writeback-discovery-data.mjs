@@ -93,7 +93,7 @@ export const adapters = [
     slug: 'github',
     title: 'GitHub adapter',
     overview:
-      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, submitting pull request reviews, and merging pull requests.',
+      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, submitting pull request reviews, merging pull requests, and replying to pull request review comment threads.',
     readPaths: [
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
@@ -160,6 +160,10 @@ export const adapters = [
             }),
           },
         },
+      }),
+      contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/new.json', 'pulls/create-reply-for-review-comment', { body: 'Replace example reply body.' }, {
+        title: 'Reply to GitHub pull request review comment',
+        description: 'Creates a reply to a top-level pull request review comment thread. Write to a path like `/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/new.json` where {commentId} is the ID of the top-level review comment to reply to.',
       }),
     ],
   },

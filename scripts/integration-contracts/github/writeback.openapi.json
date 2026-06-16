@@ -23,6 +23,11 @@
       "operationId": "pulls/merge",
       "summary": "Merge a pull request",
       "description": "Merges a GitHub pull request with an optional method, commit text, and expected head SHA."
+    },
+    {
+      "operationId": "pulls/create-reply-for-review-comment",
+      "summary": "Create a reply for a review comment",
+      "description": "Creates a reply to a top-level pull request review comment thread."
     }
   ]
 }

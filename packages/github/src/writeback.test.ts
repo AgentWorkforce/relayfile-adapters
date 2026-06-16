@@ -151,6 +151,34 @@ describe('writeback', () => {
     assert.strictEqual(provider.requests[0]?.endpoint, '/repos/acme/widgets/pulls/12/reviews');
   });
 
+  it('writeBack creates PR review comment replies through the adapter pipeline', async () => {
+    const { handler, provider } = createHandler(() => ({
+      status: 201,
+      headers: {},
+      data: { id: 1001 } satisfies JsonObject,
+    }));
+
+    const result = await handler.writeBack(
+      'workspace-1',
+      '/github/repos/acme/widgets/pulls/12/review-comments/991/replies/reply-draft.json',
+      JSON.stringify({ body: 'Thanks, updated this branch.' }),
+    );
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.externalId, '1001');
+    assert.strictEqual(provider.requests.length, 1);
+    assert.strictEqual(provider.requests[0]?.method, 'POST');
+    assert.strictEqual(
+      provider.requests[0]?.endpoint,
+      '/repos/acme/widgets/pulls/12/comments/991/replies',
+    );
+    assert.strictEqual(provider.requests[0]?.connectionId, 'conn-default');
+    assert.strictEqual(provider.requests[0]?.headers?.['Provider-Config-Key'], 'github-app-oauth');
+    assert.deepStrictEqual(provider.requests[0]?.body, {
+      body: 'Thanks, updated this branch.',
+    });
+  });
+
   it('handleWriteback merges pull requests through the GitHub merge endpoint', async () => {
     const { handler, provider } = createHandler(() => ({
       status: 200,
@@ -424,6 +452,62 @@ describe('writeback', () => {
           JSON.stringify({ id: 123, title: 'Nope' }),
         ),
       (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
+    );
+  });
+
+  it('resolves PR review comment reply writebacks to GitHub replies endpoint', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42/review-comments/999/replies/reply-draft.json',
+      JSON.stringify({ body: 'Thanks for the feedback!' }),
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.baseUrl, 'https://api.github.com');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/42/comments/999/replies');
+    assert.strictEqual(request.connectionId, '');
+    assert.deepStrictEqual(request.body, { body: 'Thanks for the feedback!' });
+  });
+
+  it('resolves PR review comment reply with plain-text body', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/7/review-comments/123/replies/new-reply.json',
+      'Acknowledged, will update.',
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/7/comments/123/replies');
+    assert.deepStrictEqual(request.body, { body: 'Acknowledged, will update.' });
+  });
+
+  it('resolves PR review comment reply on PR with slug segment', () => {
+    const request = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42__fix-bug/review-comments/999/replies/draft.json',
+      JSON.stringify({ body: 'Reply to slugged PR comment.' }),
+    );
+
+    assert.strictEqual(request.method, 'POST');
+    assert.strictEqual(request.endpoint, '/repos/acme/widgets/pulls/42/comments/999/replies');
+  });
+
+  it('rejects PR review comment reply with empty body', () => {
+    assert.throws(
+      () =>
+        resolveWritebackRequest(
+          '/github/repos/acme/widgets/pulls/42/review-comments/999/replies/draft.json',
+          JSON.stringify({ body: '   ' }),
+        ),
+      /body must be a non-empty string/,
+    );
+  });
+
+  it('does not route replies through the synced flat PR comments namespace', () => {
+    assert.throws(
+      () =>
+        resolveWritebackRequest(
+          '/github/repos/acme/widgets/pulls/42/comments/999/replies/draft.json',
+          JSON.stringify({ body: 'This path would collide with comments/999.json.' }),
+        ),
+      /Unsupported GitHub writeback path/,
     );
   });
 });
