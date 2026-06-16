@@ -664,9 +664,29 @@ function mergeFallbackPayload(
   // Strip stale _webhook from the existing payload so the current event's
   // metadata wins.
   const { _webhook: _discarded, ...existingWithoutWebhook } = existingPayload ?? {};
-  return {
+  const merged: Record<string, unknown> = {
     ...existingWithoutWebhook,
     ...webhookPayload,
+  };
+  mergeRecordMap(merged, existingWithoutWebhook, webhookPayload, 'fields');
+  mergeRecordMap(merged, existingWithoutWebhook, webhookPayload, 'cellValuesByFieldId');
+  return merged;
+}
+
+function mergeRecordMap(
+  target: Record<string, unknown>,
+  existingPayload: Record<string, unknown>,
+  webhookPayload: Record<string, unknown>,
+  key: string,
+): void {
+  const existingMap = getRecord(existingPayload[key]);
+  const webhookMap = getRecord(webhookPayload[key]);
+  if (!existingMap || !webhookMap) {
+    return;
+  }
+  target[key] = {
+    ...existingMap,
+    ...webhookMap,
   };
 }
 

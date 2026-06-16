@@ -437,6 +437,14 @@ test('ingestWebhook merges top-level payload fields from existing record during 
         tableId: 'tbl_tasks',
         createdTime: '2026-01-01T00:00:00.000Z',
         permissionLevel: 'create',
+        cellValuesByFieldId: {
+          fld_name: 'Existing row',
+          fld_status: 'In progress',
+        },
+        fields: {
+          Name: 'Existing row',
+          Status: 'In progress',
+        },
         _webhook: { action: 'create', eventType: 'record.create' },
       },
     }),
@@ -457,6 +465,7 @@ test('ingestWebhook merges top-level payload fields from existing record during 
       id: 'rec_1',
       baseId: 'app_base',
       tableId: 'tbl_tasks',
+      cellValuesByFieldId: { fld_status: 'Done' },
       fields: { Status: 'Done' },
       _webhook: { action: 'update', eventType: 'record.update' },
     },
@@ -469,7 +478,8 @@ test('ingestWebhook merges top-level payload fields from existing record during 
   assert.equal(payload.createdTime, '2026-01-01T00:00:00.000Z');
   assert.equal(payload.permissionLevel, 'create');
   // Incoming delta fields take precedence
-  assert.deepEqual(payload.fields, { Status: 'Done' });
+  assert.deepEqual(payload.fields, { Name: 'Existing row', Status: 'Done' });
+  assert.deepEqual(payload.cellValuesByFieldId, { fld_name: 'Existing row', fld_status: 'Done' });
   // Stale _webhook from existing record must not survive into the merged payload
   const existingWebhook = (payload._webhook as Record<string, unknown> | undefined);
   assert.notEqual(existingWebhook?.action, 'create');
