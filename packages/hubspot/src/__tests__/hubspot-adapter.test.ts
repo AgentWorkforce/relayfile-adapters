@@ -13,6 +13,7 @@ import {
   type ConnectionProvider,
   type ProxyRequest,
   type ProxyResponse,
+  type ReadFileResult,
   type RelayFileClientLike,
   type WriteFileInput,
 } from '../index.js';
@@ -20,37 +21,49 @@ import { ReadOnlyFieldError } from '../writeback.js';
 
 interface CapturedClient extends RelayFileClientLike {
   deleted: string[];
+  files: Map<string, string>;
   writes: WriteFileInput[];
 }
 
 function createClient(): CapturedClient {
   return {
     deleted: [],
+    files: new Map(),
     writes: [],
     async deleteFile(input) {
       this.deleted.push(input.path);
     },
     async writeFile(input) {
       this.writes.push(input);
+      this.files.set(input.path, input.content);
       return { created: true };
+    },
+    async readFile(input): Promise<ReadFileResult | undefined> {
+      const content = this.files.get(input.path);
+      return content ? { content } : undefined;
     },
   };
 }
 
-function createProvider(): ConnectionProvider {
-  return {
+function createProvider(
+  proxyFn: (request: ProxyRequest) => Promise<ProxyResponse> = async () => ({
+    data: null,
+    headers: {},
+    status: 200,
+  }),
+): ConnectionProvider & { requests: ProxyRequest[] } {
+  const requests: ProxyRequest[] = [];
+  const provider: ConnectionProvider = {
     name: 'hubspot-test-provider',
-    async proxy<T = unknown>(_request: ProxyRequest): Promise<ProxyResponse<T>> {
-      return {
-        data: null as never,
-        headers: {},
-        status: 200,
-      };
+    async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+      requests.push(request);
+      return proxyFn(request) as Promise<ProxyResponse<T>>;
     },
     async healthCheck() {
       return true;
     },
   };
+  return Object.assign(provider, { requests });
 }
 
 function createAdapter(client = createClient()): HubSpotAdapter {
@@ -291,4 +304,172 @@ test('path mapping stays deterministic for supported HubSpot VFS objects', () =>
     () => resolveHubSpotDeleteRequest('/hubspot/contacts/draft-contact.json'),
     /No HubSpot delete writeback rule matched/,
   );
+});
+
+test('ingestWebhook re-fetches full CRM contact record from HubSpot API before writing', async () => {
+  const client = createClient();
+  const provider = createProvider(async (request) => {
+    assert.equal(request.method, 'GET');
+    assert.equal(request.connectionId, 'conn_hubspot_123');
+    assert.deepEqual(request.headers, { 'Provider-Config-Key': 'hubspot-primary' });
+    assert.ok(request.endpoint.includes('/crm/v3/objects/contacts/101'));
+    return {
+      status: 200,
+      headers: {},
+      data: {
+        id: '101',
+        properties: {
+          email: 'ada@example.com',
+          firstname: 'Ada',
+          lastname: 'Lovelace',
+          phone: '+1-555-0100',
+          lastmodifieddate: '2026-06-15T20:00:00.000Z',
+        },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-06-15T20:00:00.000Z',
+        archived: false,
+      },
+    };
+  });
+  const adapter = new HubSpotAdapter(client, provider, {
+    connectionId: 'conn_hubspot_123',
+    providerConfigKey: 'hubspot-primary',
+  });
+
+  // HubSpot notification-only payload: single propertyChange event
+  const result = await adapter.ingestWebhook('workspace_123', {
+    provider: 'hubspot',
+    eventType: 'contact.propertyChange',
+    objectType: 'contact',
+    objectId: '101',
+    payload: {
+      objectId: 101,
+      subscriptionType: 'contact.propertyChange',
+      propertyName: 'jobtitle',
+      propertyValue: 'CTO',
+      _webhook: { subscriptionType: 'contact.propertyChange', propertyName: 'jobtitle' },
+    },
+  });
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(provider.requests.length, 1);
+  assert.ok(provider.requests[0]?.endpoint.includes('/crm/v3/objects/contacts/101'));
+
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  // Full record should be present from re-fetch
+  const props = (payload.properties ?? payload) as Record<string, unknown>;
+  assert.equal(props.email ?? (payload as Record<string, unknown>).email, 'ada@example.com');
+  assert.equal(props.firstname ?? (payload as Record<string, unknown>).firstname, 'Ada');
+  assert.equal(props.jobtitle, 'CTO');
+  assert.equal(client.writes[0]?.semantics?.properties?.['hubspot.contact.job_title'], 'CTO');
+  // Webhook metadata preserved
+  assert.ok(payload._webhook !== undefined);
+});
+
+test('ingestWebhook falls back to merging delta onto existing record when re-fetch fails', async () => {
+  const client = createClient();
+  const path = '/hubspot/contacts/101.json';
+  client.files.set(
+    path,
+    JSON.stringify({
+      provider: 'hubspot',
+      payload: {
+        id: '101',
+        properties: {
+          email: 'ada@example.com',
+          firstname: 'Ada',
+          lastname: 'Lovelace',
+          jobtitle: 'Engineer',
+        },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+    }),
+  );
+
+  const provider = createProvider(async () => ({
+    status: 503,
+    headers: {},
+    data: { message: 'Service unavailable' },
+  }));
+  const adapter = new HubSpotAdapter(client, provider, {
+    connectionId: 'conn_hubspot_123',
+    providerConfigKey: 'hubspot-primary',
+  });
+
+  await adapter.ingestWebhook('workspace_123', {
+    provider: 'hubspot',
+    eventType: 'contact.propertyChange',
+    objectType: 'contact',
+    objectId: '101',
+    payload: {
+      objectId: 101,
+      subscriptionType: 'contact.propertyChange',
+      propertyName: 'jobtitle',
+      propertyValue: 'CTO',
+      _webhook: { subscriptionType: 'contact.propertyChange', propertyName: 'jobtitle' },
+    },
+  });
+
+  // API was attempted
+  assert.ok(provider.requests.length >= 1);
+  assert.ok(provider.requests[0]?.endpoint.includes('/crm/v3/objects/contacts/101'));
+
+  // Fallback merge: existing fields survive, delta overrides
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  const props = payload.properties as Record<string, unknown>;
+  // propertyValue from webhook delta
+  assert.equal(payload.propertyValue, 'CTO');
+  assert.equal(props.jobtitle, 'CTO');
+  assert.equal(client.writes[0]?.semantics?.properties?.['hubspot.contact.job_title'], 'CTO');
+  // id from existing record
+  assert.equal(payload.id, '101');
+  // _webhook from incoming event (stale _webhook stripped)
+  assert.ok((payload._webhook as Record<string, unknown> | undefined) !== undefined);
+});
+
+test('ingestWebhook strips stale _webhook from existing record during fallback merge', async () => {
+  const client = createClient();
+  const path = '/hubspot/contacts/101.json';
+  client.files.set(
+    path,
+    JSON.stringify({
+      provider: 'hubspot',
+      payload: {
+        id: '101',
+        subscriptionType: 'contact.creation',
+        _webhook: { subscriptionType: 'contact.creation', eventType: 'contact.created' },
+      },
+    }),
+  );
+
+  const provider = createProvider(async () => ({
+    status: 503,
+    headers: {},
+    data: null,
+  }));
+  const adapter = new HubSpotAdapter(client, provider, {
+    connectionId: 'conn_hubspot_123',
+  });
+
+  await adapter.ingestWebhook('workspace_123', {
+    provider: 'hubspot',
+    eventType: 'contact.propertyChange',
+    objectType: 'contact',
+    objectId: '101',
+    payload: {
+      objectId: 101,
+      subscriptionType: 'contact.propertyChange',
+      propertyName: 'email',
+      propertyValue: 'new@example.com',
+    },
+  });
+
+  const written = JSON.parse(client.writes[0]?.content ?? '{}') as Record<string, unknown>;
+  const payload = written.payload as Record<string, unknown>;
+  // Stale _webhook from existing record must NOT survive into the merged payload
+  const webhook = payload._webhook as Record<string, unknown> | undefined;
+  assert.notEqual(webhook?.subscriptionType, 'contact.creation');
 });
