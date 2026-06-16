@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/postgres",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Postgres storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -62,6 +62,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.47"
+    "@relayfile/adapter-core": "^0.3.48"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-segment",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Segment adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -69,6 +69,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.47"
+    "@relayfile/adapter-core": "^0.3.48"
   }
 }
