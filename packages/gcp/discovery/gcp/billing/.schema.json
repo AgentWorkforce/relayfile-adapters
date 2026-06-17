@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCP Cloud Billing current state",
+  "description": "Normalized current Cloud Billing FinOps snapshot, sourced from the Cloud Billing API GET /v1/billingAccounts/{id} and project billing info. A single current-state file. Read-only.",
+  "type": "object",
+  "required": ["billingAccountId", "open"],
+  "properties": {
+    "billingAccountId": {
+      "type": "string",
+      "description": "Billing account id (last path segment of the billing account name).",
+      "minLength": 1
+    },
+    "open": {
+      "type": "boolean",
+      "description": "Whether the billing account is open/active."
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO-4217 currency code for the account, if known."
+    },
+    "amount": {
+      "type": "number",
+      "description": "Current period cost amount, if available."
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this snapshot was captured."
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,35 @@
+adapter:
+  name: gcp
+  version: "1.0.0"
+  # GCP exposes data over REST across multiple API hosts, so there is no single
+  # baseUrl. The provider/proxy (e.g. @relayfile/provider-nango via a Nango GCP
+  # connection) overrides baseUrl per call. Per-resource API hosts:
+  baseUrls:
+    cloud-run-services: https://run.googleapis.com
+    monitoring-alerts: https://monitoring.googleapis.com
+    billing: https://cloudbilling.googleapis.com
+# This adapter is auth-agnostic and declarative: it contains no HTTP client and
+# no credentials. Auth is supplied at runtime by a provider via a Nango GCP
+# connection.
+resources:
+  cloud-run-services:
+    # Cloud Run Admin API
+    # GET https://run.googleapis.com/v2/projects/{project}/locations/{location}/services
+    # (and .../services/{service}/revisions). One file per service.
+    path: /gcp/run/services
+  monitoring-alerts:
+    # Cloud Monitoring API alert policies
+    # GET https://monitoring.googleapis.com/v3/projects/{project}/alertPolicies
+    # plus firing incidents. One file per alert policy.
+    path: /gcp/monitoring/alerts
+  billing:
+    # Cloud Billing API
+    # GET https://cloudbilling.googleapis.com/v1/billingAccounts/{id}
+    # and project billing info (the FinOps mount). A single current-state file.
+    path: /gcp/billing/current
+webhooks:
+  # GCP push signals arrive as Cloud Monitoring alert notifications delivered via
+  # Pub/Sub -> an HTTP push subscription. The incident.state open/closed drives
+  # alert create/update.
+  monitoring.incident.open: {}
+  monitoring.incident.closed: {}

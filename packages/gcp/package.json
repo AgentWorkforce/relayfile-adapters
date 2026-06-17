@@ -1,0 +1,84 @@
+{
+  "name": "@relayfile/adapter-gcp",
+  "version": "0.1.0",
+  "description": "GCP adapter package for Relayfile",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./digest": {
+      "types": "./dist/digest.d.ts",
+      "import": "./dist/digest.js",
+      "default": "./dist/digest.js"
+    },
+    "./emit-auxiliary-files": {
+      "types": "./dist/emit-auxiliary-files.d.ts",
+      "import": "./dist/emit-auxiliary-files.js",
+      "default": "./dist/emit-auxiliary-files.js"
+    },
+    "./layout-prompt": {
+      "types": "./dist/layout-prompt.d.ts",
+      "import": "./dist/layout-prompt.js",
+      "default": "./dist/layout-prompt.js"
+    },
+    "./path-mapper": {
+      "types": "./dist/path-mapper.d.ts",
+      "import": "./dist/path-mapper.js",
+      "default": "./dist/path-mapper.js"
+    },
+    "./resources": {
+      "types": "./dist/resources.d.ts",
+      "import": "./dist/resources.js",
+      "default": "./dist/resources.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
+    "./webhook": {
+      "types": "./dist/webhook-normalizer.d.ts",
+      "import": "./dist/webhook-normalizer.js",
+      "default": "./dist/webhook-normalizer.js"
+    }
+  },
+  "files": [
+    "dist",
+    "gcp.mapping.yaml",
+    "discovery"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@relayfile/adapter-core": "^0.3.48"
+  },
+  "peerDependencies": {
+    "@relayfile/sdk": ">=0.6.0 <1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentWorkforce/relayfile-adapters",
+    "directory": "packages/gcp"
+  }
+}
