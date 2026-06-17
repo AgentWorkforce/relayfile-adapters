@@ -25,6 +25,7 @@ export interface WorkspaceWriteError {
 export interface WorkspaceWriteFilesResult {
   responses: WriteQueuedResponse[];
   errors: WorkspaceWriteError[];
+  primaryWriteErrors: WorkspaceWriteError[];
 }
 
 export async function collectWorkspaceFiles(client: NotionApiClient): Promise<NotionVfsFile[]> {
@@ -79,12 +80,14 @@ export async function writeWorkspaceFiles(
         }
         return { response };
       } catch (error) {
+        const writeError = {
+          path: file.path,
+          error: error instanceof Error ? error.message : String(error),
+        };
         return {
           response,
-          error: {
-            path: file.path,
-            error: error instanceof Error ? error.message : String(error),
-          },
+          error: writeError,
+          primaryWriteError: response ? undefined : writeError,
         };
       }
     }),
@@ -93,6 +96,7 @@ export async function writeWorkspaceFiles(
   return {
     responses: outcomes.flatMap((outcome) => (outcome.response ? [outcome.response] : [])),
     errors: outcomes.flatMap((outcome) => (outcome.error ? [outcome.error] : [])),
+    primaryWriteErrors: outcomes.flatMap((outcome) => (outcome.primaryWriteError ? [outcome.primaryWriteError] : [])),
   };
 }
 

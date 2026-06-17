@@ -22,7 +22,12 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 function extractNotionId(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  // <slug>__<32-hex> (current convention) or legacy <slug>--<32-hex>: reverse
+  // <slug>__<8-4-4-4-12 UUID>: current canonical page paths preserve the
+  // hyphenated provider id, so strip the human-readable prefix before writing.
+  const sluggedUuid = /(?:--|__)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(decoded);
+  if (sluggedUuid) return sluggedUuid[1];
+
+  // <slug>__<32-hex> (alias convention) or legacy <slug>--<32-hex>: reverse
   // the path-mapper encoding to canonical UUID.
   const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32) return formatUuid(slugged32[1]);

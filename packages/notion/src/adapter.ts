@@ -207,7 +207,7 @@ export class NotionAdapter extends IntegrationAdapter {
       const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
       return {
         ...summarizeFiles(files, writeResult.errors, writeResult.responses.length),
-        nextCursor,
+        nextCursor: writeResult.primaryWriteErrors.length > 0 ? watermark : nextCursor,
       };
     }
 
