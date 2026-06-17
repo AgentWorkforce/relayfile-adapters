@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+Cross-package release notes for the relayfile adapters workspace. Curate
+`[Unreleased]` as PRs land; the publish workflow cuts versioned sections.
+
+## [Unreleased]
 
 ### Breaking
 
