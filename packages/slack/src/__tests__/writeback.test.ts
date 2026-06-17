@@ -349,4 +349,46 @@ describe('slack writeback', () => {
       );
     });
   });
+
+  describe('idempotencyKey', () => {
+    it('surfaces a draft idempotencyKey on the request without forwarding it to Slack', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/C01ABC1234/messages/draft@message.json',
+        JSON.stringify({ text: 'hi', idempotencyKey: 'tick:delivery-7:1' }),
+      );
+      assert.strictEqual(req.idempotencyKey, 'tick:delivery-7:1');
+      // Never leaks into the Slack API body.
+      assert.deepStrictEqual(req.body, { channel: 'C01ABC1234', text: 'hi' });
+    });
+
+    it('surfaces idempotencyKey on a thread reply', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/C01ABC1234/messages/1762445678_001234/replies/draft@reply.json',
+        JSON.stringify({ text: 'in thread', idempotencyKey: 'tick:delivery-7:2' }),
+      );
+      assert.strictEqual(req.action, 'reply_in_thread');
+      assert.strictEqual(req.idempotencyKey, 'tick:delivery-7:2');
+      assert.strictEqual((req.body as { idempotencyKey?: unknown }).idempotencyKey, undefined);
+    });
+
+    it('surfaces idempotencyKey on a direct message and keeps it out of the message body', () => {
+      const req = resolveWritebackRequest(
+        '/slack/users/U01ABC1234/messages/create.json',
+        JSON.stringify({ text: 'dm', idempotencyKey: 'tick:delivery-7:3' }),
+      );
+      assert.strictEqual(req.action, 'post_dm');
+      assert.strictEqual(req.idempotencyKey, 'tick:delivery-7:3');
+      const message = (req.body as { message: Record<string, unknown> }).message;
+      assert.strictEqual(message.idempotencyKey, undefined);
+      assert.strictEqual(message.text, 'dm');
+    });
+
+    it('omits idempotencyKey when the draft has none', () => {
+      const req = resolveWritebackRequest(
+        '/slack/channels/C01ABC1234/messages/draft@message.json',
+        JSON.stringify({ text: 'hi' }),
+      );
+      assert.strictEqual(req.idempotencyKey, undefined);
+    });
+  });
 });
