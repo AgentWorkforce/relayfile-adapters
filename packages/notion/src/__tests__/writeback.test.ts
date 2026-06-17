@@ -304,9 +304,9 @@ describe('writeback rule matching', () => {
     assert.equal(create?.resource.schema, 'discovery/notion/databases/{databaseId}/pages/.schema.json');
     assert.equal(create?.id, 'draft-page');
 
-    const page = classifyWrite('/notion/databases/db-1/pages/00000000000000000000000000000001.json', resources);
+    const page = classifyWrite('/notion/databases/db-1/pages/00000000000000000000000000000001/meta.json', resources);
     assert.equal(page?.kind, 'patch');
-    assert.equal(page?.resource.schema, 'discovery/notion/databases/{databaseId}/pages/{pageId}.json/.schema.json');
+    assert.equal(page?.resource.schema, 'discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.schema.json');
     assert.equal(page?.id, '00000000000000000000000000000001');
 
     const properties = classifyWrite('/notion/pages/00000000000000000000000000000002/properties.json', resources);

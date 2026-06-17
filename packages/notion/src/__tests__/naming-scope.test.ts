@@ -40,8 +40,8 @@ test('withNotionNamingScope isolates concurrent scopes', async () => {
 
   assert.equal(results.a.length, 2);
   assert.equal(results.a[0], results.a[1]);
-  assert.equal(results.a[0], `/notion/pages/shared__${PAGE_A}.json`);
+  assert.equal(results.a[0], `/notion/pages/shared__${PAGE_A}/meta.json`);
   // Scope B sees a clean slate — no collision suffix because PAGE_B is the
   // first entry in its own scope.
-  assert.equal(results.b[0], `/notion/pages/shared__${PAGE_B}.json`);
+  assert.equal(results.b[0], `/notion/pages/shared__${PAGE_B}/meta.json`);
 });

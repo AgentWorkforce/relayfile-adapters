@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
 import test from 'node:test';
 
 import { collectWorkspaceFiles } from '../bulk-ingest.js';
@@ -28,17 +28,17 @@ test('collectWorkspaceFiles emits canonical <name>__<id> Notion filenames and pa
   const paths = files.map((file) => file.path).sort();
 
   assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/metadata.json'));
-  assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222.json'));
+  assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222/meta.json'));
   assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222/content.md'));
   assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222/comments.json'));
   assert.ok(paths.includes('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222/blocks/block-1.json'));
-  assert.ok(paths.includes('/notion/pages/standalone-page__44444444-4444-4444-4444-444444444444.json'));
+  assert.ok(paths.includes('/notion/pages/standalone-page__44444444-4444-4444-4444-444444444444/meta.json'));
 
-  const parsedDatabasePage = parseNameWithId(basename('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222.json'));
+  const parsedDatabasePage = parseNameWithId(basename(dirname('/notion/databases/roadmap__11111111-1111-1111-1111-111111111111/pages/creme-brulee__22222222-2222-2222-2222-222222222222/meta.json')));
   assert.deepEqual(parsedDatabasePage, {
     humanReadable: 'creme-brulee',
     id: PAGE_ID_A,
-    ext: 'json',
+    ext: null,
   });
 
   const parsedDatabaseDir = parseNameWithId('roadmap__11111111-1111-1111-1111-111111111111');
@@ -56,7 +56,7 @@ test('collectWorkspaceFiles applies a deterministic collision hash suffix for du
   const secondRun = await collectWorkspaceFiles(client);
   const expectedSuffix = createHash('sha256').update(PAGE_ID_B).digest('hex').slice(0, 8);
   const expectedPath =
-    `/notion/databases/roadmap__${DATABASE_ID}/pages/creme-brulee-${expectedSuffix}__${PAGE_ID_B}.json`;
+    `/notion/databases/roadmap__${DATABASE_ID}/pages/creme-brulee-${expectedSuffix}__${PAGE_ID_B}/meta.json`;
 
   assert.ok(firstRun.some((file) => file.path === expectedPath));
   assert.ok(secondRun.some((file) => file.path === expectedPath));

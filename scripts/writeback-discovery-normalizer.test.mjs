@@ -170,6 +170,26 @@ test('normalizes existing writeback discovery adapter endpoints without changing
   });
 });
 
+test('normalizes Notion page meta writebacks as pages resources', () => {
+  const notion = adapters.find((adapter) => adapter.slug === 'notion');
+  assert.ok(notion);
+
+  const normalized = normalizeWritebackDiscoveryAdapter(notion);
+  const databasePageEndpoint = normalized.endpoints.find(
+    (endpoint) => endpoint.path === '/notion/databases/{databaseId}/pages/{pageId}/meta.json'
+  );
+  assert.ok(databasePageEndpoint);
+  assert.equal(databasePageEndpoint.resource.name, 'pages');
+  assert.equal(databasePageEndpoint.resource.resourcePath, '/notion/databases/{databaseId}/pages/{pageId}/meta.json');
+
+  const standalonePageEndpoint = normalized.endpoints.find(
+    (endpoint) => endpoint.path === '/notion/pages/{pageId}/meta.json'
+  );
+  assert.ok(standalonePageEndpoint);
+  assert.equal(standalonePageEndpoint.resource.name, 'pages');
+  assert.equal(standalonePageEndpoint.resource.resourcePath, '/notion/pages/{pageId}/meta.json');
+});
+
 test('normalizes GitLab slugged nested writeback paths to runtime matchers', () => {
   const gitlab = adapters.find((adapter) => adapter.slug === 'gitlab');
   assert.ok(gitlab);

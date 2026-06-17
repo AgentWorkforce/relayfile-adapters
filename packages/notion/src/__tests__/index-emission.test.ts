@@ -146,13 +146,13 @@ describe('notion index emission', () => {
 
     assert.equal(
       notionStandalonePagePath('page-1'),
-      '/notion/pages/page-1.json',
-      'existing standalone page paths must remain unchanged',
+      '/notion/pages/page-1/meta.json',
+      'standalone pages must use directory records so child artifacts can live under the page',
     );
     assert.equal(
       notionDatabasePagePath('db-1', 'page-1'),
-      '/notion/databases/db-1/pages/page-1.json',
-      'existing database page paths must remain unchanged',
+      '/notion/databases/db-1/pages/page-1/meta.json',
+      'database pages must use directory records so child artifacts can live under the page',
     );
   });
 

@@ -531,14 +531,14 @@ export const WRITEBACK_PATH_CATALOG = {
         ]
       },
       {
-        "path": "/notion/databases/{databaseId}/pages/{pageId}.json",
+        "path": "/notion/databases/{databaseId}/pages/{pageId}/meta.json",
         "params": [
           "databaseId",
           "pageId"
         ]
       },
       {
-        "path": "/notion/pages/{pageId}.json",
+        "path": "/notion/pages/{pageId}/meta.json",
         "params": [
           "pageId"
         ]

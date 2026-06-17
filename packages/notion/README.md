@@ -34,12 +34,12 @@ Create a Notion internal integration in the Notion developer dashboard, grant it
 
 ```text
 /notion/databases/{database_id}/metadata.json
-/notion/databases/{database_id}/pages/{page_id}.json
+/notion/databases/{database_id}/pages/{page_id}/meta.json
 /notion/databases/{database_id}/pages/{page_id}/properties.json
 /notion/databases/{database_id}/pages/{page_id}/content.md
 /notion/databases/{database_id}/pages/{page_id}/blocks/{block_id}.json
 /notion/databases/{database_id}/pages/{page_id}/comments.json
-/notion/pages/{page_id}.json
+/notion/pages/{page_id}/meta.json
 /notion/pages/{page_id}/properties.json
 /notion/pages/{page_id}/content.md
 /notion/pages/{page_id}/comments.json
@@ -82,7 +82,7 @@ Notion webhooks are not broadly available across all plans, so the adapter inclu
 
 ## Writeback
 
-- Editing `*.json` page files maps to `PATCH /v1/pages/{page_id}`.
+- Editing page `meta.json` files maps to `PATCH /v1/pages/{page_id}`.
 - Editing `properties.json` next to a page maps to `PATCH /v1/pages/{page_id}`.
 - Editing `content.md` maps to `PATCH /v1/pages/{page_id}/markdown`.
 - Editing `comments.json` creates a new comment with `POST /v1/comments`.

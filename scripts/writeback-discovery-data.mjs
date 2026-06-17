@@ -405,8 +405,8 @@ export const adapters = [
       'The Notion adapter exposes databases, pages, page markdown, blocks, and comments under `/notion`, with writeback routes for creating database pages, updating page properties/content, archiving pages, and creating page comments.',
     readPaths: [
       ['/notion/databases/<databaseId>/metadata.json', 'Database metadata.'],
-      ['/notion/databases/<databaseId>/pages/<pageId>.json', 'Database page records.'],
-      ['/notion/pages/<pageId>.json', 'Standalone page records.'],
+      ['/notion/databases/<databaseId>/pages/<pageId>/meta.json', 'Database page records.'],
+      ['/notion/pages/<pageId>/meta.json', 'Standalone page records.'],
       ['/notion/pages/<pageId>/content.md', 'Rendered page markdown.'],
     ],
     endpoints: [
@@ -415,7 +415,7 @@ export const adapters = [
         children: arr(obj('Notion block object.'), 'Optional child blocks for the new page.'),
         markdown: str('Optional markdown body. When present the adapter uses the Notion markdown API version.'),
       }, { properties: { Name: { type: 'title', value: 'Replace example page title' } } }),
-      endpoint('/notion/databases/{databaseId}/pages/{pageId}.json', 'Update Notion database page properties', 'Updates properties, archive state, icon, or cover for a page inside a Notion database.', [], notionPagePatchProps(), {
+      endpoint('/notion/databases/{databaseId}/pages/{pageId}/meta.json', 'Update Notion database page properties', 'Updates properties, archive state, icon, or cover for a page inside a Notion database.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
       }, notionPagePatchRequirement()),
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/properties.json', 'Update Notion database page properties file', 'Updates properties, archive state, icon, or cover through a database page properties sidecar.', [], notionPagePatchProps(), {
@@ -427,7 +427,7 @@ export const adapters = [
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/comments.json', 'Create Notion database page comment', 'Creates a Notion comment on a page inside a Notion database from comments.json.', [], notionCommentProps(), {
         text: 'Replace example comment body.',
       }, notionCommentRequirement()),
-      endpoint('/notion/pages/{pageId}.json', 'Update Notion standalone page properties', 'Updates properties, archive state, icon, or cover for a standalone page.', [], notionPagePatchProps(), {
+      endpoint('/notion/pages/{pageId}/meta.json', 'Update Notion standalone page properties', 'Updates properties, archive state, icon, or cover for a standalone page.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
       }, notionPagePatchRequirement()),
       endpoint('/notion/pages/{pageId}/properties.json', 'Update Notion standalone page properties file', 'Updates properties, archive state, icon, or cover through a standalone page properties sidecar.', [], notionPagePatchProps(), {

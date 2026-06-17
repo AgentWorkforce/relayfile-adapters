@@ -18,11 +18,11 @@ export const resources = [
   },
   {
     name: "pages",
-    path: "/notion/databases/{databaseId}/pages/{pageId}.json",
-    pathPattern: /^\/notion\/databases\/[^\/]+\/pages\/[^\/]+\.json$/,
+    path: "/notion/databases/{databaseId}/pages/{pageId}/meta.json",
+    pathPattern: /^\/notion\/databases\/[^\/]+\/pages\/[^\/]+\/meta\.json$/,
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
-    schema: "discovery/notion/databases/{databaseId}/pages/{pageId}.json/.schema.json",
-    createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}.json/.create.example.json",
+    schema: "discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.schema.json",
+    createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.create.example.json",
   },
   {
     name: "properties",
@@ -50,11 +50,11 @@ export const resources = [
   },
   {
     name: "pages",
-    path: "/notion/pages/{pageId}.json",
-    pathPattern: /^\/notion\/pages\/[^\/]+\.json$/,
+    path: "/notion/pages/{pageId}/meta.json",
+    pathPattern: /^\/notion\/pages\/[^\/]+\/meta\.json$/,
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
-    schema: "discovery/notion/pages/{pageId}.json/.schema.json",
-    createExample: "discovery/notion/pages/{pageId}.json/.create.example.json",
+    schema: "discovery/notion/pages/{pageId}/meta.json/.schema.json",
+    createExample: "discovery/notion/pages/{pageId}/meta.json/.create.example.json",
   },
   {
     name: "properties",

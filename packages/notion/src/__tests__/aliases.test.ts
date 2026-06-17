@@ -12,6 +12,7 @@ import {
   notionDatabaseMetadataPath,
   notionDatabasesCollectionPath,
   notionDatabasePagesCollectionPath,
+  notionStandalonePageContentPath,
   notionStandalonePagePath,
   notionStandalonePagesCollectionPath,
   notionUserPath,
@@ -362,5 +363,39 @@ describe('notion aliases', () => {
       [],
       'workspace-rooted pages must not materialize a by-parent alias',
     );
+  });
+
+  it('returns per-path write errors without aborting the workspace write batch', async () => {
+    const relay = createRelayClient();
+    const pageId = '99999999-9999-9999-9999-999999999999';
+    const recordPath = notionStandalonePagePath(pageId, 'Collision Page');
+    const contentPath = notionStandalonePageContentPath(pageId, 'Collision Page');
+    const failingClient = {
+      ...relay.client,
+      async writeFile(input: { path: string; content: string }) {
+        if (input.path === recordPath) {
+          throw new Error(`cannot create parent directory for ${input.path}`);
+        }
+        return relay.client.writeFile(input);
+      },
+    };
+
+    const result = await writeWorkspaceFiles(failingClient as never, 'ws-notion', [
+      vfsJsonFile(recordPath, { id: pageId, title: 'Collision Page' }),
+      {
+        path: contentPath,
+        contentType: 'text/markdown; charset=utf-8',
+        content: '# body\n',
+      },
+    ]);
+
+    assert.deepEqual(result.errors, [
+      {
+        path: recordPath,
+        error: `cannot create parent directory for ${recordPath}`,
+      },
+    ]);
+    assert.equal(result.responses.length, 1);
+    assert.ok(relay.files.has(contentPath), 'later files in the batch should still be written');
   });
 });
