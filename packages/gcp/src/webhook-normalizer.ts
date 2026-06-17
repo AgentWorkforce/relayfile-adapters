@@ -57,13 +57,29 @@ function readPolicyId(incident: Record<string, unknown>): string | undefined {
     readString(incident.policy_name) ??
     readString(incident.policyName) ??
     readString(incident.policy_user_label) ??
-    readString(incident.incident_id) ??
     readString(incident.condition_name);
   if (!policyName) {
     return undefined;
   }
   const segments = policyName.split("/").filter(Boolean);
   return segments.at(-1) ?? policyName;
+}
+
+function unwrapPubSubEnvelope(payload: Record<string, unknown>): Record<string, unknown> {
+  const message = payload.message;
+  if (!isRecord(message)) {
+    return payload;
+  }
+  const data = readString(message.data);
+  if (!data) {
+    return payload;
+  }
+  try {
+    const parsed = JSON.parse(Buffer.from(data, "base64").toString("utf8")) as unknown;
+    return isRecord(parsed) ? parsed : payload;
+  } catch {
+    return payload;
+  }
 }
 
 function readDisplayName(incident: Record<string, unknown>): string | undefined {
@@ -95,7 +111,7 @@ export function normalizeGcpWebhook(
   payload: unknown,
   _headers: Record<string, unknown> = {},
 ): NormalizedGcpWebhook | null {
-  const body = isRecord(payload) ? payload : {};
+  const body = unwrapPubSubEnvelope(isRecord(payload) ? payload : {});
   const incident = readNestedRecord(body, "incident") ?? body;
 
   const state = readState(incident);

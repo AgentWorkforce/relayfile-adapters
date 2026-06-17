@@ -101,6 +101,10 @@ export const KNOWN_TRIGGER_CATALOG = {
   "fathom": [
     "new-meeting-content-ready"
   ],
+  "gcp": [
+    "monitoring.incident.closed",
+    "monitoring.incident.open"
+  ],
   "gcs": [
     "file.created",
     "file.deleted",

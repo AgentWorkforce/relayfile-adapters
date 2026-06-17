@@ -836,6 +836,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "reason": "No resources.ts with writeback path templates"
   },
   {
+    "packageName": "@relayfile/adapter-gcp",
+    "packagePath": "packages/gcp",
+    "provider": "gcp",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
     "packageName": "@relayfile/adapter-segment",
     "packagePath": "packages/segment",
     "provider": "segment",

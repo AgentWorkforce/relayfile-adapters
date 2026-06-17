@@ -22,7 +22,7 @@ export const digest: DigestHandler = createDigestHandler({
   identify: gcpIdentifier,
   alias: {
     mode: "any",
-    segments: ["by-id", "by-day", "by-state", "by-type"],
+    segments: ["by-id", "by-region", "by-status", "by-title", "by-state"],
   },
   actionRules: [
     { verbs: "create|created|add|added|initialize|initialized", pastTense: "was created" },

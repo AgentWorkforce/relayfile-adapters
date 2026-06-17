@@ -60,6 +60,34 @@ test("normalizes a resolved (closed) GCP Monitoring incident as an update", () =
   assert.equal(normalized?.path, "/gcp/monitoring/alerts/67890.json");
 });
 
+test("decodes Pub/Sub push envelopes before normalizing the incident", () => {
+  const data = Buffer.from(JSON.stringify({
+    incident: {
+      policy_name: "projects/demo/alertPolicies/pubsub-policy",
+      state: "open",
+      started_at: 1_718_000_000,
+    },
+  })).toString("base64");
+
+  const normalized = normalizeGcpWebhook({
+    message: {
+      data,
+      messageId: "pubsub-message-1",
+    },
+    subscription: "projects/demo/subscriptions/alerts",
+  });
+
+  assert.equal(normalized?.policyId, "pubsub-policy");
+  assert.equal(normalized?.eventType, "monitoring.incident.open");
+  assert.deepEqual(normalized?.payload, {
+    incident: {
+      policy_name: "projects/demo/alertPolicies/pubsub-policy",
+      state: "open",
+      started_at: 1_718_000_000,
+    },
+  });
+});
+
 test("accepts an incident object at the top level (no envelope)", () => {
   const normalized = normalizeGcpWebhook({
     policy_name: "projects/demo/alertPolicies/flat",
@@ -71,5 +99,6 @@ test("accepts an incident object at the top level (no envelope)", () => {
 test("returns null for incomplete or non-incident payloads", () => {
   assert.equal(normalizeGcpWebhook({ incident: { state: "open" } }), null);
   assert.equal(normalizeGcpWebhook({ incident: { policy_name: "p/1", state: "unknown" } }), null);
+  assert.equal(normalizeGcpWebhook({ incident: { incident_id: "0.abc", state: "open" } }), null);
   assert.equal(normalizeGcpWebhook("not-json"), null);
 });

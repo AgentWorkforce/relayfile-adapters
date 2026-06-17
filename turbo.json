@@ -47,6 +47,7 @@
         "@relayfile/adapter-docker-hub#build",
         "@relayfile/adapter-dropbox#build",
         "@relayfile/adapter-fathom#build",
+        "@relayfile/adapter-gcp#build",
         "@relayfile/adapter-github#build",
         "@relayfile/adapter-gitlab#build",
         "@relayfile/adapter-google-calendar#build",

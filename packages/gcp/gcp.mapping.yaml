@@ -11,6 +11,10 @@ adapter:
 # This adapter is auth-agnostic and declarative: it contains no HTTP client and
 # no credentials. Auth is supplied at runtime by a provider via a Nango GCP
 # connection.
+scopeKeys:
+  - project
+  - location
+  - billingAccountId
 resources:
   cloud-run-services:
     # Cloud Run Admin API
