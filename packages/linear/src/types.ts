@@ -288,7 +288,7 @@ export interface LinearIssue {
   team?: LinearTeam | null;
   project?: LinearProjectReference | null;
   cycle?: LinearCycleReference | null;
-  labels?: LinearLabel[];
+  labels?: LinearLabel[] | { nodes?: LinearLabel[] };
   parent?: LinearIssueReference | null;
   children?: LinearIssueReference[];
   relations?: LinearRelation[];

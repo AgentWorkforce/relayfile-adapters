@@ -558,12 +558,18 @@ function editedDateSegment(value: string | undefined): string | undefined {
 }
 
 function toIssueNode(issue: LinearIssue): LinearIssueNode {
+  const labels = normalizeIssueLabels(issue as unknown as Record<string, unknown>);
   return {
     id: issue.id,
     identifier: issue.identifier ?? null,
     title: issue.title ?? null,
     state: issue.state
-      ? { name: issue.state.name ?? null, type: issue.state.type ?? null }
+      ? {
+          id: issue.state.id ?? null,
+          name: issue.state.name ?? null,
+          type: issue.state.type ?? null,
+          color: issue.state.color ?? null,
+        }
       : null,
     priority: issue.priority ?? null,
     assignee: issue.assignee
@@ -572,6 +578,7 @@ function toIssueNode(issue: LinearIssue): LinearIssueNode {
     creator: issue.creator
       ? { id: issue.creator.id ?? null, name: issue.creator.name ?? null, email: issue.creator.email ?? null }
       : null,
+    labels: labels ? { nodes: labels } : null,
     updatedAt: issue.updatedAt ?? null,
     createdAt: issue.createdAt ?? null,
   } as LinearIssueNode;
@@ -1009,7 +1016,77 @@ function normalizeContentPayload(
     return payload;
   }
   const project = normalizeIssueProject(payload);
-  return project ? { ...payload, project } : payload;
+  const state = normalizeIssueState(payload);
+  const labels = normalizeIssueLabels(payload);
+  if (!project && !state && labels === null) {
+    return payload;
+  }
+  return {
+    ...payload,
+    ...(project ? { project } : {}),
+    ...(state ? { state } : {}),
+    ...(labels !== null ? { labels } : {}),
+  };
+}
+
+function normalizeIssueState(issue: Record<string, unknown>): Record<string, unknown> | null {
+  const nestedState = isRecord(issue.state) ? issue.state : undefined;
+  const id =
+    readNonEmptyString(nestedState?.id) ??
+    readNonEmptyString(issue.stateId) ??
+    readNonEmptyString(issue.state_id);
+  const name = readNonEmptyString(nestedState?.name) ?? readNonEmptyString(issue.state_name);
+  const type = readNonEmptyString(nestedState?.type) ?? readNonEmptyString(issue.state_type);
+  const color = readNonEmptyString(nestedState?.color) ?? readNonEmptyString(issue.state_color);
+  if (!id && !name && !type && !color) return null;
+  return {
+    ...nestedState,
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
+    ...(type ? { type } : {}),
+    ...(color ? { color } : {}),
+  };
+}
+
+function normalizeIssueLabels(issue: Record<string, unknown>): Array<Record<string, unknown>> | null {
+  const labelsValue = issue.labels;
+  const labelEntries = Array.isArray(labelsValue)
+    ? labelsValue
+    : isRecord(labelsValue) && Array.isArray(labelsValue.nodes)
+      ? labelsValue.nodes
+      : undefined;
+
+  if (labelEntries) {
+    return labelEntries
+      .map((entry) => normalizeIssueLabel(entry))
+      .filter((entry): entry is Record<string, unknown> => entry !== null);
+  }
+
+  const labelNames = readStringArray(issue.labelNames ?? issue.label_names);
+  if (labelNames.length > 0) {
+    return labelNames.map((name) => ({ name }));
+  }
+
+  const labelIds = readStringArray(issue.labelIds ?? issue.label_ids);
+  if (labelIds.length > 0) {
+    return labelIds.map((id) => ({ id }));
+  }
+
+  return null;
+}
+
+function normalizeIssueLabel(value: unknown): Record<string, unknown> | null {
+  const label = isRecord(value) ? value : undefined;
+  if (!label) return null;
+  const id = readNonEmptyString(label.id);
+  const name = readNonEmptyString(label.name);
+  const color = readNonEmptyString(label.color);
+  if (!id && !name && !color) return null;
+  return {
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
+    ...(color ? { color } : {}),
+  };
 }
 
 function normalizeIssueProject(issue: Record<string, unknown>): Record<string, unknown> | null {
@@ -1100,6 +1177,14 @@ function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .map((entry) => readNonEmptyString(entry))
+        .filter((entry): entry is string => entry !== undefined)
+    : [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

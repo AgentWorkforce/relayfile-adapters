@@ -330,6 +330,12 @@ describe('emitLinearAuxiliaryFiles', () => {
       assignee: { id: 'user-assignee', name: 'Alice' },
       creator: { id: 'user-creator', name: 'Casey' },
       priority: 2,
+      labels: {
+        nodes: [
+          { id: 'label-repo', name: 'repo', color: '#2563eb' },
+          { id: 'label-routing', name: 'routing' },
+        ],
+      },
       updatedAt: '2026-05-12T00:00:00Z',
     };
     const result = await emitLinearAuxiliaryFiles(client, {
@@ -375,6 +381,15 @@ describe('emitLinearAuxiliaryFiles', () => {
 
     // Canonical bytes are identical at every emitted alias path.
     const canonicalBytes = client.files.get(linearIssuePath('issue-123', 'AGE-8'));
+    const canonicalRecord = JSON.parse(canonicalBytes ?? '{}');
+    assert.deepEqual(canonicalRecord.payload.state, {
+      id: 'state-1',
+      name: 'In Progress',
+    });
+    assert.deepEqual(canonicalRecord.payload.labels, [
+      { id: 'label-repo', name: 'repo', color: '#2563eb' },
+      { id: 'label-routing', name: 'routing' },
+    ]);
     for (const path of expectedPaths) {
       if (path === linearIssuesIndexPath()) continue;
       assert.equal(client.files.get(path), canonicalBytes, `bytes mismatch at ${path}`);
@@ -508,6 +523,11 @@ describe('emitLinearAuxiliaryFiles', () => {
     );
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearIssueByStatePath('Done', 'AGE-8')));
+    const canonicalRecord = JSON.parse(client.files.get(linearIssuePath('issue-123', 'AGE-8')) ?? '{}');
+    assert.deepEqual(canonicalRecord.payload.state, {
+      id: 's',
+      name: 'Done',
+    });
   });
 
   it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {

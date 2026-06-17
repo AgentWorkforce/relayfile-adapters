@@ -177,8 +177,15 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
       identifier: 'ENG-123',
       title: 'Ship index writes',
       updatedAt: '2026-04-09T10:00:00.000Z',
+      stateId: 'state_in_progress',
       state_name: 'In Progress',
       state: { name: 'In Progress' },
+      labels: {
+        nodes: [
+          { id: 'label_repo', name: 'repo', color: '#2563eb' },
+          { id: 'label_route', name: 'routing' },
+        ],
+      },
     },
   });
 
@@ -192,6 +199,15 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
   assert.equal(result.filesWritten, 3);
   assert.equal(result.filesUpdated, 1);
   assert.match(client.files.get('/linear/LAYOUT.md') ?? '', /# Linear Mount Layout/);
+  const issueRecord = JSON.parse(client.files.get('/linear/issues/ENG-123__issue_123.json') ?? '{}');
+  assert.deepEqual(issueRecord.payload.state, {
+    id: 'state_in_progress',
+    name: 'In Progress',
+  });
+  assert.deepEqual(issueRecord.payload.labels, [
+    { id: 'label_repo', name: 'repo', color: '#2563eb' },
+    { id: 'label_route', name: 'routing' },
+  ]);
   // PR 2's alias-emitter writes `_index.json` with `{ rows: [...] }` shape
   // before PR 1's `writeAuxiliaryFiles` overwrites it back to the canonical
   // issue-row array. Pre-existing rows seeded in the canonical shape are
