@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-daytona",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Daytona adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -59,7 +59,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.53"
+    "@relayfile/adapter-core": "^0.3.54"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
