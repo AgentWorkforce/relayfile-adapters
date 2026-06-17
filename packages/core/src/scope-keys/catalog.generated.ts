@@ -7,6 +7,11 @@
  */
 
 export const KNOWN_SCOPE_KEY_CATALOG = {
+  "gcp": [
+    "billingAccountId",
+    "location",
+    "project"
+  ],
   "github": [
     "owner",
     "repo"

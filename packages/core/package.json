@@ -30,6 +30,11 @@
       "types": "./dist/src/http/index.d.ts",
       "default": "./dist/src/http/index.js"
     },
+    "./digest": {
+      "types": "./dist/src/digest/index.d.ts",
+      "import": "./dist/src/digest/index.js",
+      "default": "./dist/src/digest/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {

@@ -101,6 +101,17 @@ export const KNOWN_TRIGGER_CATALOG = {
   "fathom": [
     "new-meeting-content-ready"
   ],
+  "gcp": [
+    "billing.budget.alert",
+    "cloud-run.service.created",
+    "cloud-run.service.deleted",
+    "cloud-run.service.updated",
+    "error-reporting.event.logged",
+    "error-reporting.group.opened",
+    "error-reporting.group.reopened",
+    "monitoring.incident.closed",
+    "monitoring.incident.open"
+  ],
   "gcs": [
     "file.created",
     "file.deleted",

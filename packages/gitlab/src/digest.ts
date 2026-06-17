@@ -6,7 +6,7 @@ import {
   type DigestHandler,
   type DigestSection,
   type DigestWindow,
-} from "@relayfile/adapter-core";
+} from "@relayfile/adapter-core/digest";
 
 import { gitLabFlatRecordFilename } from "./path-mapper.js";
 

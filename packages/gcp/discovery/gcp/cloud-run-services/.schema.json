@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCP Cloud Run service",
+  "description": "Normalized Cloud Run service snapshot, sourced from the Cloud Run Admin API GET /v2/projects/{project}/locations/{location}/services (and revisions). One record per service, keyed by service name. Read-only.",
+  "type": "object",
+  "required": ["serviceName", "region", "ready"],
+  "properties": {
+    "serviceName": {
+      "type": "string",
+      "description": "Short service name (last path segment of the resource name).",
+      "minLength": 1
+    },
+    "region": {
+      "type": "string",
+      "description": "Cloud Run region / location, e.g. \"us-central1\"."
+    },
+    "latestRevision": {
+      "type": "string",
+      "description": "Latest created/ready revision name, if known."
+    },
+    "ready": {
+      "type": "boolean",
+      "description": "Whether the service's Ready condition is true."
+    },
+    "url": {
+      "type": "string",
+      "description": "Public URL of the service, if exposed."
+    },
+    "lastModified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last modification (updateTime)."
+    }
+  },
+  "additionalProperties": true
+}

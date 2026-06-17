@@ -1,4 +1,9 @@
 {
+  "gcp": [
+    "billingAccountId",
+    "location",
+    "project"
+  ],
   "github": [
     "owner",
     "repo"

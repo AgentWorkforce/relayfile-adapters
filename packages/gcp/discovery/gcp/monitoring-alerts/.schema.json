@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCP Cloud Monitoring alert policy",
+  "description": "Normalized Cloud Monitoring alert policy snapshot, sourced from GET /v3/projects/{project}/alertPolicies plus firing incidents (delivered via Pub/Sub push subscription). One record per alert policy, keyed by policyId. Read-only.",
+  "type": "object",
+  "required": ["policyId", "displayName", "enabled", "firing"],
+  "properties": {
+    "policyId": {
+      "type": "string",
+      "description": "Alert policy id (last path segment of the policy name).",
+      "minLength": 1
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable display name of the policy."
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the policy is enabled."
+    },
+    "conditionsSummary": {
+      "type": "string",
+      "description": "Short summary of the policy's conditions."
+    },
+    "firing": {
+      "type": "boolean",
+      "description": "Whether the alert currently has an open/firing incident."
+    },
+    "lastIncidentTs": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the most recent incident, if any."
+    }
+  },
+  "additionalProperties": true
+}
