@@ -558,6 +558,7 @@ function editedDateSegment(value: string | undefined): string | undefined {
 }
 
 function toIssueNode(issue: LinearIssue): LinearIssueNode {
+  const labels = normalizeIssueLabels(issue as unknown as Record<string, unknown>);
   return {
     id: issue.id,
     identifier: issue.identifier ?? null,
@@ -577,6 +578,7 @@ function toIssueNode(issue: LinearIssue): LinearIssueNode {
     creator: issue.creator
       ? { id: issue.creator.id ?? null, name: issue.creator.name ?? null, email: issue.creator.email ?? null }
       : null,
+    labels: labels ? { nodes: labels } : null,
     updatedAt: issue.updatedAt ?? null,
     createdAt: issue.createdAt ?? null,
   } as LinearIssueNode;
@@ -1015,13 +1017,15 @@ function normalizeContentPayload(
   }
   const project = normalizeIssueProject(payload);
   const state = normalizeIssueState(payload);
-  if (!project && !state) {
+  const labels = normalizeIssueLabels(payload);
+  if (!project && !state && labels === null) {
     return payload;
   }
   return {
     ...payload,
     ...(project ? { project } : {}),
     ...(state ? { state } : {}),
+    ...(labels !== null ? { labels } : {}),
   };
 }
 
@@ -1040,6 +1044,47 @@ function normalizeIssueState(issue: Record<string, unknown>): Record<string, unk
     ...(id ? { id } : {}),
     ...(name ? { name } : {}),
     ...(type ? { type } : {}),
+    ...(color ? { color } : {}),
+  };
+}
+
+function normalizeIssueLabels(issue: Record<string, unknown>): Array<Record<string, unknown>> | null {
+  const labelsValue = issue.labels;
+  const labelEntries = Array.isArray(labelsValue)
+    ? labelsValue
+    : isRecord(labelsValue) && Array.isArray(labelsValue.nodes)
+      ? labelsValue.nodes
+      : undefined;
+
+  if (labelEntries) {
+    return labelEntries
+      .map((entry) => normalizeIssueLabel(entry))
+      .filter((entry): entry is Record<string, unknown> => entry !== null);
+  }
+
+  const labelNames = readStringArray(issue.labelNames ?? issue.label_names);
+  if (labelNames.length > 0) {
+    return labelNames.map((name) => ({ name }));
+  }
+
+  const labelIds = readStringArray(issue.labelIds ?? issue.label_ids);
+  if (labelIds.length > 0) {
+    return labelIds.map((id) => ({ id }));
+  }
+
+  return null;
+}
+
+function normalizeIssueLabel(value: unknown): Record<string, unknown> | null {
+  const label = isRecord(value) ? value : undefined;
+  if (!label) return null;
+  const id = readNonEmptyString(label.id);
+  const name = readNonEmptyString(label.name);
+  const color = readNonEmptyString(label.color);
+  if (!id && !name && !color) return null;
+  return {
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
     ...(color ? { color } : {}),
   };
 }
@@ -1132,6 +1177,14 @@ function readNonEmptyString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .map((entry) => readNonEmptyString(entry))
+        .filter((entry): entry is string => entry !== undefined)
+    : [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

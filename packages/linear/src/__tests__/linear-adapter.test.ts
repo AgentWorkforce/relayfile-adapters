@@ -180,6 +180,12 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
       stateId: 'state_in_progress',
       state_name: 'In Progress',
       state: { name: 'In Progress' },
+      labels: {
+        nodes: [
+          { id: 'label_repo', name: 'repo', color: '#2563eb' },
+          { id: 'label_route', name: 'routing' },
+        ],
+      },
     },
   });
 
@@ -198,6 +204,10 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
     id: 'state_in_progress',
     name: 'In Progress',
   });
+  assert.deepEqual(issueRecord.payload.labels, [
+    { id: 'label_repo', name: 'repo', color: '#2563eb' },
+    { id: 'label_route', name: 'routing' },
+  ]);
   // PR 2's alias-emitter writes `_index.json` with `{ rows: [...] }` shape
   // before PR 1's `writeAuxiliaryFiles` overwrites it back to the canonical
   // issue-row array. Pre-existing rows seeded in the canonical shape are

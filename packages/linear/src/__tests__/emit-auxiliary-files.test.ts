@@ -330,6 +330,12 @@ describe('emitLinearAuxiliaryFiles', () => {
       assignee: { id: 'user-assignee', name: 'Alice' },
       creator: { id: 'user-creator', name: 'Casey' },
       priority: 2,
+      labels: {
+        nodes: [
+          { id: 'label-repo', name: 'repo', color: '#2563eb' },
+          { id: 'label-routing', name: 'routing' },
+        ],
+      },
       updatedAt: '2026-05-12T00:00:00Z',
     };
     const result = await emitLinearAuxiliaryFiles(client, {
@@ -380,6 +386,10 @@ describe('emitLinearAuxiliaryFiles', () => {
       id: 'state-1',
       name: 'In Progress',
     });
+    assert.deepEqual(canonicalRecord.payload.labels, [
+      { id: 'label-repo', name: 'repo', color: '#2563eb' },
+      { id: 'label-routing', name: 'routing' },
+    ]);
     for (const path of expectedPaths) {
       if (path === linearIssuesIndexPath()) continue;
       assert.equal(client.files.get(path), canonicalBytes, `bytes mismatch at ${path}`);

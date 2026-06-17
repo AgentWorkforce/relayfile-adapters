@@ -1040,8 +1040,27 @@ function applyRoadmapSemantics(
   }
 }
 
-function asLabels(labels: LinearIssue['labels']): LinearLabel[] {
-  return Array.isArray(labels) ? labels.filter((label): label is LinearLabel => Boolean(label?.name)) : [];
+function asLabels(labels: LinearIssue['labels'] | unknown): LinearLabel[] {
+  const entries = Array.isArray(labels)
+    ? labels
+    : isRecord(labels) && Array.isArray(labels.nodes)
+      ? labels.nodes
+      : [];
+  const normalized: LinearLabel[] = [];
+  for (const entry of entries) {
+    const label = getRecord(entry);
+    const id = asString(label?.id);
+    const name = asString(label?.name);
+    if (!label || (!id && !name)) {
+      continue;
+    }
+    normalized.push({
+      ...(label as Partial<LinearLabel>),
+      id: id ?? '',
+      name: name ?? '',
+    });
+  }
+  return normalized;
 }
 
 function asRelations(relations: LinearIssue['relations']): LinearRelation[] {
@@ -1077,19 +1096,66 @@ function normalizeIssuePayloadForWrite(objectType: string, payload: Record<strin
   const stateName = asString(state?.name) ?? asString(payload.state_name);
   const stateType = asString(state?.type) ?? asString(payload.state_type);
   const stateColor = asString(state?.color) ?? asString(payload.state_color);
-  if (!stateId && !stateName && !stateType && !stateColor) {
+  const labels = normalizeIssueLabelsForWrite(payload);
+  if (!stateId && !stateName && !stateType && !stateColor && labels === null) {
     return payload;
   }
 
   return {
     ...payload,
-    state: {
-      ...state,
-      ...(stateId ? { id: stateId } : {}),
-      ...(stateName ? { name: stateName } : {}),
-      ...(stateType ? { type: stateType } : {}),
-      ...(stateColor ? { color: stateColor } : {}),
-    },
+    ...(stateId || stateName || stateType || stateColor
+      ? {
+          state: {
+            ...state,
+            ...(stateId ? { id: stateId } : {}),
+            ...(stateName ? { name: stateName } : {}),
+            ...(stateType ? { type: stateType } : {}),
+            ...(stateColor ? { color: stateColor } : {}),
+          },
+        }
+      : {}),
+    ...(labels !== null ? { labels } : {}),
+  };
+}
+
+function normalizeIssueLabelsForWrite(payload: Record<string, unknown>): Array<Record<string, unknown>> | null {
+  const labelsValue = payload.labels;
+  const labelEntries = Array.isArray(labelsValue)
+    ? labelsValue
+    : isRecord(labelsValue) && Array.isArray(labelsValue.nodes)
+      ? labelsValue.nodes
+      : undefined;
+
+  if (labelEntries) {
+    return labelEntries
+      .map((entry) => normalizeIssueLabelForWrite(entry))
+      .filter((entry): entry is Record<string, unknown> => entry !== null);
+  }
+
+  const labelNames = asStringArray(payload.labelNames ?? payload.label_names);
+  if (labelNames.length > 0) {
+    return labelNames.map((name) => ({ name }));
+  }
+
+  const labelIds = asStringArray(payload.labelIds ?? payload.label_ids);
+  if (labelIds.length > 0) {
+    return labelIds.map((id) => ({ id }));
+  }
+
+  return null;
+}
+
+function normalizeIssueLabelForWrite(value: unknown): Record<string, unknown> | null {
+  const label = getRecord(value);
+  if (!label) return null;
+  const id = asString(label.id);
+  const name = asString(label.name);
+  const color = asString(label.color);
+  if (!id && !name && !color) return null;
+  return {
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
+    ...(color ? { color } : {}),
   };
 }
 

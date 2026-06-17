@@ -79,6 +79,13 @@ test('LINEAR_FETCH_ACTIVE_ISSUES_QUERY matches the expected Sage active-issues q
         assignee {
           name
         }
+        labels(first: 20) {
+          nodes {
+            id
+            name
+            color
+          }
+        }
         url
         createdAt
         updatedAt
