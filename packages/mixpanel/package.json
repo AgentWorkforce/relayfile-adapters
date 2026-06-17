@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-mixpanel",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "Mixpanel adapter bootstrap package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -74,6 +74,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.52"
+    "@relayfile/adapter-core": "^0.3.53"
   }
 }

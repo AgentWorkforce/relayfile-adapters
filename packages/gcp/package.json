@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-gcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GCP adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -64,7 +64,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.52"
+    "@relayfile/adapter-core": "^0.3.53"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
