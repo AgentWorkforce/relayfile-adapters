@@ -34,6 +34,9 @@ export async function fetchThread(input: ThreadFetchInput): Promise<ThreadExpans
 function toCommentsPath(path: string): string | null {
   if (/\/comments\.json$/u.test(path)) return path;
   if (/\/content\.md$/u.test(path)) return path.replace(/\/content\.md$/u, '/comments.json');
+  if (/\/meta\.json$/u.test(path) && /\/notion\/(?:databases\/[^/]+\/pages|pages)\//u.test(path)) {
+    return path.replace(/\/meta\.json$/u, '/comments.json');
+  }
   if (/\.json$/u.test(path) && /\/notion\/(?:databases\/[^/]+\/pages|pages)\//u.test(path)) {
     return path.replace(/\.json$/u, '/comments.json');
   }

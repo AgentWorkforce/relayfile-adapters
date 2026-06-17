@@ -17,6 +17,17 @@ import type { NotionApiClient } from './client.js';
 import type { NotionVfsFile } from './types.js';
 import { withNotionNamingScope } from './path-mapper.js';
 
+export interface WorkspaceWriteError {
+  path: string;
+  error: string;
+}
+
+export interface WorkspaceWriteFilesResult {
+  responses: WriteQueuedResponse[];
+  errors: WorkspaceWriteError[];
+  primaryWriteErrors: WorkspaceWriteError[];
+}
+
 export async function collectWorkspaceFiles(client: NotionApiClient): Promise<NotionVfsFile[]> {
   const files: NotionVfsFile[] = [];
 
@@ -48,26 +59,45 @@ export async function writeWorkspaceFiles(
   relayClient: RelayFileClient,
   workspaceId: string,
   files: NotionVfsFile[],
-): Promise<WriteQueuedResponse[]> {
+): Promise<WorkspaceWriteFilesResult> {
   const batchIndexPaths = new Set(files.filter((file) => isIndexPath(file.path)).map((file) => file.path));
 
-  return Promise.all(
+  const outcomes = await Promise.all(
     files.map(async (file) => {
-      const baseRevision = await resolveBaseRevision(relayClient, workspaceId, file.path);
-      const response = await relayClient.writeFile({
-        workspaceId,
-        path: file.path,
-        baseRevision,
-        contentType: file.contentType,
-        content: file.content,
-        semantics: file.semantics,
-      });
-      if (file.aliasMetadata) {
-        await writeNotionAliases(relayClient, workspaceId, file, batchIndexPaths);
+      let response: WriteQueuedResponse | undefined;
+      try {
+        const baseRevision = await resolveBaseRevision(relayClient, workspaceId, file.path);
+        response = await relayClient.writeFile({
+          workspaceId,
+          path: file.path,
+          baseRevision,
+          contentType: file.contentType,
+          content: file.content,
+          semantics: file.semantics,
+        });
+        if (file.aliasMetadata) {
+          await writeNotionAliases(relayClient, workspaceId, file, batchIndexPaths);
+        }
+        return { response };
+      } catch (error) {
+        const writeError = {
+          path: file.path,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        return {
+          response,
+          error: writeError,
+          primaryWriteError: response ? undefined : writeError,
+        };
       }
-      return response;
     }),
   );
+
+  return {
+    responses: outcomes.flatMap((outcome) => (outcome.response ? [outcome.response] : [])),
+    errors: outcomes.flatMap((outcome) => (outcome.error ? [outcome.error] : [])),
+    primaryWriteErrors: outcomes.flatMap((outcome) => (outcome.primaryWriteError ? [outcome.primaryWriteError] : [])),
+  };
 }
 
 interface NotionIndexRow {

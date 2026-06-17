@@ -180,6 +180,9 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
       stateId: 'state_in_progress',
       state_name: 'In Progress',
       state: { name: 'In Progress' },
+      teamId: 'team_eng',
+      team_key: 'ENG',
+      team_name: 'Engineering',
       labels: {
         nodes: [
           { id: 'label_repo', name: 'repo', color: '#2563eb' },
@@ -203,6 +206,11 @@ test('ingestWebhook writes the canonical issue file plus best-effort linear layo
   assert.deepEqual(issueRecord.payload.state, {
     id: 'state_in_progress',
     name: 'In Progress',
+  });
+  assert.deepEqual(issueRecord.payload.team, {
+    id: 'team_eng',
+    key: 'ENG',
+    name: 'Engineering',
   });
   assert.deepEqual(issueRecord.payload.labels, [
     { id: 'label_repo', name: 'repo', color: '#2563eb' },

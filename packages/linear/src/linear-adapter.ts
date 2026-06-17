@@ -1096,8 +1096,9 @@ function normalizeIssuePayloadForWrite(objectType: string, payload: Record<strin
   const stateName = asString(state?.name) ?? asString(payload.state_name);
   const stateType = asString(state?.type) ?? asString(payload.state_type);
   const stateColor = asString(state?.color) ?? asString(payload.state_color);
+  const team = normalizeIssueTeamForWrite(payload);
   const labels = normalizeIssueLabelsForWrite(payload);
-  if (!stateId && !stateName && !stateType && !stateColor && labels === null) {
+  if (!stateId && !stateName && !stateType && !stateColor && !team && labels === null) {
     return payload;
   }
 
@@ -1114,6 +1115,7 @@ function normalizeIssuePayloadForWrite(objectType: string, payload: Record<strin
           },
         }
       : {}),
+    ...(team ? { team } : {}),
     ...(labels !== null ? { labels } : {}),
   };
 }
@@ -1156,6 +1158,20 @@ function normalizeIssueLabelForWrite(value: unknown): Record<string, unknown> | 
     ...(id ? { id } : {}),
     ...(name ? { name } : {}),
     ...(color ? { color } : {}),
+  };
+}
+
+function normalizeIssueTeamForWrite(payload: Record<string, unknown>): Record<string, unknown> | null {
+  const team = getRecord(payload.team);
+  const id = asString(team?.id) ?? asString(payload.teamId) ?? asString(payload.team_id);
+  const key = asString(team?.key) ?? asString(payload.team_key);
+  const name = asString(team?.name) ?? asString(payload.team_name);
+  if (!id && !key && !name) return null;
+  return {
+    ...team,
+    ...(id ? { id } : {}),
+    ...(key ? { key } : {}),
+    ...(name ? { name } : {}),
   };
 }
 

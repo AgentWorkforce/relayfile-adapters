@@ -219,6 +219,13 @@ function resourceNameFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'linear' && resourcePath === '/linear/projects/{projectId}/add-issues.json') {
     return 'project-issue-assignments';
   }
+  if (
+    adapterSlug === 'notion' &&
+    (resourcePath === '/notion/databases/{databaseId}/pages/{pageId}/meta.json' ||
+      resourcePath === '/notion/pages/{pageId}/meta.json')
+  ) {
+    return 'pages';
+  }
   const last = resourcePath.split('/').filter(Boolean).at(-1);
   if (!last) return adapterSlug;
   if (/^\{[^}]+\}\.json$/u.test(last)) {

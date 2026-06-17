@@ -69,8 +69,8 @@ interface NotionIndexRow {
 
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const DATABASE_METADATA_PATTERN = /^\/notion\/databases\/([^/]+)\/metadata\.json$/u;
-const DATABASE_PAGE_PATTERN = /^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/u;
-const STANDALONE_PAGE_PATTERN = /^\/notion\/pages\/([^/]+)\.json$/u;
+const DATABASE_PAGE_PATTERN = /^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/meta\.json$/u;
+const STANDALONE_PAGE_PATTERN = /^\/notion\/pages\/([^/]+)\/meta\.json$/u;
 const USER_PATTERN = /^\/notion\/users\/([^/]+)\.json$/u;
 
 export function buildIndexFiles(files: NotionVfsFile[]): NotionVfsFile[] {

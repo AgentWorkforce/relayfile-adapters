@@ -45,6 +45,18 @@ describe('notion writeback id extraction', () => {
     assert.strictEqual(req.endpoint, `/v1/pages/${PAGE_UUID}`);
   });
 
+  it('strips slug__<canonical UUID> for meta.json property writebacks', () => {
+    const req = resolveWritebackRequest(
+      `/notion/pages/landing__${PAGE_UUID}/meta.json`,
+      JSON.stringify({
+        properties: {
+          Name: { id: 'title', type: 'title', value: 'New' },
+        },
+      }),
+    );
+    assert.strictEqual(req.endpoint, `/v1/pages/${PAGE_UUID}`);
+  });
+
   it('rejects legacy 8-char id suffix paths with a clear re-sync message', () => {
     assert.throws(
       () =>

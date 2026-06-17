@@ -24,8 +24,8 @@ titles can collide and the canonical filenames append a UUID suffix.
 ├── LAYOUT.md                          ← this guide
 ├── pages/                             ← standalone pages (not in a database)
 │   ├── _index.json                    ← { id, title, updated, parent_id, parent_type }
-│   ├── <slug>__<id>.json              ← canonical page record (UUID-named)
 │   ├── <slug>__<id>/
+│   │   ├── meta.json                  ← canonical page record (UUID-named)
 │   │   ├── properties.json            ← page property writeback alias
 │   │   ├── content.md                 ← page body as markdown
 │   │   ├── comments.json              ← page comments
@@ -41,7 +41,11 @@ titles can collide and the canonical filenames append a UUID suffix.
 │   │   ├── metadata.json              ← database schema + title + properties
 │   │   └── pages/
 │   │       ├── _index.json
-│   │       └── <slug>__<id>.json      ← rows in this database
+│   │       └── <slug>__<id>/
+│   │           ├── meta.json          ← row record
+│   │           ├── properties.json
+│   │           ├── content.md
+│   │           └── comments.json
 │   ├── by-id/<dehyphenated-uuid>.json
 │   └── by-title/<slug>__<short_id>.json
 └── users/
@@ -62,7 +66,7 @@ canonical UUID) to every alias filename so:
   2. An agent holding only the UUID can compute the alias filename
      locally — no index scan required.
   3. A title rename invalidates the *alias*, not the canonical record at
-     \`pages/<slug>__<id>.json\`, so writeback against the canonical path
+     \`pages/<slug>__<id>/meta.json\`, so writeback against the canonical path
      keeps working through renames.
 
 ## Indexes
@@ -142,7 +146,7 @@ curl -X PATCH "https://api.notion.com/v1/pages/$id" -d '{ "archived": true }'
 \`\`\`
 
 When writing back through the relayfile mount itself, the canonical path
-encodes the UUID — \`PATCH /notion/pages/<slug>__<id>.json\` — so writeback
+encodes the UUID — \`PATCH /notion/pages/<slug>__<id>/meta.json\` — so writeback
 strips the slug and recovers the UUID from the trailing 32-hex segment
 (see \`writeback.ts:extractNotionId\`). Agents may also write the same
 property update payload to \`properties.json\` beside a page directory, such
@@ -151,13 +155,13 @@ as \`/notion/pages/<slug>__<id>/properties.json\` or
 
 Writable database page resources advertise sibling discovery files under:
 - \`discovery/notion/databases/{databaseId}/pages/.schema.json\`
-- \`discovery/notion/databases/{databaseId}/pages/{pageId}.json/.schema.json\`
+- \`discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.schema.json\`
 - \`discovery/notion/databases/{databaseId}/pages/{pageId}/properties.json/.schema.json\`
 - \`discovery/notion/databases/{databaseId}/pages/{pageId}/content.md/.schema.json\`
 - \`discovery/notion/databases/{databaseId}/pages/{pageId}/comments.json/.schema.json\`
 
 Standalone page resources advertise matching discovery files under:
-- \`discovery/notion/pages/{pageId}.json/.schema.json\`
+- \`discovery/notion/pages/{pageId}/meta.json/.schema.json\`
 - \`discovery/notion/pages/{pageId}/properties.json/.schema.json\`
 - \`discovery/notion/pages/{pageId}/content.md/.schema.json\`
 - \`discovery/notion/pages/{pageId}/comments.json/.schema.json\`

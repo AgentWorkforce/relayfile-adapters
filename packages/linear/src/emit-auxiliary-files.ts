@@ -1017,14 +1017,16 @@ function normalizeContentPayload(
   }
   const project = normalizeIssueProject(payload);
   const state = normalizeIssueState(payload);
+  const team = normalizeIssueTeam(payload);
   const labels = normalizeIssueLabels(payload);
-  if (!project && !state && labels === null) {
+  if (!project && !state && !team && labels === null) {
     return payload;
   }
   return {
     ...payload,
     ...(project ? { project } : {}),
     ...(state ? { state } : {}),
+    ...(team ? { team } : {}),
     ...(labels !== null ? { labels } : {}),
   };
 }
@@ -1073,6 +1075,23 @@ function normalizeIssueLabels(issue: Record<string, unknown>): Array<Record<stri
   }
 
   return null;
+}
+
+function normalizeIssueTeam(issue: Record<string, unknown>): Record<string, unknown> | null {
+  const nestedTeam = isRecord(issue.team) ? issue.team : undefined;
+  const id =
+    readNonEmptyString(nestedTeam?.id) ??
+    readNonEmptyString(issue.teamId) ??
+    readNonEmptyString(issue.team_id);
+  const key = readNonEmptyString(nestedTeam?.key) ?? readNonEmptyString(issue.team_key);
+  const name = readNonEmptyString(nestedTeam?.name) ?? readNonEmptyString(issue.team_name);
+  if (!id && !key && !name) return null;
+  return {
+    ...nestedTeam,
+    ...(id ? { id } : {}),
+    ...(key ? { key } : {}),
+    ...(name ? { name } : {}),
+  };
 }
 
 function normalizeIssueLabel(value: unknown): Record<string, unknown> | null {

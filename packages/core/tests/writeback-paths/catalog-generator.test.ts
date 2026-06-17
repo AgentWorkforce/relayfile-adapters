@@ -42,8 +42,8 @@ test("a resource name with multiple mount paths keeps every distinct template", 
   const paths = WRITEBACK_PATH_CATALOG.notion.pages.map((variant) => variant.path).sort();
   assert.deepEqual(paths, [
     "/notion/databases/{databaseId}/pages",
-    "/notion/databases/{databaseId}/pages/{pageId}.json",
-    "/notion/pages/{pageId}.json",
+    "/notion/databases/{databaseId}/pages/{pageId}/meta.json",
+    "/notion/pages/{pageId}/meta.json",
   ]);
 });
 
@@ -61,9 +61,9 @@ test("writebackPath disambiguates multi-template resources by exact param set", 
   assert.equal(writebackPath("notion", "pages", { databaseId: "db1" }), "/notion/databases/db1/pages");
   assert.equal(
     writebackPath("notion", "pages", { databaseId: "db1", pageId: "p9" }),
-    "/notion/databases/db1/pages/p9.json"
+    "/notion/databases/db1/pages/p9/meta.json"
   );
-  assert.equal(writebackPath("notion", "pages", { pageId: "p9" }), "/notion/pages/p9.json");
+  assert.equal(writebackPath("notion", "pages", { pageId: "p9" }), "/notion/pages/p9/meta.json");
   // A param set matching no template must throw, never silently pick one.
   assert.throws(() => writebackPath("notion", "pages", { teamId: "t1" }), WritebackPathError);
 });

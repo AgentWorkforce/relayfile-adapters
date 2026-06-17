@@ -1,6 +1,6 @@
 import type { FileSemantics, RelayFileClient, WebhookInput } from '@relayfile/sdk';
 import { NotionApiClient } from './client.js';
-import { collectWorkspaceFiles, writeWorkspaceFiles } from './bulk-ingest.js';
+import { collectWorkspaceFiles, writeWorkspaceFiles, type WorkspaceWriteError } from './bulk-ingest.js';
 import { ingestDatabaseArtifacts } from './databases/ingestion.js';
 import { discoverContentMetadata } from './discovery/discover.js';
 import { computePath as computeMappedPath, notionDiscoveryManifestPath } from './path-mapper.js';
@@ -122,13 +122,13 @@ export class NotionAdapter extends IntegrationAdapter {
   override async ingestWebhook(workspaceId: string, event: WebhookInput): Promise<IngestResult> {
     try {
       const files = await this.filesForWebhook(event);
-      await writeWorkspaceFiles(this.client, workspaceId, files);
+      const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
       return {
-        filesWritten: files.length,
+        filesWritten: writeResult.responses.length,
         filesUpdated: 0,
         filesDeleted: 0,
         paths: files.map((file) => file.path),
-        errors: [],
+        errors: writeResult.errors,
       };
     } catch (error) {
       return {
@@ -143,21 +143,21 @@ export class NotionAdapter extends IntegrationAdapter {
 
   async ingestDatabase(workspaceId: string, databaseId: string): Promise<IngestResult> {
     const files = await ingestDatabaseArtifacts(this.api, databaseId);
-    await writeWorkspaceFiles(this.client, workspaceId, files);
-    return summarizeFiles(files);
+    const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
+    return summarizeFiles(files, writeResult.errors, writeResult.responses.length);
   }
 
   async ingestPage(workspaceId: string, pageId: string, databaseId?: string): Promise<IngestResult> {
     const page = await retrievePage(this.api, pageId);
     const files = await ingestPageArtifacts(this.api, page, { databaseId });
-    await writeWorkspaceFiles(this.client, workspaceId, files);
-    return summarizeFiles(files);
+    const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
+    return summarizeFiles(files, writeResult.errors, writeResult.responses.length);
   }
 
   async bulkIngest(workspaceId: string): Promise<IngestResult> {
     const files = await collectWorkspaceFiles(this.api);
-    await writeWorkspaceFiles(this.client, workspaceId, files);
-    return summarizeFiles(files);
+    const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
+    return summarizeFiles(files, writeResult.errors, writeResult.responses.length);
   }
 
   async discover(workspaceId: string, options: DiscoverOptions = {}): Promise<DiscoverResult> {
@@ -204,7 +204,11 @@ export class NotionAdapter extends IntegrationAdapter {
     }
 
     if (files.length > 0) {
-      await writeWorkspaceFiles(this.client, workspaceId, files);
+      const writeResult = await writeWorkspaceFiles(this.client, workspaceId, files);
+      return {
+        ...summarizeFiles(files, writeResult.errors, writeResult.responses.length),
+        nextCursor: writeResult.primaryWriteErrors.length > 0 ? watermark : nextCursor,
+      };
     }
 
     return {
@@ -245,13 +249,17 @@ export class NotionAdapter extends IntegrationAdapter {
   }
 }
 
-function summarizeFiles(files: NotionVfsFile[]): IngestResult {
+function summarizeFiles(
+  files: NotionVfsFile[],
+  errors: WorkspaceWriteError[] = [],
+  filesWritten = files.length,
+): IngestResult {
   return {
-    filesWritten: files.length,
+    filesWritten,
     filesUpdated: 0,
     filesDeleted: 0,
     paths: files.map((file) => file.path),
-    errors: [],
+    errors,
   };
 }
 

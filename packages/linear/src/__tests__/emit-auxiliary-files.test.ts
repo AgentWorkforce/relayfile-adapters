@@ -429,6 +429,42 @@ describe('emitLinearAuxiliaryFiles', () => {
     });
   });
 
+  it('populates issue state id, team, and labels from flattened sync fields', async () => {
+    const client = createClient();
+    await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{
+        id: 'issue-123',
+        identifier: 'AGE-8',
+        title: 'Release Plan',
+        state_name: 'Ready for Agent',
+        stateId: 'state-ready',
+        teamId: 'team-ar',
+        team_key: 'AR',
+        team_name: 'Agent Relay',
+        labelNames: ['factory', 'repo:relayfile-adapters'],
+        updatedAt: '2026-05-12T00:00:00Z',
+      } as never],
+    });
+
+    const canonical = JSON.parse(client.files.get(linearIssuePath('issue-123', 'AGE-8'))!) as {
+      payload: Record<string, unknown>;
+    };
+    assert.deepEqual(canonical.payload.state, {
+      id: 'state-ready',
+      name: 'Ready for Agent',
+    });
+    assert.deepEqual(canonical.payload.team, {
+      id: 'team-ar',
+      key: 'AR',
+      name: 'Agent Relay',
+    });
+    assert.deepEqual(canonical.payload.labels, [
+      { name: 'factory' },
+      { name: 'repo:relayfile-adapters' },
+    ]);
+  });
+
   it('reconciles prior by-title alias and canonical path on issue rename via the by-id anchor', async () => {
     const priorPayload = {
       provider: 'linear',

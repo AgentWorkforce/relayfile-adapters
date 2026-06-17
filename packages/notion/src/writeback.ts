@@ -22,7 +22,12 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 function extractNotionId(segment: string): string {
   const decoded = decodeURIComponent(segment);
 
-  // <slug>__<32-hex> (current convention) or legacy <slug>--<32-hex>: reverse
+  // <slug>__<8-4-4-4-12 UUID>: current canonical page paths preserve the
+  // hyphenated provider id, so strip the human-readable prefix before writing.
+  const sluggedUuid = /(?:--|__)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(decoded);
+  if (sluggedUuid) return sluggedUuid[1];
+
+  // <slug>__<32-hex> (alias convention) or legacy <slug>--<32-hex>: reverse
   // the path-mapper encoding to canonical UUID.
   const slugged32 = /(?:--|__)([0-9a-f]{32})$/i.exec(decoded);
   if (slugged32) return formatUuid(slugged32[1]);
@@ -71,8 +76,10 @@ function isCanonicalStandalonePageSegment(segment: string): boolean {
  * Resolve a relayfile writeback into a Notion REST request.
  *
  * Routes:
- *   - PATCH /notion/databases/<db>/pages/<slug>--<id>.json       → page properties
- *   - PATCH /notion/pages/<slug>--<id>.json                       → page properties (top-level)
+ *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/meta.json  → page properties
+ *   - PATCH /notion/pages/<slug>--<id>/meta.json                  → page properties (top-level)
+ *   - PATCH /notion/databases/<db>/pages/<slug>--<id>.json       → page properties (legacy)
+ *   - PATCH /notion/pages/<slug>--<id>.json                       → page properties (legacy)
  *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/properties.json → page properties
  *   - PATCH /notion/pages/<slug>--<id>/properties.json             → page properties (top-level)
  *   - PATCH /notion/databases/<db>/pages/<slug>--<id>/content.md  → page markdown
@@ -86,6 +93,11 @@ function isCanonicalStandalonePageSegment(segment: string): boolean {
  */
 export function resolveWritebackRequest(path: string, content: string): NotionWritebackRequest {
   const route = classifyWrite(path, resources);
+  const databasePageMetaMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/meta\.json$/);
+  if (databasePageMetaMatch?.[2] && isCanonicalStandalonePageSegment(databasePageMetaMatch[2])) {
+    return buildPagePropertiesWriteback(extractNotionId(databasePageMetaMatch[2]), content);
+  }
+
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (route?.resource.name === 'pages' && databasePageMatch) {
     if (route.kind === 'create') {
@@ -98,6 +110,11 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
 
   // Standalone pages: see resolveDeleteRequest for why classifyWrite returns
   // null for these paths and why the canonical-id gate substitutes for it.
+  const standalonePageMetaMatch = path.match(/^\/notion\/pages\/([^/]+)\/meta\.json$/);
+  if (standalonePageMetaMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMetaMatch[1])) {
+    return buildPagePropertiesWriteback(extractNotionId(standalonePageMetaMatch[1]), content);
+  }
+
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
   if ((route === null || route?.kind === 'patch' || route?.kind === 'create') && standalonePageMatch && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildPagePropertiesWriteback(extractNotionId(standalonePageMatch[1]), content);
@@ -138,6 +155,11 @@ export function resolveWritebackRequest(path: string, content: string): NotionWr
 
 export function resolveDeleteRequest(path: string): NotionWritebackRequest {
   const route = classifyWrite(path, resources, { fsEvent: 'delete' });
+  const databasePageMetaMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\/meta\.json$/);
+  if (databasePageMetaMatch?.[2] && isCanonicalStandalonePageSegment(databasePageMetaMatch[2])) {
+    return buildArchivePageWriteback(extractNotionId(databasePageMetaMatch[2]));
+  }
+
   const databasePageMatch = path.match(/^\/notion\/databases\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (route?.resource.name === 'pages' && route.kind === 'delete' && databasePageMatch?.[2]) {
     return buildArchivePageWriteback(extractNotionId(databasePageMatch[2]));
@@ -146,6 +168,11 @@ export function resolveDeleteRequest(path: string): NotionWritebackRequest {
   // Standalone pages may be classified when discovery resources are present.
   // The canonical-id gate keeps aliases and create-like filenames out of the
   // archive route.
+  const standalonePageMetaMatch = path.match(/^\/notion\/pages\/([^/]+)\/meta\.json$/);
+  if (standalonePageMetaMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMetaMatch[1])) {
+    return buildArchivePageWriteback(extractNotionId(standalonePageMetaMatch[1]));
+  }
+
   const standalonePageMatch = path.match(/^\/notion\/pages\/([^/]+)\.json$/);
   if ((route === null || route?.kind === 'delete') && standalonePageMatch?.[1] && isCanonicalStandalonePageSegment(standalonePageMatch[1])) {
     return buildArchivePageWriteback(extractNotionId(standalonePageMatch[1]));

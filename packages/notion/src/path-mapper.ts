@@ -194,6 +194,25 @@ export function notionDatabasePagePath(
   pageTitle?: string,
   databaseTitle?: string,
 ): string {
+  return notionDatabasePageMetaPath(databaseId, pageId, pageTitle, databaseTitle);
+}
+
+export function notionDatabasePageMetaPath(
+  databaseId: string,
+  pageId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
+  return `${NOTION_PATH_ROOT}/databases/${databaseSegment(databaseId, databaseTitle)}/pages/${databasePageSegment(databaseId, pageId, pageTitle)}/meta.json`;
+}
+
+/** @deprecated Use `notionDatabasePageMetaPath`; page records own child files. */
+export function notionDatabasePageLegacyJsonPath(
+  databaseId: string,
+  pageId: string,
+  pageTitle?: string,
+  databaseTitle?: string,
+): string {
   return `${NOTION_PATH_ROOT}/databases/${databaseSegment(databaseId, databaseTitle)}/pages/${databasePageSegment(databaseId, pageId, pageTitle)}.json`;
 }
 
@@ -226,6 +245,15 @@ export function notionDatabaseBlockPath(
 }
 
 export function notionStandalonePagePath(pageId: string, pageTitle?: string): string {
+  return notionStandalonePageMetaPath(pageId, pageTitle);
+}
+
+export function notionStandalonePageMetaPath(pageId: string, pageTitle?: string): string {
+  return `${NOTION_PATH_ROOT}/pages/${standalonePageSegment(pageId, pageTitle)}/meta.json`;
+}
+
+/** @deprecated Use `notionStandalonePageMetaPath`; page records own child files. */
+export function notionStandalonePageLegacyJsonPath(pageId: string, pageTitle?: string): string {
   return `${NOTION_PATH_ROOT}/pages/${standalonePageSegment(pageId, pageTitle)}.json`;
 }
 
