@@ -941,6 +941,7 @@ function slackMessageProps() {
     unfurl_links: bool('Whether Slack should unfurl links.'),
     unfurl_media: bool('Whether Slack should unfurl media.'),
     mrkdwn: bool('Whether Slack should parse mrkdwn in text.'),
+    idempotencyKey: str('Optional client-supplied idempotency token. The writeback engine uses it to deduplicate repeated posts (e.g. across scheduled-tick re-runs); it is never forwarded to Slack.'),
   };
 }
 
