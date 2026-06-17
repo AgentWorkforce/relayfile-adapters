@@ -563,7 +563,12 @@ function toIssueNode(issue: LinearIssue): LinearIssueNode {
     identifier: issue.identifier ?? null,
     title: issue.title ?? null,
     state: issue.state
-      ? { name: issue.state.name ?? null, type: issue.state.type ?? null }
+      ? {
+          id: issue.state.id ?? null,
+          name: issue.state.name ?? null,
+          type: issue.state.type ?? null,
+          color: issue.state.color ?? null,
+        }
       : null,
     priority: issue.priority ?? null,
     assignee: issue.assignee
@@ -1009,7 +1014,34 @@ function normalizeContentPayload(
     return payload;
   }
   const project = normalizeIssueProject(payload);
-  return project ? { ...payload, project } : payload;
+  const state = normalizeIssueState(payload);
+  if (!project && !state) {
+    return payload;
+  }
+  return {
+    ...payload,
+    ...(project ? { project } : {}),
+    ...(state ? { state } : {}),
+  };
+}
+
+function normalizeIssueState(issue: Record<string, unknown>): Record<string, unknown> | null {
+  const nestedState = isRecord(issue.state) ? issue.state : undefined;
+  const id =
+    readNonEmptyString(nestedState?.id) ??
+    readNonEmptyString(issue.stateId) ??
+    readNonEmptyString(issue.state_id);
+  const name = readNonEmptyString(nestedState?.name) ?? readNonEmptyString(issue.state_name);
+  const type = readNonEmptyString(nestedState?.type) ?? readNonEmptyString(issue.state_type);
+  const color = readNonEmptyString(nestedState?.color) ?? readNonEmptyString(issue.state_color);
+  if (!id && !name && !type && !color) return null;
+  return {
+    ...nestedState,
+    ...(id ? { id } : {}),
+    ...(name ? { name } : {}),
+    ...(type ? { type } : {}),
+    ...(color ? { color } : {}),
+  };
 }
 
 function normalizeIssueProject(issue: Record<string, unknown>): Record<string, unknown> | null {

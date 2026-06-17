@@ -64,8 +64,10 @@ const LINEAR_ACTIVE_ISSUE_FIELDS = `
         title
         description
         state {
+          id
           name
           type
+          color
         }
         priority
         assignee {

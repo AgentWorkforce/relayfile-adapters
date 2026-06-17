@@ -204,21 +204,24 @@ export class LinearAdapter extends IntegrationAdapter {
       }
 
       const normalized = this.normalizeEvent(event);
+      const payload = normalizeIssuePayloadForWrite(normalized.objectType, normalized.payload);
+      const eventForWrite: NormalizedWebhook =
+        payload === normalized.payload ? normalized : { ...normalized, payload };
       const path = computeLinearPath(
-        normalized.objectType,
-        normalized.objectId,
-        readPathHumanReadable(normalized.objectType, normalized.payload),
+        eventForWrite.objectType,
+        eventForWrite.objectId,
+        readPathHumanReadable(eventForWrite.objectType, eventForWrite.payload),
       );
-      const content = this.renderContent(workspaceId, normalized, false);
-      const semantics = this.computeSemantics(normalized.objectType, normalized.objectId, normalized.payload);
-      const aliasErrorPath = inferIssueStateAliasErrorPath(normalized);
+      const content = this.renderContent(workspaceId, eventForWrite, false);
+      const semantics = this.computeSemantics(eventForWrite.objectType, eventForWrite.objectId, eventForWrite.payload);
+      const aliasErrorPath = inferIssueStateAliasErrorPath(eventForWrite);
 
-      if (this.isRemoveEvent(normalized)) {
+      if (this.isRemoveEvent(eventForWrite)) {
         const deletePaths = [path];
         let filesDeleted = 0;
         let filesWritten = 0;
         let filesUpdated = 0;
-        const aliasPaths = await resolveRemoveAliasPaths(this.client, workspaceId, normalized);
+        const aliasPaths = await resolveRemoveAliasPaths(this.client, workspaceId, eventForWrite);
 
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path });
@@ -230,7 +233,7 @@ export class LinearAdapter extends IntegrationAdapter {
             filesDeleted += 1;
           }
 
-          const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
+          const auxiliary = await this.writeAuxiliaryFiles(workspaceId, eventForWrite, true);
           return {
             filesWritten: filesWritten + auxiliary.filesWritten,
             filesUpdated: filesUpdated + auxiliary.filesUpdated,
@@ -243,12 +246,12 @@ export class LinearAdapter extends IntegrationAdapter {
         const deleteResult = await this.client.writeFile({
           workspaceId,
           path,
-          content: this.renderContent(workspaceId, normalized, true),
+          content: this.renderContent(workspaceId, eventForWrite, true),
           contentType: JSON_CONTENT_TYPE,
           semantics,
         });
 
-        const counts = inferWriteCounts(normalized, deleteResult, true);
+        const counts = inferWriteCounts(eventForWrite, deleteResult, true);
         filesDeleted += counts.filesDeleted;
         filesWritten += counts.filesWritten;
         filesUpdated += counts.filesUpdated;
@@ -257,18 +260,18 @@ export class LinearAdapter extends IntegrationAdapter {
           const aliasDeleteResult = await this.client.writeFile({
             workspaceId,
             path: candidatePath,
-            content: this.renderContent(workspaceId, normalized, true),
+            content: this.renderContent(workspaceId, eventForWrite, true),
             contentType: JSON_CONTENT_TYPE,
             semantics,
           });
-          const aliasCounts = inferWriteCounts(normalized, aliasDeleteResult, true);
+          const aliasCounts = inferWriteCounts(eventForWrite, aliasDeleteResult, true);
           deletePaths.push(candidatePath);
           filesDeleted += aliasCounts.filesDeleted;
           filesWritten += aliasCounts.filesWritten;
           filesUpdated += aliasCounts.filesUpdated;
         }
 
-        const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, true);
+        const auxiliary = await this.writeAuxiliaryFiles(workspaceId, eventForWrite, true);
         return {
           filesWritten: filesWritten + auxiliary.filesWritten,
           filesUpdated: filesUpdated + auxiliary.filesUpdated,
@@ -285,10 +288,10 @@ export class LinearAdapter extends IntegrationAdapter {
         contentType: JSON_CONTENT_TYPE,
         semantics,
       });
-      await writeLinearAliases(this.client, workspaceId, normalized, path, content, semantics);
+      await writeLinearAliases(this.client, workspaceId, eventForWrite, path, content, semantics);
 
-      const counts = inferWriteCounts(normalized, writeResult, false);
-      const auxiliary = await this.writeAuxiliaryFiles(workspaceId, normalized, false);
+      const counts = inferWriteCounts(eventForWrite, writeResult, false);
+      const auxiliary = await this.writeAuxiliaryFiles(workspaceId, eventForWrite, false);
       const result: IngestResult = {
         filesWritten: counts.filesWritten + auxiliary.filesWritten,
         filesUpdated: counts.filesUpdated + auxiliary.filesUpdated,
@@ -297,12 +300,12 @@ export class LinearAdapter extends IntegrationAdapter {
         errors: auxiliary.errors,
       };
 
-      if (normalized.objectType !== 'issue') {
+      if (eventForWrite.objectType !== 'issue') {
         return result;
       }
 
-      const previousAliasPath = resolvePreviousIssueStateAliasPath(normalized.payload);
-      const aliasPath = resolveIssueStateAliasPath(normalized.payload);
+      const previousAliasPath = resolvePreviousIssueStateAliasPath(eventForWrite.payload);
+      const aliasPath = resolveIssueStateAliasPath(eventForWrite.payload);
       if (previousAliasPath && previousAliasPath !== aliasPath) {
         if (this.client.deleteFile) {
           await this.client.deleteFile({ workspaceId, path: previousAliasPath });
@@ -311,11 +314,11 @@ export class LinearAdapter extends IntegrationAdapter {
           const previousDeleteResult = await this.client.writeFile({
             workspaceId,
             path: previousAliasPath,
-            content: this.renderContent(workspaceId, normalized, true),
+            content: this.renderContent(workspaceId, eventForWrite, true),
             contentType: JSON_CONTENT_TYPE,
             semantics,
           });
-          const previousCounts = inferWriteCounts(normalized, previousDeleteResult, true);
+          const previousCounts = inferWriteCounts(eventForWrite, previousDeleteResult, true);
           result.filesWritten += previousCounts.filesWritten;
           result.filesUpdated += previousCounts.filesUpdated;
           result.filesDeleted += previousCounts.filesDeleted;
@@ -338,7 +341,7 @@ export class LinearAdapter extends IntegrationAdapter {
         contentType: JSON_CONTENT_TYPE,
         semantics,
       });
-      const aliasCounts = inferWriteCounts(normalized, aliasWriteResult, false);
+      const aliasCounts = inferWriteCounts(eventForWrite, aliasWriteResult, false);
       result.filesWritten += aliasCounts.filesWritten;
       result.filesUpdated += aliasCounts.filesUpdated;
       result.paths.push(aliasPath);
@@ -1061,6 +1064,32 @@ function mergeLinearPayload(event: LinearWebhookPayload): Record<string, unknown
       type: asString(event.type),
       url: asString(event.url),
     }),
+  };
+}
+
+function normalizeIssuePayloadForWrite(objectType: string, payload: Record<string, unknown>): Record<string, unknown> {
+  if (normalizeLinearObjectType(objectType) !== 'issue') {
+    return payload;
+  }
+
+  const state = getRecord(payload.state);
+  const stateId = asString(state?.id) ?? asString(payload.stateId) ?? asString(payload.state_id);
+  const stateName = asString(state?.name) ?? asString(payload.state_name);
+  const stateType = asString(state?.type) ?? asString(payload.state_type);
+  const stateColor = asString(state?.color) ?? asString(payload.state_color);
+  if (!stateId && !stateName && !stateType && !stateColor) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    state: {
+      ...state,
+      ...(stateId ? { id: stateId } : {}),
+      ...(stateName ? { name: stateName } : {}),
+      ...(stateType ? { type: stateType } : {}),
+      ...(stateColor ? { color: stateColor } : {}),
+    },
   };
 }
 

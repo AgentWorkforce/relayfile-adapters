@@ -375,6 +375,11 @@ describe('emitLinearAuxiliaryFiles', () => {
 
     // Canonical bytes are identical at every emitted alias path.
     const canonicalBytes = client.files.get(linearIssuePath('issue-123', 'AGE-8'));
+    const canonicalRecord = JSON.parse(canonicalBytes ?? '{}');
+    assert.deepEqual(canonicalRecord.payload.state, {
+      id: 'state-1',
+      name: 'In Progress',
+    });
     for (const path of expectedPaths) {
       if (path === linearIssuesIndexPath()) continue;
       assert.equal(client.files.get(path), canonicalBytes, `bytes mismatch at ${path}`);
@@ -508,6 +513,11 @@ describe('emitLinearAuxiliaryFiles', () => {
     );
     const writtenPaths = client.writes.map((w) => w.path);
     assert.ok(writtenPaths.includes(linearIssueByStatePath('Done', 'AGE-8')));
+    const canonicalRecord = JSON.parse(client.files.get(linearIssuePath('issue-123', 'AGE-8')) ?? '{}');
+    assert.deepEqual(canonicalRecord.payload.state, {
+      id: 's',
+      name: 'Done',
+    });
   });
 
   it('reconciles issue assignee, creator, and priority aliases on metadata changes', async () => {
