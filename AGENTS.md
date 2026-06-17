@@ -200,6 +200,11 @@ pushes. The version bump happens here, never in the feature PR — see
 [Versioning](#versioning) and [Do not bump package versions in feature
 PRs](#do-not-bump-package-versions-in-feature-prs).
 
+The workflow does **not** touch `CHANGELOG.md` — there is no changelog
+automation. Cutting `[Unreleased]` into a dated, versioned section is a manual
+step the releaser performs (rename `[Unreleased]`, open a fresh empty one above
+it) alongside running the publish workflow.
+
 ### Adapter writeback discovery is required
 
 Every adapter resource that supports writeback must declare file-native writeback metadata:
