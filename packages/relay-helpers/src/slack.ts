@@ -6,6 +6,22 @@ function tsParam(ts: string): string {
   return ts.replace(/\./g, '_');
 }
 
+/**
+ * The delivered Slack message ts off a writeback receipt. The writeback worker
+ * records the real `chat.postMessage` ts as the receipt's `externalId` (the
+ * idempotency-replay path also mirrors it onto `ts`); only older/non-message
+ * receipts fall back to `created`/`id`. Returning the actual message ts is what
+ * lets callers thread a reply onto a post — reading `created`/`id` alone gave an
+ * empty (or non-ts) value, so threaded replies silently failed.
+ */
+export function slackReceiptTs(
+  receipt: { externalId?: string; ts?: unknown; created?: string; id?: string } | undefined
+): string {
+  if (!receipt) return '';
+  const replayTs = typeof receipt.ts === 'string' ? receipt.ts : undefined;
+  return receipt.externalId ?? replayTs ?? receipt.created ?? receipt.id ?? '';
+}
+
 export interface SlackClient extends ProviderClient<'slack'> {
   /** Post a message to a channel. */
   post(channel: string, text: string): Promise<{ channel: string; ts: string }>;
@@ -26,15 +42,15 @@ export function slackClient(opts: IntegrationClientOptions = {}): SlackClient {
   return Object.assign(base, {
     async post(channel: string, text: string) {
       const result = await base.messages.write({ channelId: channel }, { text });
-      return { channel, ts: result.receipt?.created ?? result.receipt?.id ?? '' };
+      return { channel, ts: slackReceiptTs(result.receipt) };
     },
     async dm(user: string, text: string) {
       const result = await base['direct-messages'].write({ userId: user }, { text });
-      return { user, ts: result.receipt?.created ?? result.receipt?.id ?? '' };
+      return { user, ts: slackReceiptTs(result.receipt) };
     },
     async reply(channel: string, threadTs: string, text: string) {
       const result = await base.replies.write({ channelId: channel, messageTs: tsParam(threadTs) }, { text });
-      return { channel, ts: result.receipt?.created ?? result.receipt?.id ?? '' };
+      return { channel, ts: slackReceiptTs(result.receipt) };
     },
     async react(channel: string, messageTs: string, emoji: string) {
       await base.reactions.write({ channelId: channel, messageTs: tsParam(messageTs) }, { emoji });
