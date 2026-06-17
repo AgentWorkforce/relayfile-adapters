@@ -32,6 +32,15 @@ export interface SlackWritebackRequest {
     | '/api/reactions.add'
     | '/api/reactions.remove';
   body: Record<string, unknown>;
+  /**
+   * Optional client-supplied idempotency token, read off the writeback draft's
+   * `idempotencyKey` field. It is NOT forwarded to Slack — the cloud writeback
+   * engine uses it to deduplicate message posts (so a re-run of the same
+   * scheduled tick can't post twice even when the regenerated content differs).
+   * Absent when the draft carried no token; the engine then falls back to its
+   * content-hash idempotency.
+   */
+  idempotencyKey?: string;
 }
 
 export const SLACK_CHANNEL_TYPES = ['app_home', 'channel', 'group', 'im', 'mpim'] as const;

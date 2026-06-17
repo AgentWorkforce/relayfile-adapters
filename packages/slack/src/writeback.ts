@@ -297,11 +297,17 @@ function buildPostMessage(
     ? 'reply_in_thread'
     : 'post_message';
 
+  // Client-supplied idempotency token: surfaced on the request for the cloud
+  // writeback engine's dedup, deliberately NOT copied into `body` (it must not
+  // be sent to Slack's API).
+  const idempotencyKey = readString(parsed, 'idempotencyKey');
+
   return {
     action,
     method: 'POST',
     endpoint: '/api/chat.postMessage',
     body,
+    ...(idempotencyKey ? { idempotencyKey } : {}),
   };
 }
 
@@ -319,6 +325,7 @@ function buildPostDirectMessage(userSegment: string, content: string): SlackWrit
       return_im: true,
       message: messageBody,
     },
+    ...(message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : {}),
   };
 }
 
