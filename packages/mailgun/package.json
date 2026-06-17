@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-mailgun",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Mailgun adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -74,6 +74,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.54"
+    "@relayfile/adapter-core": "^0.3.55"
   }
 }

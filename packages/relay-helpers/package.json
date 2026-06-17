@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/relay-helpers",
-  "version": "0.3.39",
+  "version": "0.3.40",
   "description": "Ergonomic, catalog-backed provider clients for Relayfile integration handlers",
   "license": "Apache-2.0",
   "repository": {
@@ -31,7 +31,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.54",
-    "@relayfile/adapter-linear": "^0.3.20"
+    "@relayfile/adapter-core": "^0.3.55",
+    "@relayfile/adapter-linear": "^0.3.21"
   }
 }
