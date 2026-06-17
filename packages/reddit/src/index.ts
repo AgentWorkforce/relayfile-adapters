@@ -4,4 +4,5 @@ export * from './index-emitter.js';
 export * from './layout-prompt.js';
 export * from './path-mapper.js';
 export * from './resources.js';
+export * from './sync-bucketing.js';
 export type * from './types.js';

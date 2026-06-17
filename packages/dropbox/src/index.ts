@@ -14,3 +14,4 @@ export * from './digest.js';
 export * from './layout-prompt.js';
 export * from './emit-auxiliary-files.js';
 export * from './webhook-normalizer.js';
+export * from './sync-bucketing.js';

@@ -8,3 +8,4 @@ export * from './layout-prompt.js';
 export * from './path-mapper.js';
 export * from './webhook-normalizer.js';
 export type * from './types.js';
+export * from './sync-bucketing.js';

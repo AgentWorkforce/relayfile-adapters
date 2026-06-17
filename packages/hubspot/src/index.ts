@@ -12,3 +12,4 @@ export * from './queries.js';
 export * from './writeback.js';
 
 export * from './resources.js';
+export * from './sync-bucketing.js';

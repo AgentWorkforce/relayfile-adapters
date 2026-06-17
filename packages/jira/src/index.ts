@@ -88,3 +88,4 @@ export {
 export type * from './types.js';
 
 export * from './resources.js';
+export * from './sync-bucketing.js';
