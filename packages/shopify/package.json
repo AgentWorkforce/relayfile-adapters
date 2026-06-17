@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-shopify",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Shopify adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -69,6 +69,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.56"
+    "@relayfile/adapter-core": "^0.3.57"
   }
 }

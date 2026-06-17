@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-dropbox",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "Dropbox storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -76,6 +76,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.56"
+    "@relayfile/adapter-core": "^0.3.57"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-clickup",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "ClickUp adapter package for Relayfile",
   "type": "module",
   "sideEffects": false,
@@ -61,7 +61,7 @@
     "directory": "packages/clickup"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.56"
+    "@relayfile/adapter-core": "^0.3.57"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
