@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCP Error Reporting group",
+  "description": "Normalized Error Reporting group snapshot, sourced from the Error Reporting API GET /v1beta1/projects/{project}/groupStats. One record per error group. Read-only.",
+  "type": "object",
+  "required": ["groupId", "resolutionStatus"],
+  "properties": {
+    "groupId": {
+      "type": "string",
+      "description": "Opaque Error Reporting group id.",
+      "minLength": 1
+    },
+    "resolutionStatus": {
+      "type": "string",
+      "description": "Error group's current resolution status.",
+      "enum": ["OPEN", "ACKNOWLEDGED", "RESOLVED", "MUTED"]
+    },
+    "count": {
+      "type": "number",
+      "description": "Approximate occurrence count in the returned time range."
+    },
+    "affectedUsersCount": {
+      "type": "number",
+      "description": "Approximate affected user count in the returned time range."
+    },
+    "service": {
+      "type": "string",
+      "description": "The primary affected service, when available."
+    },
+    "version": {
+      "type": "string",
+      "description": "The primary affected service version, when available."
+    },
+    "exceptionType": {
+      "type": "string",
+      "description": "Representative exception type for the group, when available."
+    },
+    "exceptionMessage": {
+      "type": "string",
+      "description": "Representative exception message for the group, when available."
+    },
+    "firstSeenTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "First seen timestamp returned by Error Reporting."
+    },
+    "lastSeenTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last seen timestamp returned by Error Reporting."
+    },
+    "detailLink": {
+      "type": "string",
+      "description": "Link to the Error Reporting group details page, when available.",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": true
+}

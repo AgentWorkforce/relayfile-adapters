@@ -14,12 +14,14 @@ Connection scopes are \`project\`, \`location\`, and \`billingAccountId\`. \`pro
 \`/gcp/run/services/\` holds Cloud Run service records, sourced from the Cloud Run Admin API GET /v2/projects/{project}/locations/{location}/services (and revisions). One record per service, keyed by service name.
 \`/gcp/monitoring/alerts/\` holds Cloud Monitoring alert policy records, sourced from GET /v3/projects/{project}/alertPolicies plus firing incidents (delivered via Pub/Sub push). One record per alert policy, keyed by policyId.
 \`/gcp/billing/current.json\` is the single FinOps current-state file, sourced from the Cloud Billing API GET /v1/billingAccounts/{id} and project billing info.
+\`/gcp/error-reporting/groups/\` holds Error Reporting group records, sourced from GET /v1beta1/projects/{project}/groupStats. One record per error group, keyed by groupId.
 
 ## Discovery
 
 \`/discovery/gcp/cloud-run-services/.schema.json\` documents the Cloud Run service record shape.
 \`/discovery/gcp/monitoring-alerts/.schema.json\` documents the Monitoring alert record shape.
 \`/discovery/gcp/billing/.schema.json\` documents the billing current-state record shape.
+\`/discovery/gcp/error-reporting-groups/.schema.json\` documents the Error Reporting group record shape.
 
 ## Indexes
 
@@ -29,7 +31,8 @@ Connection scopes are \`project\`, \`location\`, and \`billingAccountId\`. \`pro
 [
   { "id": "run", "title": "Cloud Run Services", "canonicalPath": "/gcp/run/services/_index.json" },
   { "id": "monitoring", "title": "Monitoring Alerts", "canonicalPath": "/gcp/monitoring/alerts/_index.json" },
-  { "id": "billing", "title": "Billing", "canonicalPath": "/gcp/billing/_index.json" }
+  { "id": "billing", "title": "Billing", "canonicalPath": "/gcp/billing/_index.json" },
+  { "id": "error-reporting", "title": "Error Reporting Groups", "canonicalPath": "/gcp/error-reporting/groups/_index.json" }
 ]
 \`\`\`
 
@@ -51,6 +54,12 @@ Connection scopes are \`project\`, \`location\`, and \`billingAccountId\`. \`pro
 { "id": "<billingAccountId>", "title": "Billing current state", "updated": "<iso8601>", "canonicalPath": "/gcp/billing/current.json" }
 \`\`\`
 
+\`/gcp/error-reporting/groups/_index.json\` rows use:
+
+\`\`\`json
+{ "id": "<groupId>", "title": "<exceptionType or groupId>", "updated": "<iso8601>", "canonicalPath": "/gcp/error-reporting/groups/<groupId>.json", "service": "<service>", "resolutionStatus": "OPEN" }
+\`\`\`
+
 Indexes are sorted by \`updated\` descending so readers can consume recent records without re-sorting.
 
 ## Aliases
@@ -61,6 +70,9 @@ Indexes are sorted by \`updated\` descending so readers can consume recent recor
 - Cloud Run by status: \`/gcp/run/services/by-status/<ready|not-ready>/<serviceName>.json\`.
 - Monitoring by title: \`/gcp/monitoring/alerts/by-title/<display-name-slug>-<hash>__<policyId>.json\`.
 - Monitoring by state: \`/gcp/monitoring/alerts/by-state/<open|closed>/<policyId>.json\`.
+- Error Reporting stable anchor: \`/gcp/error-reporting/groups/by-id/<groupId>.json\`.
+- Error Reporting by service: \`/gcp/error-reporting/groups/by-service/<service-slug>/<groupId>.json\`.
+- Error Reporting by resolution status: \`/gcp/error-reporting/groups/by-status/<open|resolved|acknowledged>/<groupId>.json\`.
 
 Alias files are materialized canonical mirrors containing the full provider payload alongside \`{ provider, objectType, objectId, canonicalPath }\` metadata. Title aliases use the shared \`slugifyAlias\` and \`aliasCollisionSuffix\` helpers for deterministic collision safety. Billing has no alias subtree — it is a single \`current.json\` file.
 
@@ -82,6 +94,9 @@ jq '.firing' /gcp/monitoring/alerts/<policyId>.json
 ls /gcp/monitoring/alerts/by-state/open
 jq '.canonicalPath' /gcp/monitoring/alerts/by-title/<display-name-slug>-<hash>__<policyId>.json
 jq '{open, currency, amount}' /gcp/billing/current.json
+ls /gcp/error-reporting/groups
+jq '.[] | select(.resolutionStatus == "OPEN")' /gcp/error-reporting/groups/_index.json
+ls /gcp/error-reporting/groups/by-service/<service-slug>
 \`\`\`
 `;
 

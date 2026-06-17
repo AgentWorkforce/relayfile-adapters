@@ -11,6 +11,10 @@ import {
   gcpCloudRunServiceByRegionAliasPath,
   gcpCloudRunServiceByStatusAliasPath,
   gcpCloudRunServicesIndexPath,
+  gcpErrorGroupByIdAliasPath,
+  gcpErrorGroupByServiceAliasPath,
+  gcpErrorGroupByStatusAliasPath,
+  gcpErrorGroupsIndexPath,
   gcpMonitoringAlertByIdAliasPath,
   gcpMonitoringAlertByStateAliasPath,
   gcpMonitoringAlertByTitleAliasPath,
@@ -26,10 +30,13 @@ type GcpRecord = Record<string, unknown> & {
   serviceName?: string;
   policyId?: string;
   billingAccountId?: string;
+  groupId?: string;
   displayName?: string;
+  service?: string;
   region?: string;
   state?: string;
   status?: string;
+  resolutionStatus?: string;
   ready?: boolean;
   enabled?: boolean;
   firing?: boolean;
@@ -38,6 +45,9 @@ type GcpRecord = Record<string, unknown> & {
   lastModified?: string;
   lastIncidentTs?: string;
   capturedAt?: string;
+  lastSeenTime?: string;
+  firstSeenTime?: string;
+  exceptionType?: string;
   _deleted?: true;
 };
 
@@ -53,6 +63,7 @@ export interface EmitGcpAuxiliaryFilesInput {
   cloudRunServices?: readonly GcpRecord[];
   monitoringAlerts?: readonly GcpRecord[];
   billing?: readonly GcpRecord[];
+  errorGroups?: readonly GcpRecord[];
   connectionId?: string;
 }
 
@@ -71,6 +82,7 @@ export async function emitGcpAuxiliaryFiles(
         { id: "run", title: "Cloud Run Services", canonicalPath: gcpCloudRunServicesIndexPath() },
         { id: "monitoring", title: "Monitoring Alerts", canonicalPath: gcpMonitoringAlertsIndexPath() },
         { id: "billing", title: "Billing", canonicalPath: gcpBillingIndexPath() },
+        { id: "error-reporting", title: "Error Reporting Groups", canonicalPath: gcpErrorGroupsIndexPath() },
       ],
       null,
       2,
@@ -102,6 +114,17 @@ export async function emitGcpAuxiliaryFiles(
 
   await emitBillingCurrentState(client, input.workspaceId, {
     records: input.billing ?? [],
+    aggregate,
+  });
+
+  await emitCollection(client, input.workspaceId, {
+    objectType: "error-group",
+    indexPath: gcpErrorGroupsIndexPath(),
+    anchorAliasPath: gcpErrorGroupByIdAliasPath,
+    aliasPaths: errorGroupAliasPaths,
+    indexExtras: errorGroupIndexExtras,
+    records: input.errorGroups ?? [],
+    connectionId: input.connectionId,
     aggregate,
   });
 
@@ -158,12 +181,15 @@ async function emitCollection(
     const title =
       readString(record.displayName) ??
       readString(record.serviceName) ??
+      readString(record.exceptionType) ??
       id;
     const updated =
       readString(record.updatedAt) ??
       readString(record.updated_at) ??
       readString(record.lastModified) ??
       readString(record.lastIncidentTs) ??
+      readString(record.lastSeenTime) ??
+      readString(record.firstSeenTime) ??
       readString(record.capturedAt) ??
       existingRow?.updated ??
       new Date().toISOString();
@@ -246,6 +272,26 @@ function monitoringAlertIndexExtras(record: GcpRecord): Record<string, unknown> 
     state: readMonitoringAlertState(record),
     firing: typeof record.firing === "boolean" ? record.firing : undefined,
     enabled: typeof record.enabled === "boolean" ? record.enabled : undefined,
+  });
+}
+
+function errorGroupAliasPaths(record: GcpRecord, id: string): string[] {
+  const aliases: string[] = [];
+  const service = readString(record.service);
+  if (service) {
+    aliases.push(gcpErrorGroupByServiceAliasPath(service, id));
+  }
+  const status = readErrorGroupStatus(record);
+  if (status) {
+    aliases.push(gcpErrorGroupByStatusAliasPath(status, id));
+  }
+  return aliases;
+}
+
+function errorGroupIndexExtras(record: GcpRecord): Record<string, unknown> {
+  return compactObject({
+    service: readString(record.service),
+    resolutionStatus: readErrorGroupStatus(record),
   });
 }
 
@@ -437,6 +483,7 @@ function readId(record: GcpRecord): string | null {
     record.serviceName ??
     record.policyId ??
     record.billingAccountId ??
+    record.groupId ??
     null;
   if (typeof candidate === "string" && candidate.trim().length > 0) {
     return candidate.trim();
@@ -478,6 +525,14 @@ function readMonitoringAlertState(record: GcpRecord): string | undefined {
     return record.firing ? "open" : "closed";
   }
   return undefined;
+}
+
+function readErrorGroupStatus(record: GcpRecord): string | undefined {
+  return (
+    readString(record.resolutionStatus) ??
+    readString(record.state) ??
+    readString(record.status)
+  );
 }
 
 function readString(value: unknown): string | undefined {

@@ -3,11 +3,22 @@ export const GCP_PATH_ROOT = "/gcp";
 export const GCP_WEBHOOK_EVENTS = [
   "monitoring.incident.open",
   "monitoring.incident.closed",
+  "cloud-run.service.created",
+  "cloud-run.service.updated",
+  "cloud-run.service.deleted",
+  "billing.budget.alert",
+  "error-reporting.event.logged",
+  "error-reporting.group.opened",
+  "error-reporting.group.reopened",
 ] as const;
 
 export type GcpWebhookEvent = (typeof GCP_WEBHOOK_EVENTS)[number];
 
-export type GcpPathObjectType = "cloud-run-service" | "monitoring-alert" | "billing";
+export type GcpPathObjectType =
+  | "cloud-run-service"
+  | "monitoring-alert"
+  | "billing"
+  | "error-group";
 
 /**
  * Normalized Cloud Run service shape.
@@ -68,4 +79,34 @@ export interface GcpBilling {
   amount?: number;
   /** ISO-8601 timestamp when this snapshot was captured. */
   capturedAt?: string;
+}
+
+/**
+ * Normalized Error Reporting group shape.
+ * Sourced from the Error Reporting API:
+ * GET https://clouderrorreporting.googleapis.com/v1beta1/projects/{project}/groupStats
+ */
+export interface GcpErrorGroup {
+  /** Opaque Error Reporting group id. */
+  groupId: string;
+  /** Error group's current resolution status. */
+  resolutionStatus: string;
+  /** Approximate occurrence count in the returned time range. */
+  count?: number;
+  /** Approximate affected user count in the returned time range. */
+  affectedUsersCount?: number;
+  /** The primary affected service, when available. */
+  service?: string;
+  /** The primary affected service version, when available. */
+  version?: string;
+  /** Representative exception type for the group, when available. */
+  exceptionType?: string;
+  /** Representative exception message for the group, when available. */
+  exceptionMessage?: string;
+  /** First seen timestamp returned by Error Reporting. */
+  firstSeenTime?: string;
+  /** Last seen timestamp returned by Error Reporting. */
+  lastSeenTime?: string;
+  /** Link to the Error Reporting group details page, when available. */
+  detailLink?: string;
 }

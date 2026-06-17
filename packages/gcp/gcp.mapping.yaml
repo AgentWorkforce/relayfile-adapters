@@ -8,6 +8,7 @@ adapter:
     cloud-run-services: https://run.googleapis.com
     monitoring-alerts: https://monitoring.googleapis.com
     billing: https://cloudbilling.googleapis.com
+    error-reporting-groups: https://clouderrorreporting.googleapis.com
 # This adapter is auth-agnostic and declarative: it contains no HTTP client and
 # no credentials. Auth is supplied at runtime by a provider via a Nango GCP
 # connection.
@@ -31,9 +32,25 @@ resources:
     # GET https://cloudbilling.googleapis.com/v1/billingAccounts/{id}
     # and project billing info (the FinOps mount). A single current-state file.
     path: /gcp/billing/current
+  error-reporting-groups:
+    # Error Reporting API
+    # GET https://clouderrorreporting.googleapis.com/v1beta1/projects/{project}/groupStats
+    # One file per error group.
+    path: /gcp/error-reporting/groups
 webhooks:
   # GCP push signals arrive as Cloud Monitoring alert notifications delivered via
   # Pub/Sub -> an HTTP push subscription. The incident.state open/closed drives
   # alert create/update.
   monitoring.incident.open: {}
   monitoring.incident.closed: {}
+  # Cloud Run admin changes are routed from Cloud Audit Logs -> Pub/Sub -> HTTP push.
+  cloud-run.service.created: {}
+  cloud-run.service.updated: {}
+  cloud-run.service.deleted: {}
+  # Cloud Billing budgets publish current budget status to Pub/Sub multiple times per day.
+  billing.budget.alert: {}
+  # Error signals can arrive either as native Error Reporting webhooks or as
+  # Cloud Run error-log push signals that refresh Error Reporting groups.
+  error-reporting.event.logged: {}
+  error-reporting.group.opened: {}
+  error-reporting.group.reopened: {}

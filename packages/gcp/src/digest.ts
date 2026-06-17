@@ -50,6 +50,9 @@ function gcpIdentifier(path: string): string {
   if (path.includes("/billing/")) {
     return `billing ${basename}`;
   }
+  if (path.includes("/error-reporting/groups/")) {
+    return `error group ${basename}`;
+  }
 
   return basename;
 }

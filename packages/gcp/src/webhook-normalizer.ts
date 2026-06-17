@@ -1,25 +1,63 @@
-import { computeGcpPath } from "./path-mapper.js";
+import {
+  computeGcpPath,
+  gcpBillingPath,
+  gcpCloudRunServicesIndexPath,
+  gcpErrorGroupsIndexPath,
+} from "./path-mapper.js";
 import { GCP_WEBHOOK_EVENTS, type GcpWebhookEvent } from "./types.js";
 
-export type GcpWebhookObjectType = "monitoring-alert";
+export type GcpWebhookObjectType =
+  | "monitoring-alert"
+  | "cloud-run-service"
+  | "billing"
+  | "error-group";
+
+type FileEventType = "file.created" | "file.updated" | "file.deleted";
 
 export interface NormalizedGcpWebhook {
   provider: "gcp";
   eventType: GcpWebhookEvent;
   objectType: GcpWebhookObjectType;
   objectId: string;
-  policyId: string;
-  displayName: string;
-  conditionName?: string;
-  resourceName?: string;
-  state: "open" | "closed";
-  firing: boolean;
-  timestamp: string;
   payload: Record<string, unknown>;
-  fileEventType: "file.created" | "file.updated" | "file.deleted";
+  fileEventType: FileEventType;
   shouldDelete: boolean;
   path: string;
+  syncNames?: readonly string[];
+  policyId?: string;
+  displayName?: string;
+  conditionName?: string;
+  resourceName?: string;
+  state?: "open" | "closed";
+  firing?: boolean;
+  timestamp?: string;
+  serviceName?: string;
+  region?: string;
+  billingAccountId?: string;
+  budgetId?: string;
+  budgetDisplayName?: string;
+  budgetAmount?: number;
+  costAmount?: number;
+  currencyCode?: string;
+  groupId?: string;
+  detailLink?: string;
+  exceptionType?: string;
+  exceptionMessage?: string;
+  service?: string;
+  version?: string;
+  resolutionStatus?: string;
 }
+
+const GCP_CLOUD_RUN_SYNC = "fetch-cloud-run";
+const GCP_BILLING_SYNC = "fetch-billing";
+const GCP_ERROR_GROUPS_SYNC = "fetch-error-groups";
+
+const CLOUD_RUN_METHODS: Readonly<Record<string, GcpWebhookEvent>> = {
+  "google.cloud.run.v1.Services.ReplaceService": "cloud-run.service.updated",
+  "google.cloud.run.v2.Services.CreateService": "cloud-run.service.created",
+  "google.cloud.run.v2.Services.UpdateService": "cloud-run.service.updated",
+  "google.cloud.run.v2.Services.DeleteService": "cloud-run.service.deleted",
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -37,12 +75,6 @@ function readNestedRecord(
   return isRecord(value) ? value : undefined;
 }
 
-/**
- * GCP Monitoring alert notifications arrive via Pub/Sub -> an HTTP push
- * subscription. The body carries an `incident` object with:
- * `incident.policy_name`, `incident.state` (open|closed), `incident.condition_name`,
- * `incident.started_at`, `incident.resource_name`.
- */
 function readState(incident: Record<string, unknown>): "open" | "closed" | undefined {
   const raw = readString(incident.state)?.toLowerCase();
   if (raw === "open" || raw === "closed") {
@@ -51,7 +83,6 @@ function readState(incident: Record<string, unknown>): "open" | "closed" | undef
   return undefined;
 }
 
-/** Derive the policy id (last path segment) from incident.policy_name. */
 function readPolicyId(incident: Record<string, unknown>): string | undefined {
   const policyName =
     readString(incident.policy_name) ??
@@ -61,25 +92,41 @@ function readPolicyId(incident: Record<string, unknown>): string | undefined {
   if (!policyName) {
     return undefined;
   }
-  const segments = policyName.split("/").filter(Boolean);
-  return segments.at(-1) ?? policyName;
+  return lastPathSegment(policyName) ?? policyName;
 }
 
-function unwrapPubSubEnvelope(payload: Record<string, unknown>): Record<string, unknown> {
+function unwrapPubSubEnvelope(payload: Record<string, unknown>): {
+  body: Record<string, unknown>;
+  attributes: Record<string, string>;
+} {
   const message = payload.message;
   if (!isRecord(message)) {
-    return payload;
+    return { body: payload, attributes: {} };
   }
+
+  const attributes = normalizeStringRecord(message.attributes);
   const data = readString(message.data);
   if (!data) {
-    return payload;
+    return { body: payload, attributes };
   }
+
   try {
     const parsed = JSON.parse(Buffer.from(data, "base64").toString("utf8")) as unknown;
-    return isRecord(parsed) ? parsed : payload;
+    return { body: isRecord(parsed) ? parsed : payload, attributes };
   } catch {
-    return payload;
+    return { body: payload, attributes };
   }
+}
+
+function normalizeStringRecord(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, entry]) => [key, readString(entry)])
+      .filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
 }
 
 function readDisplayName(incident: Record<string, unknown>): string | undefined {
@@ -107,13 +154,26 @@ function readTimestamp(incident: Record<string, unknown>): string {
   );
 }
 
-export function normalizeGcpWebhook(
-  payload: unknown,
-  _headers: Record<string, unknown> = {},
-): NormalizedGcpWebhook | null {
-  const body = unwrapPubSubEnvelope(isRecord(payload) ? payload : {});
-  const incident = readNestedRecord(body, "incident") ?? body;
+function lastPathSegment(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return value.split("/").filter(Boolean).at(-1);
+}
 
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function normalizeMonitoringWebhook(body: Record<string, unknown>): NormalizedGcpWebhook | null {
+  const incident = readNestedRecord(body, "incident") ?? body;
   const state = readState(incident);
   if (!state) {
     return null;
@@ -134,7 +194,6 @@ export function normalizeGcpWebhook(
   const conditionName = readString(incident.condition_name);
   const resourceName = readString(incident.resource_name);
   const firing = state === "open";
-  const fileEventType = firing ? "file.created" : "file.updated";
 
   return {
     provider: "gcp",
@@ -149,8 +208,230 @@ export function normalizeGcpWebhook(
     firing,
     timestamp: readTimestamp(incident),
     payload: body,
-    fileEventType,
+    fileEventType: firing ? "file.created" : "file.updated",
     shouldDelete: false,
     path: computeGcpPath("monitoring-alert", policyId),
   };
+}
+
+function normalizeBillingBudgetWebhook(
+  body: Record<string, unknown>,
+  attributes: Record<string, string>,
+): NormalizedGcpWebhook | null {
+  const budgetDisplayName = readString(body.budgetDisplayName);
+  const costAmount = readNumber(body.costAmount);
+  const budgetAmount = readNumber(body.budgetAmount);
+  const billingAccountId = attributes.billingAccountId;
+  const budgetId = attributes.budgetId;
+
+  if (!budgetDisplayName && costAmount === undefined && budgetAmount === undefined) {
+    return null;
+  }
+  if (!billingAccountId && !budgetId) {
+    return null;
+  }
+
+  const eventType: GcpWebhookEvent = "billing.budget.alert";
+  if (!GCP_WEBHOOK_EVENTS.includes(eventType)) {
+    return null;
+  }
+  const currencyCode = readString(body.currencyCode);
+
+  return {
+    provider: "gcp",
+    eventType,
+    objectType: "billing",
+    objectId: billingAccountId ?? budgetId ?? "current",
+    payload: body,
+    fileEventType: "file.updated",
+    shouldDelete: false,
+    path: gcpBillingPath(),
+    syncNames: [GCP_BILLING_SYNC],
+    ...(billingAccountId ? { billingAccountId } : {}),
+    ...(budgetId ? { budgetId } : {}),
+    ...(budgetDisplayName ? { budgetDisplayName } : {}),
+    ...(budgetAmount !== undefined ? { budgetAmount } : {}),
+    ...(costAmount !== undefined ? { costAmount } : {}),
+    ...(currencyCode ? { currencyCode } : {}),
+  };
+}
+
+function normalizeCloudRunWebhook(body: Record<string, unknown>): NormalizedGcpWebhook | null {
+  const protoPayload = readNestedRecord(body, "protoPayload");
+  if (!protoPayload) {
+    return null;
+  }
+  if (readString(protoPayload.serviceName) !== "run.googleapis.com") {
+    return null;
+  }
+
+  const methodName = readString(protoPayload.methodName);
+  const eventType = methodName ? CLOUD_RUN_METHODS[methodName] : undefined;
+  if (!eventType || !GCP_WEBHOOK_EVENTS.includes(eventType)) {
+    return null;
+  }
+
+  const resource = readNestedRecord(body, "resource");
+  const resourceLabels = readNestedRecord(resource ?? {}, "labels");
+  const resourceName =
+    readString(protoPayload.resourceName) ??
+    readString(resourceLabels?.service_name) ??
+    readString(resourceLabels?.serviceName);
+  const serviceName =
+    readString(resourceLabels?.service_name) ??
+    readString(resourceLabels?.serviceName) ??
+    lastPathSegment(resourceName);
+  const region =
+    readString(resourceLabels?.location) ??
+    readString(resourceLabels?.region) ??
+    regionFromResourceName(resourceName);
+
+  return {
+    provider: "gcp",
+    eventType,
+    objectType: "cloud-run-service",
+    objectId: serviceName ?? resourceName ?? eventType,
+    payload: body,
+    fileEventType:
+      eventType === "cloud-run.service.created"
+        ? "file.created"
+        : eventType === "cloud-run.service.deleted"
+          ? "file.deleted"
+          : "file.updated",
+    shouldDelete: eventType === "cloud-run.service.deleted",
+    path: serviceName ? computeGcpPath("cloud-run-service", serviceName) : gcpCloudRunServicesIndexPath(),
+    syncNames: [GCP_CLOUD_RUN_SYNC],
+    ...(serviceName ? { serviceName } : {}),
+    ...(region ? { region } : {}),
+    ...(resourceName ? { resourceName } : {}),
+  };
+}
+
+function regionFromResourceName(resourceName: string | undefined): string | undefined {
+  if (!resourceName) {
+    return undefined;
+  }
+  const match = /\/locations\/([^/]+)\//u.exec(resourceName);
+  return match?.[1];
+}
+
+function normalizeErrorReportingWebhook(body: Record<string, unknown>): NormalizedGcpWebhook | null {
+  const groupInfo = readNestedRecord(body, "group_info");
+  if (!groupInfo) {
+    return null;
+  }
+
+  const subject = readString(body.subject);
+  const detailLink = readString(groupInfo.detail_link);
+  const groupId = extractErrorGroupId(detailLink);
+  const eventType: GcpWebhookEvent =
+    subject?.toLowerCase().includes("reopen")
+      ? "error-reporting.group.reopened"
+      : "error-reporting.group.opened";
+
+  if (!GCP_WEBHOOK_EVENTS.includes(eventType)) {
+    return null;
+  }
+
+  const exceptionInfo = readNestedRecord(body, "exception_info");
+  const eventInfo = readNestedRecord(body, "event_info");
+  const exceptionType = readString(exceptionInfo?.type);
+  const exceptionMessage = readString(exceptionInfo?.message);
+  const service = readString(eventInfo?.service);
+  const version = readString(eventInfo?.version);
+  return {
+    provider: "gcp",
+    eventType,
+    objectType: "error-group",
+    objectId: groupId ?? subject ?? eventType,
+    payload: body,
+    fileEventType: "file.updated",
+    shouldDelete: false,
+    path: groupId ? computeGcpPath("error-group", groupId) : gcpErrorGroupsIndexPath(),
+    syncNames: [GCP_ERROR_GROUPS_SYNC],
+    ...(groupId ? { groupId } : {}),
+    ...(detailLink ? { detailLink } : {}),
+    ...(exceptionType ? { exceptionType } : {}),
+    ...(exceptionMessage ? { exceptionMessage } : {}),
+    ...(service ? { service } : {}),
+    ...(version ? { version } : {}),
+    resolutionStatus: "OPEN",
+  };
+}
+
+function normalizeErrorLogSignal(body: Record<string, unknown>): NormalizedGcpWebhook | null {
+  const resource = readNestedRecord(body, "resource");
+  const resourceType = readString(resource?.type);
+  const severity = readString(body.severity);
+  if (resourceType !== "cloud_run_revision") {
+    return null;
+  }
+  if (!severity || !["ERROR", "CRITICAL", "ALERT", "EMERGENCY"].includes(severity.toUpperCase())) {
+    return null;
+  }
+
+  const labels = readNestedRecord(resource ?? {}, "labels");
+  const serviceName =
+    readString(labels?.service_name) ??
+    readString(labels?.serviceName);
+  const eventType: GcpWebhookEvent = "error-reporting.event.logged";
+  if (!GCP_WEBHOOK_EVENTS.includes(eventType)) {
+    return null;
+  }
+
+  return {
+    provider: "gcp",
+    eventType,
+    objectType: "error-group",
+    objectId: serviceName ?? eventType,
+    payload: body,
+    fileEventType: "file.updated",
+    shouldDelete: false,
+    path: gcpErrorGroupsIndexPath(),
+    syncNames: [GCP_ERROR_GROUPS_SYNC],
+    ...(serviceName ? { service: serviceName } : {}),
+  };
+}
+
+function extractErrorGroupId(detailLink: string | undefined): string | undefined {
+  if (!detailLink) {
+    return undefined;
+  }
+  try {
+    const url = new URL(detailLink);
+    const groupId =
+      url.searchParams.get("groupId") ??
+      url.searchParams.get("group") ??
+      undefined;
+    if (groupId) {
+      return groupId;
+    }
+    const match = /groups\/([^/?#]+)/u.exec(url.pathname);
+    if (match?.[1]) {
+      return match[1];
+    }
+    const detailMatch = /errors\/detail\/([^/?#]+)/u.exec(url.pathname);
+    if (detailMatch?.[1]) {
+      return detailMatch[1];
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function normalizeGcpWebhook(
+  payload: unknown,
+  _headers: Record<string, unknown> = {},
+): NormalizedGcpWebhook | null {
+  const source = isRecord(payload) ? payload : {};
+  const { body, attributes } = unwrapPubSubEnvelope(source);
+
+  return (
+    normalizeMonitoringWebhook(body) ??
+    normalizeBillingBudgetWebhook(body, attributes) ??
+    normalizeCloudRunWebhook(body) ??
+    normalizeErrorReportingWebhook(body) ??
+    normalizeErrorLogSignal(body)
+  );
 }

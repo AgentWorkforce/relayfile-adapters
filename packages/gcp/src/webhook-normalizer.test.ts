@@ -96,6 +96,93 @@ test("accepts an incident object at the top level (no envelope)", () => {
   assert.equal(normalized?.objectId, "flat");
 });
 
+test("normalizes Cloud Billing budget Pub/Sub notifications", () => {
+  const data = Buffer.from(JSON.stringify({
+    budgetDisplayName: "NightCTO Budget",
+    costAmount: 141.23,
+    budgetAmount: 200,
+    currencyCode: "USD",
+  })).toString("base64");
+
+  const normalized = normalizeGcpWebhook({
+    message: {
+      attributes: {
+        billingAccountId: "01D4EE-079462-DFD6EC",
+        budgetId: "budget-123",
+      },
+      data,
+    },
+  });
+
+  assert.equal(normalized?.eventType, "billing.budget.alert");
+  assert.equal(normalized?.objectType, "billing");
+  assert.equal(normalized?.path, "/gcp/billing/current.json");
+  assert.deepEqual(normalized?.syncNames, ["fetch-billing"]);
+});
+
+test("normalizes Cloud Run audit log create events", () => {
+  const normalized = normalizeGcpWebhook({
+    protoPayload: {
+      serviceName: "run.googleapis.com",
+      methodName: "google.cloud.run.v2.Services.CreateService",
+      resourceName: "projects/demo/locations/us-central1/services/api",
+    },
+    resource: {
+      type: "cloud_run_revision",
+      labels: {
+        service_name: "api",
+        location: "us-central1",
+      },
+    },
+  });
+
+  assert.equal(normalized?.eventType, "cloud-run.service.created");
+  assert.equal(normalized?.objectType, "cloud-run-service");
+  assert.equal(normalized?.path, "/gcp/run/services/api.json");
+  assert.deepEqual(normalized?.syncNames, ["fetch-cloud-run"]);
+});
+
+test("normalizes Error Reporting native webhook payloads", () => {
+  const normalized = normalizeGcpWebhook({
+    version: "1.0",
+    subject: "Reopened error group: TypeError",
+    group_info: {
+      project_id: "nightcto-production",
+      detail_link: "https://console.cloud.google.com/errors/detail/abc123?project=nightcto-production",
+    },
+    exception_info: {
+      type: "TypeError",
+      message: "undefined is not a function",
+    },
+    event_info: {
+      service: "nightcto-production-api",
+      version: "2026-06-17",
+    },
+  });
+
+  assert.equal(normalized?.eventType, "error-reporting.group.reopened");
+  assert.equal(normalized?.objectType, "error-group");
+  assert.deepEqual(normalized?.syncNames, ["fetch-error-groups"]);
+});
+
+test("normalizes Cloud Run error log signals into Error Reporting refreshes", () => {
+  const normalized = normalizeGcpWebhook({
+    severity: "ERROR",
+    resource: {
+      type: "cloud_run_revision",
+      labels: {
+        service_name: "nightcto-production-api",
+      },
+    },
+    textPayload: "Unhandled exception",
+  });
+
+  assert.equal(normalized?.eventType, "error-reporting.event.logged");
+  assert.equal(normalized?.objectType, "error-group");
+  assert.equal(normalized?.path, "/gcp/error-reporting/groups/_index.json");
+  assert.deepEqual(normalized?.syncNames, ["fetch-error-groups"]);
+});
+
 test("returns null for incomplete or non-incident payloads", () => {
   assert.equal(normalizeGcpWebhook({ incident: { state: "open" } }), null);
   assert.equal(normalizeGcpWebhook({ incident: { policy_name: "p/1", state: "unknown" } }), null);

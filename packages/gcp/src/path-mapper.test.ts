@@ -7,6 +7,9 @@ import {
   gcpCloudRunServiceByRegionAliasPath,
   gcpCloudRunServiceByStatusAliasPath,
   gcpCloudRunServicePath,
+  gcpErrorGroupByServiceAliasPath,
+  gcpErrorGroupByStatusAliasPath,
+  gcpErrorGroupPath,
   gcpMonitoringAlertByStateAliasPath,
   gcpMonitoringAlertByTitleAliasPath,
   gcpMonitoringAlertPath,
@@ -18,12 +21,14 @@ test("GCP path helpers produce canonical resource paths", () => {
   assert.equal(gcpCloudRunServicePath("api"), "/gcp/run/services/api.json");
   assert.equal(gcpMonitoringAlertPath("policy-123"), "/gcp/monitoring/alerts/policy-123.json");
   assert.equal(gcpBillingPath(), "/gcp/billing/current.json");
+  assert.equal(gcpErrorGroupPath("group-123"), "/gcp/error-reporting/groups/group-123.json");
 });
 
 test("computeGcpPath resolves supported object types", () => {
   assert.equal(computeGcpPath("cloud-run-service", "api"), "/gcp/run/services/api.json");
   assert.equal(computeGcpPath("monitoring-alert", "policy-123"), "/gcp/monitoring/alerts/policy-123.json");
   assert.equal(computeGcpPath("billing", "ignored"), "/gcp/billing/current.json");
+  assert.equal(computeGcpPath("error-group", "group-123"), "/gcp/error-reporting/groups/group-123.json");
 });
 
 test("computeGcpPath normalizes aliases and URL-encodes ids", () => {
@@ -34,6 +39,10 @@ test("computeGcpPath normalizes aliases and URL-encodes ids", () => {
   assert.equal(
     computeGcpPath("GcpMonitoringAlert", "policy/with/slashes"),
     "/gcp/monitoring/alerts/policy%2Fwith%2Fslashes.json",
+  );
+  assert.equal(
+    computeGcpPath("GcpErrorGroup", "group/with/slashes"),
+    "/gcp/error-reporting/groups/group%2Fwith%2Fslashes.json",
   );
 });
 
@@ -49,6 +58,10 @@ test("GCP canonical paths round-trip through parseGcpPath", () => {
   assert.deepEqual(parseGcpPath(gcpBillingPath()), {
     objectType: "billing",
     id: "current",
+  });
+  assert.deepEqual(parseGcpPath(gcpErrorGroupPath("group/with/slashes")), {
+    objectType: "error-group",
+    id: "group/with/slashes",
   });
 });
 
@@ -69,6 +82,14 @@ test("GCP alias helpers use shared slug normalization and deterministic suffixes
     gcpMonitoringAlertByStateAliasPath("Open", "policy-123"),
     "/gcp/monitoring/alerts/by-state/open/policy-123.json",
   );
+  assert.equal(
+    gcpErrorGroupByServiceAliasPath("NightCTO API", "group-1"),
+    "/gcp/error-reporting/groups/by-service/nightcto-api/group-1.json",
+  );
+  assert.equal(
+    gcpErrorGroupByStatusAliasPath("OPEN", "group-1"),
+    "/gcp/error-reporting/groups/by-status/open/group-1.json",
+  );
 });
 
 test("GCP title aliases remain distinct for display name collisions", () => {
@@ -85,6 +106,8 @@ test("normalizeNangoGcpModel accepts singular and plural GCP-prefixed models", (
   assert.equal(normalizeNangoGcpModel("GcpCloudRunServices"), "cloud-run-service");
   assert.equal(normalizeNangoGcpModel("GcpMonitoringAlert"), "monitoring-alert");
   assert.equal(normalizeNangoGcpModel("GcpMonitoringAlerts"), "monitoring-alert");
+  assert.equal(normalizeNangoGcpModel("GcpErrorGroup"), "error-group");
+  assert.equal(normalizeNangoGcpModel("error-groups"), "error-group");
 });
 
 test("computeGcpPath rejects unsupported object types and empty ids", () => {

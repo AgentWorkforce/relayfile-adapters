@@ -16,6 +16,9 @@ import {
   gcpCloudRunServiceByStatusAliasPath,
   gcpCloudRunServicesIndexPath,
   gcpCloudRunServicePath,
+  gcpErrorGroupByIdAliasPath,
+  gcpErrorGroupByServiceAliasPath,
+  gcpErrorGroupsIndexPath,
   gcpMonitoringAlertByIdAliasPath,
   gcpMonitoringAlertByStateAliasPath,
   gcpMonitoringAlertByTitleAliasPath,
@@ -241,6 +244,49 @@ test("emitGcpAuxiliaryFiles indexes billing current state by billingAccountId", 
       title: "Billing current state",
       updated: "2026-01-04T00:00:00.000Z",
       canonicalPath: "/gcp/billing/current.json",
+    },
+  ]);
+});
+
+test("emitGcpAuxiliaryFiles writes Error Reporting aliases and indexes", async () => {
+  const client = createClient();
+
+  await emitGcpAuxiliaryFiles(client, {
+    workspaceId: "ws-1",
+    errorGroups: [
+      {
+        groupId: "group-1",
+        service: "nightcto-production-api",
+        resolutionStatus: "OPEN",
+        exceptionType: "TypeError",
+        lastSeenTime: "2026-01-06T00:00:00.000Z",
+      },
+    ],
+  });
+
+  assert.equal(
+    JSON.parse(client.files.get(gcpErrorGroupByIdAliasPath("group-1"))!).canonicalPath,
+    "/gcp/error-reporting/groups/group-1.json",
+  );
+  assert.equal(
+    JSON.parse(client.files.get(gcpErrorGroupByServiceAliasPath("nightcto-production-api", "group-1"))!)
+      .canonicalPath,
+    "/gcp/error-reporting/groups/group-1.json",
+  );
+
+  const rows = JSON.parse(client.files.get(gcpErrorGroupsIndexPath())!) as Array<{
+    id: string;
+    service?: string;
+    resolutionStatus?: string;
+  }>;
+  assert.deepEqual(rows, [
+      {
+        id: "group-1",
+        title: "TypeError",
+        updated: "2026-01-06T00:00:00.000Z",
+      canonicalPath: "/gcp/error-reporting/groups/group-1.json",
+      service: "nightcto-production-api",
+      resolutionStatus: "OPEN",
     },
   ]);
 });

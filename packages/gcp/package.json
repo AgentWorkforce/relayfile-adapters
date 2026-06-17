@@ -26,6 +26,11 @@
       "import": "./dist/layout-prompt.js",
       "default": "./dist/layout-prompt.js"
     },
+    "./layout": {
+      "types": "./dist/layout.d.ts",
+      "import": "./dist/layout.js",
+      "default": "./dist/layout.js"
+    },
     "./path-mapper": {
       "types": "./dist/path-mapper.d.ts",
       "import": "./dist/path-mapper.js",

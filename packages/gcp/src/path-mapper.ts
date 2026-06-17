@@ -5,12 +5,14 @@ import { GCP_PATH_ROOT, type GcpPathObjectType } from "./types.js";
 export type GcpNangoModel =
   | "GcpCloudRunService"
   | "GcpMonitoringAlert"
-  | "GcpBilling";
+  | "GcpBilling"
+  | "GcpErrorGroup";
 
 export type ParsedGcpPath =
   | { objectType: "cloud-run-service"; id: string }
   | { objectType: "monitoring-alert"; id: string }
-  | { objectType: "billing"; id: "current" };
+  | { objectType: "billing"; id: "current" }
+  | { objectType: "error-group"; id: string };
 
 function assertNonEmpty(value: string, label: string): string {
   const trimmed = value.trim();
@@ -78,6 +80,26 @@ export function gcpBillingIndexPath(): string {
   return `${GCP_PATH_ROOT}/billing/_index.json`;
 }
 
+export function gcpErrorGroupPath(groupId: string): string {
+  return `${GCP_PATH_ROOT}/error-reporting/groups/${encodeGcpPathSegment(groupId)}.json`;
+}
+
+export function gcpErrorGroupsIndexPath(): string {
+  return `${GCP_PATH_ROOT}/error-reporting/groups/_index.json`;
+}
+
+export function gcpErrorGroupByIdAliasPath(groupId: string): string {
+  return `${GCP_PATH_ROOT}/error-reporting/groups/by-id/${encodeGcpPathSegment(groupId)}.json`;
+}
+
+export function gcpErrorGroupByServiceAliasPath(service: string, groupId: string): string {
+  return `${GCP_PATH_ROOT}/error-reporting/groups/by-service/${encodeGcpPathSegment(slugifyAlias(service))}/${encodeGcpPathSegment(groupId)}.json`;
+}
+
+export function gcpErrorGroupByStatusAliasPath(status: string, groupId: string): string {
+  return `${GCP_PATH_ROOT}/error-reporting/groups/by-status/${encodeGcpPathSegment(slugifyAlias(status))}/${encodeGcpPathSegment(groupId)}.json`;
+}
+
 export function normalizeNangoGcpModel(model: string): GcpPathObjectType | null {
   const normalized = model.trim().toLowerCase().replace(/[_\s]+/gu, "-");
   if (
@@ -100,6 +122,15 @@ export function normalizeNangoGcpModel(model: string): GcpPathObjectType | null 
   }
   if (normalized === "gcpbilling" || normalized === "billing") {
     return "billing";
+  }
+  if (
+    normalized === "gcperrorgroup" ||
+    normalized === "gcperrorgroups" ||
+    normalized === "error-group" ||
+    normalized === "error-groups" ||
+    normalized === "group"
+  ) {
+    return "error-group";
   }
   return null;
 }
@@ -131,6 +162,17 @@ export function parseGcpPath(path: string): ParsedGcpPath | null {
     return { objectType: "billing", id: "current" };
   }
 
+  const errorGroupMatch = /^\/gcp\/error-reporting\/groups\/([^/]+)\.json$/u.exec(path);
+  if (errorGroupMatch) {
+    if (errorGroupMatch[1] === "_index") {
+      return null;
+    }
+    return {
+      objectType: "error-group",
+      id: decodeURIComponent(errorGroupMatch[1]!),
+    };
+  }
+
   return null;
 }
 
@@ -148,6 +190,9 @@ export function computeGcpPath(objectType: string, objectId: string): string {
   }
   if (normalizedType === "monitoring-alert") {
     return gcpMonitoringAlertPath(normalizedId);
+  }
+  if (normalizedType === "error-group") {
+    return gcpErrorGroupPath(normalizedId);
   }
 
   throw new Error(`Unsupported GCP object type: ${objectType}`);
