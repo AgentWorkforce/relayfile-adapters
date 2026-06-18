@@ -59,7 +59,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.59"
+    "@relayfile/adapter-core": "^0.3.60"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
