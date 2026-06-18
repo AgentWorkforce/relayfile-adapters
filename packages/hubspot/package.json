@@ -60,7 +60,7 @@
     "directory": "packages/hubspot"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.58"
+    "@relayfile/adapter-core": "^0.3.59"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
