@@ -558,6 +558,12 @@ export const KNOWN_TRIGGER_CATALOG = {
 
 export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
   {
+    "packageName": "@relayfile/adapter-neon",
+    "packagePath": "packages/neon",
+    "provider": "neon",
+    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
+  },
+  {
     "packageName": "@relayfile/adapter-reddit",
     "packagePath": "packages/reddit",
     "provider": "reddit",
