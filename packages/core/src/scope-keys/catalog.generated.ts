@@ -7,6 +7,10 @@
  */
 
 export const KNOWN_SCOPE_KEY_CATALOG = {
+  "cloudflare": [
+    "accountId",
+    "zoneId"
+  ],
   "gcp": [
     "billingAccountId",
     "location",
