@@ -77,6 +77,10 @@ export function normalizeNeonSyncDelta(
   modelName: string,
   records: readonly Record<string, unknown>[],
 ): NormalizedNeonSyncDelta[] {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+
   const model = normalizeNangoNeonModel(modelName);
   if (model !== "operation" && model !== "endpoint" && model !== "advisor-issue") {
     return [];
@@ -147,10 +151,16 @@ function normalizeRecordDelta(
     if (!objectId) return null;
 
     const status = readFieldString(record, "status")?.toLowerCase();
-    if (action === "ADDED" && status === "failed") {
+    if (
+      status === "failed" &&
+      (action === "ADDED" || hasTransitionEvidence(record, metadata, "status", "failed"))
+    ) {
       return buildDelta("operation.failed", model, objectId, payload, action, timestamps);
     }
-    if (action === "ADDED" && status === "cancelled") {
+    if (
+      status === "cancelled" &&
+      (action === "ADDED" || hasTransitionEvidence(record, metadata, "status", "cancelled"))
+    ) {
       return buildDelta("operation.cancelled", model, objectId, payload, action, timestamps);
     }
     if (
@@ -308,11 +318,14 @@ function readFieldString(record: Record<string, unknown>, field: keyof typeof FI
 function normalizeFieldName(field: string): string {
   const trimmed = field.trim();
   if (trimmed === "currentState") return "current_state";
-  return trimmed;
+  return trimmed.toLowerCase();
 }
 
 function readTimestamp(...values: unknown[]): string | undefined {
   for (const value of values) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString();
+    }
     const text = readString(value);
     if (text !== undefined) {
       return text;

@@ -129,6 +129,27 @@ test("normalizeNeonSyncDelta suppresses plain final snapshots without transition
     [],
   );
   assert.deepEqual(
+    normalizeNeonSyncDelta("NeonOperation", [
+      {
+        id: "op-failed",
+        status: "failed",
+        _nango_metadata: {
+          last_action: "UPDATED",
+          last_modified_at: "2026-06-18T09:10:00.000Z",
+        },
+      },
+      {
+        id: "op-cancelled",
+        status: "cancelled",
+        _nango_metadata: {
+          last_action: "UPDATED",
+          last_modified_at: "2026-06-18T09:12:00.000Z",
+        },
+      },
+    ]),
+    [],
+  );
+  assert.deepEqual(
     normalizeNeonSyncDelta("NeonEndpoint", [
       {
         id: "ep-1",
@@ -144,7 +165,33 @@ test("normalizeNeonSyncDelta suppresses plain final snapshots without transition
 });
 
 test("normalizeNeonSyncDelta accepts workflow-boundary transition evidence", () => {
-  const [operationEvent] = normalizeNeonSyncDelta("NeonOperation", [
+  const [failedEvent, cancelledEvent, operationEvent] = normalizeNeonSyncDelta("NeonOperation", [
+    {
+      id: "op-failed",
+      status: "failed",
+      _nango_metadata: {
+        last_action: "updated",
+        last_modified_at: "2026-06-18T09:06:00.000Z",
+      },
+      _relayfile_transition: {
+        previous: { status: "running" },
+        current: { status: "failed" },
+        changedFields: ["status"],
+      },
+    },
+    {
+      id: "op-cancelled",
+      status: "cancelled",
+      _nango_metadata: {
+        last_action: "updated",
+        last_modified_at: "2026-06-18T09:08:00.000Z",
+      },
+      _relayfile_transition: {
+        previous: { status: "running" },
+        current: { status: "cancelled" },
+        changedFields: ["status"],
+      },
+    },
     {
       id: "op-finished",
       status: "finished",
@@ -175,6 +222,10 @@ test("normalizeNeonSyncDelta accepts workflow-boundary transition evidence", () 
     },
   ]);
 
+  assert.equal(failedEvent?.eventType, "operation.failed");
+  assert.equal(failedEvent?.metadata.action, "UPDATED");
+  assert.equal(cancelledEvent?.eventType, "operation.cancelled");
+  assert.equal(cancelledEvent?.metadata.action, "UPDATED");
   assert.equal(operationEvent?.eventType, "operation.succeeded");
   assert.equal(endpointEvent?.eventType, "endpoint.state_changed");
   assert.equal("_relayfile_transition" in (operationEvent?.payload ?? {}), false);
@@ -182,6 +233,7 @@ test("normalizeNeonSyncDelta accepts workflow-boundary transition evidence", () 
 });
 
 test("normalizeNeonSyncDelta drops records without required Nango metadata or stable ids", () => {
+  assert.deepEqual(normalizeNeonSyncDelta("NeonOperation", null as unknown as Record<string, unknown>[]), []);
   assert.deepEqual(
     normalizeNeonSyncDelta("NeonOperation", [
       {
@@ -210,12 +262,13 @@ test("normalizeNeonSyncDelta case-normalizes last_action and accepts changedFiel
       status: "finished",
       _nango_metadata: {
         last_action: "updated",
-        updatedAt: "2026-06-18T09:10:00.000Z",
-        changedFields: ["status"],
+        updatedAt: new Date("2026-06-18T09:10:00.000Z"),
+        changedFields: ["Status"],
       },
     },
   ]);
 
   assert.equal(event?.eventType, "operation.succeeded");
   assert.equal(event?.metadata.action, "UPDATED");
+  assert.equal(event?.occurredAt, "2026-06-18T09:10:00.000Z");
 });
