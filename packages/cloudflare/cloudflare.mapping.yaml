@@ -1,0 +1,43 @@
+adapter:
+  name: cloudflare
+  version: "1.0.0"
+  baseUrl: https://api.cloudflare.com/client/v4
+scopeKeys:
+  - accountId
+  - zoneId
+resources:
+  workers-scripts:
+    path: /cloudflare/workers/scripts
+  worker-usage:
+    path: /cloudflare/analytics/workers/scripts
+  pages-projects:
+    path: /cloudflare/pages/projects
+  d1-databases:
+    path: /cloudflare/d1/databases
+  kv-namespaces:
+    path: /cloudflare/kv/namespaces
+  r2-buckets:
+    path: /cloudflare/r2/buckets
+  queues:
+    path: /cloudflare/queues
+  tunnels:
+    path: /cloudflare/tunnels
+  zones:
+    path: /cloudflare/zones
+  dns-records:
+    path: /cloudflare/zones/{zoneId}/dns-records
+  notification-webhooks:
+    path: /cloudflare/notifications/webhooks
+  notification-policies:
+    path: /cloudflare/notifications/policies
+  notification-events:
+    path: /cloudflare/notifications/events
+webhooks:
+  workers_alert: {}
+  workers_observability_alert: {}
+  advanced_http_alert_error: {}
+  http_alert_origin_error: {}
+  billing_usage_alert: {}
+  health_check_status_notification: {}
+  dedicated_ssl_certificate_event_type: {}
+  access_custom_certificate_expiration_type: {}

@@ -67,6 +67,16 @@
     "task.deleted",
     "task.updated"
   ],
+  "cloudflare": [
+    "access_custom_certificate_expiration_type",
+    "advanced_http_alert_error",
+    "billing_usage_alert",
+    "dedicated_ssl_certificate_event_type",
+    "health_check_status_notification",
+    "http_alert_origin_error",
+    "workers_alert",
+    "workers_observability_alert"
+  ],
   "confluence": [
     "page.created",
     "page.deleted",
