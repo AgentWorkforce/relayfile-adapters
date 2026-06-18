@@ -6,6 +6,7 @@ adapter:
 scopeKeys:
   - organizationId
   - projectId
+webhooks: {}
 resources:
   organizations:
     path: /neon/organizations

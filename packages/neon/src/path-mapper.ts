@@ -54,7 +54,7 @@ export function neonProjectByIdAliasPath(id: string): string {
 }
 
 export function neonProjectByOrgAliasPath(orgId: string, projectId: string): string {
-  return `${NEON_PATH_ROOT}/projects/by-org/${encodePathSegment(slugifyAlias(orgId))}/${encodePathSegment(projectId)}.json`;
+  return `${NEON_PATH_ROOT}/projects/by-org/${encodePathSegment(orgId)}/${encodePathSegment(projectId)}.json`;
 }
 
 export function neonBranchPath(id: string): string {

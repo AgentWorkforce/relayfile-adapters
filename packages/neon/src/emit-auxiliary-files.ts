@@ -548,7 +548,12 @@ async function safeDelete(
     await client.deleteFile({ workspaceId, path });
     aggregate.deleted += 1;
   } catch (error) {
-    aggregate.errors.push({ path, error: String(error) });
+    const status = (error as { status?: number } | null)?.status;
+    if (status === 404) {
+      aggregate.deleted += 1;
+    } else {
+      aggregate.errors.push({ path, error: String(error) });
+    }
   }
 }
 
@@ -571,17 +576,7 @@ function buildAliasPayload(input: {
 }
 
 function readId(record: NeonRecord): string | null {
-  const candidate =
-    readString(record.id) ??
-    readString(record.projectId) ??
-    readString(record.project_id) ??
-    readString(record.branchId) ??
-    readString(record.branch_id) ??
-    readString(record.endpointId) ??
-    readString(record.endpoint_id) ??
-    readString(record.orgId) ??
-    readString(record.org_id);
-  return candidate ?? null;
+  return readString(record.id) ?? null;
 }
 
 function readOrgId(record: NeonRecord): string | undefined {

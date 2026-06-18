@@ -50,13 +50,13 @@ function neonIdentifier(path: string): string {
   const leaf = segments.at(-1) ?? path;
   const basename = leaf.replace(/\.[^.]+$/u, "");
 
-  if (path.includes("/organizations/")) return `organization ${basename}`;
-  if (path.includes("/projects/") && !path.includes("/consumption/")) return `project ${basename}`;
-  if (path.includes("/branches/") && !path.includes("/consumption/")) return `branch ${basename}`;
-  if (path.includes("/endpoints/")) return `endpoint ${basename}`;
-  if (path.includes("/operations/")) return `operation ${basename}`;
   if (path.includes("/consumption/projects/")) return `project consumption ${basename}`;
   if (path.includes("/consumption/branches/")) return `branch consumption ${basename}`;
+  if (path.includes("/endpoints/")) return `endpoint ${basename}`;
+  if (path.includes("/operations/")) return `operation ${basename}`;
+  if (path.includes("/branches/")) return `branch ${basename}`;
+  if (path.includes("/projects/")) return `project ${basename}`;
+  if (path.includes("/organizations/")) return `organization ${basename}`;
   if (path.includes("/spending-limits/")) return `spending limit ${basename}`;
   if (path.includes("/advisors/")) return `advisor issue ${basename}`;
   return basename;
