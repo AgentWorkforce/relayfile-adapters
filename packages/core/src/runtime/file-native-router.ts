@@ -526,6 +526,8 @@ function statusCodeForOutcome(
       return "READ_ONLY_FIELD";
     case "validation_failed":
       return "VALIDATION_FAILED";
+    case "no_receipt":
+      return "NO_RECEIPT";
   }
 }
 

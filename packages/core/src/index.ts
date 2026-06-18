@@ -9,6 +9,7 @@ export * from "./ingest/sample.js";
 export * from "./runtime/schema-adapter.js";
 export * from "./runtime/file-native-router.js";
 export * from "./runtime/writeback-status.js";
+export { WritebackError } from "./vfs-client/index.js";
 export * from "./generate/adapter-generator.js";
 export * from "./generate/types-generator.js";
 export * from "./drift/drift-checker.js";

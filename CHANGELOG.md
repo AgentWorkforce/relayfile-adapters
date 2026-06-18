@@ -16,3 +16,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 - See `docs/migration/file-native-writeback.md` for the new read/edit/create/delete contract, schema discovery flow, writeback status surface, and per-adapter draft filename examples.
 - See `docs/migration/new-json-callers.md` for the Cloud and demo caller scan that identifies `new.json` write paths to migrate.
+
+### Added
+
+- `normalizeWritebackStatus(result, entry?)` + `NormalizedWritebackState` (incl. `'no_receipt'`) and `NormalizedWritebackStatus` in `@relayfile/adapter-core` (and re-exported from the `vfs-client` subpath). Bridges high-level `WritebackResult` (receipt present/absent) with low-level `WritebackStatusEntry` outcomes. First-class support for agent debuggability (writeback no-receipt, W6) so runtime wrappers and terminal status taxonomies share a stable enum without per-adapter code. See updated `WritebackOutcome` and docs.

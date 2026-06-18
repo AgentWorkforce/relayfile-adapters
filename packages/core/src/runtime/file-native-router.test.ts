@@ -11,7 +11,10 @@ import {
 import {
   clearWritebackStatus,
   listWritebackStatus,
+  normalizeWritebackStatus,
   recordWritebackStatus,
+  WritebackError,
+  type NormalizedWritebackState,
 } from "./writeback-status.js";
 
 const resources: readonly AdapterResourceConfig[] = [
@@ -229,6 +232,53 @@ test("writeback status sink records and filters entries", () => {
       timestamp: "2026-05-09T09:00:00.000Z",
     },
   ]);
+});
+
+test("normalizeWritebackStatus bridges no-receipt and outcomes for W6", () => {
+  // no receipt case (core of writeback_no_receipt)
+  const noReceipt = normalizeWritebackStatus({ path: "/linear/issues/draft.json" });
+  assert.equal(noReceipt.state, "no_receipt");
+  assert.equal(noReceipt.path, "/linear/issues/draft.json");
+  assert.match(noReceipt.error || "", /no receipt/);
+
+  // with receipt -> succeeded (unless entry says otherwise)
+  const withReceipt = normalizeWritebackStatus({
+    path: "/linear/issues/123.json",
+    receipt: { id: "123", created: "2026-..." },
+  });
+  assert.equal(withReceipt.state, "succeeded");
+  assert.equal(withReceipt.id, "123");
+
+  // entry validation failure takes precedence
+  const valFail = normalizeWritebackStatus(
+    { path: "/linear/issues/bad.json", receipt: { id: "x" } },
+    {
+      path: "/linear/issues/bad.json",
+      op: "create",
+      outcome: "validation_failed",
+      error: "bad field",
+      timestamp: "t",
+    }
+  );
+  assert.equal(valFail.state, "validation_failed");
+  assert.equal(valFail.error, "bad field");
+
+  // can feed a full result + entry with ok -> succeeded
+  const ok = normalizeWritebackStatus(
+    { path: "/foo/bar.json", receipt: { created: "abc" } },
+    { path: "/foo/bar.json", op: "create", outcome: "ok", timestamp: "t2" }
+  );
+  assert.equal(ok.state, "succeeded");
+  assert.equal(ok.receipt?.created, "abc");
+});
+
+test("WritebackError carries normalized fields for easy catching in runtime", () => {
+  const n = normalizeWritebackStatus({ path: "/linear/issues/draft.json" });
+  const err = new WritebackError(n);
+  assert.equal(err.name, "WritebackError");
+  assert.equal(err.state, "no_receipt");
+  assert.equal(err.path, "/linear/issues/draft.json");
+  assert.match(err.message, /no_receipt/);
 });
 
 test("executeFileNativeWriteback validates, resolves create, records ok, and returns receipt", async () => {

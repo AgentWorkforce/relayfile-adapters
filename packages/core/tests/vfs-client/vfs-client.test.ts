@@ -5,9 +5,11 @@ import path from "node:path";
 import test from "node:test";
 import {
   RelayfileWritebackError,
+  WritebackError,
   draftFile,
   encodeSegment,
   listJsonFiles,
+  normalizeWritebackStatus,
   readJsonFile,
   resolveMountRoot,
   writeJsonFile
@@ -138,6 +140,17 @@ test("a draft carrying a monitored field is not mistaken for a receipt", async (
     { id: "ISS-1", title: "still a draft" }
   );
   assert.equal(result.receipt, undefined);
+
+  // normalize makes no-receipt first class (for W6 / RFC 2291)
+  const n = normalizeWritebackStatus(result);
+  assert.equal(n.state, "no_receipt");
+  assert.equal(n.path, "/linear/issues/ISS-1.json");
+
+  // compatibility: WritebackError extends RelayfileWritebackError so instanceof works
+  const err = new WritebackError(n);
+  assert(err instanceof WritebackError);
+  assert(err instanceof RelayfileWritebackError);
+  assert.equal(err.state, "no_receipt");
 });
 
 test("an in-mount name starting with '..' is allowed (not a traversal escape)", async () => {
