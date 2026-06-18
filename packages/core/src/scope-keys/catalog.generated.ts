@@ -19,6 +19,10 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
   "gitlab": [
     "projectPath"
   ],
+  "neon": [
+    "organizationId",
+    "projectId"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

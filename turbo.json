@@ -58,6 +58,7 @@
         "@relayfile/adapter-linear#build",
         "@relayfile/adapter-mailgun#build",
         "@relayfile/adapter-mixpanel#build",
+        "@relayfile/adapter-neon#build",
         "@relayfile/adapter-notion#build",
         "@relayfile/adapter-pipedrive#build",
         "@relayfile/adapter-recall#build",

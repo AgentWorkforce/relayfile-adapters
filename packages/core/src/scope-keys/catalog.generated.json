@@ -11,6 +11,10 @@
   "gitlab": [
     "projectPath"
   ],
+  "neon": [
+    "organizationId",
+    "projectId"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

@@ -1,0 +1,28 @@
+adapter:
+  name: neon
+  version: "1.0.0"
+  baseUrls:
+    api: https://console.neon.tech/api/v2
+scopeKeys:
+  - organizationId
+  - projectId
+webhooks: {}
+resources:
+  organizations:
+    path: /neon/organizations
+  projects:
+    path: /neon/projects
+  branches:
+    path: /neon/branches
+  endpoints:
+    path: /neon/endpoints
+  operations:
+    path: /neon/operations
+  project-consumption:
+    path: /neon/consumption/projects
+  branch-consumption:
+    path: /neon/consumption/branches
+  spending-limits:
+    path: /neon/spending-limits
+  advisor-issues:
+    path: /neon/advisors
