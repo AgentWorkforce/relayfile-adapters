@@ -321,6 +321,13 @@
     "profile.merge",
     "profile.update"
   ],
+  "neon": [
+    "advisor.issue_raised",
+    "endpoint.state_changed",
+    "operation.cancelled",
+    "operation.failed",
+    "operation.succeeded"
+  ],
   "notion": [
     "database.created",
     "database.deleted",

@@ -329,6 +329,13 @@ export const KNOWN_TRIGGER_CATALOG = {
     "profile.merge",
     "profile.update"
   ],
+  "neon": [
+    "advisor.issue_raised",
+    "endpoint.state_changed",
+    "operation.cancelled",
+    "operation.failed",
+    "operation.succeeded"
+  ],
   "notion": [
     "database.created",
     "database.deleted",
@@ -557,12 +564,6 @@ export const KNOWN_TRIGGER_CATALOG = {
 >;
 
 export const ADAPTERS_WITHOUT_KNOWN_TRIGGERS = [
-  {
-    "packageName": "@relayfile/adapter-neon",
-    "packagePath": "packages/neon",
-    "provider": "neon",
-    "reason": "No supportedEvents() implementation and no mapping.yaml webhooks block"
-  },
   {
     "packageName": "@relayfile/adapter-reddit",
     "packagePath": "packages/reddit",
