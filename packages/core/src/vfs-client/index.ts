@@ -306,3 +306,62 @@ async function readCurrentJson(absolutePath: string): Promise<unknown> {
     return undefined;
   }
 }
+
+// Re-export the writeback status normalizer + normalized types so consumers
+// of the high-level write path (WritebackResult) have a single import site for
+// the W6 / observability bridge (RFC PR 2291 alignment).
+// Types needed for the normalized writeback error (imported as types to avoid cycles)
+import type {
+  NormalizedWritebackState,
+  NormalizedWritebackStatus,
+  WritebackOperation,
+  WritebackReceiptLike,
+} from "../runtime/writeback-status.js";
+
+// Re-export the normalize + status types (the implementation of normalize stays in writeback-status)
+export {
+  normalizeWritebackStatus,
+  type NormalizedWritebackState,
+  type NormalizedWritebackStatus,
+  type WritebackOutcome,
+  type WritebackStatusEntry,
+} from "../runtime/writeback-status.js";
+
+/**
+ * Typed error for writeback failures after normalization (high-level writeJsonFile etc).
+ * Extends the existing RelayfileWritebackError so that instanceof checks
+ * (WorkforceIntegrationError aliases, cloud/agent catches) continue to work.
+ *
+ * For RFC 2291 / W6 / W2 alignment. Carries `state` for taxonomy mapping.
+ */
+export class WritebackError extends RelayfileWritebackError {
+  readonly state: NormalizedWritebackState;
+  readonly path: string;
+  readonly op?: WritebackOperation;
+  readonly id?: string;
+  readonly receipt?: WritebackReceiptLike;
+  readonly field?: string;
+  readonly timestamp?: string;
+
+  constructor(normalized: NormalizedWritebackStatus) {
+    const detail = normalized.error ? `: ${normalized.error}` : "";
+    // Call super with synthetic provider/operation so the base message and fields are populated.
+    // We use a stable "writeback" provider and the state as operation for diagnostics.
+    super({
+      provider: "writeback",
+      operation: normalized.state,
+      cause: normalized.error ? new Error(normalized.error) : undefined,
+      retryable: false,
+    });
+    // Override message to be more precise (the super sets a transport-style one).
+    this.message = `writeback ${normalized.state} ${normalized.path}${detail}`;
+    this.name = "WritebackError";
+    this.state = normalized.state;
+    this.path = normalized.path;
+    this.op = normalized.op;
+    this.id = normalized.id;
+    this.receipt = normalized.receipt;
+    this.field = normalized.field;
+    this.timestamp = normalized.timestamp;
+  }
+}

@@ -61,6 +61,7 @@ Validation and adapter failures are surfaced through `relayfile writeback status
 - `validation_failed` for schema problems such as missing required fields, unknown fields when `additionalProperties: false`, type mismatches, or invalid enum values.
 - `readonly_rejected` when a payload includes a field marked `readOnly` in the schema.
 - `adapter_error` when the adapter or provider rejects an otherwise routed writeback.
+- `no_receipt` (via `normalizeWritebackStatus`) when the high-level write (writeJsonFile etc) returns with no receipt (timeout or fire-and-forget via `writebackTimeoutMs: 0`). This is first-class for debuggability (W6).
 
 Use the status surface before retrying a write. For example, if a create fails because `teamId` is missing, update the non-canonical draft file with the required field and write it again.
 
