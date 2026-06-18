@@ -824,6 +824,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "reason": "No resources.ts with writeback path templates"
   },
   {
+    "packageName": "@relayfile/adapter-cloudflare",
+    "packagePath": "packages/cloudflare",
+    "provider": "cloudflare",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
     "packageName": "@relayfile/adapter-docker-hub",
     "packagePath": "packages/docker-hub",
     "provider": "docker-hub",

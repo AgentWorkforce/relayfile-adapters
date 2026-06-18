@@ -22,6 +22,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
     { path: "cloudflare/queues", title: "Queues", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/tunnels", title: "Cloudflare Tunnels", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/zones", title: "Zones", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
+    { path: "cloudflare/zones/*/dns-records", title: "DNS records", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/notifications/webhooks", title: "Notification webhooks", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/notifications/policies", title: "Notification policies", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/notifications/events", title: "Notification events", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },

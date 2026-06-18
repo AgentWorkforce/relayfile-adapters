@@ -11,7 +11,7 @@ Always run \`ls\` before constructing a path. Cloudflare records are keyed by pr
 \`/cloudflare/zones/\` holds zone inventory. Each zone may expose \`/cloudflare/zones/<zoneId>/dns-records/\`.
 \`/cloudflare/notifications/webhooks/\`, \`/cloudflare/notifications/policies/\`, and \`/cloudflare/notifications/events/\` hold Notification configuration and delivered alert events.
 
-Each collection exposes an \`_index.json\` plus \`by-id/\` aliases. Discovery schemas are emitted under \`/discovery/cloudflare/\`.
+Each collection exposes an \`_index.json\` plus \`by-id/\` aliases. Start from concrete indexes such as \`/cloudflare/workers/scripts/_index.json\`, \`/cloudflare/analytics/workers/scripts/_index.json\`, \`/cloudflare/zones/_index.json\`, and \`/cloudflare/zones/<zoneId>/dns-records/_index.json\`. Discovery schemas are emitted under \`/discovery/cloudflare/\`.
 
 Discovery contracts:
 - \`/cloudflare/workers/scripts/{scriptName}.json\` → \`discovery/cloudflare/workers-scripts/.schema.json\`

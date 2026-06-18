@@ -6,7 +6,10 @@ import {
 export type { AdapterResourceConfig } from "./read-only-resources.js";
 export { readOnlyResources } from "./read-only-resources.js";
 
-export const resources = readOnlyResources;
+// Cloudflare is currently read-only for Relayfile materialization. Keep the
+// writeback catalog empty so adapter-core does not advertise unsupported file
+// native writes for inventory and notification records.
+export const resources = [] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(
   path: string,

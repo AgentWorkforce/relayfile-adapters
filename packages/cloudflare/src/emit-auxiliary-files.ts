@@ -118,6 +118,16 @@ async function emitCollection(
 
   for (const [groupKey, groupRecords] of grouped.entries()) {
     const zoneId = groupKey || undefined;
+    if (objectType === "dns-record" && !zoneId) {
+      for (const record of groupRecords) {
+        const id = readObjectId(record, objectType) ?? "unknown";
+        aggregate.errors.push({
+          path: `${inputPathPrefix(objectType)}/_index.json`,
+          error: `Skipping dns-record ${id}: missing zone_id`,
+        });
+      }
+      continue;
+    }
     const indexPath = cloudflareCollectionIndexPath(objectType, { zoneId });
     const existingRows = await readIndex(client, workspaceId, indexPath, aggregate);
     const rows = new Map(existingRows.map((row) => [row.id, row]));
@@ -129,6 +139,13 @@ async function emitCollection(
       }
       const id = readObjectId(record, normalizedType);
       if (!id) {
+        continue;
+      }
+      if (normalizedType === "dns-record" && !(zoneId ?? readString(record.zone_id))) {
+        aggregate.errors.push({
+          path: indexPath,
+          error: `Skipping dns-record ${id}: missing zone_id`,
+        });
         continue;
       }
       const canonicalPath = computeCanonicalPath(normalizedType, record, id, zoneId);
@@ -311,4 +328,10 @@ async function safeDelete(
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function inputPathPrefix(objectType: CloudflarePathObjectType): string {
+  return objectType === "dns-record"
+    ? `${cloudflareCollectionIndexPath("zone").replace(/\/_index\.json$/u, "")}/<zoneId>/dns-records`
+    : cloudflareCollectionIndexPath(objectType).replace(/\/_index\.json$/u, "");
 }

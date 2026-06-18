@@ -1,4 +1,8 @@
 {
+  "cloudflare": [
+    "accountId",
+    "zoneId"
+  ],
   "gcp": [
     "billingAccountId",
     "location",

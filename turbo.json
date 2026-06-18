@@ -42,6 +42,7 @@
         "@relayfile/adapter-asana#build",
         "@relayfile/adapter-calendly#build",
         "@relayfile/adapter-clickup#build",
+        "@relayfile/adapter-cloudflare#build",
         "@relayfile/adapter-confluence#build",
         "@relayfile/adapter-daytona#build",
         "@relayfile/adapter-docker-hub#build",

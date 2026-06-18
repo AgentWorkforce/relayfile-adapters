@@ -65,17 +65,13 @@ export function cloudflareByIdAliasPath(
 }
 
 export function computeCloudflarePath(
-  objectType: string,
+  objectType: CloudflarePathObjectType,
   objectId: string,
   context: { zoneId?: string } = {},
 ): string {
-  const normalizedType = normalizeNangoCloudflareModel(objectType);
-  if (!normalizedType) {
-    throw new Error(`Unsupported Cloudflare object type: ${objectType}`);
-  }
   const id = encodeCloudflarePathSegment(objectId);
 
-  switch (normalizedType) {
+  switch (objectType) {
     case "worker-script":
       return `${CLOUDFLARE_PATH_ROOT}/workers/scripts/${id}.json`;
     case "worker-usage":
@@ -106,6 +102,18 @@ export function computeCloudflarePath(
     case "notification-event":
       return `${CLOUDFLARE_PATH_ROOT}/notifications/events/${id}.json`;
   }
+}
+
+export function computeCloudflarePathFromModel(
+  model: string,
+  objectId: string,
+  context: { zoneId?: string } = {},
+): string {
+  const normalizedType = normalizeNangoCloudflareModel(model);
+  if (!normalizedType) {
+    throw new Error(`Unsupported Cloudflare object type: ${model}`);
+  }
+  return computeCloudflarePath(normalizedType, objectId, context);
 }
 
 export function normalizeNangoCloudflareModel(

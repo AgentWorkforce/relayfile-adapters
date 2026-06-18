@@ -41,7 +41,7 @@
     "test": "node --import tsx --test 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
-    "build": "npm run build --workspace @relayfile/adapter-core && tsc",
+    "build": "tsc",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

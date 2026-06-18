@@ -30,14 +30,18 @@ export const digest: DigestHandler = createDigestHandler({
     { verbs: "delete|deleted|remove|removed", pastTense: "was deleted" },
     { verbs: "open|opened|start|started", pastTense: "started" },
     { verbs: "close|closed|resolve|resolved|end|ended", pastTense: "was resolved" },
+    { verbs: "archive|archived", pastTense: "was archived" },
+    { verbs: "complete|completed", pastTense: "was completed" },
+    { verbs: "cancel|canceled|cancelled", pastTense: "was canceled" },
+    { verbs: "merge|merged", pastTense: "was merged" },
     { verbs: "fire|fired|alert", pastTense: "fired" },
   ],
 });
 
 function cloudflareIdentifier(path: string): string {
   const basename = path.split("/").filter(Boolean).at(-1)?.replace(/\.[^.]+$/u, "") ?? path;
-  if (path.includes("/workers/scripts/")) return `Worker script ${basename}`;
   if (path.includes("/analytics/workers/scripts/")) return `Worker usage ${basename}`;
+  if (path.includes("/workers/scripts/")) return `Worker script ${basename}`;
   if (path.includes("/pages/projects/")) return `Pages project ${basename}`;
   if (path.includes("/d1/databases/")) return `D1 database ${basename}`;
   if (path.includes("/kv/namespaces/")) return `KV namespace ${basename}`;
