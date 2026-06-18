@@ -6,7 +6,17 @@ adapter:
 scopeKeys:
   - organizationId
   - projectId
-webhooks: {}
+webhooks:
+  operation.failed:
+    path: /neon/operations
+  operation.cancelled:
+    path: /neon/operations
+  operation.succeeded:
+    path: /neon/operations
+  endpoint.state_changed:
+    path: /neon/endpoints
+  advisor.issue_raised:
+    path: /neon/advisors
 resources:
   organizations:
     path: /neon/organizations
