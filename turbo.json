@@ -14,11 +14,17 @@
       ]
     },
     "@relayfile/adapter-linear#build": {
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": [
         "dist/**"
       ]
     },
     "@relayfile/adapter-slack#build": {
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": [
         "dist/**"
       ]
