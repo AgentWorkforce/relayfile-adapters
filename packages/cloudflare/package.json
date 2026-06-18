@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-cloudflare",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cloudflare adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -64,7 +64,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.60"
+    "@relayfile/adapter-core": "^0.3.61"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
