@@ -33,11 +33,19 @@ resources:
   notification-events:
     path: /cloudflare/notifications/events
 webhooks:
-  workers_alert: {}
-  workers_observability_alert: {}
-  advanced_http_alert_error: {}
-  http_alert_origin_error: {}
-  billing_usage_alert: {}
-  health_check_status_notification: {}
-  dedicated_ssl_certificate_event_type: {}
-  access_custom_certificate_expiration_type: {}
+  workers_alert:
+    path: /cloudflare/notifications/events
+  workers_observability_alert:
+    path: /cloudflare/notifications/events
+  advanced_http_alert_error:
+    path: /cloudflare/notifications/events
+  http_alert_origin_error:
+    path: /cloudflare/notifications/events
+  billing_usage_alert:
+    path: /cloudflare/notifications/events
+  health_check_status_notification:
+    path: /cloudflare/notifications/events
+  dedicated_ssl_certificate_event_type:
+    path: /cloudflare/notifications/events
+  access_custom_certificate_expiration_type:
+    path: /cloudflare/notifications/events
