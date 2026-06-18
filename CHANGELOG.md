@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+Cross-package release notes for the relayfile adapters workspace. Curate
+`[Unreleased]` as PRs land. The publish workflow does not touch this file, so
+the release cut is manual: when you run a release, rename `[Unreleased]` to the
+published version with a date and open a fresh empty `[Unreleased]` above it.
+
+## [Unreleased]
 
 ### Breaking
 

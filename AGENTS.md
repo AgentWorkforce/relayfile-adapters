@@ -161,6 +161,50 @@ node scripts/resolve-publish-targets.mjs all
 
 If your new adapter is missing from the output, check that `packages/<slug>/package.json` exists and is not marked private.
 
+### Changelog
+
+Curate `[Unreleased]` in `CHANGELOG.md` as you land PRs — it carries the
+cross-package, user-facing release narrative for the adapters workspace. There
+are no per-package changelogs today; the root `CHANGELOG.md` is the single
+source of truth.
+
+Changelog entries should be concise and impact-first. Prefer one short bullet
+per user-visible change: name the adapter, path-mapper helper, `LAYOUT.md`,
+writeback resource, or catalog touched and the practical effect. Drop issue/PR
+links, internal review notes, implementation backstory, and "foundation
+for..." phrasing unless that text clearly explains the shipped impact. Path-mapper
+and `LAYOUT.md` changes that consumers must resync against belong here (see
+[Cross-repo coordination](#cross-repo-coordination)).
+
+### Releases
+
+```bash
+# from GitHub Actions: workflow_dispatch -> "Publish Package"
+#   package: all | missing | a group alias (storage, messaging, calendar,
+#            devtools, crm, pm, support, analytics, email, commerce, db) |
+#            one or more package dir names, comma- or space-separated
+#   version: patch | minor | major | prerelease | none (publish current
+#            package.json as-is) | an exact semver like 1.2.3 or 0.2.0-beta.1
+#   tag:     latest | next | beta (npm dist-tag)
+#   dry_run: true to skip the actual publish, version commit, and push
+```
+
+The workflow (`.github/workflows/publish.yml`) installs and builds the whole
+workspace with `npx turbo build`, resolves publish targets via
+`scripts/resolve-publish-targets.mjs`, bumps `version` in each resolved
+`packages/<slug>/package.json` (`npm version --no-git-tag-version`, skipped when
+`version: none`), syncs internal dependency specifiers
+(`scripts/sync-internal-dependencies.mjs`), publishes each target to npm with
+`--provenance`, then commits the version bumps as `chore(release): bump ...` and
+pushes. The version bump happens here, never in the feature PR — see
+[Versioning](#versioning) and [Do not bump package versions in feature
+PRs](#do-not-bump-package-versions-in-feature-prs).
+
+The workflow does **not** touch `CHANGELOG.md` — there is no changelog
+automation. Cutting `[Unreleased]` into a dated, versioned section is a manual
+step the releaser performs (rename `[Unreleased]`, open a fresh empty one above
+it) alongside running the publish workflow.
+
 ### Adapter writeback discovery is required
 
 Every adapter resource that supports writeback must declare file-native writeback metadata:
