@@ -60,7 +60,7 @@
     "directory": "packages/zendesk"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.61"
+    "@relayfile/adapter-core": "^0.3.62"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
