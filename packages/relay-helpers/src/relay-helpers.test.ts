@@ -146,6 +146,50 @@ test('githubClient.comment and slackClient.post target the canonical paths', asy
   assert.deepEqual(msg.body, { text: 'shipped' });
 });
 
+test('slackClient.post can return ts from direct Relayfile op providerResult', async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const fetchImpl: typeof fetch = async (input, init = {}) => {
+    const url = String(input);
+    requests.push({ url, init });
+    if (url.includes('/fs/file')) {
+      return Response.json({
+        opId: 'op_slack_direct',
+        status: 'queued',
+        targetRevision: 'rev_1',
+        writeback: { provider: 'slack', state: 'pending' }
+      });
+    }
+    if (url.includes('/ops/op_slack_direct')) {
+      return Response.json({
+        opId: 'op_slack_direct',
+        status: 'succeeded',
+        attemptCount: 1,
+        providerResult: {
+          provider: 'slack',
+          externalId: '1781870464.800039',
+          ts: '1781870464.800039',
+          channel: 'C123'
+        }
+      });
+    }
+    return Response.json({ code: 'not_found', message: 'unexpected request' }, { status: 404 });
+  };
+
+  const result = await slackClient({
+    relayfileBaseUrl: 'https://relayfile.example.test',
+    relayfileApiToken: 'token-with-fs-write-and-ops-read',
+    workspaceId: 'rw_7ccfea89',
+    fetchImpl,
+    writebackTimeoutMs: 100,
+    writebackPollMs: 5
+  }).post('C123', 'shipped');
+
+  assert.deepEqual(result, { channel: 'C123', ts: '1781870464.800039' });
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
+  assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_direct$/);
+});
+
 test('every catalog provider has a named client export', () => {
   const providers = Object.keys(WRITEBACK_PATH_CATALOG);
   assert.ok(providers.length >= 29, `expected >=29 providers, saw ${providers.length}`);
