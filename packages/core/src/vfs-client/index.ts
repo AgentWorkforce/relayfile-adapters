@@ -385,7 +385,7 @@ async function writeJsonFileViaRelayfileApi(
     contentType: "application/json",
     content: `${JSON.stringify(body, null, 2)}\n`
   });
-  const receipt = queued.writeback && queued.opId
+  const receipt = queued.opId
     ? await waitForOperationReceipt(client, provider, operation, direct, queued.opId, relayPath)
     : undefined;
   return {
