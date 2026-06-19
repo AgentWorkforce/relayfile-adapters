@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   RelayfileWritebackError,
   RelayfileWritebackPendingError,
+  RelayfileWritebackReceiptError,
   WritebackError,
   draftFile,
   encodeSegment,
@@ -291,6 +292,55 @@ test("writeJsonFile direct mode surfaces op authorization failures instead of pe
       !(error instanceof RelayfileWritebackPendingError) &&
       error.cause instanceof Error &&
       /missing ops read scope/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode rejects succeeded Slack ops without a provider ts", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_missing_ts",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_missing_ts")) {
+      return Response.json({
+        opId: "op_missing_ts",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: {
+          provider: "slack",
+          acknowledgedAt: "2026-06-19T12:01:04Z"
+        }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--4.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.cause instanceof Error &&
+      /writeback_receipt_invalid/.test(error.cause.message) &&
+      /externalId or providerResult\.ts/.test(error.cause.message)
   );
 });
 

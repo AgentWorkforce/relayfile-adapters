@@ -114,6 +114,28 @@ export class RelayfileWritebackTerminalError extends RelayfileWritebackError {
   }
 }
 
+export interface RelayfileWritebackReceiptErrorOptions {
+  provider: string;
+  operation: string;
+  opId: string;
+  reason: string;
+}
+
+export class RelayfileWritebackReceiptError extends RelayfileWritebackError {
+  readonly opId: string;
+
+  constructor(options: RelayfileWritebackReceiptErrorOptions) {
+    super({
+      provider: options.provider,
+      operation: options.operation,
+      cause: new Error(`writeback_receipt_invalid: op ${options.opId}: ${options.reason}`),
+      retryable: false
+    });
+    this.name = "RelayfileWritebackReceiptError";
+    this.opId = options.opId;
+  }
+}
+
 export interface IntegrationClientOptions {
   /** Absolute path to the Relayfile mount the consumer is running in. */
   relayfileMountRoot?: string;
@@ -263,6 +285,39 @@ function providerResultReceipt(op: OperationStatusResponse): WritebackReceipt | 
   return isRecord(op.providerResult) ? (op.providerResult as WritebackReceipt) : undefined;
 }
 
+function hasReceiptPayload(receipt: WritebackReceipt | undefined): receipt is WritebackReceipt {
+  return receipt !== undefined && Object.keys(receipt).length > 0;
+}
+
+function hasSlackReceiptTs(receipt: WritebackReceipt): boolean {
+  return typeof receipt.externalId === "string" || typeof receipt.ts === "string";
+}
+
+function validateTerminalReceipt(
+  provider: string,
+  operation: string,
+  opId: string,
+  receipt: WritebackReceipt | undefined
+): WritebackReceipt {
+  if (!hasReceiptPayload(receipt)) {
+    throw new RelayfileWritebackReceiptError({
+      provider,
+      operation,
+      opId,
+      reason: "succeeded without providerResult"
+    });
+  }
+  if (provider === "slack" && !hasSlackReceiptTs(receipt)) {
+    throw new RelayfileWritebackReceiptError({
+      provider,
+      operation,
+      opId,
+      reason: "succeeded without providerResult.externalId or providerResult.ts"
+    });
+  }
+  return receipt;
+}
+
 async function waitForOperationReceipt(
   client: IntegrationClientOptions,
   provider: string,
@@ -281,7 +336,7 @@ async function waitForOperationReceipt(
       const op = await direct.relayfile.getOp(direct.workspaceId, opId);
       last = op;
       if (op.status === "succeeded") {
-        return providerResultReceipt(op);
+        return validateTerminalReceipt(provider, operation, opId, providerResultReceipt(op));
       }
       if (isTerminalOp(op)) {
         throw new RelayfileWritebackTerminalError({
@@ -293,7 +348,7 @@ async function waitForOperationReceipt(
         });
       }
     } catch (error) {
-      if (error instanceof RelayfileWritebackTerminalError) {
+      if (error instanceof RelayfileWritebackTerminalError || error instanceof RelayfileWritebackReceiptError) {
         throw error;
       }
       if (error instanceof RelayFileApiError && error.status !== 404) {
@@ -330,7 +385,7 @@ async function writeJsonFileViaRelayfileApi(
     contentType: "application/json",
     content: `${JSON.stringify(body, null, 2)}\n`
   });
-  const receipt = queued.writeback
+  const receipt = queued.writeback && queued.opId
     ? await waitForOperationReceipt(client, provider, operation, direct, queued.opId, relayPath)
     : undefined;
   return {

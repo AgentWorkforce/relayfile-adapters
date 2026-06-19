@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { RelayfileWritebackPendingError, RelayfileWritebackReceiptError } from '@relayfile/adapter-core/vfs-client';
 import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths';
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import * as helpers from './index.js';
@@ -188,6 +189,50 @@ test('slackClient.post can return ts from direct Relayfile op providerResult', a
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
   assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_direct$/);
+});
+
+test('slackClient.post rejects a terminal op without Slack ts instead of returning an empty ts', async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes('/fs/file')) {
+      return Response.json({
+        opId: 'op_slack_no_ts',
+        status: 'queued',
+        targetRevision: 'rev_1',
+        writeback: { provider: 'slack', state: 'pending' }
+      });
+    }
+    if (url.includes('/ops/op_slack_no_ts')) {
+      return Response.json({
+        opId: 'op_slack_no_ts',
+        status: 'succeeded',
+        attemptCount: 1,
+        providerResult: {
+          provider: 'slack',
+          acknowledgedAt: '2026-06-19T12:01:04Z'
+        }
+      });
+    }
+    return Response.json({ code: 'not_found', message: 'unexpected request' }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      slackClient({
+        relayfileBaseUrl: 'https://relayfile.example.test',
+        relayfileApiToken: 'token-with-fs-write-and-ops-read',
+        workspaceId: 'rw_7ccfea89',
+        fetchImpl,
+        writebackTimeoutMs: 20,
+        writebackPollMs: 5
+      }).post('C123', 'shipped'),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      !(error instanceof RelayfileWritebackPendingError) &&
+      error.opId === 'op_slack_no_ts' &&
+      error.cause instanceof Error &&
+      /externalId or providerResult\.ts/.test(error.cause.message)
+  );
 });
 
 test('every catalog provider has a named client export', () => {
