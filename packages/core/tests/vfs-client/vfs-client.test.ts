@@ -5,6 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import {
   RelayfileWritebackError,
+  RelayfileWritebackPendingError,
+  RelayfileWritebackReceiptError,
   WritebackError,
   draftFile,
   encodeSegment,
@@ -151,6 +153,322 @@ test("a draft carrying a monitored field is not mistaken for a receipt", async (
   assert(err instanceof WritebackError);
   assert(err instanceof RelayfileWritebackError);
   assert.equal(err.state, "no_receipt");
+});
+
+test("writeJsonFile can wait on direct Relayfile op providerResult instead of mount receipt visibility", async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const fetchImpl: typeof fetch = async (input, init = {}) => {
+    const url = String(input);
+    requests.push({ url, init });
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_slack_1",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_slack_1")) {
+      return Response.json({
+        opId: "op_slack_1",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: {
+          provider: "slack",
+          externalId: "1781870464.800039",
+          ts: "1781870464.800039",
+          channel: "C0AF4JELP1S"
+        }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  const result = await writeJsonFile(
+    {
+      relayfileBaseUrl: "https://relayfile.example.test",
+      relayfileApiToken: "token-with-fs-write-and-ops-read",
+      workspaceId: "rw_7ccfea89",
+      fetchImpl,
+      writebackTimeoutMs: 100,
+      writebackPollMs: 5
+    },
+    "slack",
+    "post",
+    "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--1.json",
+    { text: "hello" }
+  );
+
+  assert.equal(result.opId, "op_slack_1");
+  assert.equal(result.receipt?.externalId, "1781870464.800039");
+  assert.equal(requests.length, 2);
+  assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
+  assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_1$/);
+});
+
+test("writeJsonFile direct mode reports a pending op as retryable writeback_pending", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_pending",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_pending")) {
+      return Response.json({
+        opId: "op_pending",
+        status: "running",
+        attemptCount: 1
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--2.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackPendingError &&
+      error.retryable &&
+      error.opId === "op_pending" &&
+      /writeback_pending/.test(error.message)
+  );
+});
+
+test("writeJsonFile direct mode surfaces op authorization failures instead of pending", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_forbidden",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_forbidden")) {
+      return Response.json(
+        { code: "forbidden", message: "missing ops read scope", correlationId: "rf_forbidden" },
+        { status: 403 }
+      );
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-without-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--3.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackError &&
+      !(error instanceof RelayfileWritebackPendingError) &&
+      error.cause instanceof Error &&
+      /missing ops read scope/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode rejects succeeded Slack ops without a provider ts", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_missing_ts",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_missing_ts")) {
+      return Response.json({
+        opId: "op_missing_ts",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: {
+          provider: "slack",
+          acknowledgedAt: "2026-06-19T12:01:04Z"
+        }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--4.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.cause instanceof Error &&
+      /writeback_receipt_invalid/.test(error.cause.message) &&
+      /externalId or providerResult\.ts/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode rejects empty Slack receipt identifiers", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_empty_ts",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_empty_ts")) {
+      return Response.json({
+        opId: "op_empty_ts",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: {
+          provider: "slack",
+          externalId: "",
+          ts: "   "
+        }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--5.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.cause instanceof Error &&
+      /externalId or providerResult\.ts/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode rejects queued writeback responses missing opId", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--6.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.opId === "(missing)" &&
+      error.cause instanceof Error &&
+      /did not include opId/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode surfaces unexpected op polling failures", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_transport_failure",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_transport_failure")) {
+      throw new TypeError("network unavailable");
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--7.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackError &&
+      !(error instanceof RelayfileWritebackPendingError) &&
+      error.cause instanceof TypeError &&
+      /network unavailable/.test(error.cause.message)
+  );
 });
 
 test("an in-mount name starting with '..' is allowed (not a traversal escape)", async () => {
