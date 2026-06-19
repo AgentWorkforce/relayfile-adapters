@@ -290,7 +290,7 @@ function hasReceiptPayload(receipt: WritebackReceipt | undefined): receipt is Wr
 }
 
 function hasSlackReceiptTs(receipt: WritebackReceipt): boolean {
-  return typeof receipt.externalId === "string" || typeof receipt.ts === "string";
+  return nonEmpty(receipt.externalId) !== undefined || nonEmpty(receipt.ts) !== undefined;
 }
 
 function validateTerminalReceipt(
@@ -354,6 +354,9 @@ async function waitForOperationReceipt(
       if (error instanceof RelayFileApiError && error.status !== 404) {
         throw error;
       }
+      if (!(error instanceof RelayFileApiError)) {
+        throw error;
+      }
       // The op can briefly be unreadable immediately after enqueue. Keep polling
       // until the caller's bounded wait expires.
     }
@@ -385,6 +388,14 @@ async function writeJsonFileViaRelayfileApi(
     contentType: "application/json",
     content: `${JSON.stringify(body, null, 2)}\n`
   });
+  if (queued.writeback && !nonEmpty(queued.opId)) {
+    throw new RelayfileWritebackReceiptError({
+      provider,
+      operation,
+      opId: "(missing)",
+      reason: "queued writeback response did not include opId"
+    });
+  }
   const receipt = queued.opId
     ? await waitForOperationReceipt(client, provider, operation, direct, queued.opId, relayPath)
     : undefined;

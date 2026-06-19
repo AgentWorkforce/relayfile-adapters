@@ -23,6 +23,9 @@ export const calendlyClient = (opts?: IntegrationClientOptions): ProviderClient<
 export const clickupClient = (opts?: IntegrationClientOptions): ProviderClient<'clickup'> =>
   providerClient('clickup', opts);
 
+export const cloudflareClient = (opts?: IntegrationClientOptions): ProviderClient<'cloudflare'> =>
+  providerClient('cloudflare', opts);
+
 export const confluenceClient = (opts?: IntegrationClientOptions): ProviderClient<'confluence'> =>
   providerClient('confluence', opts);
 

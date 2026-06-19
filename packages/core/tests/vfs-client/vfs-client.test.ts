@@ -344,6 +344,133 @@ test("writeJsonFile direct mode rejects succeeded Slack ops without a provider t
   );
 });
 
+test("writeJsonFile direct mode rejects empty Slack receipt identifiers", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_empty_ts",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_empty_ts")) {
+      return Response.json({
+        opId: "op_empty_ts",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: {
+          provider: "slack",
+          externalId: "",
+          ts: "   "
+        }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--5.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.cause instanceof Error &&
+      /externalId or providerResult\.ts/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode rejects queued writeback responses missing opId", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--6.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackReceiptError &&
+      error.opId === "(missing)" &&
+      error.cause instanceof Error &&
+      /did not include opId/.test(error.cause.message)
+  );
+});
+
+test("writeJsonFile direct mode surfaces unexpected op polling failures", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_transport_failure",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_transport_failure")) {
+      throw new TypeError("network unavailable");
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-with-fs-write-and-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--7.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackError &&
+      !(error instanceof RelayfileWritebackPendingError) &&
+      error.cause instanceof TypeError &&
+      /network unavailable/.test(error.cause.message)
+  );
+});
+
 test("an in-mount name starting with '..' is allowed (not a traversal escape)", async () => {
   const { root, opts } = await mount();
   await writeJsonFile(opts, "x", "write", "/..foo/bar.json", { ok: true });
