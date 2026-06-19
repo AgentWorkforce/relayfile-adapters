@@ -250,6 +250,50 @@ test("writeJsonFile direct mode reports a pending op as retryable writeback_pend
   );
 });
 
+test("writeJsonFile direct mode surfaces op authorization failures instead of pending", async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_forbidden",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_forbidden")) {
+      return Response.json(
+        { code: "forbidden", message: "missing ops read scope", correlationId: "rf_forbidden" },
+        { status: 403 }
+      );
+    }
+    return Response.json({ code: "not_found", message: "unexpected request" }, { status: 404 });
+  };
+
+  await assert.rejects(
+    () =>
+      writeJsonFile(
+        {
+          relayfileBaseUrl: "https://relayfile.example.test",
+          relayfileApiToken: "token-without-ops-read",
+          workspaceId: "rw_7ccfea89",
+          fetchImpl,
+          writebackTimeoutMs: 20,
+          writebackPollMs: 5
+        },
+        "slack",
+        "post",
+        "/slack/channels/C0AF4JELP1S/messages/relayfile-writeback--3.json",
+        { text: "hello" }
+      ),
+    (error: unknown) =>
+      error instanceof RelayfileWritebackError &&
+      !(error instanceof RelayfileWritebackPendingError) &&
+      error.cause instanceof Error &&
+      /missing ops read scope/.test(error.cause.message)
+  );
+});
+
 test("an in-mount name starting with '..' is allowed (not a traversal escape)", async () => {
   const { root, opts } = await mount();
   await writeJsonFile(opts, "x", "write", "/..foo/bar.json", { ok: true });
