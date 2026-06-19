@@ -185,7 +185,11 @@ test('slackClient.post can return ts from direct Relayfile op providerResult', a
     writebackPollMs: 5
   }).post('C123', 'shipped');
 
-  assert.deepEqual(result, { channel: 'C123', ts: '1781870464.800039' });
+  assert.equal(result.channel, 'C123');
+  assert.equal(result.ts, '1781870464.800039');
+  // post() now also returns `ref` — the draft handle for server-side threading
+  // (the draft's relay path, available regardless of the receipt round-trip).
+  assert.ok(result.ref, 'post returns a draft-handle ref');
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
   assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_direct$/);

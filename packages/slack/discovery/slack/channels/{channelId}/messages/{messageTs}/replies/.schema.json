@@ -80,6 +80,10 @@
       "type": "string",
       "description": "Optional client-supplied idempotency token. The writeback engine uses it to deduplicate repeated posts (e.g. across scheduled-tick re-runs); it is never forwarded to Slack."
     },
+    "parentRef": {
+      "type": "string",
+      "description": "Server-side threading: relay path of a parent message draft (e.g. the ref returned by a prior post) to thread this message under. The cloud orders this write after the parent delivers and sets thread_ts to its delivered timestamp; routing-only, never forwarded to Slack."
+    },
     "reply_broadcast": {
       "type": "boolean",
       "description": "Whether Slack should also broadcast the reply to the channel."
