@@ -104,5 +104,8 @@ export const sharepointClient = (opts?: IntegrationClientOptions): ProviderClien
 export const teamsClient = (opts?: IntegrationClientOptions): ProviderClient<'teams'> =>
   providerClient('teams', opts);
 
+export const telegramClient = (opts?: IntegrationClientOptions): ProviderClient<'telegram'> =>
+  providerClient('telegram', opts);
+
 export const zendeskClient = (opts?: IntegrationClientOptions): ProviderClient<'zendesk'> =>
   providerClient('zendesk', opts);
