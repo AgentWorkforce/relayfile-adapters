@@ -11,7 +11,7 @@ export const resources = [
   {
     name: "discussions",
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions",
-    pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[^\/]+(?:__[^\/]+)?\/discussions(?:\/[^\/]+(?:\.json)?)?$/,
+    pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[^\/]+(?:__[^\/]+)?\/discussions(?:\/[^\/]+(?:\.json)?|\/[^\/]+\/notes\/[^\/]+\.json)?$/,
     idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.schema.json",
     createExample: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.create.example.json",

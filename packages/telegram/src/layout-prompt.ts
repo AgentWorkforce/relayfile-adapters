@@ -25,7 +25,7 @@ Before connecting, create a bot in @BotFather with \`/newbot\` and use the token
 
 \`/telegram/chats/by-title/<slug>__<chatId>.json\` points to the canonical chat record. Title collisions append a deterministic id hash before the id suffix.
 \`/telegram/chats/by-username/<username>__<chatId>.json\` points to public chats with usernames.
-\`/telegram/messages/by-user/<userId>/<chatId>__<messageId>.json\` points to message records sent by a known user.
+\`/telegram/messages/by-user/<userId>__<chatId>__<messageId>.json\` points to message records sent by a known user.
 \`/telegram/callback-queries/by-data/<slug>__<callbackQueryId>.json\` points to callback queries by callback data.
 
 Alias files are minimal pointers with \`{ id, canonicalPath, ... }\`; read the canonical path for full payloads.

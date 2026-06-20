@@ -130,10 +130,11 @@ function validateSchema(adapterSlug, schemaPath, schema) {
     }
   }
 
+  const writableSystemFields = new Set(schema['x-relayfile-writableSystemFields'] ?? []);
   for (const systemField of ['id', 'createdAt', 'updatedAt', 'url', '_webhook', '_connection']) {
     if (!schema.properties[systemField]) {
       failures.push(`${adapterSlug}: ${schemaPath} must include system field ${systemField}`);
-    } else if (schema.properties[systemField].readOnly !== true) {
+    } else if (!writableSystemFields.has(systemField) && schema.properties[systemField].readOnly !== true) {
       failures.push(`${adapterSlug}: ${schemaPath} system field ${systemField} must be readOnly`);
     }
   }

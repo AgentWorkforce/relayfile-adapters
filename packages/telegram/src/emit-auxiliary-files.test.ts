@@ -50,7 +50,7 @@ test('telegram auxiliary emitter writes indexes, aliases, and message records', 
   assert.ok(client.files.has('/telegram/chats/_index.json'));
   assert.ok(client.files.has('/telegram/chats/8587455921__khaliq-gant/meta.json'));
   assert.ok(client.files.has('/telegram/chats/by-username/khaliq__8587455921.json'));
-  assert.ok(client.files.has('/telegram/messages/by-user/8587455921/8587455921__42.json'));
+  assert.ok(client.files.has('/telegram/messages/by-user/8587455921__8587455921__42.json'));
   assert.ok(client.files.has('/telegram/callback-queries/by-data/approve__cb_1.json'));
 
   const chatIndex = JSON.parse(client.files.get('/telegram/chats/_index.json') ?? '[]');
@@ -98,4 +98,61 @@ test('telegram auxiliary emitter deletes reaction child paths by reaction object
 
   assert.equal(result.errors.length, 0);
   assert.equal(client.files.has(reactionPath), false);
+});
+
+test('telegram auxiliary emitter deletes message canonical paths by message object id', async () => {
+  const client = new MemoryClient();
+  await emitTelegramAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    chats: [
+      { id: '8587455921', title: 'Khaliq Gant', updated: '2026-06-20T10:00:00Z' },
+    ],
+    messages: [
+      {
+        id: '8587455921:42',
+        chatId: '8587455921',
+        chatTitle: 'Khaliq Gant',
+        messageId: 42,
+        text: 'hello telegram',
+        updated: '2026-06-20T10:01:00Z',
+      },
+    ],
+  });
+
+  const messagePath = '/telegram/chats/8587455921__khaliq-gant/messages/42/meta.json';
+  const oldBugUpdatePath = '/telegram/updates/8587455921_42.json';
+  client.files.set(oldBugUpdatePath, '{"id":"8587455921:42"}');
+  assert.ok(client.files.has(messagePath));
+
+  const result = await emitTelegramAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    chats: [
+      { id: '8587455921', title: 'Khaliq Gant', updated: '2026-06-20T10:00:00Z' },
+    ],
+    messages: [
+      { id: '8587455921:42', _deleted: true },
+    ],
+  });
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(client.files.has(messagePath), false);
+  assert.equal(client.files.has(oldBugUpdatePath), true);
+  const messageIndex = JSON.parse(client.files.get('/telegram/chats/8587455921__khaliq-gant/messages/_index.json') ?? '[]');
+  assert.equal(messageIndex.some((row: { id?: string }) => row.id === '42'), false);
+});
+
+test('telegram auxiliary emitter ignores malformed reaction tombstones', async () => {
+  const client = new MemoryClient();
+  const unrelatedUpdatePath = '/telegram/updates/malformed.json';
+  client.files.set(unrelatedUpdatePath, '{"id":"malformed"}');
+
+  const result = await emitTelegramAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    reactions: [
+      { id: 'malformed', _deleted: true },
+    ],
+  });
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(client.files.has(unrelatedUpdatePath), true);
 });

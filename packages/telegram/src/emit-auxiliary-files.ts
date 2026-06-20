@@ -22,7 +22,9 @@ import {
   telegramInlineQueriesIndexPath,
   telegramInlineQueryPath,
   telegramMessagePath,
+  parseTelegramMessageObjectId,
   parseTelegramReactionObjectId,
+  parseTelegramThreadMessageObjectId,
   telegramReactionPath,
   telegramRootIndexPath,
   telegramThreadMessagePath,
@@ -242,7 +244,7 @@ async function emitMessages(
   };
 
   const result = await runEmitBatch(client, workspaceId, records, (record) => {
-    if (isDelete(record)) return { deletes: [{ path: telegramUpdatePath(record.id) }] };
+    if (isDelete(record)) return planMessageDelete(record.id, chatTitleById, getIndex);
     const chatTitle = record.chatTitle ?? chatTitleById.get(String(record.chatId));
     const canonicalPath = record.messageThreadId === undefined
       ? telegramMessagePath(record.chatId, record.messageId, chatTitle)
@@ -435,7 +437,7 @@ function planReactionDelete(
 ): EmitPlan {
   const parsed = parseTelegramReactionObjectId(id);
   if (!parsed) {
-    return { deletes: [{ path: telegramUpdatePath(id) }] };
+    return { deletes: [] };
   }
 
   return {
@@ -447,6 +449,38 @@ function planReactionDelete(
           parsed.updateId,
           chatTitleById.get(String(parsed.chatId)),
         ),
+      },
+    ],
+  };
+}
+
+function planMessageDelete(
+  id: string,
+  chatTitleById: ReadonlyMap<string, string>,
+  getIndex: (chatId: TelegramChatId, title?: string) => IndexFileReconciler<TelegramIndexRow>,
+): EmitPlan {
+  const thread = parseTelegramThreadMessageObjectId(id);
+  if (thread) {
+    const chatTitle = chatTitleById.get(String(thread.chatId));
+    getIndex(thread.chatId, chatTitle).remove(thread.messageId);
+    return {
+      deletes: [
+        {
+          path: telegramThreadMessagePath(thread.chatId, thread.threadId, thread.messageId, chatTitle),
+        },
+      ],
+    };
+  }
+
+  const message = parseTelegramMessageObjectId(id);
+  if (!message) return { deletes: [] };
+
+  const chatTitle = chatTitleById.get(String(message.chatId));
+  getIndex(message.chatId, chatTitle).remove(message.messageId);
+  return {
+    deletes: [
+      {
+        path: telegramMessagePath(message.chatId, message.messageId, chatTitle),
       },
     ],
   };

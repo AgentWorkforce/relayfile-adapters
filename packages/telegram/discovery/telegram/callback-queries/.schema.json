@@ -2,6 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Answer Telegram callback query",
   "type": "object",
+  "x-relayfile-writableSystemFields": [
+    "url"
+  ],
   "required": [
     "callback_query_id"
   ],
@@ -21,8 +24,7 @@
     "url": {
       "type": "string",
       "format": "uri",
-      "description": "Provider URL for the record.",
-      "readOnly": true
+      "description": "Optional URL opened by the client."
     },
     "cache_time": {
       "type": "integer",

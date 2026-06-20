@@ -372,6 +372,23 @@ test('fullRecordSchema marks provider-managed fields read-only', () => {
   assert.equal(schema.additionalProperties, false);
 });
 
+test('fullRecordSchema allows explicitly writable system field names', () => {
+  const schema = fullRecordSchema({
+    title: 'Answer Callback',
+    type: 'object',
+    required: ['callback_query_id'],
+    'x-relayfile-writableSystemFields': ['url'],
+    properties: {
+      callback_query_id: { type: 'string', description: 'Callback query id.' },
+      url: { type: 'string', format: 'uri', description: 'Optional URL opened by the client.' },
+    },
+  });
+
+  assert.deepEqual(schema['x-relayfile-writableSystemFields'], ['url']);
+  assert.equal(schema.properties.url.readOnly, undefined);
+  assert.equal(schema.properties.id.readOnly, true);
+});
+
 test('escapeMarkdownTableCell escapes literal pipes inside regex cells', () => {
   assert.equal(escapeMarkdownTableCell('/^(a|b)$/'), '/^(a\\|b)$/');
 });

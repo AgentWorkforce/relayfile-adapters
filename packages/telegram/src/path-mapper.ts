@@ -165,13 +165,9 @@ export function telegramByUserMessageAliasPath(
   chatId: string | number,
   messageId: string | number,
 ): string {
-  return joinPath(
-    TELEGRAM_ROOT,
-    'messages',
-    'by-user',
-    normalizeSegment(userId),
-    `${normalizeSegment(chatId)}__${normalizeSegment(messageId)}.json`,
-  );
+  const slug = slugifyAlias(String(userId));
+  const id = `${normalizeSegment(chatId)}__${normalizeSegment(messageId)}`;
+  return joinPath(TELEGRAM_ROOT, 'messages', 'by-user', `${slug}__${id}.json`);
 }
 
 export function telegramByDataCallbackAliasPath(data: string, callbackQueryId: string): string {
