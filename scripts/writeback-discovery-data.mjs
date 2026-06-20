@@ -942,6 +942,7 @@ function slackMessageProps() {
     unfurl_media: bool('Whether Slack should unfurl media.'),
     mrkdwn: bool('Whether Slack should parse mrkdwn in text.'),
     idempotencyKey: str('Optional client-supplied idempotency token. The writeback engine uses it to deduplicate repeated posts (e.g. across scheduled-tick re-runs); it is never forwarded to Slack.'),
+    parentRef: str('Server-side threading: relay path of a parent message draft (e.g. the ref returned by a prior post) to thread this message under. The cloud orders this write after the parent delivers and sets thread_ts to its delivered timestamp; routing-only, never forwarded to Slack.'),
   };
 }
 

@@ -265,6 +265,12 @@ function buildPostMessage(
   if (attachments) body.attachments = attachments;
 
   // Thread context: URL-derived first, then payload override.
+  // NOTE: a `parentRef` field (server-side threading) is intentionally NOT
+  // handled here. It names a parent *draft* whose delivered ts isn't known at
+  // request-build time; resolving it requires ordered, ack-driven dispatch,
+  // which is the cloud writeback DO's job (it injects `thread_ts` from the
+  // parent's delivered id). This stateless resolver leaves it for the cloud and
+  // drops it from the Slack request (it is never a Slack API field).
   if (threadTs) body.thread_ts = threadTs;
   const explicitThreadTs = readString(parsed, 'thread_ts');
   if (explicitThreadTs) body.thread_ts = explicitThreadTs;

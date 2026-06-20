@@ -66,11 +66,30 @@ function withIdempotency(body: Record<string, unknown>): Record<string, unknown>
 }
 
 export interface SlackClient extends ProviderClient<'slack'> {
-  /** Post a message to a channel. */
-  post(channel: string, text: string): Promise<{ channel: string; ts: string }>;
+  /**
+   * Post a message to a channel.
+   *
+   * Returns `ref` — the draft handle for this post — alongside the delivered
+   * `ts`. Pass that `ref` as `opts.replyTo` on a later `post` to thread the new
+   * message under this one **without waiting for a receipt**: the new post is
+   * written with `parentRef`, and the cloud orders it after this post delivers
+   * and sets `thread_ts` to its delivered ts server-side.
+   *
+   * `replyTo` relies on the cloud's server-side threading (it resolves
+   * `parentRef` via the writeback DO's ordered dispatch). The in-repo Slack
+   * writeback resolver does NOT turn `parentRef` into a thread — so on any path
+   * that posts through the adapter without the cloud (e.g. a local executor),
+   * a `replyTo` post lands top-level. For ts-based threading independent of the
+   * cloud, use `reply(channel, ts, text)`, which is unchanged.
+   */
+  post(
+    channel: string,
+    text: string,
+    opts?: { replyTo?: string },
+  ): Promise<{ channel: string; ts: string; ref: string }>;
   /** Direct-message a user. */
   dm(user: string, text: string): Promise<{ user: string; ts: string }>;
-  /** Reply in a thread. */
+  /** Reply in a thread by the parent's delivered ts. */
   reply(channel: string, threadTs: string, text: string): Promise<{ channel: string; ts: string }>;
   /** React to a message. */
   react(channel: string, messageTs: string, emoji: string): Promise<void>;
@@ -83,9 +102,16 @@ export interface SlackClient extends ProviderClient<'slack'> {
 export function slackClient(opts: IntegrationClientOptions = {}): SlackClient {
   const base = providerClient('slack', opts);
   return Object.assign(base, {
-    async post(channel: string, text: string) {
-      const result = await base.messages.write({ channelId: channel }, withIdempotency({ text }));
-      return { channel, ts: slackReceiptTs(result.receipt) };
+    async post(channel: string, text: string, opts: { replyTo?: string } = {}) {
+      const body = opts.replyTo ? { text, parentRef: opts.replyTo } : { text };
+      const result = await base.messages.write({ channelId: channel }, withIdempotency(body));
+      return {
+        channel,
+        ts: slackReceiptTs(result.receipt),
+        // The draft path doubles as the threading handle — available immediately,
+        // even with a 0ms writeback timeout (no receipt wait needed to thread).
+        ref: result.path,
+      };
     },
     async dm(user: string, text: string) {
       const result = await base['direct-messages'].write({ userId: user }, withIdempotency({ text }));
