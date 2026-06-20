@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-docker-hub",
-  "version": "0.1.13",
+  "version": "0.2.0",
   "description": "Docker Hub adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -65,7 +65,7 @@
     "directory": "packages/docker-hub"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.3.63"
+    "@relayfile/adapter-core": "^0.4.0"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
