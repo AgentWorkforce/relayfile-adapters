@@ -42,8 +42,8 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
 }
 
 export function fullRecordSchema(schema) {
-  const properties = {
-    ...schema.properties,
+  const writableSystemFields = new Set(schema['x-relayfile-writableSystemFields'] ?? []);
+  const systemProperties = {
     id: readOnlyString('Provider canonical record id.'),
     createdAt: readOnlyString('Provider creation timestamp.', 'date-time'),
     updatedAt: readOnlyString('Provider last update timestamp.', 'date-time'),
@@ -67,9 +67,18 @@ export function fullRecordSchema(schema) {
       additionalProperties: true,
     },
   };
+  const properties = {
+    ...Object.fromEntries(
+      Object.entries(systemProperties).filter(([field]) => !writableSystemFields.has(field)),
+    ),
+    ...schema.properties,
+  };
 
   return {
     ...schema,
+    ...(writableSystemFields.size > 0
+      ? { 'x-relayfile-writableSystemFields': [...writableSystemFields] }
+      : {}),
     title: schema.title.replace(/^Create /, ''),
     description: 'Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents.',
     properties,

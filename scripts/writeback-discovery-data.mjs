@@ -549,6 +549,29 @@ export const adapters = [
     ],
   },
   {
+    slug: 'telegram',
+    title: 'Telegram adapter',
+    overview:
+      'The Telegram adapter exposes bot configuration, chats, event-sourced messages, callback queries, inline queries, reactions, and raw update envelopes under `/telegram`. Writeback routes proxy Telegram Bot API actions for rich bot messages, reactions, callback answers, inline-query answers, commands, and menu buttons. Conversation history starts when the bot is connected and receiving updates; Telegram Bot API does not provide arbitrary historical backfill.',
+    readPaths: [
+      ['/telegram/bot/config.json', 'Bot identity, command/menu/description, webhook, and sync-mode snapshot.'],
+      ['/telegram/chats/<chatId>__<title>/meta.json', 'Chat records seen or enriched by the bot.'],
+      ['/telegram/chats/<chatId>__<title>/messages/<messageId>/meta.json', 'Captured message records.'],
+      ['/telegram/chats/<chatId>__<title>/messages/<messageId>/reactions/<updateId>.json', 'Reaction update records.'],
+      ['/telegram/callback-queries/<callbackQueryId>.json', 'Inline keyboard callback query records.'],
+      ['/telegram/inline-queries/<inlineQueryId>.json', 'Inline-mode query records.'],
+      ['/telegram/updates/<updateId>.json', 'Raw Telegram update envelopes captured by optional history sync.'],
+    ],
+    endpoints: [
+      endpoint('/telegram/chats/{chatId}/messages/new.json', 'Send Telegram message', 'Sends a Telegram Bot API message with optional rich reply markup.', [], telegramMessageProps(), { text: 'Replace example Telegram message text.' }, telegramMessageRequirement()),
+      endpoint('/telegram/chats/{chatId}/messages/{messageId}/reactions/new.json', 'Set Telegram reaction', 'Sets a Telegram reaction on a message.', [], telegramReactionProps(), { reaction: [{ type: 'emoji', emoji: '👍' }] }, { required: ['reaction'] }),
+      endpoint('/telegram/callback-queries/new.json', 'Answer Telegram callback query', 'Answers an inline keyboard callback query.', [], telegramCallbackAnswerProps(), { callback_query_id: 'replace-callback-query-id', text: 'Done' }, { required: ['callback_query_id'], 'x-relayfile-writableSystemFields': ['url'] }),
+      endpoint('/telegram/inline-queries/new.json', 'Answer Telegram inline query', 'Answers an inline query with Telegram inline results.', [], telegramInlineAnswerProps(), { inline_query_id: 'replace-inline-query-id', results: [] }, { required: ['inline_query_id', 'results'] }),
+      endpoint('/telegram/bot/commands/new.json', 'Set Telegram bot commands', 'Sets Telegram bot command menu entries.', [], telegramCommandsProps(), { commands: [{ command: 'start', description: 'Start the bot' }] }, { required: ['commands'] }),
+      endpoint('/telegram/bot/menu-button/new.json', 'Set Telegram menu button', 'Sets the bot menu button globally or for a chat.', [], telegramMenuButtonProps(), { menu_button: { type: 'commands' } }, { required: ['menu_button'] }),
+    ],
+  },
+  {
     slug: 'zendesk',
     title: 'Zendesk adapter',
     overview:
@@ -1037,6 +1060,105 @@ function teamsContentRequirement() {
       { required: ['text'] },
       { required: ['content'] },
     ],
+  };
+}
+
+function telegramMessageProps() {
+  return {
+    text: str('Message text. Required unless a richer Bot API content field is supplied.'),
+    rich_message: obj('InputRichMessage payload for `sendRichMessage`.'),
+    photo: str('Photo file_id, HTTP URL, or upload reference for `sendPhoto`.'),
+    audio: str('Audio file_id, HTTP URL, or upload reference for `sendAudio`.'),
+    document: str('Document file_id, HTTP URL, or upload reference for `sendDocument`.'),
+    video: str('Video file_id, HTTP URL, or upload reference for `sendVideo`.'),
+    animation: str('Animation file_id, HTTP URL, or upload reference for `sendAnimation`.'),
+    voice: str('Voice file_id, HTTP URL, or upload reference for `sendVoice`.'),
+    video_note: str('Video note file_id or upload reference for `sendVideoNote`.'),
+    media: arr(obj('InputMedia object.'), 'InputMedia objects for `sendMediaGroup`.'),
+    latitude: num('Latitude for `sendLocation` or `sendVenue`.'),
+    longitude: num('Longitude for `sendLocation` or `sendVenue`.'),
+    title: str('Venue title when using `sendVenue`.'),
+    address: str('Venue address when using `sendVenue`.'),
+    phone_number: str('Contact phone number when using `sendContact`.'),
+    first_name: str('Contact first name when using `sendContact`.'),
+    question: str('Poll question when using `sendPoll`.'),
+    options: arr(str('Poll option text.'), 'Poll options when using `sendPoll`.'),
+    checklist: obj('InputChecklist payload for `sendChecklist`.'),
+    emoji: str('Dice emoji when using `sendDice`.'),
+    caption: str('Optional caption for media send methods.'),
+    parse_mode: en(['Markdown', 'MarkdownV2', 'HTML'], 'Telegram parse mode for `text`.'),
+    disable_web_page_preview: bool('Whether Telegram should suppress link previews.'),
+    disable_notification: bool('Whether Telegram should send silently.'),
+    reply_to_message_id: int('Optional message id to reply to.'),
+    reply_markup: obj('InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, or ForceReply payload.'),
+    message_thread_id: int('Forum topic thread id for supergroups with topics enabled.'),
+    business_connection_id: str('Business connection id when sending on behalf of a business account.'),
+    idempotencyKey: str('Optional client-supplied idempotency token. The writeback engine may use it to deduplicate repeated posts; it is never forwarded to Telegram.'),
+  };
+}
+
+function telegramMessageRequirement() {
+  return {
+    anyOf: [
+      { required: ['text'] },
+      { required: ['rich_message'] },
+      { required: ['photo'] },
+      { required: ['audio'] },
+      { required: ['document'] },
+      { required: ['video'] },
+      { required: ['animation'] },
+      { required: ['voice'] },
+      { required: ['video_note'] },
+      { required: ['media'] },
+      { required: ['latitude', 'longitude'] },
+      { required: ['phone_number', 'first_name'] },
+      { required: ['question', 'options'] },
+      { required: ['checklist'] },
+      { required: ['emoji'] },
+    ],
+  };
+}
+
+function telegramReactionProps() {
+  return {
+    reaction: arr(obj('Telegram ReactionType object, e.g. `{ "type": "emoji", "emoji": "👍" }`.'), 'Reaction list to set.'),
+    is_big: bool('Whether Telegram should show a big reaction animation.'),
+  };
+}
+
+function telegramCallbackAnswerProps() {
+  return {
+    callback_query_id: str('Callback query id from `/telegram/callback-queries`.'),
+    text: str('Notification text to show to the user.'),
+    show_alert: bool('Whether to show an alert instead of a toast notification.'),
+    url: str('Optional URL opened by the client.', 'uri'),
+    cache_time: int('Maximum cache time in seconds.', { minimum: 0 }),
+  };
+}
+
+function telegramInlineAnswerProps() {
+  return {
+    inline_query_id: str('Inline query id from `/telegram/inline-queries`.'),
+    results: arr(obj('Telegram InlineQueryResult object.'), 'Inline results to return.'),
+    cache_time: int('Maximum cache time in seconds.', { minimum: 0 }),
+    is_personal: bool('Whether results are cached only for the requesting user.'),
+    next_offset: str('Pagination offset for the next inline query page.'),
+    button: obj('Optional InlineQueryResultsButton object.'),
+  };
+}
+
+function telegramCommandsProps() {
+  return {
+    commands: arr(obj('Telegram BotCommand object with command and description.'), 'Commands to expose in Telegram clients.'),
+    scope: obj('Optional BotCommandScope object.'),
+    language_code: str('Optional ISO 639-1 language code.'),
+  };
+}
+
+function telegramMenuButtonProps() {
+  return {
+    chat_id: str('Optional chat id. Omit for default menu button.'),
+    menu_button: obj('Telegram MenuButton object, such as `{ "type": "commands" }` or web_app.'),
   };
 }
 

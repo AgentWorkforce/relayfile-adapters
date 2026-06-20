@@ -896,6 +896,49 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "telegram": {
+    "callback-queries": [
+      {
+        "path": "/telegram/callback-queries",
+        "params": []
+      }
+    ],
+    "commands": [
+      {
+        "path": "/telegram/bot/commands",
+        "params": []
+      }
+    ],
+    "inline-queries": [
+      {
+        "path": "/telegram/inline-queries",
+        "params": []
+      }
+    ],
+    "menu-button": [
+      {
+        "path": "/telegram/bot/menu-button",
+        "params": []
+      }
+    ],
+    "messages": [
+      {
+        "path": "/telegram/chats/{chatId}/messages",
+        "params": [
+          "chatId"
+        ]
+      }
+    ],
+    "reactions": [
+      {
+        "path": "/telegram/chats/{chatId}/messages/{messageId}/reactions",
+        "params": [
+          "chatId",
+          "messageId"
+        ]
+      }
+    ]
+  },
   "zendesk": {
     "comments": [
       {

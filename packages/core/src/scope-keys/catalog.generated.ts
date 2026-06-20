@@ -260,6 +260,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
+    "packageName": "@relayfile/adapter-telegram",
+    "packagePath": "packages/telegram",
+    "provider": "telegram",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
     "packageName": "@relayfile/adapter-x",
     "packagePath": "packages/x",
     "provider": "x",

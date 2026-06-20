@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Answer Telegram callback query",
+  "type": "object",
+  "x-relayfile-writableSystemFields": [
+    "url"
+  ],
+  "required": [
+    "callback_query_id"
+  ],
+  "properties": {
+    "callback_query_id": {
+      "type": "string",
+      "description": "Callback query id from `/telegram/callback-queries`."
+    },
+    "text": {
+      "type": "string",
+      "description": "Notification text to show to the user."
+    },
+    "show_alert": {
+      "type": "boolean",
+      "description": "Whether to show an alert instead of a toast notification."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL opened by the client."
+    },
+    "cache_time": {
+      "type": "integer",
+      "description": "Maximum cache time in seconds.",
+      "minimum": 0
+    },
+    "id": {
+      "type": "string",
+      "description": "Provider canonical record id.",
+      "readOnly": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider creation timestamp.",
+      "readOnly": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Provider human-readable identifier or key.",
+      "readOnly": true
+    },
+    "provider": {
+      "type": "string",
+      "description": "Relayfile provider name.",
+      "readOnly": true
+    },
+    "objectType": {
+      "type": "string",
+      "description": "Relayfile object type.",
+      "readOnly": true
+    },
+    "objectId": {
+      "type": "string",
+      "description": "Relayfile object id.",
+      "readOnly": true
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Relayfile workspace id.",
+      "readOnly": true
+    },
+    "connectionId": {
+      "type": "string",
+      "description": "Relayfile connection id.",
+      "readOnly": true
+    },
+    "_webhook": {
+      "type": "object",
+      "description": "Provider webhook metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    },
+    "_connection": {
+      "type": "object",
+      "description": "Relayfile connection metadata captured during sync.",
+      "readOnly": true,
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "description": "Full resource record schema. Fields marked readOnly are synced from the provider and cannot be written by agents."
+}
