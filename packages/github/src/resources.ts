@@ -42,11 +42,11 @@ export const resources = [
   },
   {
     name: "replies",
-    path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies",
-    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/pulls\/[^\/]+\/review-comments\/[^\/]+\/replies(?:\/[^\/]+(?:\.json)?)?$/,
+    path: "/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies",
+    pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/pulls\/[^\/]+\/comments\/[^\/]+\/replies(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^\d+$/,
-    schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.schema.json",
-    createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.create.example.json",
+    schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/.schema.json",
+    createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
