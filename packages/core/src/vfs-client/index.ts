@@ -226,23 +226,65 @@ export function draftFile(prefix: string): string {
 }
 
 /**
+ * The configured Relayfile mount root, if any — the same precedence as
+ * {@link resolveMountRoot} but WITHOUT the `client.workspaceCwd` / `process.cwd()`
+ * fallback. Returns `undefined` when no caller-supplied mount root and no
+ * sandbox mount-root env var is present.
+ *
+ * This is the signal for "a real Relayfile FS mount exists". The cwd fallback is
+ * deliberately excluded: under `sandbox: false` there is no mount, so we must NOT
+ * treat the process cwd as a mount (which would write a stray draft into cwd that
+ * no writeback worker ever picks up). When this returns `undefined` the write
+ * path routes over HTTP instead (see {@link writeJsonFile}).
+ */
+export function configuredMountRoot(client: IntegrationClientOptions): string | undefined {
+  const candidate =
+    mountRootCandidate(client.relayfileMountRoot) ??
+    mountRootCandidate(client.relayfileRoot) ??
+    mountRootCandidate(client.mountRoot) ??
+    mountRootCandidate(process.env.RELAYFILE_MOUNT_PATH) ??
+    mountRootCandidate(process.env.WORKSPACE_ROOT) ??
+    mountRootCandidate(process.env.WORKFORCE_SANDBOX_ROOT) ??
+    mountRootCandidate(process.env.RELAYFILE_MOUNT_ROOT) ??
+    mountRootCandidate(process.env.RELAYFILE_ROOT);
+  return candidate ? path.resolve(candidate) : undefined;
+}
+
+/**
  * Resolve the absolute Relayfile mount root, honoring (in order) the
  * client-supplied option, deployed sandbox mount-root env vars, legacy
  * Relayfile root env vars, and finally `workspaceCwd` / `process.cwd()`.
  */
 export function resolveMountRoot(client: IntegrationClientOptions): string {
-  return path.resolve(
-    mountRootCandidate(client.relayfileMountRoot) ??
-      mountRootCandidate(client.relayfileRoot) ??
-      mountRootCandidate(client.mountRoot) ??
-      mountRootCandidate(process.env.RELAYFILE_MOUNT_PATH) ??
-      mountRootCandidate(process.env.WORKSPACE_ROOT) ??
-      mountRootCandidate(process.env.WORKFORCE_SANDBOX_ROOT) ??
-      mountRootCandidate(process.env.RELAYFILE_MOUNT_ROOT) ??
-      mountRootCandidate(process.env.RELAYFILE_ROOT) ??
-      mountRootCandidate(client.workspaceCwd) ??
-      process.cwd()
+  return (
+    configuredMountRoot(client) ??
+    path.resolve(mountRootCandidate(client.workspaceCwd) ?? process.cwd())
   );
+}
+
+/**
+ * True when the caller passed a mount root explicitly on `opts` (as opposed to
+ * picking one up from an env var). An explicit option is an unambiguous "use the
+ * FS mount" intent and outranks any env-derived direct HTTP config.
+ */
+function hasExplicitMountOption(client: IntegrationClientOptions): boolean {
+  return (
+    mountRootCandidate(client.relayfileMountRoot) !== undefined ||
+    mountRootCandidate(client.relayfileRoot) !== undefined ||
+    mountRootCandidate(client.mountRoot) !== undefined
+  );
+}
+
+/**
+ * True when the caller passed direct Relayfile HTTP config explicitly on `opts`
+ * (base URL + token + workspace id). An explicit option is an unambiguous "talk
+ * to Relayfile over HTTP" intent and outranks any env-derived mount root.
+ */
+function hasExplicitDirectOption(client: IntegrationClientOptions): boolean {
+  const baseUrl = nonEmpty(client.relayfileBaseUrl);
+  const token = nonEmpty(client.relayfileApiToken) ?? nonEmpty(client.relayfileOpsToken);
+  const workspaceId = nonEmpty(client.workspaceId);
+  return Boolean(baseUrl && token && workspaceId);
 }
 
 function directClientConfig(
@@ -519,9 +561,45 @@ export async function writeJsonFile(
   body: unknown
 ): Promise<WritebackResult> {
   try {
-    const direct = directClientConfig(client);
-    if (direct) {
-      return await writeJsonFileViaRelayfileApi(client, provider, operation, relayPath, body, direct);
+    // Backend selection. A real FS mount (an explicit mount-root option or a
+    // sandbox mount-root env var — NOT the cwd fallback) always wins so harness
+    // agents are byte-for-byte unchanged: write the draft into the mount and let
+    // the relayfile-mount daemon turn it into a provider call + receipt.
+    //
+    // When there is no mount (e.g. a `sandbox: false` reply bot running in the
+    // cloud worker with no Daytona box), route the SAME draft to the SAME path
+    // over HTTP via `RelayFileClient` (RELAYFILE_URL/RELAYFILE_TOKEN/
+    // RELAYFILE_WORKSPACE_ID, injected by the cloud). The server fires the
+    // identical writeback and returns the receipt — no FS, no cold start.
+    //
+    // No mount AND no HTTP config is a hard error: silently writing into cwd
+    // would drop a draft no writeback worker ever picks up.
+    //
+    // Precedence:
+    //   1. An explicit HTTP option on `opts` (relayfileBaseUrl+token+workspaceId)
+    //      means "talk over HTTP" even if a mount env var happens to be set.
+    //   2. Otherwise a configured mount (explicit option OR sandbox env var) wins.
+    //   3. Otherwise fall back to env-derived HTTP config, if present.
+    //   4. Otherwise error (never a stray cwd write).
+    const useDirectFirst = hasExplicitDirectOption(client) && !hasExplicitMountOption(client);
+    const hasMount = configuredMountRoot(client) !== undefined;
+    if (useDirectFirst || !hasMount) {
+      const direct = directClientConfig(client);
+      if (direct) {
+        return await writeJsonFileViaRelayfileApi(client, provider, operation, relayPath, body, direct);
+      }
+      if (!hasMount) {
+        throw new RelayfileWritebackError({
+          provider,
+          operation,
+          cause: new Error(
+            "no Relayfile mount and no direct HTTP config: set a mount root " +
+              "(relayfileMountRoot / RELAYFILE_MOUNT_PATH) or RELAYFILE_URL + " +
+              "RELAYFILE_TOKEN + RELAYFILE_WORKSPACE_ID"
+          ),
+          retryable: false
+        });
+      }
     }
     const absolutePath = toAbsolutePath(client, relayPath);
     await mkdir(path.dirname(absolutePath), { recursive: true });
