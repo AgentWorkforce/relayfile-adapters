@@ -195,6 +195,69 @@ test('slackClient.post can return ts from direct Relayfile op providerResult', a
   assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_direct$/);
 });
 
+test('slackClient.post routes over HTTP via RELAYFILE_URL/TOKEN/WORKSPACE_ID env when no mount is present (sandbox:false)', async () => {
+  // Exact sandbox:false reply-bot surface: no mount root, only the env vars the
+  // cloud injects. slackClient().post() must transparently go over HTTP.
+  const envKeys = [
+    'RELAYFILE_MOUNT_PATH',
+    'WORKSPACE_ROOT',
+    'WORKFORCE_SANDBOX_ROOT',
+    'RELAYFILE_MOUNT_ROOT',
+    'RELAYFILE_ROOT',
+    'RELAYFILE_BASE_URL',
+    'RELAYFILE_URL',
+    'RELAYFILE_TOKEN',
+    'RELAYFILE_WORKSPACE_ID',
+    'RELAYFILE_WORKSPACE',
+    'RELAY_WORKSPACE_ID',
+  ];
+  const saved = new Map<string, string | undefined>();
+  for (const key of envKeys) {
+    saved.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  process.env.RELAYFILE_URL = 'https://relayfile.example.test';
+  process.env.RELAYFILE_TOKEN = 'env-token';
+  process.env.RELAYFILE_WORKSPACE_ID = 'rw_env';
+
+  const requests: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url.includes('/fs/file')) {
+      return Response.json({
+        opId: 'op_env_post',
+        status: 'queued',
+        targetRevision: 'rev_1',
+        writeback: { provider: 'slack', state: 'pending' },
+      });
+    }
+    if (url.includes('/ops/op_env_post')) {
+      return Response.json({
+        opId: 'op_env_post',
+        status: 'succeeded',
+        attemptCount: 1,
+        providerResult: { provider: 'slack', externalId: '1781870464.999999', ts: '1781870464.999999', channel: 'C9' },
+      });
+    }
+    return Response.json({ code: 'not_found' }, { status: 404 });
+  };
+
+  try {
+    const result = await slackClient({ fetchImpl, writebackTimeoutMs: 100, writebackPollMs: 5 }).post('C9', 'shipped');
+    assert.equal(result.channel, 'C9');
+    assert.equal(result.ts, '1781870464.999999');
+    assert.ok(result.ref, 'post still returns a draft-handle ref over HTTP');
+    assert.equal(requests.length, 2);
+    assert.match(requests[0], /\/v1\/workspaces\/rw_env\/fs\/file\?/);
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('slackClient.post rejects a terminal op without Slack ts instead of returning an empty ts', async () => {
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);

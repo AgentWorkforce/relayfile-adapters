@@ -476,3 +476,173 @@ test("an in-mount name starting with '..' is allowed (not a traversal escape)", 
   await writeJsonFile(opts, "x", "write", "/..foo/bar.json", { ok: true });
   assert.deepEqual(JSON.parse(await readFile(path.join(root, "..foo/bar.json"), "utf8")), { ok: true });
 });
+
+// --- backend selection: FS mount vs HTTP fallback (sandbox:false reply bots) ---
+
+const MOUNT_AND_DIRECT_ENV_KEYS = [
+  "RELAYFILE_MOUNT_PATH",
+  "WORKSPACE_ROOT",
+  "WORKFORCE_SANDBOX_ROOT",
+  "RELAYFILE_MOUNT_ROOT",
+  "RELAYFILE_ROOT",
+  "RELAYFILE_BASE_URL",
+  "RELAYFILE_URL",
+  "RELAYFILE_TOKEN",
+  "RELAYFILE_WORKSPACE_ID",
+  "RELAYFILE_WORKSPACE",
+  "RELAY_WORKSPACE_ID"
+] as const;
+
+/** Run `fn` with the listed env vars cleared, then set to `overrides`; always restored. */
+async function withScrubbedEnv(
+  overrides: Partial<Record<(typeof MOUNT_AND_DIRECT_ENV_KEYS)[number], string>>,
+  fn: () => Promise<void>
+): Promise<void> {
+  const saved = new Map<string, string | undefined>();
+  for (const key of MOUNT_AND_DIRECT_ENV_KEYS) {
+    saved.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  for (const [key, value] of Object.entries(overrides)) {
+    process.env[key] = value;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+test("writeJsonFile uses the FS mount path when a mount is configured (HTTP env present but ignored)", async () => {
+  const { root, opts } = await mount();
+  let fetched = false;
+  const fetchImpl: typeof fetch = async () => {
+    fetched = true;
+    return Response.json({ code: "should_not_be_called" }, { status: 500 });
+  };
+  // Even with full direct HTTP env set, an explicit mount root must win → FS.
+  await withScrubbedEnv(
+    {
+      RELAYFILE_URL: "https://relayfile.example.test",
+      RELAYFILE_TOKEN: "tok",
+      RELAYFILE_WORKSPACE_ID: "rw_env"
+    },
+    async () => {
+      const rel = `/slack/channels/C1/messages/${draftFile("msg")}`;
+      const result = await writeJsonFile({ ...opts, fetchImpl }, "slack", "post", rel, { text: "hi" });
+      assert.equal(result.absolutePath.startsWith(root), true);
+    }
+  );
+  assert.equal(fetched, false, "must not hit HTTP when a mount root is configured");
+  const dir = path.join(root, "slack/channels/C1/messages");
+  const files = (await readdir(dir)).filter((f) => f.endsWith(".json"));
+  assert.equal(files.length, 1);
+});
+
+test("writeJsonFile routes over HTTP when there is no mount but RELAYFILE_URL/TOKEN/WORKSPACE_ID are set", async () => {
+  const requests: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url.includes("/fs/file")) {
+      return Response.json({
+        opId: "op_env_http",
+        status: "queued",
+        targetRevision: "rev_1",
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+    if (url.includes("/ops/op_env_http")) {
+      return Response.json({
+        opId: "op_env_http",
+        status: "succeeded",
+        attemptCount: 1,
+        providerResult: { provider: "slack", externalId: "1781870464.800039", ts: "1781870464.800039", channel: "C1" }
+      });
+    }
+    return Response.json({ code: "not_found" }, { status: 404 });
+  };
+
+  await withScrubbedEnv(
+    {
+      RELAYFILE_URL: "https://relayfile.example.test",
+      RELAYFILE_TOKEN: "env-token",
+      RELAYFILE_WORKSPACE_ID: "rw_env"
+    },
+    async () => {
+      const result = await writeJsonFile(
+        { fetchImpl, writebackTimeoutMs: 100, writebackPollMs: 5 },
+        "slack",
+        "post",
+        "/slack/channels/C1/messages/relayfile-writeback--env.json",
+        { text: "hi" }
+      );
+      assert.equal(result.opId, "op_env_http");
+      assert.equal(result.receipt?.externalId, "1781870464.800039");
+    }
+  );
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[0], /\/v1\/workspaces\/rw_env\/fs\/file\?/);
+  assert.match(requests[0], /path=/); // same provider draft path is sent over HTTP
+  assert.match(requests[1], /\/v1\/workspaces\/rw_env\/ops\/op_env_http$/);
+});
+
+test("writeJsonFile throws a clear error when there is no mount and no HTTP config (no stray cwd write)", async () => {
+  let fetched = false;
+  const fetchImpl: typeof fetch = async () => {
+    fetched = true;
+    return Response.json({}, { status: 200 });
+  };
+  await withScrubbedEnv({}, async () => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          { fetchImpl, writebackTimeoutMs: 0 },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--none.json",
+          { text: "hi" }
+        ),
+      (error: unknown) =>
+        error instanceof RelayfileWritebackError &&
+        error.cause instanceof Error &&
+        /no Relayfile mount and no direct HTTP config/.test(error.cause.message)
+    );
+  });
+  assert.equal(fetched, false);
+});
+
+test("an explicit direct HTTP option beats a mount-root env var (intentional HTTP)", async () => {
+  const requests: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url.includes("/fs/file")) {
+      return Response.json({ opId: "op_explicit", status: "queued", targetRevision: "rev_1" });
+    }
+    return Response.json({ code: "not_found" }, { status: 404 });
+  };
+  // A mount env var is present, but the caller passes explicit HTTP opts → HTTP.
+  await withScrubbedEnv({ WORKFORCE_SANDBOX_ROOT: "/tmp/some-sandbox-root" }, async () => {
+    const result = await writeJsonFile(
+      {
+        relayfileBaseUrl: "https://relayfile.example.test",
+        relayfileApiToken: "explicit-token",
+        workspaceId: "rw_explicit",
+        fetchImpl,
+        writebackTimeoutMs: 0
+      },
+      "slack",
+      "post",
+      "/slack/channels/C1/messages/relayfile-writeback--explicit.json",
+      { text: "hi" }
+    );
+    assert.equal(result.opId, "op_explicit");
+  });
+  assert.equal(requests.length, 1);
+  assert.match(requests[0], /\/v1\/workspaces\/rw_explicit\/fs\/file\?/);
+});
