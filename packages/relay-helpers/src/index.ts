@@ -16,8 +16,8 @@
  *
  * Every provider in the catalog has a named client (`asanaClient`,
  * `notionClient`, … through all 29), exposing its resources as
- * `.{resource}.{path,write,read,list}`. `linear` / `github` / `slack` add
- * named ergonomic methods on top. `relayClient(provider)` is the dynamic,
+ * `.{resource}.{path,write,read,list}`. `linear` / `github` / `slack` /
+ * `telegram` add named ergonomic methods on top. `relayClient(provider)` is the dynamic,
  * string-keyed escape hatch when the provider isn't known at author time.
  */
 export { relayClient, encodeSegment, type RelayClient, type RelayParams } from './generic.js';
@@ -28,6 +28,19 @@ export { created } from './receipt.js';
 export { linearClient, type LinearClient, type LinearCreateIssueArgs } from './linear.js';
 export { githubClient, type GithubClient, type GithubTarget } from './github.js';
 export { slackClient, type SlackClient } from './slack.js';
+export {
+  telegramClient,
+  telegramReceiptMessageId,
+  telegramReceiptTs,
+  type TelegramChatId,
+  type TelegramClient,
+  type TelegramEditMessageOptions,
+  type TelegramMessageId,
+  type TelegramMessageResult,
+  type TelegramParseMode,
+  type TelegramReactionResult,
+  type TelegramSendMessageOptions,
+} from './telegram.js';
 
 // Named resource-keyed clients for the remaining catalog providers
 // (generated from the catalog — see scripts/generate-clients.mjs).

@@ -22,5 +22,10 @@
   "salesforce": [
     "connectionId",
     "providerConfigKey"
+  ],
+  "telegram": [
+    "chatId",
+    "messageThreadId",
+    "userId"
   ]
 }

@@ -36,6 +36,10 @@ export class TelegramAdapter {
     return [...TELEGRAM_SUPPORTED_EVENTS];
   }
 
+  supportedScopeKeys(): string[] {
+    return ['chatId', 'messageThreadId', 'userId'];
+  }
+
   computePath(objectType: string, objectId: string): string {
     return computeTelegramPath(objectType, objectId);
   }

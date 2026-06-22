@@ -10,6 +10,14 @@ export interface AdapterResourceConfig {
 export const resources = [
   {
     name: "messages",
+    path: "/telegram/chats/{chatId}/messages/{messageId}.json",
+    pathPattern: /^\/telegram\/chats\/[^\/]+\/messages\/\d+\.json$/,
+    idPattern: /^\d+$/,
+    schema: "discovery/telegram/chats/{chatId}/messages/.schema.json",
+    createExample: "discovery/telegram/chats/{chatId}/messages/.create.example.json",
+  },
+  {
+    name: "messages",
     path: "/telegram/chats/{chatId}/messages",
     pathPattern: /^\/telegram\/chats\/[^\/]+\/messages(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[A-Za-z0-9_.:-]+$/,

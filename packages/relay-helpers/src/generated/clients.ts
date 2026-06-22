@@ -2,7 +2,7 @@
 // @relayfile/adapter-core/writeback-paths — do not edit by hand.
 // Run `npm run gen -w @relayfile/relay-helpers` after bumping adapter-core.
 //
-// linear / github / slack have bespoke ergonomic clients in their own modules;
+// linear / github / slack / telegram have bespoke ergonomic clients in their own modules;
 // every other catalog provider gets a uniform resource-keyed client here.
 
 import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
@@ -103,9 +103,6 @@ export const sharepointClient = (opts?: IntegrationClientOptions): ProviderClien
 
 export const teamsClient = (opts?: IntegrationClientOptions): ProviderClient<'teams'> =>
   providerClient('teams', opts);
-
-export const telegramClient = (opts?: IntegrationClientOptions): ProviderClient<'telegram'> =>
-  providerClient('telegram', opts);
 
 export const zendeskClient = (opts?: IntegrationClientOptions): ProviderClient<'zendesk'> =>
   providerClient('zendesk', opts);
