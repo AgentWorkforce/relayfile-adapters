@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-telegram",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Telegram Bot API adapter for Relayfile messaging, conversation history, and bot configuration",
   "type": "module",
   "sideEffects": false,
@@ -58,7 +58,7 @@
     "directory": "packages/telegram"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.4.2"
+    "@relayfile/adapter-core": "^0.4.3"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
