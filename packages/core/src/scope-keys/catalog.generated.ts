@@ -30,6 +30,11 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
   "salesforce": [
     "connectionId",
     "providerConfigKey"
+  ],
+  "telegram": [
+    "chatId",
+    "messageThreadId",
+    "userId"
   ]
 } as const satisfies Record<
   string,
@@ -257,12 +262,6 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "packageName": "@relayfile/adapter-teams",
     "packagePath": "packages/teams",
     "provider": "teams",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
-    "packageName": "@relayfile/adapter-telegram",
-    "packagePath": "packages/telegram",
-    "provider": "telegram",
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {

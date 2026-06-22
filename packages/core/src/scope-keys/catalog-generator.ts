@@ -322,9 +322,18 @@ async function readSupportedScopeKeysFromModule(
 }
 
 async function readSupportedScopesFromSource(entryPoint: string): Promise<string[]> {
+  const entryPointKeys = await readSupportedScopesFromSourceFile(entryPoint);
+  if (entryPointKeys.length > 0) {
+    return entryPointKeys;
+  }
+
+  return readSupportedScopesFromSourceDir(dirname(entryPoint));
+}
+
+async function readSupportedScopesFromSourceFile(filePath: string): Promise<string[]> {
   let contents: string;
   try {
-    contents = await readFile(entryPoint, "utf8");
+    contents = await readFile(filePath, "utf8");
   } catch {
     return [];
   }
@@ -342,6 +351,37 @@ async function readSupportedScopesFromSource(entryPoint: string): Promise<string
     keys.add(match[1]);
   }
   return [...keys].sort();
+}
+
+async function readSupportedScopesFromSourceDir(dir: string): Promise<string[]> {
+  const keys = new Set<string>();
+  for (const filePath of await sourceFiles(dir)) {
+    for (const key of await readSupportedScopesFromSourceFile(filePath)) {
+      keys.add(key);
+    }
+  }
+  return [...keys].sort();
+}
+
+async function sourceFiles(dir: string): Promise<string[]> {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  for (const entry of entries) {
+    const filePath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "dist" || entry.name === "node_modules") continue;
+      files.push(...(await sourceFiles(filePath)));
+    } else if (entry.isFile() && filePath.endsWith(".ts") && !filePath.endsWith(".d.ts")) {
+      files.push(filePath);
+    }
+  }
+  return files.sort();
 }
 
 async function readMappingScopeKeys(repoRoot: string, adapterPackage: AdapterPackage): Promise<string[]> {

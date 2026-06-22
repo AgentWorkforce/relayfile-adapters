@@ -8,7 +8,16 @@ import { RelayfileWritebackPendingError, RelayfileWritebackReceiptError } from '
 import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths';
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import * as helpers from './index.js';
-import { githubClient, linearClient, notionClient, providerClient, relayClient, slackClient } from './index.js';
+import {
+  githubClient,
+  linearClient,
+  notionClient,
+  providerClient,
+  relayClient,
+  slackClient,
+  telegramClient,
+  telegramReceiptTs,
+} from './index.js';
 
 const clientExportName = (provider: string): string =>
   `${provider.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase())}Client`;
@@ -145,6 +154,61 @@ test('githubClient.comment and slackClient.post target the canonical paths', asy
   await slackClient(opts).post('C123', 'shipped');
   const msg = await onlyJsonIn(path.join(root, 'slack/channels/C123/messages'));
   assert.deepEqual(msg.body, { text: 'shipped' });
+});
+
+test('telegramClient sends, edits, and reacts through canonical Telegram paths', async () => {
+  const { root, opts } = await mount();
+  const oldDeliveryId = process.env.WORKFORCE_TICK_DELIVERY_ID;
+  process.env.WORKFORCE_TICK_DELIVERY_ID = 'telegram-delivery-1';
+  try {
+    const sent = await telegramClient(opts).sendMessage('C123', 'hello', {
+      replyToMessageId: 41,
+      threadId: 7,
+      parseMode: 'MarkdownV2',
+    });
+
+    assert.equal(sent.ok, false);
+    assert.equal(sent.chatId, 'C123');
+    assert.equal(sent.messageId, '');
+    assert.ok(sent.ref.startsWith('/telegram/chats/C123/messages/'));
+
+    const msg = await onlyJsonIn(path.join(root, 'telegram/chats/C123/messages'));
+    assert.deepEqual(msg.body, {
+      text: 'hello',
+      reply_to_message_id: 41,
+      message_thread_id: 7,
+      parse_mode: 'MarkdownV2',
+      idempotencyKey: 'tick:telegram-delivery-1:1',
+    });
+  } finally {
+    if (oldDeliveryId === undefined) delete process.env.WORKFORCE_TICK_DELIVERY_ID;
+    else process.env.WORKFORCE_TICK_DELIVERY_ID = oldDeliveryId;
+  }
+
+  const edited = await telegramClient(opts).editMessage('C123', 42, 'edited', {
+    disableWebPagePreview: true,
+  });
+  assert.deepEqual(edited, {
+    ok: true,
+    chatId: 'C123',
+    messageId: '42',
+    ref: '/telegram/chats/C123/messages/42.json',
+  });
+  const editBody = JSON.parse(await readFile(path.join(root, 'telegram/chats/C123/messages/42.json'), 'utf8'));
+  assert.deepEqual(editBody, { text: 'edited', disable_web_page_preview: true });
+
+  const reaction = await telegramClient(opts).react('C123', 42, '\u{1F44D}');
+  assert.deepEqual(reaction, { ok: true, chatId: 'C123', messageId: '42' });
+  const reactionDraft = await onlyJsonIn(path.join(root, 'telegram/chats/C123/messages/42/reactions'));
+  assert.deepEqual(reactionDraft.body, { reaction: [{ type: 'emoji', emoji: '\u{1F44D}' }] });
+});
+
+test('telegramReceiptTs extracts the delivered message id from common receipt shapes', () => {
+  assert.equal(telegramReceiptTs({ externalId: '42', created: 'fallback' }), '42');
+  assert.equal(telegramReceiptTs({ messageId: 43 }), '43');
+  assert.equal(telegramReceiptTs({ message_id: '44' }), '44');
+  assert.equal(telegramReceiptTs({ id: '45' }), '45');
+  assert.equal(telegramReceiptTs(undefined), '');
 });
 
 test('slackClient.post can return ts from direct Relayfile op providerResult', async () => {

@@ -29,3 +29,7 @@ test("generated scope catalog is in sync with adapter supportedScopes", async ()
 test("github declares its connection scope keys (owner/repo)", () => {
   assert.deepEqual([...KNOWN_SCOPE_KEY_CATALOG.github], ["owner", "repo"]);
 });
+
+test("telegram declares chat-oriented connection scope keys", () => {
+  assert.deepEqual([...KNOWN_SCOPE_KEY_CATALOG.telegram], ["chatId", "messageThreadId", "userId"]);
+});

@@ -35,6 +35,8 @@ test("linear/github/slack writeback templates match the canonical mount paths", 
     "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments"
   );
   assert.equal(WRITEBACK_PATH_CATALOG.slack.messages[0].path, "/slack/channels/{channelId}/messages");
+  assert.equal(WRITEBACK_PATH_CATALOG.telegram.messages[0].path, "/telegram/chats/{chatId}/messages");
+  assert.equal(WRITEBACK_PATH_CATALOG.telegram.reactions[0].path, "/telegram/chats/{chatId}/messages/{messageId}/reactions");
 });
 
 test("a resource name with multiple mount paths keeps every distinct template", () => {
@@ -55,6 +57,7 @@ test("writebackPath substitutes and url-encodes params in template order", () =>
   );
   // Path segments are percent-encoded so identifiers round-trip safely.
   assert.equal(writebackPath("slack", "messages", { channelId: "C/1" }), "/slack/channels/C%2F1/messages");
+  assert.equal(writebackPath("telegram", "messages", { chatId: "C/1" }), "/telegram/chats/C%2F1/messages");
 });
 
 test("writebackPath disambiguates multi-template resources by exact param set", () => {
@@ -64,6 +67,10 @@ test("writebackPath disambiguates multi-template resources by exact param set", 
     "/notion/databases/db1/pages/p9/meta.json"
   );
   assert.equal(writebackPath("notion", "pages", { pageId: "p9" }), "/notion/pages/p9/meta.json");
+  assert.equal(
+    writebackPath("telegram", "messages", { chatId: "C1", messageId: 42 }),
+    "/telegram/chats/C1/messages/42.json"
+  );
   // A param set matching no template must throw, never silently pick one.
   assert.throws(() => writebackPath("notion", "pages", { teamId: "t1" }), WritebackPathError);
 });

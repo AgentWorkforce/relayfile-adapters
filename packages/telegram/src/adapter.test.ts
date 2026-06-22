@@ -10,3 +10,8 @@ test('telegram adapter advertises Bot API update event names', () => {
   assert.ok(adapter.supportedEvents().includes('message_reaction'));
   assert.deepEqual(adapter.supportedEvents(), [...TELEGRAM_SUPPORTED_EVENTS]);
 });
+
+test('telegram adapter declares chat-oriented scope keys', () => {
+  const adapter = new TelegramAdapter();
+  assert.deepEqual(adapter.supportedScopeKeys(), ['chatId', 'messageThreadId', 'userId']);
+});

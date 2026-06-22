@@ -17,6 +17,14 @@ export const resources = [
     createExample: "discovery/telegram/chats/{chatId}/messages/.create.example.json",
   },
   {
+    name: "messages",
+    path: "/telegram/chats/{chatId}/messages/{messageId}.json",
+    pathPattern: /^\/telegram\/chats\/[^\/]+\/messages\/[^\/]+\.json$/,
+    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    schema: "discovery/telegram/chats/{chatId}/messages/.schema.json",
+    createExample: "discovery/telegram/chats/{chatId}/messages/.create.example.json",
+  },
+  {
     name: "reactions",
     path: "/telegram/chats/{chatId}/messages/{messageId}/reactions",
     pathPattern: /^\/telegram\/chats\/[^\/]+\/messages\/[^\/]+\/reactions(?:\/[^\/]+(?:\.json)?)?$/,

@@ -927,6 +927,13 @@ export const WRITEBACK_PATH_CATALOG = {
         "params": [
           "chatId"
         ]
+      },
+      {
+        "path": "/telegram/chats/{chatId}/messages/{messageId}.json",
+        "params": [
+          "chatId",
+          "messageId"
+        ]
       }
     ],
     "reactions": [
