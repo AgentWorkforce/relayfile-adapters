@@ -14,6 +14,28 @@ export interface ParseNameWithIdResult {
   ext: string | null;
 }
 
+export interface ParsedGitHubRepoPath {
+  owner: string;
+  repo: string;
+  rest: string;
+}
+
+export type GitHubIssuePullPathShape =
+  | 'alias'
+  | 'directory-record'
+  | 'flat-record'
+  | 'legacy-directory-record';
+
+export interface ParsedGitHubIssuePullPath extends ParsedGitHubRepoPath {
+  kind: 'issues' | 'pulls';
+  number: number;
+  numberText: string;
+  recordSegment: string;
+  shape: GitHubIssuePullPathShape;
+  subpath: string;
+  aliasKey?: string;
+}
+
 const MAX_HUMAN_READABLE_LENGTH = 80;
 
 function slugify(value: string): string {
@@ -95,6 +117,228 @@ export function parseNameWithId(filename: string): ParseNameWithIdResult {
     id: basename.slice(0, separatorIndex),
     ext,
   };
+}
+
+/**
+ * Parse a GitHub Relayfile repository mount path.
+ *
+ * This is the shared read-mount path contract for downstream consumers. Keep it
+ * in the GitHub adapter path mapper, not in `@relayfile/relay-helpers`: relay
+ * helpers provide ergonomic write clients, while this function describes the
+ * provider-owned filesystem layout emitted by the adapter.
+ */
+export function parseGitHubRepoPath(path: string): ParsedGitHubRepoPath | undefined {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments[0] !== 'github' || segments[1] !== 'repos') {
+    return undefined;
+  }
+
+  const firstRepoSegment = segments[2];
+  if (!firstRepoSegment || firstRepoSegment === '_index.json') {
+    return undefined;
+  }
+
+  const compactSeparatorIndex = firstRepoSegment.indexOf('__');
+  if (compactSeparatorIndex > 0 && compactSeparatorIndex < firstRepoSegment.length - 2) {
+    const owner = decodeGitHubPathSegment(firstRepoSegment.slice(0, compactSeparatorIndex));
+    const repo = decodeGitHubPathSegment(firstRepoSegment.slice(compactSeparatorIndex + 2));
+    if (!owner || !repo) return undefined;
+    return {
+      owner,
+      repo,
+      rest: segments.slice(3).join('/'),
+    };
+  }
+
+  const secondRepoSegment = segments[3];
+  if (!secondRepoSegment) {
+    return undefined;
+  }
+
+  const owner = decodeGitHubPathSegment(firstRepoSegment);
+  const repo = decodeGitHubPathSegment(secondRepoSegment);
+  if (!owner || !repo) return undefined;
+  return {
+    owner,
+    repo,
+    rest: segments.slice(4).join('/'),
+  };
+}
+
+export function parseGitHubIssuePath(path: string): ParsedGitHubIssuePullPath | undefined {
+  return parseGitHubIssuePullPath(path, 'issues');
+}
+
+export function parseGitHubPullPath(path: string): ParsedGitHubIssuePullPath | undefined {
+  return parseGitHubIssuePullPath(path, 'pulls');
+}
+
+function parseGitHubIssuePullPath(
+  path: string,
+  kind: 'issues' | 'pulls',
+): ParsedGitHubIssuePullPath | undefined {
+  const repoPath = parseGitHubRepoPath(path);
+  if (!repoPath || !repoPath.rest) return undefined;
+
+  const restSegments = repoPath.rest.split('/').filter(Boolean);
+  if (restSegments[0] !== kind) {
+    return undefined;
+  }
+
+  const firstRecordSegment = restSegments[1];
+  if (!firstRecordSegment || firstRecordSegment === '_index.json') {
+    return undefined;
+  }
+
+  if (firstRecordSegment.startsWith('by-')) {
+    const parsedAlias = parseGitHubIssuePullAlias(kind, restSegments);
+    return parsedAlias
+      ? {
+          ...repoPath,
+          ...parsedAlias,
+        }
+      : undefined;
+  }
+
+  const parsedRecord = parseGitHubIssuePullRecord(kind, restSegments);
+  return parsedRecord
+    ? {
+        ...repoPath,
+        ...parsedRecord,
+      }
+    : undefined;
+}
+
+function parseGitHubIssuePullRecord(
+  kind: 'issues' | 'pulls',
+  restSegments: string[],
+): Omit<ParsedGitHubIssuePullPath, keyof ParsedGitHubRepoPath> | undefined {
+  const recordSegment = restSegments[1];
+  if (!recordSegment) {
+    return undefined;
+  }
+  const parsedNumber = parseLeadingGitHubNumber(recordSegment);
+  if (!parsedNumber) {
+    return undefined;
+  }
+
+  if (recordSegment.endsWith('.json')) {
+    if (restSegments.length !== 2) {
+      return undefined;
+    }
+    return {
+      kind,
+      number: parsedNumber.number,
+      numberText: parsedNumber.numberText,
+      recordSegment,
+      shape: 'flat-record',
+      subpath: '',
+    };
+  }
+
+  const subpath = restSegments.slice(2).join('/');
+  if (subpath === 'meta.json') {
+    return {
+      kind,
+      number: parsedNumber.number,
+      numberText: parsedNumber.numberText,
+      recordSegment,
+      shape: 'directory-record',
+      subpath,
+    };
+  }
+  if (subpath === 'metadata.json') {
+    return {
+      kind,
+      number: parsedNumber.number,
+      numberText: parsedNumber.numberText,
+      recordSegment,
+      shape: 'legacy-directory-record',
+      subpath,
+    };
+  }
+  if (subpath) {
+    return {
+      kind,
+      number: parsedNumber.number,
+      numberText: parsedNumber.numberText,
+      recordSegment,
+      shape: 'directory-record',
+      subpath,
+    };
+  }
+
+  return undefined;
+}
+
+function parseGitHubIssuePullAlias(
+  kind: 'issues' | 'pulls',
+  restSegments: string[],
+): Omit<ParsedGitHubIssuePullPath, keyof ParsedGitHubRepoPath> | undefined {
+  const aliasKey = restSegments[1];
+  const aliasTail = restSegments.slice(2);
+  const recordSegment = aliasTail.at(-1);
+  if (!aliasKey || !recordSegment?.endsWith('.json')) {
+    return undefined;
+  }
+
+  const parsedNumber =
+    aliasKey === 'by-title'
+      ? parseTrailingGitHubNumber(recordSegment)
+      : parseLeadingGitHubNumber(recordSegment);
+  if (!parsedNumber) {
+    return undefined;
+  }
+
+  return {
+    kind,
+    number: parsedNumber.number,
+    numberText: parsedNumber.numberText,
+    recordSegment,
+    shape: 'alias',
+    subpath: aliasTail.join('/'),
+    aliasKey,
+  };
+}
+
+function parseLeadingGitHubNumber(segment: string): { number: number; numberText: string } | undefined {
+  const decoded = decodeGitHubPathSegment(segment);
+  if (!decoded) return undefined;
+  const basename = decoded.replace(/\.json$/u, '');
+  const numberText = basename.split('__', 1)[0];
+  return parsePositiveIntegerText(numberText);
+}
+
+function parseTrailingGitHubNumber(segment: string): { number: number; numberText: string } | undefined {
+  const decoded = decodeGitHubPathSegment(segment);
+  if (!decoded) return undefined;
+  const basename = decoded.replace(/\.json$/u, '');
+  const separatorIndex = basename.lastIndexOf('__');
+  if (separatorIndex <= 0 || separatorIndex === basename.length - 2) {
+    return undefined;
+  }
+  return parsePositiveIntegerText(basename.slice(separatorIndex + 2));
+}
+
+function parsePositiveIntegerText(value: string): { number: number; numberText: string } | undefined {
+  if (!/^[1-9]\d*$/u.test(value)) {
+    return undefined;
+  }
+  const number = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(number)) {
+    return undefined;
+  }
+  return { number, numberText: value };
+}
+
+function decodeGitHubPathSegment(value: string): string | undefined {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.includes('/') ? undefined : decoded;
+  } catch {
+    return undefined;
+  }
 }
 
 // GitHub collision tracking keys on the full `<number>__<slug>` directory name, unlike `nameWithId`, which tracks only the slug stem.
