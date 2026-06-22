@@ -1,6 +1,6 @@
 import type { IntegrationClientOptions, WritebackReceipt } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
-import { createWritebackIdempotency, withWritebackIdempotency } from './writeback-idempotency.js';
+import { withProcessWritebackIdempotency } from './writeback-idempotency.js';
 
 export type TelegramChatId = string | number;
 export type TelegramMessageId = string | number;
@@ -63,7 +63,6 @@ export function telegramReceiptTs(
     receiptValue(receipt.messageId) ??
     receiptValue(receipt.message_id) ??
     receiptValue(receipt.id) ??
-    receiptValue(receipt.created) ??
     ''
   );
 }
@@ -98,11 +97,8 @@ function editBody(text: string, opts: TelegramEditMessageOptions): Record<string
   };
 }
 
-/** Process-wide stamper shared across every telegramClient instance in this run. */
-const nextWritebackIdempotencyKey = createWritebackIdempotency();
-
 function withIdempotency(body: Record<string, unknown>): Record<string, unknown> {
-  return withWritebackIdempotency(body, nextWritebackIdempotencyKey);
+  return withProcessWritebackIdempotency(body);
 }
 
 export interface TelegramClient extends ProviderClient<'telegram'> {
@@ -143,7 +139,12 @@ export function telegramClient(opts: IntegrationClientOptions = {}): TelegramCli
     ) {
       const result = await base.messages.write({ chatId, messageId }, editBody(text, opts));
       const receiptMessageId = telegramReceiptTs(result.receipt) || String(messageId);
-      return { ok: result.receipt ? receiptOk(result.receipt, receiptMessageId) : true, chatId, messageId: receiptMessageId, ref: result.path };
+      return {
+        ok: result.receipt ? receiptOk(result.receipt, receiptMessageId) : true,
+        chatId,
+        messageId: receiptMessageId,
+        ref: result.path,
+      };
     },
     async react(chatId: TelegramChatId, messageId: TelegramMessageId, emoji: string) {
       await base.reactions.write(

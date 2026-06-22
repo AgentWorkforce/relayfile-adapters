@@ -1,6 +1,6 @@
 import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
-import { createWritebackIdempotency, withWritebackIdempotency } from './writeback-idempotency.js';
+import { withProcessWritebackIdempotency } from './writeback-idempotency.js';
 
 export { createWritebackIdempotency } from './writeback-idempotency.js';
 
@@ -25,12 +25,9 @@ export function slackReceiptTs(
   return receipt.externalId ?? replayTs ?? receipt.created ?? receipt.id ?? '';
 }
 
-/** Process-wide stamper shared across every slackClient instance in this run. */
-const nextWritebackIdempotencyKey = createWritebackIdempotency();
-
 /** Attach the per-message idempotency token to a writeback body when one applies. */
 function withIdempotency(body: Record<string, unknown>): Record<string, unknown> {
-  return withWritebackIdempotency(body, nextWritebackIdempotencyKey);
+  return withProcessWritebackIdempotency(body);
 }
 
 export interface SlackClient extends ProviderClient<'slack'> {

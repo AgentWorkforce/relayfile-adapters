@@ -23,3 +23,14 @@ export function withWritebackIdempotency(
   const idempotencyKey = nextIdempotencyKey();
   return idempotencyKey ? { ...body, idempotencyKey } : body;
 }
+
+const nextProcessWritebackIdempotencyKey = createWritebackIdempotency();
+
+/**
+ * Process-wide stamper shared by all ergonomic helper clients in this run.
+ * Keeping one ordinal sequence avoids duplicate keys when a scheduled handler
+ * writes to multiple providers during the same delivery.
+ */
+export function withProcessWritebackIdempotency(body: Record<string, unknown>): Record<string, unknown> {
+  return withWritebackIdempotency(body, nextProcessWritebackIdempotencyKey);
+}
