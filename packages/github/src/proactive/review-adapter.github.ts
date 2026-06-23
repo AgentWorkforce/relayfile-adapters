@@ -17,7 +17,7 @@ import type {
 } from '@relayfile/adapter-core';
 
 import { GITHUB_API_BASE_URL } from '../config.js';
-import { githubIssuePath, githubPullRequestPath, parseNameWithId } from '../path-mapper.js';
+import { githubIssuePath, githubPullRequestPath, parseGitHubIssuePath, parseGitHubPullPath } from '../path-mapper.js';
 import type {
   AgentReview as GitHubAgentReview,
   GitHubRequestProvider,
@@ -36,9 +36,6 @@ const REVIEW_SELF_TRIGGER_EVENTS = [
   'issue_comment.created',
 ] as const;
 const AUTOFIX_SELF_TRIGGER_EVENTS = ['pull_request.synchronize'] as const;
-
-const GITHUB_ITEM_PATH =
-  /^\/github\/repos\/([^/]+)\/([^/]+)\/(issues|pulls)\/([^/]+)(?:\/|$)/;
 
 interface AdapterOptions {
   defaultConnectionId?: string;
@@ -334,25 +331,11 @@ function inputPayload(input: PathOrPayload): unknown {
 }
 
 function keyFromGithubPath(path: string): string | null {
-  const match = path.match(GITHUB_ITEM_PATH);
-  if (!match?.[1] || !match[2] || !match[3] || !match[4]) return null;
-  const parsed = parseNameWithId(match[4]);
-  const number = Number.parseInt(parsed.id, 10);
-  if (!Number.isFinite(number)) return null;
-  const owner = decodePathSegment(match[1]);
-  const repo = decodePathSegment(match[2]);
-  if (!owner || !repo) return null;
-  return match[3] === 'pulls'
-    ? `github-pr:${owner}/${repo}#${number}`
-    : `github:${owner}/${repo}#${number}`;
-}
-
-function decodePathSegment(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
+  const pull = parseGitHubPullPath(path);
+  if (pull) return `github-pr:${pull.owner}/${pull.repo}#${pull.number}`;
+  const issue = parseGitHubIssuePath(path);
+  if (issue) return `github:${issue.owner}/${issue.repo}#${issue.number}`;
+  return null;
 }
 
 function repoPartsFromPayload(

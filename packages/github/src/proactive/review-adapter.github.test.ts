@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { githubIssuePath, githubPullRequestPath } from '../path-mapper.js';
+import { githubByIdAliasPath, githubIssuePath, githubPullRequestPath } from '../path-mapper.js';
 import type {
   GitHubRequestProvider,
   JsonObject,
@@ -48,6 +48,14 @@ describe('GithubProactiveReviewAdapter', () => {
     );
     assert.strictEqual(
       adapter.deriveWorkItemKey(githubPullRequestPath('acme', 'widgets', 7, 'Fix login')),
+      'github-pr:acme/widgets#7',
+    );
+    assert.strictEqual(
+      adapter.deriveWorkItemKey(githubByIdAliasPath('acme', 'widgets', 'issues', 42)),
+      'github:acme/widgets#42',
+    );
+    assert.strictEqual(
+      adapter.deriveWorkItemKey(githubByIdAliasPath('acme', 'widgets', 'pulls', 7)),
       'github-pr:acme/widgets#7',
     );
   });
