@@ -16,7 +16,10 @@ import {
   linearByNameAliasPath,
   linearByTitleAliasPath,
   linearByUuidAliasPath,
+  linearCommentPath,
+  linearCommentsIndexPath,
   linearCyclesIndexPath,
+  linearCyclePath,
   linearIssueByAssigneePath,
   linearIssueByCreatorPath,
   linearIssueByEditedPath,
@@ -27,11 +30,15 @@ import {
   linearLabelByTeamPath,
   linearLabelPath,
   linearLabelsIndexPath,
+  linearMilestonePath,
+  linearMilestonesIndexPath,
   linearProjectByStatePath,
   linearProjectByTeamPath,
   linearProjectLegacyPath,
   linearProjectsIndexPath,
   linearProjectPath,
+  linearRoadmapPath,
+  linearRoadmapsIndexPath,
   linearRootIndexPath,
   linearStatesIndexPath,
   linearStatePath,
@@ -317,6 +324,71 @@ describe('emitLinearAuxiliaryFiles', () => {
         title: 'In Progress',
         updated: '2026-05-02T00:00:00.000Z',
       },
+    ]);
+  });
+
+  it('materializes comments, cycles, milestones, and roadmaps as canonical files plus stable indexes', async () => {
+    const client = createClient();
+    const result = await emitLinearAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      comments: [{
+        id: 'comment-1',
+        body: 'Ship it',
+        issue: {
+          id: 'issue-1',
+          identifier: 'AGE-8',
+          title: 'Release Plan',
+        },
+        createdAt: '2026-05-01T00:00:00Z',
+        updatedAt: '2026-05-12T00:00:00Z',
+      }],
+      cycles: [{
+        id: 'cycle-1',
+        name: 'Cycle 42',
+        number: 42,
+        startsAt: '2026-05-01T00:00:00Z',
+        endsAt: '2026-05-14T00:00:00Z',
+        updatedAt: '2026-05-13T00:00:00Z',
+      }],
+      milestones: [{
+        id: 'milestone-1',
+        name: 'Public Beta',
+        status: 'planned',
+        updatedAt: '2026-05-14T00:00:00Z',
+      }],
+      roadmaps: [{
+        id: 'roadmap-1',
+        name: 'Platform Roadmap',
+        updatedAt: '2026-05-15T00:00:00Z',
+      }],
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.deleted, 0);
+    assert.ok(client.files.has(linearCommentPath('comment-1', 'AGE-8')));
+    assert.ok(client.files.has(linearCyclePath('cycle-1')));
+    assert.ok(client.files.has(linearMilestonePath('milestone-1')));
+    assert.ok(client.files.has(linearRoadmapPath('roadmap-1')));
+
+    const commentRecord = JSON.parse(client.files.get(linearCommentPath('comment-1', 'AGE-8'))!) as {
+      objectType: string;
+      payload: { id: string; body: string; issue: { identifier: string } };
+    };
+    assert.equal(commentRecord.objectType, 'comment');
+    assert.equal(commentRecord.payload.id, 'comment-1');
+    assert.equal(commentRecord.payload.issue.identifier, 'AGE-8');
+
+    assert.deepEqual(JSON.parse(client.files.get(linearCommentsIndexPath())!), [
+      { id: 'comment-1', title: 'Ship it', updated: '2026-05-12T00:00:00Z' },
+    ]);
+    assert.deepEqual(JSON.parse(client.files.get(linearCyclesIndexPath())!), [
+      { id: 'cycle-1', title: 'Cycle 42', updated: '2026-05-13T00:00:00Z' },
+    ]);
+    assert.deepEqual(JSON.parse(client.files.get(linearMilestonesIndexPath())!), [
+      { id: 'milestone-1', title: 'Public Beta', updated: '2026-05-14T00:00:00Z' },
+    ]);
+    assert.deepEqual(JSON.parse(client.files.get(linearRoadmapsIndexPath())!), [
+      { id: 'roadmap-1', title: 'Platform Roadmap', updated: '2026-05-15T00:00:00Z' },
     ]);
   });
 
