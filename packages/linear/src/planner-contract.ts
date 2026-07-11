@@ -18,7 +18,7 @@ export const LINEAR_OBJECT_TYPES = [
   'user',
 ] as const;
 
-export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
+type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
 
 const LINEAR_PATH_ROOT = '/linear';
 

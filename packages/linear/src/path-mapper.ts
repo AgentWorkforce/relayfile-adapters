@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 import {
+  LINEAR_OBJECT_TYPES,
   linearStatePath,
   normalizeNangoLinearModel,
 } from './planner-contract.js';
-import type { LinearPathObjectType } from './planner-contract.js';
 import { LINEAR_AGENT_WEBHOOK_EVENTS } from './types.js';
 
 export {
@@ -13,7 +13,8 @@ export {
   linearStatesIndexPath,
   normalizeNangoLinearModel,
 } from './planner-contract.js';
-export type { LinearPathObjectType } from './planner-contract.js';
+
+export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
 
 export const LINEAR_PATH_ROOT = '/linear';
 export const LINEAR_CANONICAL_STATES = ['Todo', 'In Progress', 'Done', 'Backlog', 'Canceled'] as const;

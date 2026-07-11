@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { builtinModules } from 'node:module';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 import * as plannerContract from '../planner-contract.js';
+
+// @ts-expect-error The planner subpath deliberately has no fifth public type export.
+type NoPlannerContractTypeExport = import('../planner-contract.js').LinearPathObjectType;
 
 test('planner-contract exposes only the Worker planning surface', () => {
   assert.deepEqual(Object.keys(plannerContract).sort(), [
@@ -25,8 +29,9 @@ test('planner-contract exposes only the Worker planning surface', () => {
 });
 
 test('planner-contract public subpath has a pure Worker transitive import graph', async () => {
+  const packageRoot = fileURLToPath(new URL('../..', import.meta.url));
   const result = await build({
-    absWorkingDir: new URL('../..', import.meta.url).pathname,
+    absWorkingDir: packageRoot,
     bundle: true,
     conditions: ['worker', 'browser', 'import'],
     format: 'esm',
@@ -36,7 +41,7 @@ test('planner-contract public subpath has a pure Worker transitive import graph'
     stdin: {
       contents: `export * from '@relayfile/adapter-linear/planner-contract';`,
       loader: 'js',
-      resolveDir: new URL('../..', import.meta.url).pathname,
+      resolveDir: packageRoot,
       sourcefile: 'worker-entry.js',
     },
     write: false,
