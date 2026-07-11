@@ -16,6 +16,11 @@
       "import": "./dist/path-mapper.js",
       "default": "./dist/path-mapper.js"
     },
+    "./planner-contract": {
+      "types": "./dist/planner-contract.d.ts",
+      "import": "./dist/planner-contract.js",
+      "default": "./dist/planner-contract.js"
+    },
     "./writeback": {
       "types": "./dist/writeback.d.ts",
       "import": "./dist/writeback.js",
@@ -64,6 +69,7 @@
     "@agent-relay/sdk": "^6.0.7",
     "@relayfile/sdk": "^0.6.0",
     "@types/node": "^24.6.0",
+    "esbuild": "^0.27.7",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

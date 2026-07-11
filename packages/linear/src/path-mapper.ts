@@ -1,6 +1,19 @@
 import { createHash } from 'node:crypto';
 import { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
+import {
+  linearStatePath,
+  normalizeNangoLinearModel,
+} from './planner-contract.js';
+import type { LinearPathObjectType } from './planner-contract.js';
 import { LINEAR_AGENT_WEBHOOK_EVENTS } from './types.js';
+
+export {
+  LINEAR_OBJECT_TYPES,
+  linearStatePath,
+  linearStatesIndexPath,
+  normalizeNangoLinearModel,
+} from './planner-contract.js';
+export type { LinearPathObjectType } from './planner-contract.js';
 
 export const LINEAR_PATH_ROOT = '/linear';
 export const LINEAR_CANONICAL_STATES = ['Todo', 'In Progress', 'Done', 'Backlog', 'Canceled'] as const;
@@ -11,20 +24,6 @@ export const LINEAR_AGENT_WEBHOOK_PATH_ROOTS = {
   OAuthApp: `${LINEAR_PATH_ROOT}/oauth-app`,
 } as const;
 
-export const LINEAR_OBJECT_TYPES = [
-  'comment',
-  'cycle',
-  'issue',
-  'label',
-  'milestone',
-  'project',
-  'roadmap',
-  'state',
-  'team',
-  'user',
-] as const;
-
-export type LinearPathObjectType = (typeof LINEAR_OBJECT_TYPES)[number];
 export type LinearAgentWebhookCategory = keyof typeof LINEAR_AGENT_WEBHOOK_PATH_ROOTS;
 
 export interface NameWithIdOptions {
@@ -38,65 +37,6 @@ export interface ParseNameWithIdResult {
   id: string;
   ext: string | null;
 }
-
-const OBJECT_TYPE_ALIASES: Readonly<Record<string, LinearPathObjectType>> = {
-  comment: 'comment',
-  comments: 'comment',
-  linearcomment: 'comment',
-  cycle: 'cycle',
-  cycles: 'cycle',
-  linearcycle: 'cycle',
-  issue: 'issue',
-  issues: 'issue',
-  issue_label: 'label',
-  issuelabel: 'label',
-  linearissue: 'issue',
-  linearissuelabel: 'label',
-  label: 'label',
-  labels: 'label',
-  linearlabel: 'label',
-  milestone: 'milestone',
-  milestones: 'milestone',
-  projectmilestone: 'milestone',
-  projectmilestones: 'milestone',
-  linearmilestone: 'milestone',
-  project: 'project',
-  projects: 'project',
-  linearproject: 'project',
-  roadmap: 'roadmap',
-  roadmaps: 'roadmap',
-  linearroadmap: 'roadmap',
-  state: 'state',
-  states: 'state',
-  linearstate: 'state',
-  team: 'team',
-  teams: 'team',
-  linearteam: 'team',
-  user: 'user',
-  users: 'user',
-  linearuser: 'user',
-};
-
-/**
- * Nango sync record `model` names → canonical Linear object types. The Nango
- * `linear-relay` integration emits records under these PascalCase model names
- * (see `cloud/nango-integrations/linear-relay/syncs/*.ts`). Resolving them
- * here lets the cloud's record-writer turn a Nango payload into a relayfile
- * path without hardcoding the mapping at the dispatch site.
- */
-const NANGO_MODEL_MAP: Readonly<Record<string, LinearPathObjectType>> = {
-  LinearComment: 'comment',
-  LinearCycle: 'cycle',
-  LinearIssue: 'issue',
-  LinearIssueLabel: 'label',
-  LinearLabel: 'label',
-  LinearMilestone: 'milestone',
-  LinearProject: 'project',
-  LinearRoadmap: 'roadmap',
-  LinearState: 'state',
-  LinearTeam: 'team',
-  LinearUser: 'user',
-};
 
 const LINEAR_PUBLIC_IDENTIFIER_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/u;
 const MAX_HUMAN_READABLE_LENGTH = 80;
@@ -232,12 +172,7 @@ export function slugifyStateName(stateName: string): string {
 }
 
 export function normalizeLinearObjectType(objectType: string): LinearPathObjectType {
-  const normalized = objectType.trim().toLowerCase();
-  const mapped = OBJECT_TYPE_ALIASES[normalized];
-  if (!mapped) {
-    throw new Error(`Unsupported Linear object type: ${objectType}`);
-  }
-  return mapped;
+  return normalizeNangoLinearModel(objectType);
 }
 
 export function tryNormalizeLinearObjectType(objectType: string): LinearPathObjectType | undefined {
@@ -246,12 +181,6 @@ export function tryNormalizeLinearObjectType(objectType: string): LinearPathObje
   } catch {
     return undefined;
   }
-}
-
-export function normalizeNangoLinearModel(model: string): LinearPathObjectType {
-  const direct = NANGO_MODEL_MAP[model];
-  if (direct) return direct;
-  return normalizeLinearObjectType(model);
 }
 
 export function linearAgentWebhookCategory(eventType: string): LinearAgentWebhookCategory | null {
@@ -435,14 +364,6 @@ export function linearLabelsIndexPath(): string {
 
 export function linearLabelByTeamPath(teamId: string, labelId: string): string {
   return `${LINEAR_PATH_ROOT}/labels/by-team/${encodeLinearPathSegment(teamId)}/${encodeLinearPathSegment(labelId)}.json`;
-}
-
-export function linearStatePath(stateId: string): string {
-  return `${LINEAR_PATH_ROOT}/states/${encodeLinearPathSegment(stateId)}.json`;
-}
-
-export function linearStatesIndexPath(): string {
-  return `${LINEAR_PATH_ROOT}/states/_index.json`;
 }
 
 export function linearCyclePath(cycleId: string): string {
