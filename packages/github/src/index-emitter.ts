@@ -22,6 +22,13 @@ export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   assigneeKeys?: string[];
   creatorKey?: string;
   priority?: string;
+  // Merge lifecycle carried inline (pull requests only) so time-windowed
+  // consumers — e.g. a "what merged in the last 24h" digest — can filter the
+  // index alone without opening every `meta.json`. `merged` is true once the PR
+  // has a merge timestamp; `mergedAt` is the ISO 8601 `merged_at`. Both are
+  // omitted for issues and for unmerged PRs. Additive — older readers ignore it.
+  merged?: boolean;
+  mergedAt?: string;
 }
 
 export interface GitHubRootIndexRow {

@@ -781,7 +781,16 @@ function buildRecordIndexRow(
     ...withOptionalArray('assigneeKeys', readGitHubAssigneeKeys(record)),
     ...withOptionalString('creatorKey', readGitHubCreatorKey(record)),
     ...withOptionalString('priority', readPriority(record)),
+    ...withMerged(readNonEmptyString(record.merged_at)),
   };
+}
+
+// Surface merge lifecycle on the index row (pull requests only) so windowed
+// consumers filter the index alone. A PR is "merged" once GitHub stamps
+// `merged_at`; issues and unmerged PRs have no `merged_at`, so both fields are
+// omitted (matching the additive `withOptional*` convention).
+function withMerged(mergedAt: string | undefined): Partial<GitHubRecordIndexRow> {
+  return mergedAt ? { merged: true, mergedAt } : {};
 }
 
 // ---------------------------------------------------------------------------
