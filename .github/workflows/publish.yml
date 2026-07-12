@@ -102,6 +102,7 @@ jobs:
           INPUT_TAG: ${{ github.event.inputs.tag }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
           RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
+          NPM_PUBLISH_CLI_VERSION: "11.18.0"
         run: |
           set -euo pipefail
           while IFS= read -r pkg; do
@@ -119,9 +120,9 @@ jobs:
 
             if [ "$INPUT_DRY_RUN" = "true" ]; then
               echo "DRY RUN: $name@$version"
-              npm publish --dry-run --access public --tag "$INPUT_TAG" --ignore-scripts
+              npx --yes "npm@$NPM_PUBLISH_CLI_VERSION" publish --dry-run --access public --tag "$INPUT_TAG" --ignore-scripts
             else
-              npm publish --access public --provenance --tag "$INPUT_TAG" --ignore-scripts
+              npx --yes "npm@$NPM_PUBLISH_CLI_VERSION" publish --access public --provenance --tag "$INPUT_TAG" --ignore-scripts
               echo "Published $name@$version"
             fi
 
