@@ -19,5 +19,6 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- GitHub pull indexes now surface `merged` and `mergedAt` across webhook, direct, and bulk ingestion paths so time-windowed consumers can identify merged pull requests without opening every `meta.json`.
 - Added the Telegram adapter with typed path helpers, rich Bot API writeback resources for messages, reactions, callback answers, inline answers, commands, and menu buttons, plus optional event-sourced conversation history layout and discovery metadata.
 - `normalizeWritebackStatus(result, entry?)` + `NormalizedWritebackState` (incl. `'no_receipt'`) and `NormalizedWritebackStatus` in `@relayfile/adapter-core` (and re-exported from the `vfs-client` subpath). Bridges high-level `WritebackResult` (receipt present/absent) with low-level `WritebackStatusEntry` outcomes. First-class support for agent debuggability (writeback no-receipt, W6) so runtime wrappers and terminal status taxonomies share a stable enum without per-adapter code. See updated `WritebackOutcome` and docs.

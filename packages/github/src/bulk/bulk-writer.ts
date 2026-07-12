@@ -14,6 +14,7 @@ import { type BatchFetchCache, batchFetchFiles, type BatchOptions, type FileCont
 import {
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
+  pullRequestMergeIndexFields,
   upsertRecordIndexRow,
   upsertRepoIndexRow,
 } from '../index-emitter.js';
@@ -215,6 +216,7 @@ export async function bulkIngestPR(
             updated,
             number: metadata.number,
             state: metadata.state || '',
+            ...pullRequestMergeIndexFields(metadata.mergedAt),
           }),
         (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
       ),

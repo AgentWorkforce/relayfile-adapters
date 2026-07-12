@@ -512,6 +512,34 @@ describe('pull request ingestion', () => {
     );
   });
 
+  it('projects merge lifecycle into the pull index row', async () => {
+    const mergedAt = '2026-03-29T12:00:00Z';
+    const { provider } = createFixtureProvider({
+      prPayload: {
+        state: 'closed',
+        merged: true,
+        closed_at: mergedAt,
+        merged_at: mergedAt,
+      },
+    });
+    const { vfs, writes } = createMemoryVfs();
+
+    const result = await ingestPullRequest(
+      provider,
+      mockRepoContext.owner,
+      mockRepoContext.repo,
+      42,
+      vfs,
+    );
+
+    assert.deepStrictEqual(result.errors, []);
+    const rows = JSON.parse(
+      writes.get('/github/repos/octocat/hello-world/pulls/_index.json') ?? '[]',
+    ) as Array<{ merged?: boolean; mergedAt?: string }>;
+    assert.equal(rows[0]!.merged, true);
+    assert.equal(rows[0]!.mergedAt, mergedAt);
+  });
+
   it('buildVFSPath constructs correct paths', () => {
     assert.strictEqual(
       buildVFSPath(' acme org ', 'widgets', 7, '/files/src/my file.ts'),

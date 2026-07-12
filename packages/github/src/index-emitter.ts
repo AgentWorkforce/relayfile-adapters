@@ -31,6 +31,14 @@ export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   mergedAt?: string;
 }
 
+/** Add merge lifecycle fields to a pull-request index row when GitHub supplies a timestamp. */
+export function pullRequestMergeIndexFields(
+  mergedAt: string | null | undefined,
+): Partial<Pick<GitHubRecordIndexRow, 'merged' | 'mergedAt'>> {
+  const normalized = mergedAt?.trim();
+  return normalized ? { merged: true, mergedAt: normalized } : {};
+}
+
 export interface GitHubRootIndexRow {
   id: string;
   title: string;

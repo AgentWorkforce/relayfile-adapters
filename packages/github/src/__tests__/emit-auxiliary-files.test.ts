@@ -191,6 +191,17 @@ describe('emitGitHubAuxiliaryFiles', () => {
           closed_at: '2026-05-12T08:30:00Z',
         },
       ],
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 102,
+          title: 'Issue with unexpected merge-shaped metadata',
+          state: 'closed',
+          updated_at: '2026-05-12T07:00:00Z',
+          merged_at: '2026-05-12T07:30:00Z',
+        },
+      ],
     });
 
     assert.deepEqual(result.errors, []);
@@ -210,6 +221,15 @@ describe('emitGitHubAuxiliaryFiles', () => {
     // Closed-but-unmerged PR: no merge timestamp → both fields omitted.
     assert.equal(byId.get('101')!.merged, undefined);
     assert.equal(byId.get('101')!.mergedAt, undefined);
+
+    // Issue rows never expose PR merge lifecycle, even if an upstream payload
+    // unexpectedly carries a merge-shaped field.
+    const issueRows = JSON.parse(
+      client.files.get(githubRepoIssuesIndexPath('acme', 'widgets'))!,
+    ) as Array<{ id: string; merged?: boolean; mergedAt?: string }>;
+    assert.equal(issueRows[0]!.id, '102');
+    assert.equal(issueRows[0]!.merged, undefined);
+    assert.equal(issueRows[0]!.mergedAt, undefined);
   });
 
   it('reconciles a PR rename: prior by-title alias and prior canonical meta.json are deleted via by-id anchor', async () => {
