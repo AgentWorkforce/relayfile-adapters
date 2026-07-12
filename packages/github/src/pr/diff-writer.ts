@@ -8,6 +8,7 @@ import type { GitHubRequestProvider, JsonValue, ProxyResponse } from '../types.j
 import {
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
+  pullRequestMergeIndexFields,
   upsertRecordIndexRow,
   upsertRepoIndexRow,
 } from '../index-emitter.js';
@@ -173,6 +174,7 @@ export async function ingestPullRequest(
           updated,
           number: parsedPullRequest.number,
           state: parsedPullRequest.state || '',
+          ...pullRequestMergeIndexFields(parsedPullRequest.mergedAt),
         }),
       (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
     );

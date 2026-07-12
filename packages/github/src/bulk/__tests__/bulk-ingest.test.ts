@@ -376,7 +376,13 @@ describe('bulk ingest', () => {
           };
         }
 
-        return jsonResponse(mockPRPayload as unknown as ProxyResponse['data']);
+        return jsonResponse({
+          ...mockPRPayload,
+          state: 'closed',
+          merged: true,
+          closed_at: '2026-03-29T12:00:00Z',
+          merged_at: '2026-03-29T12:00:00Z',
+        } as unknown as ProxyResponse['data']);
       }
 
       const prefix = `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/contents/`;
@@ -430,7 +436,9 @@ describe('bulk ingest', () => {
         title: mockPRPayload.title,
         updated: mockPRPayload.updated_at,
         number: 42,
-        state: mockPRPayload.state,
+        state: 'closed',
+        merged: true,
+        mergedAt: '2026-03-29T12:00:00Z',
       }],
     );
     assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'), []);

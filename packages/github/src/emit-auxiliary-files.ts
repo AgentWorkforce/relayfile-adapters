@@ -64,6 +64,7 @@ import {
   buildRepoIndexFile,
   buildRepoIssuesIndexFile,
   buildRepoPullsIndexFile,
+  pullRequestMergeIndexFields,
   type GitHubRecordIndexRow,
   type GitHubRepoIndexRow,
 } from './index-emitter.js';
@@ -532,7 +533,7 @@ async function planNumberedWrite(
 
   // Index row upsert.
   const reconciler = getReconciler(repoInfo.owner, repoInfo.repo);
-  reconciler.upsert(buildRecordIndexRow(number, record, title, state));
+  reconciler.upsert(buildRecordIndexRow(number, record, title, state, objectType));
 
   return { writes, deletes };
 }
@@ -771,6 +772,7 @@ function buildRecordIndexRow(
   record: GitHubPullRequestEmitRecord | GitHubIssueEmitRecord,
   title: string | undefined,
   state: string | undefined,
+  objectType: 'pull_request' | 'issue',
 ): GitHubRecordIndexRow {
   return {
     id: number,
@@ -781,6 +783,9 @@ function buildRecordIndexRow(
     ...withOptionalArray('assigneeKeys', readGitHubAssigneeKeys(record)),
     ...withOptionalString('creatorKey', readGitHubCreatorKey(record)),
     ...withOptionalString('priority', readPriority(record)),
+    ...(objectType === 'pull_request'
+      ? pullRequestMergeIndexFields(readNonEmptyString(record.merged_at))
+      : {}),
   };
 }
 

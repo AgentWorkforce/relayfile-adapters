@@ -29,7 +29,7 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 { "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "number": 42, "state": "open", "labels": ["factory"] }
 \`\`\`
 
-\`labels\` carries the issue's label names inline so you can filter on the index without opening every \`meta.json\` (e.g. \`jq '.[] | select(.labels | index("factory"))'\`). It is present on issue rows; pull rows may omit it.
+\`labels\` carries the issue's label names inline so you can filter on the index without opening every \`meta.json\` (e.g. \`jq '.[] | select(.labels | index("factory"))'\`). It is present on issue rows; pull rows may omit it. Merged pull rows additionally carry \`"merged": true\` and \`"mergedAt": "<iso8601>"\`; issues and unmerged pulls omit both fields.
 
 ## JSONL And Querying
 
@@ -41,6 +41,7 @@ Examples:
 ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
+jq '.[] | select(.mergedAt != null) | {number, title, mergedAt}' /github/repos/octocat/hello-world/pulls/_index.json
 jq '.[] | select(.labels | index("factory"))' /github/repos/octocat/hello-world/issues/_index.json
 ls /github/repos/octocat__hello-world/issues/by-state/open
 ls /github/repos/octocat__hello-world/issues/by-assignee/octocat
