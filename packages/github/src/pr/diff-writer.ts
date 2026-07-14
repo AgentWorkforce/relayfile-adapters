@@ -20,7 +20,11 @@ import { githubLayoutPromptFile } from '../layout-prompt.js';
 import { cleanupStaleGitHubTitleAliases } from '../alias-cleanup.js';
 import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
 import { buildVFSPath, mapPRFiles, type PullRequestFileMapping } from './file-mapper.js';
-import { parsePullRequest, type PullRequestMetadata } from './parser.js';
+import {
+  parsePullRequest,
+  type ParsePullRequestOptions,
+  type PullRequestMetadata,
+} from './parser.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 
@@ -43,11 +47,12 @@ export async function fetchAndWriteDiff(
   number: number,
   vfs: VfsLike,
   title?: string,
+  explicitConnectionId?: string,
 ): Promise<DiffWriteResult> {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
   const prNumber = requirePositiveInteger(number, 'number');
-  const connectionId = await resolveConnectionId(provider);
+  const connectionId = await resolveConnectionId(provider, explicitConnectionId);
 
   const response = await withProxyRetry(provider).proxy({
     method: 'GET',
@@ -82,6 +87,7 @@ export async function ingestPullRequest(
   repo: string,
   number: number,
   vfs: VfsLike,
+  options: ParsePullRequestOptions = {},
 ): Promise<IngestResult> {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
@@ -91,7 +97,13 @@ export async function ingestPullRequest(
 
   let parsedPullRequest: PullRequestMetadata | null = null;
   try {
-    parsedPullRequest = await parsePullRequest(provider, trimmedOwner, trimmedRepo, prNumber);
+    parsedPullRequest = await parsePullRequest(
+      provider,
+      trimmedOwner,
+      trimmedRepo,
+      prNumber,
+      options,
+    );
   } catch (error) {
     result.errors.push({
       path: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'meta.json'),
@@ -117,7 +129,14 @@ export async function ingestPullRequest(
 
   let mappedFiles: PullRequestFileMapping[] = [];
   try {
-    mappedFiles = await mapPRFiles(provider, trimmedOwner, trimmedRepo, prNumber, parsedPullRequest?.title);
+    mappedFiles = await mapPRFiles(
+      provider,
+      trimmedOwner,
+      trimmedRepo,
+      prNumber,
+      parsedPullRequest?.title,
+      options.connectionId,
+    );
   } catch (error) {
     result.errors.push({
       path: buildVFSPath(trimmedOwner, trimmedRepo, prNumber, 'files', parsedPullRequest?.title),
@@ -140,6 +159,7 @@ export async function ingestPullRequest(
       prNumber,
       vfs,
       parsedPullRequest?.title,
+      options.connectionId,
     );
     result.paths.push(diffResult.path);
 
@@ -314,7 +334,13 @@ function requirePositiveInteger(value: number, fieldName: string): number {
   return value;
 }
 
-async function resolveConnectionId(provider: GitHubRequestProvider): Promise<string> {
+async function resolveConnectionId(
+  provider: GitHubRequestProvider,
+  explicitConnectionId?: string,
+): Promise<string> {
+  if (explicitConnectionId?.trim()) {
+    return explicitConnectionId.trim();
+  }
   const connectionAwareProvider = provider as ConnectionAwareProvider;
   const candidateConnectionId =
     connectionAwareProvider.connectionId?.trim() ??

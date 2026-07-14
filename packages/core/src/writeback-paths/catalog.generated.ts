@@ -298,6 +298,16 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "github": {
+    "close-pull-request": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber"
+        ]
+      }
+    ],
     "issue-comments": [
       {
         "path": "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
@@ -324,6 +334,24 @@ export const WRITEBACK_PATH_CATALOG = {
           "owner",
           "repo",
           "pullNumber"
+        ]
+      }
+    ],
+    "pull-requests": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pull-requests",
+        "params": [
+          "owner",
+          "repo"
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "path": "/github/repos/{owner}/{repo}/refs",
+        "params": [
+          "owner",
+          "repo"
         ]
       }
     ],

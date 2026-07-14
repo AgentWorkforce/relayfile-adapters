@@ -22,7 +22,18 @@ interface FixtureProviderOptions {
   prNumber?: number;
   prPayload?: Record<string, unknown>;
   responses?: Partial<Record<'diff' | 'files' | 'pull', ProxyResponse>>;
+  reviews?: readonly Record<string, unknown>[];
+  reviewRequirements?: Record<string, unknown> | null;
+  checkRuns?: readonly Record<string, unknown>[];
+  statuses?: readonly Record<string, unknown>[];
 }
+
+const gateReviews = [
+  { id: 1, state: 'APPROVED', user: { login: 'reviewer' } },
+];
+const gateCheckRuns = [
+  { id: 2, name: 'test', status: 'completed', conclusion: 'success', details_url: 'https://example.test/check/2' },
+];
 
 function createPullRequestFixture(prPayload?: Record<string, unknown>) {
   const payload = {
@@ -79,6 +90,36 @@ function createFixtureProvider(options: FixtureProviderOptions = {}) {
           data: options.files ?? mockPRFiles,
         }
       );
+    }
+
+    if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${prNumber}/reviews`) {
+      return { status: 200, headers: {}, data: options.reviews ?? gateReviews };
+    }
+
+    if (
+      request.endpoint ===
+      `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/branches/${encodeURIComponent(mockPRPayload.base.ref)}/protection/required_pull_request_reviews`
+    ) {
+      if (options.reviewRequirements === null) {
+        return { status: 404, headers: {}, data: { message: 'Not Found' } };
+      }
+      return {
+        status: 200,
+        headers: {},
+        data: options.reviewRequirements ?? {
+          required_approving_review_count: 1,
+          require_code_owner_reviews: false,
+        },
+      };
+    }
+
+    if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`) {
+      const checkRuns = options.checkRuns ?? gateCheckRuns;
+      return { status: 200, headers: {}, data: { total_count: checkRuns.length, check_runs: checkRuns } };
+    }
+
+    if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/status`) {
+      return { status: 200, headers: {}, data: { state: 'success', statuses: options.statuses ?? [] } };
     }
 
     if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/${prNumber}`) {
@@ -199,8 +240,18 @@ describe('pull request ingestion', () => {
           htmlUrl: `https://github.com/${mockRepoContext.owner}/${mockRepoContext.repo}`,
         },
       },
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      reviewDecision: 'APPROVED',
+      statusCheckRollup: [{
+        name: 'test',
+        status: 'COMPLETED',
+        conclusion: 'SUCCESS',
+        detailsUrl: 'https://example.test/check/2',
+      }],
+      headRefOid: mockPRPayload.head.sha,
     });
-    assert.strictEqual(proxy.mock.calls.length, 1);
+    assert.strictEqual(proxy.mock.calls.length, 5);
     assert.deepStrictEqual(proxy.mock.calls[0].arguments, [{
       method: 'GET',
       baseUrl: 'https://api.github.com',
@@ -211,6 +262,89 @@ describe('pull request ingestion', () => {
         'X-GitHub-Api-Version': '2022-11-28',
       },
     }]);
+  });
+
+  it('derives gate metadata from live reviews, check runs, and classic statuses', async () => {
+    const { provider } = createFixtureProvider({
+      reviews: [
+        { id: 1, state: 'APPROVED', user: { login: 'alice' } },
+        { id: 2, state: 'CHANGES_REQUESTED', user: { login: 'bob' } },
+      ],
+      checkRuns: [
+        { id: 2, name: 'unit', status: 'in_progress', conclusion: null, details_url: null },
+      ],
+      statuses: [
+        { id: 3, context: 'legacy/ci', state: 'failure', target_url: 'https://example.test/legacy' },
+      ],
+      prPayload: { mergeable: null, mergeable_state: 'blocked' },
+    });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+
+    assert.strictEqual(parsed.mergeable, 'UNKNOWN');
+    assert.strictEqual(parsed.mergeStateStatus, 'BLOCKED');
+    assert.strictEqual(parsed.reviewDecision, 'CHANGES_REQUESTED');
+    assert.deepStrictEqual(parsed.statusCheckRollup, [
+      { name: 'unit', status: 'IN_PROGRESS', conclusion: null, detailsUrl: null },
+      { name: 'legacy/ci', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: 'https://example.test/legacy' },
+    ]);
+  });
+
+  it('skips deleted and malformed reviewers while preserving valid approvals', async () => {
+    const { provider } = createFixtureProvider({
+      reviews: [
+        { id: 1, state: 'APPROVED', user: null },
+        { id: 2, state: 'APPROVED' },
+        { id: 3, state: 'APPROVED', user: { login: 'alice' } },
+      ],
+    });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+    assert.equal(parsed.reviewDecision, 'APPROVED');
+  });
+
+  it('does not infer approval when authoritative and branch-protection requirements are unavailable', async () => {
+    const { provider } = createFixtureProvider({
+      reviews: [{ id: 1, state: 'APPROVED', user: { login: 'alice' } }],
+      reviewRequirements: null,
+    });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+    assert.equal(parsed.reviewDecision, 'REVIEW_REQUIRED');
+  });
+
+  it('honors authoritative review decisions and code-owner requirements', async () => {
+    const authoritative = createFixtureProvider({
+      prPayload: { reviewDecision: 'APPROVED' },
+      reviewRequirements: null,
+    });
+    assert.equal(
+      (await parsePullRequest(authoritative.provider, mockRepoContext.owner, mockRepoContext.repo, 42)).reviewDecision,
+      'APPROVED',
+    );
+
+    const codeOwners = createFixtureProvider({
+      reviews: [{ id: 1, state: 'APPROVED', user: { login: 'alice' } }],
+      reviewRequirements: {
+        required_approving_review_count: 1,
+        require_code_owner_reviews: true,
+      },
+    });
+    assert.equal(
+      (await parsePullRequest(codeOwners.provider, mockRepoContext.owner, mockRepoContext.repo, 42)).reviewDecision,
+      'REVIEW_REQUIRED',
+    );
+  });
+
+  it('fails gate metadata closed when a successful auxiliary response is malformed', async () => {
+    const { provider } = createFixtureProvider({ checkRuns: [{ id: 2, status: 'completed' }] });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+    assert.equal(parsed.mergeStateStatus, 'UNKNOWN');
+    assert.equal(parsed.reviewDecision, 'REVIEW_REQUIRED');
+    assert.deepEqual(parsed.statusCheckRollup, [
+      { name: 'relayfile/gate-data', status: 'PENDING', conclusion: null, detailsUrl: null },
+    ]);
   });
 
   it('mapPRFiles maps file paths correctly', async () => {

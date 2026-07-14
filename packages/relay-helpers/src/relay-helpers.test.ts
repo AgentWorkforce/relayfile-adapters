@@ -156,6 +156,41 @@ test('githubClient.comment and slackClient.post target the canonical paths', asy
   assert.deepEqual(msg.body, { text: 'shipped' });
 });
 
+test('githubClient exposes pull request create, ref push, and close operations', async () => {
+  const { root, opts } = await mount();
+  const github = githubClient(opts);
+  await github.createPullRequest({
+    owner: 'AgentWorkforce', repo: 'factory', title: 'Fix #52', head: 'factory/52', base: 'main', author: 'user',
+  });
+  assert.deepEqual(
+    (await onlyJsonIn(path.join(root, 'github/repos/AgentWorkforce/factory/pull-requests'))).body,
+    { title: 'Fix #52', head: 'factory/52', base: 'main', author: 'user' },
+  );
+
+  await github.pushRef({ owner: 'AgentWorkforce', repo: 'factory', ref: 'factory/52', sha: 'abc123' });
+  assert.deepEqual(
+    (await onlyJsonIn(path.join(root, 'github/repos/AgentWorkforce/factory/refs'))).body,
+    { ref: 'factory/52', sha: 'abc123' },
+  );
+
+  await github.updateRef({
+    owner: 'AgentWorkforce', repo: 'factory', ref: 'factory/52', sha: 'def456', force: true,
+  });
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(
+      root,
+      'github/repos/AgentWorkforce/factory/refs/refs%2Fheads%2Ffactory%2F52.json',
+    ), 'utf8')),
+    { ref: 'refs/heads/factory/52', sha: 'def456', force: true },
+  );
+
+  await github.closePullRequest({ owner: 'AgentWorkforce', repo: 'factory', number: 52 });
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(root, 'github/repos/AgentWorkforce/factory/pulls/52/close.json'), 'utf8')),
+    {},
+  );
+});
+
 test('telegramClient sends, edits, and reacts through canonical Telegram paths', async () => {
   const { root, opts } = await mount();
   const oldDeliveryId = process.env.WORKFORCE_TICK_DELIVERY_ID;

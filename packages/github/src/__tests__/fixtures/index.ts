@@ -103,6 +103,8 @@ export const mockPRPayload = {
   review_comments: 2,
   comments: 2,
   maintainer_can_modify: true,
+  mergeable: true,
+  mergeable_state: 'clean',
   head: {
     label: `${MOCK_OWNER}:feature/fixture-e2e`,
     ref: 'feature/fixture-e2e',

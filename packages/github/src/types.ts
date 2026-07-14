@@ -35,6 +35,7 @@ export const DEFAULT_GITHUB_EVENTS = [
   'issues.reopened',
   'issues.closed',
   'check_run.completed',
+  'status',
   'deployment_status.created',
 ] as const;
 
@@ -101,6 +102,23 @@ export interface GitHubMergePullRequestWritebackInput {
   commitMessage?: string;
   sha?: string;
   metadata?: AgentReviewMetadata;
+}
+
+export interface GitHubCreatePullRequestWritebackInput {
+  title: string;
+  head: string;
+  base: string;
+  body?: string;
+  draft?: boolean;
+  maintainerCanModify?: boolean;
+  /** Selects the connection credential used by the write orchestrator. Never sent to GitHub. */
+  author?: 'app' | 'user';
+}
+
+export interface GitHubPushRefWritebackInput {
+  ref: string;
+  sha: string;
+  force?: boolean;
 }
 
 export type ProxyRequest = SharedProxyRequest;
@@ -230,6 +248,23 @@ export type GitHubMaterializationPolicy =
     'webhookWritesForLazyRepos'
   >;
 
+export interface GitHubWritebackAuthorshipSelection {
+  connectionId: string;
+  provider?: GitHubRequestProvider;
+  providerConfigKey?: string;
+}
+
+export interface GitHubWritebackAuthorshipInput {
+  workspaceId: string;
+  owner: string;
+  repo: string;
+  author: 'app' | 'user';
+}
+
+export type GitHubResolveAuthorship = (
+  input: GitHubWritebackAuthorshipInput,
+) => Promise<GitHubWritebackAuthorshipSelection> | GitHubWritebackAuthorshipSelection;
+
 export interface GitHubAdapterConfig {
   baseUrl: string;
   defaultBranch: string;
@@ -243,6 +278,14 @@ export interface GitHubAdapterConfig {
   repo?: string;
   connectionId?: string;
   providerConfigKey?: string;
+  /**
+   * Selects the connection credential for authored writebacks. When a
+   * pull-request writeback specifies `author: 'app' | 'user'`, the adapter
+   * calls this to resolve the connection/provider-config key/optional provider
+   * override for that authorship. When omitted, authored writebacks fall back
+   * to `defaultConnectionId` / `defaultProviderConfigKey`.
+   */
+  resolveAuthorship?: GitHubResolveAuthorship;
 }
 
 export interface NormalizedWebhook {

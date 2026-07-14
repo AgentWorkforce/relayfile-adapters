@@ -7,6 +7,10 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ## [Unreleased]
 
+### Added
+
+- Add authenticated GitHub pull-request create, ref push/update, and pull-request close writeback resources, selectable app/user PR authorship, plus live fail-closed merge-gate metadata on mounted pull requests.
+
 ### Breaking
 
 - Writeback creation is now file-native. The reserved `new.json` create path is no longer special; create operations happen when an agent writes a valid JSON document to any non-canonical filename in a writable resource directory.

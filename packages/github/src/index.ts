@@ -1,7 +1,9 @@
 import type { SchemaAdapter } from '@relayfile/adapter-core';
+import { withProxyRetry } from '@relayfile/adapter-core/http';
 import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
+import { GITHUB_API_BASE_URL } from './config.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
 import { mergeIngestResults, vfsPathExists } from './ingest-utils.js';
@@ -33,6 +35,7 @@ import {
 import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event-map.js';
 import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
+import { fetchPullRequestGateMetadata } from './pr/parser.js';
 
 export * from './emit-auxiliary-files.js';
 export * from './digest.js';
@@ -50,6 +53,9 @@ const EMPTY_RESULT: IngestResult = {
   paths: [],
   errors: [],
 };
+
+const GITHUB_PAGE_SIZE = 100;
+const GITHUB_STATUS_PULL_REQUEST_MAX_PAGES = 100;
 
 export const adapterName = 'github' as const;
 export const GITHUB_ADAPTER_NAME = adapterName;
@@ -71,6 +77,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     this.writebackHandler = new GitHubWritebackHandler(provider as never, {
       defaultConnectionId: validatedConfig.connectionId,
       defaultProviderConfigKey: validatedConfig.providerConfigKey,
+      ...(config.resolveAuthorship ? { resolveAuthorship: config.resolveAuthorship } : {}),
     });
   }
 
@@ -202,12 +209,13 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
 
   async ingestReview(payload: Record<string, unknown>): Promise<IngestResult> {
     const action = readString(payload.action);
-    return this.createIngestResult(
+    const child = await this.createIngestResult(
       action ? `pull_request_review.${action}` : 'pull_request_review.submitted',
       'review',
       payload,
       action === 'submitted' || !action ? 'write' : 'update',
     );
+    return this.reconcileGateParents(payload, child);
   }
 
   async ingestReviewComment(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -268,7 +276,23 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestCheckRun(payload: Record<string, unknown>): Promise<IngestResult> {
-    return this.createIngestResult('check_run.completed', 'check_run', payload, 'write');
+    const child = await this.createIngestResult('check_run.completed', 'check_run', payload, 'write');
+    return this.reconcileGateParents(payload, child);
+  }
+
+  async ingestCommitStatus(payload: Record<string, unknown>): Promise<IngestResult> {
+    try {
+      const targets = await this.resolveStatusPullRequestTargets(payload);
+      return this.reconcileGateParents(payload, EMPTY_RESULT, targets);
+    } catch (error) {
+      return {
+        ...EMPTY_RESULT,
+        errors: [{
+          path: this.computeScopedPath('commit', readString(payload.sha) ?? 'unknown', payload),
+          error: error instanceof Error ? error.message : String(error),
+        }],
+      };
+    }
   }
 
   async ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult> {
@@ -380,6 +404,122 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       );
     } catch {
       return undefined;
+    }
+  }
+
+  private async reconcileGateParents(
+    payload: Record<string, unknown>,
+    child: IngestResult,
+    explicitTargets?: Array<{ owner: string; repo: string; number: number }>,
+  ): Promise<IngestResult> {
+    const vfs = this.tryGetVfsProvider();
+    const targets = explicitTargets ?? this.resolvePullRequestTargets(payload);
+    if (!vfs || targets.length === 0) return child;
+
+    const parentResults = await Promise.all(targets
+      .filter((target) => shouldWriteWebhookForRepo(this.config, target.owner, target.repo))
+      .map(async (target) => {
+        try {
+          // Invalidate any previously-ready snapshot before the network refresh.
+          // If GitHub is unavailable, Factory sees this fail-closed state rather
+          // than merging against stale successful checks or approvals.
+          return await reconcilePullRequestGateRecord(
+            this.provider as unknown as GitHubRequestProvider,
+            target.owner,
+            target.repo,
+            target.number,
+            vfs,
+            this.config.connectionId,
+          );
+        } catch (error) {
+          return {
+            ...EMPTY_RESULT,
+            errors: [{
+              path: githubPullRequestPath(target.owner, target.repo, target.number),
+              error: error instanceof Error ? error.message : String(error),
+            }],
+          };
+        }
+      }));
+    return mergeIngestResults(child, ...parentResults);
+  }
+
+  private resolvePullRequestTargets(
+    payload: Record<string, unknown>,
+  ): Array<{ owner: string; repo: string; number: number }> {
+    const repoInfo = extractRepoInfo(payload);
+    const owner = repoInfo.owner || this.config.owner;
+    const repo = repoInfo.repo || this.config.repo;
+    if (!owner || !repo) return [];
+    const numbers = new Set<number>();
+    if (repoInfo.number && Number.isInteger(repoInfo.number)) numbers.add(repoInfo.number);
+    const checkRun = asRecord(payload.check_run);
+    if (Array.isArray(checkRun?.pull_requests)) {
+      for (const value of checkRun.pull_requests) {
+        const number = readNumber(asRecord(value), 'number');
+        if (number && Number.isInteger(number)) numbers.add(number);
+      }
+    }
+    return [...numbers].map((number) => ({ owner, repo, number }));
+  }
+
+  private async resolveStatusPullRequestTargets(
+    payload: Record<string, unknown>,
+  ): Promise<Array<{ owner: string; repo: string; number: number }>> {
+    const repoInfo = extractRepoInfo(payload);
+    const owner = repoInfo.owner || this.config.owner;
+    const repo = repoInfo.repo || this.config.repo;
+    const sha = readString(payload.sha);
+    const connectionId = this.config.connectionId;
+    const missing = [
+      !owner ? 'owner' : undefined,
+      !repo ? 'repo' : undefined,
+      !sha ? 'sha' : undefined,
+      !connectionId ? 'connectionId' : undefined,
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0) {
+      throw new Error(`Cannot resolve GitHub status pull request targets: missing ${missing.join(', ')}`);
+    }
+    if (!owner || !repo || !sha || !connectionId) {
+      throw new Error('Cannot resolve GitHub status pull request targets: invalid configuration');
+    }
+    try {
+      const targets = new Map<number, { owner: string; repo: string; number: number }>();
+      for (let page = 1; page <= GITHUB_STATUS_PULL_REQUEST_MAX_PAGES; page += 1) {
+        const response = await withProxyRetry(this.provider as unknown as GitHubRequestProvider).proxy({
+          method: 'GET',
+          baseUrl: GITHUB_API_BASE_URL,
+          endpoint: `/repos/${owner}/${repo}/commits/${sha}/pulls`,
+          connectionId,
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          query: {
+            page: String(page),
+            per_page: String(GITHUB_PAGE_SIZE),
+          },
+        });
+        if (response.status >= 400) {
+          throw new Error(`GitHub pull request lookup for status ${sha} failed with HTTP ${response.status}`);
+        }
+        if (!Array.isArray(response.data)) {
+          throw new Error(`GitHub pull request lookup for status ${sha} returned a malformed payload`);
+        }
+        for (const value of response.data) {
+          const number = readNumber(asRecord(value), 'number');
+          if (number && Number.isInteger(number)) targets.set(number, { owner, repo, number });
+        }
+        if (!hasNextPage(response.headers) && response.data.length < GITHUB_PAGE_SIZE) break;
+        if (page === GITHUB_STATUS_PULL_REQUEST_MAX_PAGES) {
+          throw new Error(
+            `GitHub pull request lookup for status ${sha} exceeded ${GITHUB_STATUS_PULL_REQUEST_MAX_PAGES} pages`,
+          );
+        }
+      }
+      return [...targets.values()];
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error));
     }
   }
 
@@ -546,6 +686,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 }
 
+function hasNextPage(headers: Record<string, string>): boolean {
+  return Object.entries(headers).some(
+    ([name, value]) => name.toLowerCase() === 'link' && value.includes('rel="next"'),
+  );
+}
+
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -554,6 +700,121 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+}
+
+function readNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = record?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+async function reconcilePullRequestGateRecord(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  number: number,
+  vfs: VfsLike,
+  connectionId?: string,
+): Promise<IngestResult> {
+  if (!connectionId?.trim()) {
+    throw new Error(`Missing GitHub connection id while refreshing ${owner}/${repo}#${number} gate metadata`);
+  }
+  const aliasPath = githubByIdAliasPath(owner, repo, 'pulls', number);
+  const raw = await readVfsText(vfs, aliasPath);
+  if (!raw) {
+    throw new Error(`Cannot refresh GitHub gate metadata before ${aliasPath} is materialized`);
+  }
+  const record = asRecord(JSON.parse(raw));
+  if (!record) throw new Error(`GitHub pull request record at ${aliasPath} is malformed`);
+  const wrappedPayload = asRecord(record.payload);
+  const current = wrappedPayload ?? record;
+  const headSha = readString(current.headRefOid) ?? readNestedString(current, 'head', 'sha');
+  if (!headSha) throw new Error(`GitHub pull request record at ${aliasPath} is missing headRefOid`);
+  const baseRef = readNestedString(current, 'base', 'ref');
+  const title = readString(current.title);
+  const canonicalPath = githubPullRequestPath(owner, repo, number, title);
+
+  // Fail closed before any provider request, then restore only the refreshed
+  // gate fields. The rest of the mounted PR snapshot remains byte-for-byte
+  // equivalent at the value level and no files, diff, indexes, or layout are
+  // re-ingested for review/check/status events.
+  await markPullRequestGatePending(vfs, owner, repo, number);
+  const gate = await fetchPullRequestGateMetadata(
+    provider,
+    owner,
+    repo,
+    number,
+    headSha,
+    connectionId.trim(),
+    undefined,
+    { baseRef },
+  );
+  if (!gate.complete) {
+    throw new Error(`GitHub gate refresh was incomplete for ${owner}/${repo}#${number}`);
+  }
+  const refreshedPayload = {
+    ...current,
+    reviewDecision: gate.reviewDecision,
+    statusCheckRollup: gate.statusCheckRollup,
+  };
+  const refreshed = JSON.stringify(
+    wrappedPayload ? { ...record, payload: refreshedPayload } : refreshedPayload,
+    null,
+    2,
+  );
+  await writeVfsText(vfs, aliasPath, refreshed);
+  await writeVfsText(vfs, canonicalPath, refreshed);
+  return {
+    filesWritten: 0,
+    filesUpdated: 2,
+    filesDeleted: 0,
+    paths: [aliasPath, canonicalPath],
+    errors: [],
+  };
+}
+
+async function markPullRequestGatePending(
+  vfs: VfsLike,
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<void> {
+  const aliasPath = githubByIdAliasPath(owner, repo, 'pulls', number);
+  const raw = await readVfsText(vfs, aliasPath);
+  if (!raw) return;
+  const record = asRecord(JSON.parse(raw));
+  if (!record) return;
+  const wrappedPayload = asRecord(record.payload);
+  const current = wrappedPayload ?? record;
+  const pendingPayload = {
+    ...current,
+    mergeable: 'UNKNOWN',
+    mergeStateStatus: 'UNKNOWN',
+    reviewDecision: 'REVIEW_REQUIRED',
+    statusCheckRollup: [
+      { name: 'relayfile/gate-refresh', status: 'PENDING', conclusion: null, detailsUrl: null },
+    ],
+  };
+  const pending = JSON.stringify(
+    wrappedPayload ? { ...record, payload: pendingPayload } : pendingPayload,
+    null,
+    2,
+  );
+  const title = readString(current.title);
+  await writeVfsText(vfs, aliasPath, pending);
+  await writeVfsText(vfs, githubPullRequestPath(owner, repo, number, title), pending);
+}
+
+async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefined> {
+  const reader = vfs.readFile ?? vfs.read ?? vfs.get;
+  if (!reader) return undefined;
+  const value = await reader.call(vfs, path);
+  return typeof value === 'string' ? value : undefined;
+}
+
+async function writeVfsText(vfs: VfsLike, path: string, content: string): Promise<void> {
+  const writer = vfs.writeFile ?? vfs.write ?? vfs.put ?? vfs.set ?? vfs.upsert;
+  if (!writer) throw new Error(`GitHub VFS cannot write fail-closed gate state at ${path}`);
+  await writer.call(vfs, path, content);
 }
 
 function readNumericLike(value: unknown): string | undefined {

@@ -21,7 +21,7 @@ import {
 import { githubLayoutPromptFile } from '../layout-prompt.js';
 import { cleanupStaleGitHubTitleAliases } from '../alias-cleanup.js';
 import { githubRepoIssuesIndexPath, githubRepoPullsIndexPath } from '../path-mapper.js';
-import type { ParsePullRequestOptions, PullRequestMetadata } from '../pr/parser.js';
+import { fetchPullRequestGateMetadata, type ParsePullRequestOptions, type PullRequestMetadata } from '../pr/parser.js';
 import type { GitHubRequestProvider, JsonObject, JsonValue, ProxyResponse } from '../types.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
@@ -331,13 +331,25 @@ async function fetchPullRequestMetadata(
     connectionId,
     headers: buildJsonHeaders(provider, headers),
   });
-
-  assertSuccessfulResponse(
-    response,
-    `Failed to fetch pull request metadata for ${owner}/${repo}#${number}`,
+  assertSuccessfulResponse(response, `Failed to fetch pull request metadata for ${owner}/${repo}#${number}`);
+  const pullRequest = expectObject(response.data, 'GitHub pull request response');
+  const head = expectObject(pullRequest.head, 'GitHub pull request response.head');
+  const base = expectObject(pullRequest.base, 'GitHub pull request response.base');
+  const gate = await fetchPullRequestGateMetadata(
+    provider,
+    owner,
+    repo,
+    number,
+    readRequiredString(head, 'sha', 'GitHub pull request response.head'),
+    connectionId,
+    headers,
+    {
+      baseRef: readRequiredString(base, 'ref', 'GitHub pull request response.base'),
+      authoritativeReviewDecision:
+        readString(pullRequest, 'reviewDecision') ?? readString(pullRequest, 'review_decision'),
+    },
   );
-
-  return toPullRequestMetadata(response.data, number);
+  return toPullRequestMetadata(pullRequest, number, gate);
 }
 
 async function fetchPullRequestDiff(
@@ -408,11 +420,14 @@ function parsePullRequestFile(
   };
 }
 
-function toPullRequestMetadata(value: JsonValue | null, fallbackNumber: number): PullRequestMetadata {
-  const pullRequest = expectObject(value, 'GitHub pull request response');
+function toPullRequestMetadata(
+  pullRequest: JsonObject,
+  fallbackNumber: number,
+  gate: Awaited<ReturnType<typeof fetchPullRequestGateMetadata>>,
+): PullRequestMetadata {
   const head = expectObject(pullRequest.head, 'GitHub pull request response.head');
   const base = expectObject(pullRequest.base, 'GitHub pull request response.base');
-
+  const mergeable = pullRequest.mergeable;
   return {
     author: readAuthor(pullRequest.user),
     base: readPullRequestRef(base, 'GitHub pull request response.base'),
@@ -431,6 +446,11 @@ function toPullRequestMetadata(value: JsonValue | null, fallbackNumber: number):
     state: readString(pullRequest, 'state') ?? 'open',
     title: readString(pullRequest, 'title') ?? '',
     updatedAt: readString(pullRequest, 'updated_at') ?? '',
+    mergeable: mergeable === true ? 'MERGEABLE' : mergeable === false ? 'CONFLICTING' : 'UNKNOWN',
+    mergeStateStatus: gate.complete ? (readString(pullRequest, 'mergeable_state') ?? 'unknown').toUpperCase() : 'UNKNOWN',
+    reviewDecision: gate.reviewDecision,
+    statusCheckRollup: gate.statusCheckRollup,
+    headRefOid: readRequiredString(head, 'sha', 'GitHub pull request response.head'),
   };
 }
 
@@ -467,42 +487,22 @@ function readPullRequestRef(value: JsonObject, context: string): PullRequestMeta
 }
 
 function readRepository(value: JsonValue | undefined): PullRequestMetadata['head']['repo'] {
-  if (!value || Array.isArray(value) || typeof value !== 'object') {
-    return null;
-  }
-
+  if (!value || Array.isArray(value) || typeof value !== 'object') return null;
   const repository = value as JsonObject;
   const id = readNumber(repository, 'id');
   const name = readString(repository, 'name');
   const fullName = readString(repository, 'full_name');
   const htmlUrl = readString(repository, 'html_url');
-  const isPrivate = readBoolean(repository, 'private');
-
-  if (id === undefined || name === undefined || fullName === undefined || htmlUrl === undefined) {
-    return null;
-  }
-
-  return {
-    id,
-    name,
-    fullName,
-    htmlUrl,
-    private: isPrivate ?? false,
-  };
+  if (id === undefined || name === undefined || fullName === undefined || htmlUrl === undefined) return null;
+  return { id, name, fullName, htmlUrl, private: readBoolean(repository, 'private') ?? false };
 }
 
 function readAuthor(value: JsonValue | undefined): PullRequestMetadata['author'] {
-  if (!value || Array.isArray(value) || typeof value !== 'object') {
-    return null;
-  }
-
+  if (!value || Array.isArray(value) || typeof value !== 'object') return null;
   const author = value as JsonObject;
   const id = readNumber(author, 'id');
   const login = readString(author, 'login');
-  if (id === undefined || login === undefined) {
-    return null;
-  }
-
+  if (id === undefined || login === undefined) return null;
   return {
     id,
     login,
@@ -513,24 +513,14 @@ function readAuthor(value: JsonValue | undefined): PullRequestMetadata['author']
 }
 
 function readLabels(value: JsonValue | undefined): PullRequestMetadata['labels'] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
-    if (!entry || Array.isArray(entry) || typeof entry !== 'object') {
-      return [];
-    }
-
+    if (!entry || Array.isArray(entry) || typeof entry !== 'object') return [];
     const label = entry as JsonObject;
     const id = readNumber(label, 'id');
     const name = readString(label, 'name');
     const color = readString(label, 'color');
-
-    if (id === undefined || name === undefined || color === undefined) {
-      return [];
-    }
-
+    if (id === undefined || name === undefined || color === undefined) return [];
     return [{
       id,
       name,

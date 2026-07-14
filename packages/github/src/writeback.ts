@@ -1,6 +1,7 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GITHUB_API_BASE_URL } from './config.js';
+import { normalizeGitHubRef } from './path-mapper.js';
 import { resources } from './resources.js';
 import {
   GITHUB_REVIEW_EVENTS,
@@ -10,9 +11,13 @@ import {
   type AgentReviewMetadata,
   type GitHubIssueCommentWritebackInput,
   type GitHubIssueWritebackInput,
+  type GitHubCreatePullRequestWritebackInput,
+  type GitHubPushRefWritebackInput,
   type GitHubMergeMethod,
   type GitHubMergePullRequestWritebackInput,
   type GitHubRequestProvider,
+  type GitHubResolveAuthorship,
+  type GitHubWritebackAuthorshipSelection,
   type GitHubCreateReviewInput,
   type JsonObject,
   type JsonValue,
@@ -21,6 +26,8 @@ import {
   type WritebackPathTarget,
   type WritebackResult,
 } from './types.js';
+
+export type { GitHubWritebackAuthorshipSelection } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -32,6 +39,12 @@ const REVIEW_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/([^/]+?)(?:\.json)?$/;
 const MERGE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/merge\.json$/;
+const CLOSE_PULL_REQUEST_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/close\.json$/;
+const CREATE_PULL_REQUEST_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pull-requests(?:\/[^/]+(?:\.json)?)?$/;
+const PUSH_REF_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/refs(?:\/[^/]+(?:\.json)?)?$/;
 const ISSUE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([^/]+?)(?:\.json)?$/;
 // Issue comments are directory records (`comments/<id>/meta.json`); accept the
@@ -48,10 +61,11 @@ interface GitHubReviewResponse {
   id: number;
 }
 
-interface GitHubWritebackHandlerOptions {
+export interface GitHubWritebackHandlerOptions {
   defaultConnectionId?: string;
   defaultProviderConfigKey?: string;
   resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
+  resolveAuthorship?: GitHubResolveAuthorship;
 }
 
 /**
@@ -64,6 +78,7 @@ export class GitHubWritebackHandler {
   private readonly defaultConnectionId?: string;
   private readonly defaultProviderConfigKey: string;
   private readonly resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
+  private readonly resolveAuthorship?: GitHubWritebackHandlerOptions['resolveAuthorship'];
 
   constructor(provider: GitHubRequestProvider, options: GitHubWritebackHandlerOptions = {}) {
     this.provider = provider;
@@ -71,6 +86,7 @@ export class GitHubWritebackHandler {
     this.defaultProviderConfigKey =
       options.defaultProviderConfigKey ?? DEFAULT_PROVIDER_CONFIG_KEY;
     this.resolveConnectionId = options.resolveConnectionId;
+    this.resolveAuthorship = options.resolveAuthorship;
   }
 
   parseReviewPayload(content: string): AgentReview {
@@ -182,6 +198,43 @@ export class GitHubWritebackHandler {
     content: string,
   ): Promise<WritebackResult> {
     try {
+      const directRoute = classifyWrite(path, resources);
+      if (
+        directRoute &&
+        ['pull-requests', 'refs', 'close-pull-request'].includes(directRoute.resource.name)
+      ) {
+        const request = resolveWritebackRequest(path, content);
+        const createPayload = directRoute.resource.name === 'pull-requests'
+          ? parseCreatePullRequestPayload(content)
+          : undefined;
+        const createMatch = createPayload ? path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH) : undefined;
+        const selection = createPayload?.author
+          ? await this.resolveAuthorshipSelection({
+              workspaceId,
+              owner: decodeGitHubPathSegment(createMatch?.[1] ?? '', 'owner'),
+              repo: decodeGitHubPathSegment(createMatch?.[2] ?? '', 'repo'),
+              author: createPayload.author,
+            })
+          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId, undefined) };
+        const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
+          ...request,
+          connectionId: selection.connectionId,
+          headers: {
+            ...request.headers,
+            'Provider-Config-Key':
+              selection.providerConfigKey ?? this.defaultProviderConfigKey,
+          },
+        });
+        if (response.status >= 400) {
+          return {
+            success: false,
+            error: formatProviderError(response, 'GitHub writeback failed'),
+          };
+        }
+        const externalId = extractReviewId(response.data) ?? extractMergeSha(response.data);
+        return { success: true, ...(externalId ? { externalId } : {}) };
+      }
+
       const mergeTarget = extractMergeTarget(path);
       if (mergeTarget) {
         const payload = parseMergePayload(content);
@@ -282,6 +335,21 @@ export class GitHubWritebackHandler {
     review: AgentReview,
   ): Promise<string> {
     return this.resolveConnectionIdFromMetadata(workspaceId, review.metadata);
+  }
+
+  private async resolveAuthorshipSelection(
+    input: { workspaceId: string; owner: string; repo: string; author: 'app' | 'user' },
+  ): Promise<GitHubWritebackAuthorshipSelection> {
+    if (!this.resolveAuthorship) {
+      throw new Error(
+        `GitHub pull request requested author=${input.author}, but no workspace-validated authorship resolver is configured.`,
+      );
+    }
+    const selection = await this.resolveAuthorship(input);
+    if (!selection.connectionId.trim()) {
+      throw new Error(`GitHub pull request requested author=${input.author}, but that identity is unavailable.`);
+    }
+    return { ...selection, connectionId: selection.connectionId.trim() };
   }
 
   private async resolveConnectionIdFromMetadata(
@@ -410,6 +478,44 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
 
   const route = classifyWrite(path, resources);
 
+  if (route?.resource.name === 'pull-requests' && route.kind === 'create') {
+    const match = path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2]) {
+      throw new Error(`Unsupported GitHub pull request create writeback path: ${path}`);
+    }
+    return buildCreatePullRequest(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      parseCreatePullRequestPayload(content),
+    );
+  }
+
+  if (route?.resource.name === 'refs' && (route.kind === 'create' || route.kind === 'patch')) {
+    const match = path.match(PUSH_REF_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2]) {
+      throw new Error(`Unsupported GitHub ref writeback path: ${path}`);
+    }
+    return buildPushRef(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      parsePushRefPayload(content),
+      route.kind,
+      route.id,
+    );
+  }
+
+  if (route?.resource.name === 'close-pull-request') {
+    const match = path.match(CLOSE_PULL_REQUEST_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2] || !match[3]) {
+      throw new Error(`Unsupported GitHub pull request close writeback path: ${path}`);
+    }
+    return buildClosePullRequest(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      Number.parseInt(match[3], 10),
+    );
+  }
+
   if (route?.resource.name === 'issues') {
     const match = path.match(ISSUE_WRITEBACK_PATH);
     if (!match?.[1] || !match[2] || !match[3]) {
@@ -456,8 +562,71 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
   }
 
   throw new Error(
-    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request review, pull request merge file, or pull request review comment reply.`,
+    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request create/close/merge, ref push, review, or review comment reply.`,
   );
+}
+
+function buildCreatePullRequest(
+  owner: string,
+  repo: string,
+  payload: GitHubCreatePullRequestWritebackInput,
+): ProxyRequest {
+  return {
+    method: 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/pulls`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    // `author` is orchestration metadata. GitHub's REST create-PR body has no
+    // such field, so the writeback layer deliberately strips it here.
+    body: {
+      title: payload.title,
+      head: payload.head,
+      base: payload.base,
+      ...(payload.body !== undefined ? { body: payload.body } : {}),
+      ...(payload.draft !== undefined ? { draft: payload.draft } : {}),
+      ...(payload.maintainerCanModify !== undefined
+        ? { maintainer_can_modify: payload.maintainerCanModify }
+        : {}),
+    },
+  };
+}
+
+function buildPushRef(
+  owner: string,
+  repo: string,
+  payload: GitHubPushRefWritebackInput,
+  kind: 'create' | 'patch',
+  canonicalId?: string,
+): ProxyRequest {
+  const normalizedRef = normalizeGitHubRef(payload.ref);
+  if (kind === 'patch' && canonicalId !== normalizedRef) {
+    throw new Error(`Git ref push payload.ref must match canonical ref ${canonicalId}`);
+  }
+  const updatePath = normalizedRef.replace(/^refs\//u, '');
+  return {
+    method: kind === 'patch' ? 'PATCH' : 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: kind === 'patch'
+      ? `/repos/${owner}/${repo}/git/refs/${encodeURI(updatePath)}`
+      : `/repos/${owner}/${repo}/git/refs`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: kind === 'patch'
+      ? { sha: payload.sha, ...(payload.force !== undefined ? { force: payload.force } : {}) }
+      : { ref: normalizedRef, sha: payload.sha },
+  };
+}
+
+function buildClosePullRequest(owner: string, repo: string, prNumber: number): ProxyRequest {
+  return {
+    method: 'PATCH',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: { state: 'closed' },
+  };
 }
 
 function extractMergeTarget(path: string): { owner: string; repo: string; prNumber: number } | undefined {
@@ -681,6 +850,52 @@ function parseMergePayload(content: string): GitHubMergePullRequestWritebackInpu
     ...(sha ? { sha } : {}),
     ...(metadata ? { metadata } : {}),
   };
+}
+
+function parseCreatePullRequestPayload(content: string): GitHubCreatePullRequestWritebackInput {
+  const object = parseJsonObject(content, 'Pull request create payload');
+  rejectReadOnlyFields(object);
+  const title = readString(object, 'title', 'Pull request create payload');
+  const head = readString(object, 'head', 'Pull request create payload');
+  const base = readString(object, 'base', 'Pull request create payload');
+  const body = optionalTrimmedString(object.body, 'Pull request create payload.body');
+  const draft = optionalBoolean(object.draft, 'Pull request create payload.draft');
+  const maintainerCanModify = optionalBoolean(
+    object.maintainerCanModify ?? object.maintainer_can_modify,
+    'Pull request create payload.maintainerCanModify',
+  );
+  const author = optionalAuthor(object.author, 'Pull request create payload.author');
+  return { title, head, base, body, draft, maintainerCanModify, author };
+}
+
+function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
+  const object = parseJsonObject(content, 'Git ref push payload');
+  rejectReadOnlyFields(object);
+  const ref = readString(object, 'ref', 'Git ref push payload');
+  const sha = readString(object, 'sha', 'Git ref push payload');
+  const force = optionalBoolean(object.force, 'Git ref push payload.force');
+  return { ref, sha, force };
+}
+
+function parseJsonObject(content: string, context: string): JsonObject {
+  try {
+    return expectObject(JSON.parse(content) as JsonValue, context);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown JSON parse failure';
+    throw new Error(`Invalid ${context.toLowerCase()} JSON: ${message}`);
+  }
+}
+
+function optionalBoolean(value: JsonValue | undefined, context: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw new Error(`${context} must be a boolean`);
+  return value;
+}
+
+function optionalAuthor(value: JsonValue | undefined, context: string): 'app' | 'user' | undefined {
+  if (value === undefined) return undefined;
+  if (value !== 'app' && value !== 'user') throw new Error(`${context} must be "app" or "user"`);
+  return value;
 }
 
 function compactIssuePayload(payload: GitHubIssueWritebackInput): JsonObject {

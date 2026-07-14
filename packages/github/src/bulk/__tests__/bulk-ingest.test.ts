@@ -57,6 +57,19 @@ function createContentResponse(path: string, ref: string, content: string): Prox
   });
 }
 
+function emptyGateResponse(request: ProxyRequest): ProxyResponse | undefined {
+  if (/\/pulls\/\d+\/reviews$/u.test(request.endpoint)) {
+    return jsonResponse([]);
+  }
+  if (/\/commits\/[^/]+\/check-runs$/u.test(request.endpoint)) {
+    return jsonResponse({ total_count: 0, check_runs: [] });
+  }
+  if (/\/commits\/[^/]+\/status$/u.test(request.endpoint)) {
+    return jsonResponse({ state: 'pending', statuses: [] });
+  }
+  return undefined;
+}
+
 function createMemoryVfs(initialEntries: Record<string, string> = {}) {
   const writes = new Map(Object.entries(initialEntries));
   const deletes: string[] = [];
@@ -367,6 +380,49 @@ describe('bulk ingest', () => {
         return jsonResponse(mockPRFiles as unknown as ProxyResponse['data']);
       }
 
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/reviews`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse([
+          { id: 1, state: 'APPROVED', user: { login: 'reviewer' } },
+        ]);
+      }
+
+      if (
+        request.endpoint ===
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/branches/${encodeURIComponent(mockPRPayload.base.ref)}/protection/required_pull_request_reviews`
+      ) {
+        return jsonResponse({
+          required_approving_review_count: 1,
+          require_code_owner_reviews: false,
+        });
+      }
+
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse({
+          total_count: 1,
+          check_runs: [
+            { id: 2, name: 'ci', status: 'completed', conclusion: 'success', details_url: null },
+          ],
+        });
+      }
+
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/status`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse({
+          state: 'success',
+          statuses: [
+            { id: 3, context: 'legacy-ci', state: 'success', target_url: null },
+          ],
+        });
+      }
+
       if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
         if (request.headers?.Accept === 'application/vnd.github.diff') {
           return {
@@ -417,6 +473,7 @@ describe('bulk ingest', () => {
         metadataCache,
         skipCached: false,
         concurrency: 3,
+        headers: { Authorization: 'Bearer bulk-token' },
       },
     );
 
@@ -457,6 +514,11 @@ describe('bulk ingest', () => {
     assert.strictEqual(meta.title, mockPRPayload.title);
     assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
     assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
+    assert.strictEqual(meta.reviewDecision, 'APPROVED');
+    assert.deepStrictEqual(meta.statusCheckRollup, [
+      { name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: null },
+      { name: 'legacy-ci', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: null },
+    ]);
     assert.strictEqual(
       writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/index.ts'),
       decodeFixtureContent(mockFileContents, 'src/index.ts'),
@@ -482,7 +544,7 @@ describe('bulk ingest', () => {
         errors: 0,
       },
     ]);
-    assert.strictEqual(provider.proxy.mock.calls.length, 9);
+    assert.strictEqual(provider.proxy.mock.calls.length, 13);
   });
 
   it('bulkIngestPR preserves both pull rows when separate PRs are ingested sequentially', async () => {
@@ -503,6 +565,9 @@ describe('bulk ingest', () => {
     ]);
 
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       const match = request.endpoint.match(
         new RegExp(`^/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/(\\d+)(/files)?$`),
       );
@@ -617,6 +682,9 @@ describe('bulk ingest', () => {
     const { vfs, writes } = createMemoryVfs();
 
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
       ) {
@@ -669,12 +737,15 @@ describe('bulk ingest', () => {
     assert.strictEqual(result.filesUpdated, 0);
     assert.strictEqual(result.paths.length, 246);
     assert.strictEqual(writes.size, 249);
-    assert.strictEqual(provider.proxy.mock.calls.length, 244);
+    assert.strictEqual(provider.proxy.mock.calls.length, 248);
   });
   it('bulkIngestPR deletes the stale by-title alias when the title changes on re-ingest (issue #106)', async () => {
     const { vfs, writes, deletes } = createMemoryVfs();
     const createBulkProvider = (prPayload: Record<string, unknown>) =>
       createProvider(async (request) => {
+        const gateResponse = emptyGateResponse(request);
+        if (gateResponse) return gateResponse;
+
         if (
           request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
         ) {
@@ -759,6 +830,9 @@ describe('bulk ingest', () => {
   it('bulkIngestPR deletes nothing when re-ingested with an unchanged title', async () => {
     const { vfs, writes, deletes } = createMemoryVfs();
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
       ) {
