@@ -491,9 +491,10 @@ describe('writeback', () => {
         }));
         const handler = new GitHubWritebackHandler(defaultProvider, {
           defaultConnectionId: 'conn-default',
-          resolveAuthorship: (workspaceId, requestedAuthor) => {
-            assert.equal(workspaceId, 'workspace-1');
-            assert.equal(requestedAuthor, author);
+          resolveAuthorship: (input) => {
+            assert.deepEqual(input, {
+              workspaceId: 'workspace-1', owner: 'acme', repo: 'widgets', author,
+            });
             return { connectionId: `conn-${author}`, provider: selectedProvider };
           },
         });

@@ -67,8 +67,7 @@ interface GitHubWritebackHandlerOptions {
   defaultProviderConfigKey?: string;
   resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
   resolveAuthorship?: (
-    workspaceId: string,
-    author: 'app' | 'user',
+    input: { workspaceId: string; owner: string; repo: string; author: 'app' | 'user' },
   ) => Promise<GitHubWritebackAuthorshipSelection> | GitHubWritebackAuthorshipSelection;
 }
 
@@ -211,8 +210,14 @@ export class GitHubWritebackHandler {
         const createPayload = directRoute.resource.name === 'pull-requests'
           ? parseCreatePullRequestPayload(content)
           : undefined;
+        const createMatch = createPayload ? path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH) : undefined;
         const selection = createPayload?.author
-          ? await this.resolveAuthorshipSelection(workspaceId, createPayload.author)
+          ? await this.resolveAuthorshipSelection({
+              workspaceId,
+              owner: decodeGitHubPathSegment(createMatch?.[1] ?? '', 'owner'),
+              repo: decodeGitHubPathSegment(createMatch?.[2] ?? '', 'repo'),
+              author: createPayload.author,
+            })
           : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId) };
         const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
           ...request,
@@ -335,17 +340,16 @@ export class GitHubWritebackHandler {
   }
 
   private async resolveAuthorshipSelection(
-    workspaceId: string,
-    author: 'app' | 'user',
+    input: { workspaceId: string; owner: string; repo: string; author: 'app' | 'user' },
   ): Promise<GitHubWritebackAuthorshipSelection> {
     if (!this.resolveAuthorship) {
       throw new Error(
-        `GitHub pull request requested author=${author}, but no workspace-validated authorship resolver is configured.`,
+        `GitHub pull request requested author=${input.author}, but no workspace-validated authorship resolver is configured.`,
       );
     }
-    const selection = await this.resolveAuthorship(workspaceId, author);
+    const selection = await this.resolveAuthorship(input);
     if (!selection.connectionId.trim()) {
-      throw new Error(`GitHub pull request requested author=${author}, but that identity is unavailable.`);
+      throw new Error(`GitHub pull request requested author=${input.author}, but that identity is unavailable.`);
     }
     return { ...selection, connectionId: selection.connectionId.trim() };
   }
