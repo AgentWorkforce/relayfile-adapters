@@ -87,6 +87,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.4.6"
+    "@relayfile/adapter-core": "^0.5.0"
   }
 }
