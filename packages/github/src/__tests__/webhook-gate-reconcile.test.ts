@@ -12,14 +12,16 @@ const number = mockPRPayload.number;
 const canonical = githubPullRequestPath(owner, repo, number, mockPRPayload.title);
 const byId = githubByIdAliasPath(owner, repo, 'pulls', number);
 
-function memoryProvider() {
+function memoryProvider(exposeConnectionId = true) {
   const files = new Map<string, string>();
+  const requests: ProxyRequest[] = [];
   let reviewState = 'CHANGES_REQUESTED';
   let checkStatus = 'in_progress';
   let checkConclusion: string | null = null;
   let classicState = 'pending';
   let mergeableState = 'blocked';
   let malformedPull = false;
+  let statusPullPages: Array<Array<{ number: number }>> | undefined;
 
   const provider: GitHubRequestProvider & {
     writeFile(path: string, content: string): Promise<void>;
@@ -28,8 +30,8 @@ function memoryProvider() {
     deleteFile(path: string): Promise<void>;
   } = {
     name: 'gate-webhook-fixture',
-    connectionId: 'conn-gate',
     async proxy(request: ProxyRequest): Promise<ProxyResponse> {
+      requests.push(request);
       const pullPrefix = `/repos/${owner}/${repo}/pulls/${number}`;
       if (request.endpoint === pullPrefix && request.headers?.Accept === 'application/vnd.github.diff') {
         return { status: 200, headers: {}, data: mockDiff };
@@ -71,7 +73,12 @@ function memoryProvider() {
         return { status: 200, headers: {}, data: { state: classicState, statuses: [{ context: 'legacy-ci', state: classicState, target_url: null }] } };
       }
       if (request.endpoint === `/repos/${owner}/${repo}/commits/${mockRepoContext.headSha}/pulls`) {
-        return { status: 200, headers: {}, data: [{ number }] };
+        const page = Number(request.query?.page ?? '1');
+        const data = statusPullPages?.[page - 1] ?? [{ number }];
+        const headers = statusPullPages && page < statusPullPages.length
+          ? { link: `<https://api.github.com${request.endpoint}?page=${page + 1}>; rel="next"` }
+          : {};
+        return { status: 200, headers, data };
       }
       throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
     },
@@ -81,9 +88,12 @@ function memoryProvider() {
     async deleteFile(path) { files.delete(path); },
   };
 
+  if (exposeConnectionId) provider.connectionId = 'conn-gate';
+
   return {
     provider,
     files,
+    requests,
     ready() {
       reviewState = 'APPROVED';
       checkStatus = 'completed';
@@ -92,6 +102,7 @@ function memoryProvider() {
       mergeableState = 'clean';
     },
     failPullRefresh() { malformedPull = true; },
+    setStatusPullPages(pages: Array<Array<{ number: number }>>) { statusPullPages = pages; },
   };
 }
 
@@ -136,6 +147,47 @@ test('review, check-run, and classic-status webhooks refresh the mounted parent 
   }, 'status');
   assert.ok(statusResult.paths.includes(canonical));
   assert.ok(!statusResult.paths.includes(githubCommitPath(owner, repo, mockRepoContext.headSha)));
+});
+
+test('webhook gate reconciliation uses the adapter-configured connection id', async () => {
+  const fixture = memoryProvider(false);
+  const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-config-only' });
+
+  const result = await adapter.routeWebhook({
+    action: 'submitted',
+    repository: { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` },
+    pull_request: { number },
+    review: { id: 10, state: 'approved', user: { login: 'reviewer' } },
+  }, 'pull_request_review.submitted');
+
+  assert.deepEqual(result.errors, []);
+  assert.ok(fixture.requests.length > 0);
+  assert.ok(fixture.requests.every((request) => request.connectionId === 'conn-config-only'));
+});
+
+test('classic-status reconciliation follows every pull-request lookup page', async () => {
+  const fixture = memoryProvider();
+  fixture.setStatusPullPages([
+    Array.from({ length: 30 }, (_, index) => ({ number: index + 1 })),
+    [{ number: 31 }],
+  ]);
+  const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-gate' });
+
+  const result = await adapter.routeWebhook({
+    repository: { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` },
+    sha: mockRepoContext.headSha,
+    state: 'success',
+    context: 'legacy-ci',
+  }, 'status');
+
+  const lookupRequests = fixture.requests.filter(
+    (request) => request.endpoint === `/repos/${owner}/${repo}/commits/${mockRepoContext.headSha}/pulls`,
+  );
+  assert.deepEqual(lookupRequests.map((request) => request.query), [
+    { page: '1', per_page: '100' },
+    { page: '2', per_page: '100' },
+  ]);
+  assert.ok(result.errors.some((error) => error.path === githubPullRequestPath(owner, repo, 31)));
 });
 
 test('a failed gate refresh invalidates flat and wrapped previously-ready parents', async (t) => {

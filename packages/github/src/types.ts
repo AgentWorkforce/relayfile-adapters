@@ -113,6 +113,7 @@ export interface GitHubCreatePullRequestWritebackInput {
   maintainerCanModify?: boolean;
   /** Selects the connection credential used by the write orchestrator. Never sent to GitHub. */
   author?: 'app' | 'user';
+  metadata?: AgentReviewMetadata;
 }
 
 export interface GitHubPushRefWritebackInput {
@@ -121,6 +122,7 @@ export interface GitHubPushRefWritebackInput {
   force?: boolean;
   /** Update an existing ref instead of creating it. */
   update?: boolean;
+  metadata?: AgentReviewMetadata;
 }
 
 export type ProxyRequest = SharedProxyRequest;

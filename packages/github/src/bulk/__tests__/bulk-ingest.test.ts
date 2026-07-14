@@ -367,6 +367,39 @@ describe('bulk ingest', () => {
         return jsonResponse(mockPRFiles as unknown as ProxyResponse['data']);
       }
 
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/reviews`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse([
+          { id: 1, state: 'APPROVED', user: { login: 'reviewer' } },
+        ]);
+      }
+
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse({
+          total_count: 1,
+          check_runs: [
+            { id: 2, name: 'ci', status: 'completed', conclusion: 'success', details_url: null },
+          ],
+        });
+      }
+
+      if (
+        request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/status`
+      ) {
+        assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
+        return jsonResponse({
+          state: 'success',
+          statuses: [
+            { id: 3, context: 'legacy-ci', state: 'success', target_url: null },
+          ],
+        });
+      }
+
       if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
         if (request.headers?.Accept === 'application/vnd.github.diff') {
           return {
@@ -417,6 +450,7 @@ describe('bulk ingest', () => {
         metadataCache,
         skipCached: false,
         concurrency: 3,
+        headers: { Authorization: 'Bearer bulk-token' },
       },
     );
 
@@ -457,6 +491,11 @@ describe('bulk ingest', () => {
     assert.strictEqual(meta.title, mockPRPayload.title);
     assert.strictEqual(meta.head.sha, mockRepoContext.headSha);
     assert.strictEqual(meta.base.sha, mockRepoContext.baseSha);
+    assert.strictEqual(meta.reviewDecision, 'APPROVED');
+    assert.deepStrictEqual(meta.statusCheckRollup, [
+      { name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: null },
+      { name: 'legacy-ci', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: null },
+    ]);
     assert.strictEqual(
       writes.get('/github/repos/octocat/hello-world/pulls/42__add-fixture-backed-github-adapter-coverage/files/src/index.ts'),
       decodeFixtureContent(mockFileContents, 'src/index.ts'),

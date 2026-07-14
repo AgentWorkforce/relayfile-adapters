@@ -210,6 +210,11 @@ export class GitHubWritebackHandler {
         const createPayload = directRoute.resource.name === 'pull-requests'
           ? parseCreatePullRequestPayload(content)
           : undefined;
+        const metadata = createPayload?.metadata ?? (
+          directRoute.resource.name === 'refs'
+            ? parsePushRefPayload(content).metadata
+            : undefined
+        );
         const createMatch = createPayload ? path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH) : undefined;
         const selection = createPayload?.author
           ? await this.resolveAuthorshipSelection({
@@ -218,13 +223,14 @@ export class GitHubWritebackHandler {
               repo: decodeGitHubPathSegment(createMatch?.[2] ?? '', 'repo'),
               author: createPayload.author,
             })
-          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId) };
+          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId, metadata) };
         const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
           ...request,
-          connectionId: selection.connectionId,
+          connectionId: metadata?.connectionId?.trim() || selection.connectionId,
           headers: {
             ...request.headers,
-            'Provider-Config-Key': selection.providerConfigKey ?? this.defaultProviderConfigKey,
+            'Provider-Config-Key':
+              metadata?.providerConfigKey ?? selection.providerConfigKey ?? this.defaultProviderConfigKey,
           },
         });
         if (response.status >= 400) {
@@ -856,7 +862,9 @@ function parseCreatePullRequestPayload(content: string): GitHubCreatePullRequest
     'Pull request create payload.maintainerCanModify',
   );
   const author = optionalAuthor(object.author, 'Pull request create payload.author');
-  return { title, head, base, body, draft, maintainerCanModify, author };
+  const metadataValue = object.metadata;
+  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
+  return { title, head, base, body, draft, maintainerCanModify, author, metadata };
 }
 
 function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
@@ -866,7 +874,9 @@ function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
   const sha = readString(object, 'sha', 'Git ref push payload');
   const force = optionalBoolean(object.force, 'Git ref push payload.force');
   const update = optionalBoolean(object.update, 'Git ref push payload.update');
-  return { ref, sha, force, update };
+  const metadataValue = object.metadata;
+  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
+  return { ref, sha, force, update, metadata };
 }
 
 function parseJsonObject(content: string, context: string): JsonObject {

@@ -54,6 +54,8 @@ const EMPTY_RESULT: IngestResult = {
   errors: [],
 };
 
+const GITHUB_PAGE_SIZE = 100;
+
 export const adapterName = 'github' as const;
 export const GITHUB_ADAPTER_NAME = adapterName;
 
@@ -426,6 +428,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
             target.repo,
             target.number,
             vfs,
+            { connectionId: this.config.connectionId },
           );
         } catch (error) {
           return {
@@ -468,26 +471,37 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     const sha = readString(payload.sha);
     if (!owner || !repo || !sha || !this.config.connectionId) return [];
     try {
-      const response = await withProxyRetry(this.provider as unknown as GitHubRequestProvider).proxy({
-        method: 'GET',
-        baseUrl: GITHUB_API_BASE_URL,
-        endpoint: `/repos/${owner}/${repo}/commits/${sha}/pulls`,
-        connectionId: this.config.connectionId,
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      });
-      if (response.status >= 400) {
-        throw new Error(`GitHub pull request lookup for status ${sha} failed with HTTP ${response.status}`);
+      const targets = new Map<number, { owner: string; repo: string; number: number }>();
+      let page = 1;
+      while (true) {
+        const response = await withProxyRetry(this.provider as unknown as GitHubRequestProvider).proxy({
+          method: 'GET',
+          baseUrl: GITHUB_API_BASE_URL,
+          endpoint: `/repos/${owner}/${repo}/commits/${sha}/pulls`,
+          connectionId: this.config.connectionId,
+          headers: {
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          query: {
+            page: String(page),
+            per_page: String(GITHUB_PAGE_SIZE),
+          },
+        });
+        if (response.status >= 400) {
+          throw new Error(`GitHub pull request lookup for status ${sha} failed with HTTP ${response.status}`);
+        }
+        if (!Array.isArray(response.data)) {
+          throw new Error(`GitHub pull request lookup for status ${sha} returned a malformed payload`);
+        }
+        for (const value of response.data) {
+          const number = readNumber(asRecord(value), 'number');
+          if (number && Number.isInteger(number)) targets.set(number, { owner, repo, number });
+        }
+        if (!hasNextPage(response.headers) && response.data.length < GITHUB_PAGE_SIZE) break;
+        page += 1;
       }
-      if (!Array.isArray(response.data)) {
-        throw new Error(`GitHub pull request lookup for status ${sha} returned a malformed payload`);
-      }
-      return response.data.flatMap((value) => {
-        const number = readNumber(asRecord(value), 'number');
-        return number && Number.isInteger(number) ? [{ owner, repo, number }] : [];
-      });
+      return [...targets.values()];
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -654,6 +668,12 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     }
     return undefined;
   }
+}
+
+function hasNextPage(headers: Record<string, string>): boolean {
+  return Object.entries(headers).some(
+    ([name, value]) => name.toLowerCase() === 'link' && value.includes('rel="next"'),
+  );
 }
 
 function readString(value: unknown): string | undefined {

@@ -318,8 +318,8 @@ export async function fetchPullRequestGateMetadata(
 ): Promise<PullRequestGateMetadata> {
   const [reviewsResult, checkRunsResult, statusesResult] = await Promise.allSettled([
     fetchReviews(provider, owner, repo, prNumber, { connectionId, headers }),
-    fetchCheckRuns(provider, owner, repo, headSha, connectionId),
-    fetchClassicStatuses(provider, owner, repo, headSha, connectionId),
+    fetchCheckRuns(provider, owner, repo, headSha, connectionId, headers),
+    fetchClassicStatuses(provider, owner, repo, headSha, connectionId, headers),
   ]);
   const complete =
     reviewsResult.status === 'fulfilled' &&
@@ -372,6 +372,7 @@ async function fetchClassicStatuses(
   repo: string,
   sha: string,
   connectionId: string,
+  headers?: Record<string, string>,
 ): Promise<JsonObject[]> {
   const response = await withProxyRetry(provider).proxy({
     method: 'GET',
@@ -381,6 +382,7 @@ async function fetchClassicStatuses(
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': GITHUB_API_VERSION,
+      ...headers,
     },
   });
   if (response.status >= 400) {

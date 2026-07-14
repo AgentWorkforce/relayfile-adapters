@@ -480,6 +480,49 @@ describe('writeback', () => {
     );
   });
 
+  it('honors create and ref metadata without sending it to GitHub', async () => {
+    const { handler, provider } = createHandler();
+
+    const create = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pull-requests/factory.json',
+      JSON.stringify({
+        title: 'Factory change',
+        head: 'factory/52',
+        base: 'main',
+        metadata: {
+          connectionId: 'conn-create',
+          providerConfigKey: 'github-create',
+        },
+      }),
+    );
+    const push = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/refs/factory.json',
+      JSON.stringify({
+        ref: 'factory/52',
+        sha: 'abc123',
+        metadata: {
+          connectionId: 'conn-ref',
+          providerConfigKey: 'github-ref',
+        },
+      }),
+    );
+
+    assert.equal(create.success, true);
+    assert.equal(push.success, true);
+    assert.equal(provider.requests[0]?.connectionId, 'conn-create');
+    assert.equal(provider.requests[0]?.headers?.['Provider-Config-Key'], 'github-create');
+    assert.deepEqual(provider.requests[0]?.body, {
+      title: 'Factory change', head: 'factory/52', base: 'main',
+    });
+    assert.equal(provider.requests[1]?.connectionId, 'conn-ref');
+    assert.equal(provider.requests[1]?.headers?.['Provider-Config-Key'], 'github-ref');
+    assert.deepEqual(provider.requests[1]?.body, {
+      ref: 'refs/heads/factory/52', sha: 'abc123',
+    });
+  });
+
   it('selects a workspace-validated app or user credential without sending author to GitHub', async (t) => {
     for (const author of ['app', 'user'] as const) {
       await t.test(author, async () => {
