@@ -471,31 +471,60 @@ test("writeJsonFile direct admission deadline aborts an advertised retry without
       { status: 429, headers: { "Retry-After": "30" } }
     );
   };
-
-  await assert.rejects(
-    () =>
-      writeJsonFile(
-        {
-          relayfileBaseUrl: "https://relayfile.example.test",
-          relayfileApiToken: "test-token",
-          workspaceId: "rw_deadline",
-          fetchImpl,
-          writebackTimeoutMs: 20
-        },
-        "slack",
-        "post",
-        "/slack/channels/C1/messages/relayfile-writeback--deadline.json",
-        { text: "hello" }
-      ),
-    (error: unknown) =>
-      error instanceof RelayfileWritebackAdmissionTimeoutError &&
-      error.retryable &&
-      /writeback_admission_timeout/.test(error.message)
-  );
+  const deadlineHandle = 20 as unknown as ReturnType<typeof setTimeout>;
+  const retryHandle = 30_000 as unknown as ReturnType<typeof setTimeout>;
+  const clearedHandles: Array<ReturnType<typeof setTimeout>> = [];
+  let deadlineCallback: (() => void) | undefined;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    if (delay === 20) {
+      deadlineCallback = () => callback(...args);
+      return deadlineHandle;
+    }
+    assert.equal(delay, 30_000);
+    queueMicrotask(() => deadlineCallback?.());
+    return retryHandle;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    clearedHandles.push(handle);
+  }) as typeof clearTimeout;
+  try {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_deadline",
+            fetchImpl,
+            writebackTimeoutMs: 20
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--deadline.json",
+          { text: "hello" }
+        ),
+      (error: unknown) =>
+        error instanceof RelayfileWritebackAdmissionTimeoutError &&
+        error.retryable &&
+        /writeback_admission_timeout/.test(error.message)
+    );
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
 
   assert.equal(attempts, 1);
-  await new Promise((resolve) => setTimeout(resolve, 40));
-  assert.equal(attempts, 1, "the SDK retry timer must be canceled when the client deadline wins");
+  assert.equal(
+    clearedHandles.includes(retryHandle),
+    true,
+    "the SDK retry timer must be canceled when the client deadline wins"
+  );
 });
 
 test("writeJsonFile direct mode uses a 90s admission default when receipt timeout is omitted", async () => {
