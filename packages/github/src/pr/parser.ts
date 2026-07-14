@@ -326,34 +326,42 @@ export async function fetchPullRequestGateMetadata(
     checkRunsResult.status === 'fulfilled' &&
     statusesResult.status === 'fulfilled';
   if (!complete) {
+    return incompleteGateMetadata();
+  }
+  try {
     return {
-      complete: false,
-      reviewDecision: 'REVIEW_REQUIRED',
+      complete: true,
+      reviewDecision: deriveReviewDecision(reviewsResult.value),
       statusCheckRollup: [
-        { name: 'relayfile/gate-data', status: 'PENDING', conclusion: null, detailsUrl: null },
+        ...checkRunsResult.value.check_runs.map((checkRun, index) => ({
+          name: readString(checkRun, 'name', `Check runs response[${index}]`),
+          status: readString(checkRun, 'status', `Check runs response[${index}]`).toUpperCase(),
+          conclusion:
+            readNullableString(checkRun, 'conclusion', `Check runs response[${index}]`)?.toUpperCase() ?? null,
+          detailsUrl: readNullableString(checkRun, 'details_url', `Check runs response[${index}]`),
+        })),
+        ...statusesResult.value.map((status, index) => {
+          const state = readString(status, 'state', `Commit statuses response[${index}]`).toUpperCase();
+          return {
+            name: readString(status, 'context', `Commit statuses response[${index}]`),
+            status: state === 'PENDING' ? 'PENDING' : 'COMPLETED',
+            conclusion: state === 'PENDING' ? null : state,
+            detailsUrl: readNullableString(status, 'target_url', `Commit statuses response[${index}]`),
+          };
+        }),
       ],
     };
+  } catch {
+    return incompleteGateMetadata();
   }
+}
+
+function incompleteGateMetadata(): PullRequestGateMetadata {
   return {
-    complete: true,
-    reviewDecision: deriveReviewDecision(reviewsResult.value),
+    complete: false,
+    reviewDecision: 'REVIEW_REQUIRED',
     statusCheckRollup: [
-      ...checkRunsResult.value.check_runs.map((checkRun, index) => ({
-        name: readString(checkRun, 'name', `Check runs response[${index}]`),
-        status: readString(checkRun, 'status', `Check runs response[${index}]`).toUpperCase(),
-        conclusion:
-          readNullableString(checkRun, 'conclusion', `Check runs response[${index}]`)?.toUpperCase() ?? null,
-        detailsUrl: readNullableString(checkRun, 'details_url', `Check runs response[${index}]`),
-      })),
-      ...statusesResult.value.map((status, index) => {
-        const state = readString(status, 'state', `Commit statuses response[${index}]`).toUpperCase();
-        return {
-          name: readString(status, 'context', `Commit statuses response[${index}]`),
-          status: state === 'PENDING' ? 'PENDING' : 'COMPLETED',
-          conclusion: state === 'PENDING' ? null : state,
-          detailsUrl: readNullableString(status, 'target_url', `Commit statuses response[${index}]`),
-        };
-      }),
+      { name: 'relayfile/gate-data', status: 'PENDING', conclusion: null, detailsUrl: null },
     ],
   };
 }
@@ -394,6 +402,7 @@ function deriveReviewDecision(reviews: readonly JsonObject[]): PullRequestMetada
   const latestByReviewer = new Map<string, string>();
   for (const [index, review] of reviews.entries()) {
     const state = readString(review, 'state', `Reviews response[${index}]`).toUpperCase();
+    if (!review.user || typeof review.user !== 'object' || Array.isArray(review.user)) continue;
     const user = expectObject(review.user, `Reviews response[${index}].user`);
     const login = readString(user, 'login', `Reviews response[${index}].user`);
     if (state === 'DISMISSED') latestByReviewer.delete(login);

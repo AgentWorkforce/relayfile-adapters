@@ -480,6 +480,53 @@ describe('writeback', () => {
     );
   });
 
+  it('selects a workspace-validated app or user credential without sending author to GitHub', async (t) => {
+    for (const author of ['app', 'user'] as const) {
+      await t.test(author, async () => {
+        const defaultProvider = new FakeProvider(() => ({ status: 201, headers: {}, data: { id: 1 } }));
+        const selectedProvider = new FakeProvider(() => ({
+          status: 201,
+          headers: {},
+          data: { id: 2, user: { login: author === 'app' ? 'factory[bot]' : 'connected-human' } },
+        }));
+        const handler = new GitHubWritebackHandler(defaultProvider, {
+          defaultConnectionId: 'conn-default',
+          resolveAuthorship: (workspaceId, requestedAuthor) => {
+            assert.equal(workspaceId, 'workspace-1');
+            assert.equal(requestedAuthor, author);
+            return { connectionId: `conn-${author}`, provider: selectedProvider };
+          },
+        });
+
+        const result = await handler.handleWriteback(
+          'workspace-1',
+          '/github/repos/acme/widgets/pull-requests/factory.json',
+          JSON.stringify({ title: 'Factory change', head: 'factory/52', base: 'main', author }),
+        );
+
+        assert.equal(result.success, true);
+        assert.equal(defaultProvider.requests.length, 0);
+        assert.equal(selectedProvider.requests.length, 1);
+        assert.equal(selectedProvider.requests[0]?.connectionId, `conn-${author}`);
+        assert.deepEqual(selectedProvider.requests[0]?.body, {
+          title: 'Factory change', head: 'factory/52', base: 'main',
+        });
+      });
+    }
+  });
+
+  it('fails clearly when an explicitly requested PR author identity is unavailable', async () => {
+    const { handler, provider } = createHandler();
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pull-requests/factory.json',
+      JSON.stringify({ title: 'Factory change', head: 'factory/52', base: 'main', author: 'user' }),
+    );
+    assert.equal(result.success, false);
+    assert.match(result.error ?? '', /author=user.*no workspace-validated authorship resolver/u);
+    assert.equal(provider.requests.length, 0);
+  });
+
   it('rejects read-only fields in issue writebacks', () => {
     assert.throws(
       () =>

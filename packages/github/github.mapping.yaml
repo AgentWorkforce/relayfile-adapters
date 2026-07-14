@@ -44,6 +44,8 @@ webhooks:
       - deployment_status.environment
   push:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
+  status:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/gate-status/{{sha}}.json
   issues:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
   pull_request.edited:

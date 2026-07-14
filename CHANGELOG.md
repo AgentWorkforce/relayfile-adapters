@@ -9,7 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
-- Add authenticated GitHub pull-request create, ref push/update, and pull-request close writeback resources, plus merge-gate metadata on mounted pull requests.
+- Add authenticated GitHub pull-request create, ref push/update, and pull-request close writeback resources, selectable app/user PR authorship, plus live fail-closed merge-gate metadata on mounted pull requests.
 
 ### Breaking
 

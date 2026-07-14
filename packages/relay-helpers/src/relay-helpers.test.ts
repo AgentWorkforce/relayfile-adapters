@@ -160,11 +160,11 @@ test('githubClient exposes pull request create, ref push, and close operations',
   const { root, opts } = await mount();
   const github = githubClient(opts);
   await github.createPullRequest({
-    owner: 'AgentWorkforce', repo: 'factory', title: 'Fix #52', head: 'factory/52', base: 'main',
+    owner: 'AgentWorkforce', repo: 'factory', title: 'Fix #52', head: 'factory/52', base: 'main', author: 'user',
   });
   assert.deepEqual(
     (await onlyJsonIn(path.join(root, 'github/repos/AgentWorkforce/factory/pull-requests'))).body,
-    { title: 'Fix #52', head: 'factory/52', base: 'main' },
+    { title: 'Fix #52', head: 'factory/52', base: 'main', author: 'user' },
   );
 
   await github.pushRef({ owner: 'AgentWorkforce', repo: 'factory', ref: 'factory/52', sha: 'abc123' });

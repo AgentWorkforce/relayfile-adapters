@@ -9,7 +9,12 @@
     "base": { "type": "string", "description": "Base branch." },
     "body": { "type": "string" },
     "draft": { "type": "boolean" },
-    "maintainerCanModify": { "type": "boolean" }
+    "maintainerCanModify": { "type": "boolean" },
+    "author": {
+      "type": "string",
+      "enum": ["app", "user"],
+      "description": "Credential identity selected by the write orchestrator; it is not sent in the GitHub REST body."
+    }
   },
   "additionalProperties": false
 }

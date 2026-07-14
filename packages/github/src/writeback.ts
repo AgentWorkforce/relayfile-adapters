@@ -56,10 +56,20 @@ interface GitHubReviewResponse {
   id: number;
 }
 
+export interface GitHubWritebackAuthorshipSelection {
+  connectionId: string;
+  provider?: GitHubRequestProvider;
+  providerConfigKey?: string;
+}
+
 interface GitHubWritebackHandlerOptions {
   defaultConnectionId?: string;
   defaultProviderConfigKey?: string;
   resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
+  resolveAuthorship?: (
+    workspaceId: string,
+    author: 'app' | 'user',
+  ) => Promise<GitHubWritebackAuthorshipSelection> | GitHubWritebackAuthorshipSelection;
 }
 
 /**
@@ -72,6 +82,7 @@ export class GitHubWritebackHandler {
   private readonly defaultConnectionId?: string;
   private readonly defaultProviderConfigKey: string;
   private readonly resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
+  private readonly resolveAuthorship?: GitHubWritebackHandlerOptions['resolveAuthorship'];
 
   constructor(provider: GitHubRequestProvider, options: GitHubWritebackHandlerOptions = {}) {
     this.provider = provider;
@@ -79,6 +90,7 @@ export class GitHubWritebackHandler {
     this.defaultProviderConfigKey =
       options.defaultProviderConfigKey ?? DEFAULT_PROVIDER_CONFIG_KEY;
     this.resolveConnectionId = options.resolveConnectionId;
+    this.resolveAuthorship = options.resolveAuthorship;
   }
 
   parseReviewPayload(content: string): AgentReview {
@@ -196,13 +208,18 @@ export class GitHubWritebackHandler {
         ['pull-requests', 'refs', 'close-pull-request'].includes(directRoute.resource.name)
       ) {
         const request = resolveWritebackRequest(path, content);
-        const connectionId = await this.resolveConnectionIdFromMetadata(workspaceId);
-        const response = await withProxyRetry(this.provider).proxy({
+        const createPayload = directRoute.resource.name === 'pull-requests'
+          ? parseCreatePullRequestPayload(content)
+          : undefined;
+        const selection = createPayload?.author
+          ? await this.resolveAuthorshipSelection(workspaceId, createPayload.author)
+          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId) };
+        const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
           ...request,
-          connectionId,
+          connectionId: selection.connectionId,
           headers: {
             ...request.headers,
-            'Provider-Config-Key': this.defaultProviderConfigKey,
+            'Provider-Config-Key': selection.providerConfigKey ?? this.defaultProviderConfigKey,
           },
         });
         if (response.status >= 400) {
@@ -315,6 +332,22 @@ export class GitHubWritebackHandler {
     review: AgentReview,
   ): Promise<string> {
     return this.resolveConnectionIdFromMetadata(workspaceId, review.metadata);
+  }
+
+  private async resolveAuthorshipSelection(
+    workspaceId: string,
+    author: 'app' | 'user',
+  ): Promise<GitHubWritebackAuthorshipSelection> {
+    if (!this.resolveAuthorship) {
+      throw new Error(
+        `GitHub pull request requested author=${author}, but no workspace-validated authorship resolver is configured.`,
+      );
+    }
+    const selection = await this.resolveAuthorship(workspaceId, author);
+    if (!selection.connectionId.trim()) {
+      throw new Error(`GitHub pull request requested author=${author}, but that identity is unavailable.`);
+    }
+    return { ...selection, connectionId: selection.connectionId.trim() };
   }
 
   private async resolveConnectionIdFromMetadata(
@@ -540,6 +573,8 @@ function buildCreatePullRequest(
     endpoint: `/repos/${owner}/${repo}/pulls`,
     connectionId: '',
     headers: githubJsonHeaders(),
+    // `author` is orchestration metadata. GitHub's REST create-PR body has no
+    // such field, so the writeback layer deliberately strips it here.
     body: {
       title: payload.title,
       head: payload.head,
@@ -816,7 +851,8 @@ function parseCreatePullRequestPayload(content: string): GitHubCreatePullRequest
     object.maintainerCanModify ?? object.maintainer_can_modify,
     'Pull request create payload.maintainerCanModify',
   );
-  return { title, head, base, body, draft, maintainerCanModify };
+  const author = optionalAuthor(object.author, 'Pull request create payload.author');
+  return { title, head, base, body, draft, maintainerCanModify, author };
 }
 
 function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
@@ -841,6 +877,12 @@ function parseJsonObject(content: string, context: string): JsonObject {
 function optionalBoolean(value: JsonValue | undefined, context: string): boolean | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'boolean') throw new Error(`${context} must be a boolean`);
+  return value;
+}
+
+function optionalAuthor(value: JsonValue | undefined, context: string): 'app' | 'user' | undefined {
+  if (value === undefined) return undefined;
+  if (value !== 'app' && value !== 'user') throw new Error(`${context} must be "app" or "user"`);
   return value;
 }
 

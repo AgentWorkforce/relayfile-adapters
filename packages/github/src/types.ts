@@ -35,6 +35,7 @@ export const DEFAULT_GITHUB_EVENTS = [
   'issues.reopened',
   'issues.closed',
   'check_run.completed',
+  'status',
   'deployment_status.created',
 ] as const;
 
@@ -110,7 +111,8 @@ export interface GitHubCreatePullRequestWritebackInput {
   body?: string;
   draft?: boolean;
   maintainerCanModify?: boolean;
-  metadata?: AgentReviewMetadata;
+  /** Selects the connection credential used by the write orchestrator. Never sent to GitHub. */
+  author?: 'app' | 'user';
 }
 
 export interface GitHubPushRefWritebackInput {
@@ -119,11 +121,6 @@ export interface GitHubPushRefWritebackInput {
   force?: boolean;
   /** Update an existing ref instead of creating it. */
   update?: boolean;
-  metadata?: AgentReviewMetadata;
-}
-
-export interface GitHubClosePullRequestWritebackInput {
-  metadata?: AgentReviewMetadata;
 }
 
 export type ProxyRequest = SharedProxyRequest;

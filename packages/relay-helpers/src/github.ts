@@ -28,6 +28,7 @@ export interface GithubClient extends ProviderClient<'github'> {
     base: string;
     body?: string;
     draft?: boolean;
+    author?: 'app' | 'user';
   }): Promise<{ id: string; url: string }>;
   /** Create or update a Git ref. */
   pushRef(args: {
@@ -95,6 +96,7 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
       base: string;
       body?: string;
       draft?: boolean;
+      author?: 'app' | 'user';
     }) {
       return created(
         await base['pull-requests'].write(
@@ -104,7 +106,8 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
             head: args.head,
             base: args.base,
             ...(args.body !== undefined ? { body: args.body } : {}),
-            ...(args.draft !== undefined ? { draft: args.draft } : {})
+            ...(args.draft !== undefined ? { draft: args.draft } : {}),
+            ...(args.author !== undefined ? { author: args.author } : {})
           }
         )
       );

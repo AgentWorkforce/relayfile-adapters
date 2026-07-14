@@ -272,6 +272,30 @@ describe('pull request ingestion', () => {
     ]);
   });
 
+  it('skips deleted and malformed reviewers while preserving valid approvals', async () => {
+    const { provider } = createFixtureProvider({
+      reviews: [
+        { id: 1, state: 'APPROVED', user: null },
+        { id: 2, state: 'APPROVED' },
+        { id: 3, state: 'APPROVED', user: { login: 'alice' } },
+      ],
+    });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+    assert.equal(parsed.reviewDecision, 'APPROVED');
+  });
+
+  it('fails gate metadata closed when a successful auxiliary response is malformed', async () => {
+    const { provider } = createFixtureProvider({ checkRuns: [{ id: 2, status: 'completed' }] });
+
+    const parsed = await parsePullRequest(provider, mockRepoContext.owner, mockRepoContext.repo, 42);
+    assert.equal(parsed.mergeStateStatus, 'UNKNOWN');
+    assert.equal(parsed.reviewDecision, 'REVIEW_REQUIRED');
+    assert.deepEqual(parsed.statusCheckRollup, [
+      { name: 'relayfile/gate-data', status: 'PENDING', conclusion: null, detailsUrl: null },
+    ]);
+  });
+
   it('mapPRFiles maps file paths correctly', async () => {
     const { provider, proxy } = createFixtureProvider();
 
