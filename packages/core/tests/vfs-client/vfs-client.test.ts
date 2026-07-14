@@ -382,6 +382,44 @@ test("writeJsonFile direct mode preserves the existing two-second cap for 5xx re
   assert.equal(attempts, 4);
 });
 
+test("writeJsonFile direct mode preserves the SDK backoff schedule without Retry-After", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      { code: "rate_limited", message: "retry without an advertised delay" },
+      { status: 429 }
+    );
+  };
+  const realRandom = Math.random;
+  Math.random = () => 0.5;
+  try {
+    await withImmediateTimeouts(async (delays) => {
+      await assert.rejects(
+        () =>
+          writeJsonFile(
+            {
+              relayfileBaseUrl: "https://relayfile.example.test",
+              relayfileApiToken: "test-token",
+              workspaceId: "rw_no_retry_after",
+              fetchImpl,
+              writebackTimeoutMs: 0
+            },
+            "slack",
+            "post",
+            "/slack/channels/C1/messages/relayfile-writeback--no-retry-after.json",
+            { text: "hello" }
+          ),
+        RelayfileWritebackError
+      );
+      assert.deepEqual(delays, [100, 200, 400]);
+    });
+  } finally {
+    Math.random = realRandom;
+  }
+  assert.equal(attempts, 4);
+});
+
 test("writeJsonFile direct mode parses a digit-leading Retry-After date as a date", async () => {
   let attempts = 0;
   const fetchImpl: typeof fetch = async () => {
