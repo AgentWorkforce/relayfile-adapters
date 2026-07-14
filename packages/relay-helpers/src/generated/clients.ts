@@ -2,7 +2,7 @@
 // @relayfile/adapter-core/writeback-paths — do not edit by hand.
 // Run `npm run gen -w @relayfile/relay-helpers` after bumping adapter-core.
 //
-// linear / github / slack / telegram have bespoke ergonomic clients in their own modules;
+// linear / github / slack / telegram / reddit have bespoke ergonomic clients in their own modules;
 // every other catalog provider gets a uniform resource-keyed client here.
 
 import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
@@ -82,9 +82,6 @@ export const postgresClient = (opts?: IntegrationClientOptions): ProviderClient<
 
 export const recallClient = (opts?: IntegrationClientOptions): ProviderClient<'recall'> =>
   providerClient('recall', opts);
-
-export const redditClient = (opts?: IntegrationClientOptions): ProviderClient<'reddit'> =>
-  providerClient('reddit', opts);
 
 export const redisClient = (opts?: IntegrationClientOptions): ProviderClient<'redis'> =>
   providerClient('redis', opts);
