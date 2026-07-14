@@ -175,9 +175,10 @@ export interface IntegrationClientOptions {
   /**
    * Max wait, in ms, for the Relayfile writeback worker to emit a receipt onto
    * the just-written draft. Defaults to 3000ms. `0` means fire-and-forget — the
-   * client returns immediately without a receipt. In direct HTTP mode, the
-   * same bound also governs write admission so admission backoff cannot wait
-   * indefinitely before a receipt operation exists.
+   * client returns immediately without a receipt. In direct HTTP mode, an
+   * explicit value also governs write admission. When omitted, receipt waiting
+   * defaults to 3s while admission defaults to 90s so the SDK can honor three
+   * server-advertised delays of up to 30s before an operation exists.
    */
   writebackTimeoutMs?: number;
   /** Poll interval while waiting for a receipt. Default 250ms. */
@@ -228,6 +229,7 @@ export interface WritebackResult {
 const DEFAULT_WRITEBACK_TIMEOUT_MS = 3_000;
 const SDK_LEGACY_RETRY_MAX_DELAY_MS = 2_000;
 const WORKSPACE_BUSY_RETRY_MAX_DELAY_MS = 30_000;
+const DEFAULT_WRITEBACK_ADMISSION_TIMEOUT_MS = WORKSPACE_BUSY_RETRY_MAX_DELAY_MS * 3;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -537,7 +539,7 @@ async function writeJsonFileViaRelayfileApi(
   body: unknown,
   direct: { workspaceId: string; relayfile: RelayFileClient }
 ): Promise<WritebackResult> {
-  const timeoutMs = client.writebackTimeoutMs ?? DEFAULT_WRITEBACK_TIMEOUT_MS;
+  const timeoutMs = client.writebackTimeoutMs ?? DEFAULT_WRITEBACK_ADMISSION_TIMEOUT_MS;
   const controller = timeoutMs > 0 ? new AbortController() : undefined;
   const deadlineTimer = controller
     ? setTimeout(() => controller.abort(), timeoutMs)

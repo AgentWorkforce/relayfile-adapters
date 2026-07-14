@@ -498,6 +498,127 @@ test("writeJsonFile direct admission deadline aborts an advertised retry without
   assert.equal(attempts, 1, "the SDK retry timer must be canceled when the client deadline wins");
 });
 
+test("writeJsonFile direct mode uses a 90s admission default when receipt timeout is omitted", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      return Response.json(
+        {
+          code: "workspace_busy",
+          message: "workspace write path is busy",
+          reason: "write_admission_limit"
+        },
+        { status: 429, headers: { "Retry-After": "5" } }
+      );
+    }
+    return Response.json({ status: "queued", targetRevision: "rev_default_admitted" });
+  };
+  const delays: number[] = [];
+  const deadlineHandle = 90_000 as unknown as ReturnType<typeof setTimeout>;
+  let deadlineCleared = false;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    if (delay === 90_000) return deadlineHandle;
+    queueMicrotask(() => callback(...args));
+    return 5_000 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    if (handle === deadlineHandle) deadlineCleared = true;
+  }) as typeof clearTimeout;
+  try {
+    const result = await writeJsonFile(
+      {
+        relayfileBaseUrl: "https://relayfile.example.test",
+        relayfileApiToken: "test-token",
+        workspaceId: "rw_default_admission",
+        fetchImpl
+      },
+      "slack",
+      "post",
+      "/slack/channels/C1/messages/relayfile-writeback--default-admission.json",
+      { text: "hello" }
+    );
+    assert.equal(result.opId, undefined);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+  assert.equal(attempts, 2);
+  assert.deepEqual(delays, [90_000, 5_000]);
+  assert.equal(deadlineCleared, true);
+});
+
+test("writeJsonFile direct mode bounds repeated 30s admission delays at the 90s default", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy",
+        reason: "write_admission_limit"
+      },
+      { status: 429, headers: { "Retry-After": "30" } }
+    );
+  };
+  const delays: number[] = [];
+  let deadlineCallback: (() => void) | undefined;
+  let retryTimers = 0;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    if (delay === 90_000) {
+      deadlineCallback = () => callback(...args);
+      return 90_000 as unknown as ReturnType<typeof setTimeout>;
+    }
+    retryTimers += 1;
+    if (retryTimers < 3) {
+      queueMicrotask(() => callback(...args));
+    } else {
+      queueMicrotask(() => deadlineCallback?.());
+    }
+    return retryTimers as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = (() => {}) as typeof clearTimeout;
+  try {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_default_admission_bound",
+            fetchImpl
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--default-admission-bound.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackAdmissionTimeoutError
+    );
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [90_000, 30_000, 30_000, 30_000]);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(attempts, 3, "the default admission deadline must not leave an orphan fourth attempt");
+});
+
 test("writeJsonFile direct mode reports a pending op as retryable writeback_pending", async () => {
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
