@@ -28,6 +28,7 @@ export { created } from './receipt.js';
 export { linearClient, type LinearClient, type LinearCreateIssueArgs } from './linear.js';
 export { githubClient, type GithubClient, type GithubTarget } from './github.js';
 export { slackClient, type SlackClient } from './slack.js';
+export { redditClient } from './reddit.js';
 export {
   telegramClient,
   telegramReceiptMessageId,

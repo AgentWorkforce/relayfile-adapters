@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@relayfile/adapter-core": "^0.5.0",
-    "@relayfile/adapter-linear": "^0.4.2"
+    "@relayfile/adapter-linear": "^0.4.2",
+    "@relayfile/adapter-reddit": "^0.2.0"
   }
 }

@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths';
 
 /** Providers with a bespoke, hand-written client module (enriched with named methods). */
-export const BESPOKE_PROVIDERS = new Set(['linear', 'github', 'slack', 'telegram']);
+export const BESPOKE_PROVIDERS = new Set(['linear', 'github', 'slack', 'telegram', 'reddit']);
 
 const camel = (slug) => slug.replace(/-([a-z])/g, (_m, c) => c.toUpperCase());
 export const clientName = (provider) => `${camel(provider)}Client`;
@@ -30,7 +30,7 @@ export function renderClients() {
     `// @relayfile/adapter-core/writeback-paths — do not edit by hand.\n` +
     `// Run \`npm run gen -w @relayfile/relay-helpers\` after bumping adapter-core.\n` +
     `//\n` +
-    `// linear / github / slack / telegram have bespoke ergonomic clients in their own modules;\n` +
+    `// linear / github / slack / telegram / reddit have bespoke ergonomic clients in their own modules;\n` +
     `// every other catalog provider gets a uniform resource-keyed client here.\n`;
   const imports =
     `import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';\n` +
