@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { GitHubAdapter } from './index.js';
 import {
   GitHubWritebackHandler,
   ReadOnlyFieldError,
@@ -490,7 +491,10 @@ describe('writeback', () => {
     );
   });
 
-  it('honors create and ref metadata without sending it to GitHub', async () => {
+  it('ignores payload metadata for create-PR and push-ref writes (never sent to GitHub, never selects credentials)', async () => {
+    // create-PR and push-ref no longer honor a `metadata` field on the payload
+    // — authored writes go through resolveAuthorship, unauthored writes use
+    // the adapter defaults. A payload metadata block must be silently ignored.
     const { handler, provider } = createHandler();
 
     const create = await handler.handleWriteback(
@@ -521,13 +525,11 @@ describe('writeback', () => {
 
     assert.equal(create.success, true);
     assert.equal(push.success, true);
-    assert.equal(provider.requests[0]?.connectionId, 'conn-create');
-    assert.equal(provider.requests[0]?.headers?.['Provider-Config-Key'], 'github-create');
+    assert.equal(provider.requests[0]?.connectionId, 'conn-default');
     assert.deepEqual(provider.requests[0]?.body, {
       title: 'Factory change', head: 'factory/52', base: 'main',
     });
-    assert.equal(provider.requests[1]?.connectionId, 'conn-ref');
-    assert.equal(provider.requests[1]?.headers?.['Provider-Config-Key'], 'github-ref');
+    assert.equal(provider.requests[1]?.connectionId, 'conn-default');
     assert.deepEqual(provider.requests[1]?.body, {
       ref: 'refs/heads/factory/52', sha: 'abc123',
     });
@@ -663,5 +665,51 @@ describe('writeback', () => {
         ),
       /Unsupported GitHub writeback path/,
     );
+  });
+
+  it('GitHubAdapter forwards resolveAuthorship to the writeback handler', async () => {
+    const defaultProvider = new FakeProvider(() => ({ status: 201, headers: {}, data: { id: 1 } }));
+    const selectedProvider = new FakeProvider(() => ({
+      status: 201,
+      headers: {},
+      data: { id: 2, user: { login: 'factory[bot]' } },
+    }));
+    let invoked = false;
+    const adapter = new GitHubAdapter(defaultProvider as never, {
+      connectionId: 'conn-default',
+      providerConfigKey: 'github-default',
+      resolveAuthorship: (input) => {
+        invoked = true;
+        assert.deepEqual(input, {
+          workspaceId: 'workspace-1',
+          owner: 'acme',
+          repo: 'widgets',
+          author: 'app',
+        });
+        return {
+          connectionId: 'conn-app',
+          provider: selectedProvider as never,
+          providerConfigKey: 'github-app',
+        };
+      },
+    });
+
+    const result = await adapter.writeBack(
+      'workspace-1',
+      '/github/repos/acme/widgets/pull-requests/factory.json',
+      JSON.stringify({
+        title: 'Factory change',
+        head: 'factory/52',
+        base: 'main',
+        author: 'app',
+      }),
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(invoked, true);
+    assert.equal(defaultProvider.requests.length, 0);
+    assert.equal(selectedProvider.requests.length, 1);
+    assert.equal(selectedProvider.requests[0]?.connectionId, 'conn-app');
+    assert.equal(selectedProvider.requests[0]?.headers?.['Provider-Config-Key'], 'github-app');
   });
 });

@@ -16,6 +16,8 @@ import {
   type GitHubMergeMethod,
   type GitHubMergePullRequestWritebackInput,
   type GitHubRequestProvider,
+  type GitHubResolveAuthorship,
+  type GitHubWritebackAuthorshipSelection,
   type GitHubCreateReviewInput,
   type JsonObject,
   type JsonValue,
@@ -24,6 +26,8 @@ import {
   type WritebackPathTarget,
   type WritebackResult,
 } from './types.js';
+
+export type { GitHubWritebackAuthorshipSelection } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
@@ -57,19 +61,11 @@ interface GitHubReviewResponse {
   id: number;
 }
 
-export interface GitHubWritebackAuthorshipSelection {
-  connectionId: string;
-  provider?: GitHubRequestProvider;
-  providerConfigKey?: string;
-}
-
-interface GitHubWritebackHandlerOptions {
+export interface GitHubWritebackHandlerOptions {
   defaultConnectionId?: string;
   defaultProviderConfigKey?: string;
   resolveConnectionId?: (workspaceId: string) => Promise<string> | string;
-  resolveAuthorship?: (
-    input: { workspaceId: string; owner: string; repo: string; author: 'app' | 'user' },
-  ) => Promise<GitHubWritebackAuthorshipSelection> | GitHubWritebackAuthorshipSelection;
+  resolveAuthorship?: GitHubResolveAuthorship;
 }
 
 /**
@@ -211,11 +207,6 @@ export class GitHubWritebackHandler {
         const createPayload = directRoute.resource.name === 'pull-requests'
           ? parseCreatePullRequestPayload(content)
           : undefined;
-        const metadata = createPayload?.metadata ?? (
-          directRoute.resource.name === 'refs'
-            ? parsePushRefPayload(content).metadata
-            : undefined
-        );
         const createMatch = createPayload ? path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH) : undefined;
         const selection = createPayload?.author
           ? await this.resolveAuthorshipSelection({
@@ -224,18 +215,14 @@ export class GitHubWritebackHandler {
               repo: decodeGitHubPathSegment(createMatch?.[2] ?? '', 'repo'),
               author: createPayload.author,
             })
-          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId, metadata) };
+          : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId, undefined) };
         const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
           ...request,
-          connectionId: createPayload?.author
-            ? selection.connectionId
-            : metadata?.connectionId?.trim() || selection.connectionId,
+          connectionId: selection.connectionId,
           headers: {
             ...request.headers,
             'Provider-Config-Key':
-              createPayload?.author
-                ? selection.providerConfigKey ?? this.defaultProviderConfigKey
-                : metadata?.providerConfigKey ?? selection.providerConfigKey ?? this.defaultProviderConfigKey,
+              selection.providerConfigKey ?? this.defaultProviderConfigKey,
           },
         });
         if (response.status >= 400) {
@@ -878,9 +865,7 @@ function parseCreatePullRequestPayload(content: string): GitHubCreatePullRequest
     'Pull request create payload.maintainerCanModify',
   );
   const author = optionalAuthor(object.author, 'Pull request create payload.author');
-  const metadataValue = object.metadata;
-  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
-  return { title, head, base, body, draft, maintainerCanModify, author, metadata };
+  return { title, head, base, body, draft, maintainerCanModify, author };
 }
 
 function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
@@ -889,9 +874,7 @@ function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
   const ref = readString(object, 'ref', 'Git ref push payload');
   const sha = readString(object, 'sha', 'Git ref push payload');
   const force = optionalBoolean(object.force, 'Git ref push payload.force');
-  const metadataValue = object.metadata;
-  const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
-  return { ref, sha, force, metadata };
+  return { ref, sha, force };
 }
 
 function parseJsonObject(content: string, context: string): JsonObject {

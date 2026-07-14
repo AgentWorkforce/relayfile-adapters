@@ -77,6 +77,7 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     this.writebackHandler = new GitHubWritebackHandler(provider as never, {
       defaultConnectionId: validatedConfig.connectionId,
       defaultProviderConfigKey: validatedConfig.providerConfigKey,
+      ...(config.resolveAuthorship ? { resolveAuthorship: config.resolveAuthorship } : {}),
     });
   }
 
