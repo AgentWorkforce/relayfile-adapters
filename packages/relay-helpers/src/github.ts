@@ -19,6 +19,27 @@ export interface GithubClient extends ProviderClient<'github'> {
     body: string;
     labels?: string[];
   }): Promise<{ id: string; url: string }>;
+  /** Create a pull request from a branch already present on GitHub. */
+  createPullRequest(args: {
+    owner: string;
+    repo: string;
+    title: string;
+    head: string;
+    base: string;
+    body?: string;
+    draft?: boolean;
+  }): Promise<{ id: string; url: string }>;
+  /** Create or update a Git ref. */
+  pushRef(args: {
+    owner: string;
+    repo: string;
+    ref: string;
+    sha: string;
+    update?: boolean;
+    force?: boolean;
+  }): Promise<void>;
+  /** Close a pull request without merging it. */
+  closePullRequest(target: GithubTarget): Promise<void>;
   /**
    * Merge a pull request. (Named `mergePullRequest`, not `merge`, because
    * `merge` is the catalog resource key exposed as `.merge`.)
@@ -64,6 +85,52 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
           { owner: args.owner, repo: args.repo },
           { title: args.title, body: args.body, ...(args.labels ? { labels: args.labels } : {}) }
         )
+      );
+    },
+    async createPullRequest(args: {
+      owner: string;
+      repo: string;
+      title: string;
+      head: string;
+      base: string;
+      body?: string;
+      draft?: boolean;
+    }) {
+      return created(
+        await base['pull-requests'].write(
+          { owner: args.owner, repo: args.repo },
+          {
+            title: args.title,
+            head: args.head,
+            base: args.base,
+            ...(args.body !== undefined ? { body: args.body } : {}),
+            ...(args.draft !== undefined ? { draft: args.draft } : {})
+          }
+        )
+      );
+    },
+    async pushRef(args: {
+      owner: string;
+      repo: string;
+      ref: string;
+      sha: string;
+      update?: boolean;
+      force?: boolean;
+    }) {
+      await base.refs.write(
+        { owner: args.owner, repo: args.repo },
+        {
+          ref: args.ref,
+          sha: args.sha,
+          ...(args.update !== undefined ? { update: args.update } : {}),
+          ...(args.force !== undefined ? { force: args.force } : {})
+        }
+      );
+    },
+    async closePullRequest(target: GithubTarget) {
+      await base['close-pull-request'].write(
+        { owner: target.owner, repo: target.repo, pullNumber: target.number },
+        {}
       );
     },
     async mergePullRequest(args: {

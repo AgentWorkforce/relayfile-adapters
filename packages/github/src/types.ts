@@ -103,6 +103,29 @@ export interface GitHubMergePullRequestWritebackInput {
   metadata?: AgentReviewMetadata;
 }
 
+export interface GitHubCreatePullRequestWritebackInput {
+  title: string;
+  head: string;
+  base: string;
+  body?: string;
+  draft?: boolean;
+  maintainerCanModify?: boolean;
+  metadata?: AgentReviewMetadata;
+}
+
+export interface GitHubPushRefWritebackInput {
+  ref: string;
+  sha: string;
+  force?: boolean;
+  /** Update an existing ref instead of creating it. */
+  update?: boolean;
+  metadata?: AgentReviewMetadata;
+}
+
+export interface GitHubClosePullRequestWritebackInput {
+  metadata?: AgentReviewMetadata;
+}
+
 export type ProxyRequest = SharedProxyRequest;
 export type ProxyResponse<T = JsonValue | null> = SharedProxyResponse<T>;
 

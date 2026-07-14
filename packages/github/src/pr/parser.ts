@@ -6,6 +6,8 @@ import type {
   JsonValue,
   ProxyResponse,
 } from '../types.js';
+import { fetchReviews } from '../reviews/fetcher.js';
+import { fetchCheckRuns } from '../checks/fetcher.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 
@@ -68,6 +70,8 @@ export interface GitHubPR {
   title: string;
   updated_at: string;
   user: GitHubUser | null;
+  mergeable: boolean | null;
+  mergeable_state: string;
 }
 
 export interface PullRequestLabel {
@@ -119,7 +123,22 @@ export interface PullRequestMetadata {
   state: string;
   title: string;
   updatedAt: string;
+  mergeable: 'CONFLICTING' | 'MERGEABLE' | 'UNKNOWN';
+  mergeStateStatus: string;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED';
+  statusCheckRollup: Array<{
+    name: string;
+    status: string;
+    conclusion: string | null;
+    detailsUrl: string | null;
+  }>;
+  headRefOid: string;
 }
+
+export type PullRequestGateMetadata = Pick<
+  PullRequestMetadata,
+  'reviewDecision' | 'statusCheckRollup'
+> & { complete: boolean };
 
 export class PullRequestError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -197,7 +216,19 @@ export async function parsePullRequest(
   }
 
   const pullRequest = parseGitHubPullRequest(response.data);
-  return toPullRequestMetadata(pullRequest);
+  const gate = await fetchPullRequestGateMetadata(
+    provider,
+    trimmedOwner,
+    trimmedRepo,
+    prNumber,
+    pullRequest.head.sha,
+    connectionId,
+    options.headers,
+  );
+  return toPullRequestMetadata(
+    pullRequest,
+    gate,
+  );
 }
 
 function parseGitHubPullRequest(value: JsonValue | null): GitHubPR {
@@ -221,10 +252,15 @@ function parseGitHubPullRequest(value: JsonValue | null): GitHubPR {
     labels: readLabels(prObject.labels, 'Pull request response.labels'),
     head: readPullRequestRef(prObject.head, 'Pull request response.head'),
     base: readPullRequestRef(prObject.base, 'Pull request response.base'),
+    mergeable: readNullableBoolean(prObject, 'mergeable', 'Pull request response'),
+    mergeable_state: readOptionalString(prObject, 'mergeable_state', 'Pull request response') ?? 'unknown',
   };
 }
 
-function toPullRequestMetadata(pullRequest: GitHubPR): PullRequestMetadata {
+function toPullRequestMetadata(
+  pullRequest: GitHubPR,
+  gate: PullRequestGateMetadata,
+): PullRequestMetadata {
   return {
     number: pullRequest.number,
     title: pullRequest.title,
@@ -258,7 +294,115 @@ function toPullRequestMetadata(pullRequest: GitHubPR): PullRequestMetadata {
     })),
     head: toPullRequestRef(pullRequest.head),
     base: toPullRequestRef(pullRequest.base),
+    mergeable:
+      pullRequest.mergeable === true
+        ? 'MERGEABLE'
+        : pullRequest.mergeable === false
+          ? 'CONFLICTING'
+          : 'UNKNOWN',
+    mergeStateStatus: gate.complete ? pullRequest.mergeable_state.toUpperCase() : 'UNKNOWN',
+    reviewDecision: gate.reviewDecision,
+    statusCheckRollup: gate.statusCheckRollup,
+    headRefOid: pullRequest.head.sha,
   };
+}
+
+export async function fetchPullRequestGateMetadata(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  headSha: string,
+  connectionId: string,
+  headers?: Record<string, string>,
+): Promise<PullRequestGateMetadata> {
+  const [reviewsResult, checkRunsResult, statusesResult] = await Promise.allSettled([
+    fetchReviews(provider, owner, repo, prNumber, { connectionId, headers }),
+    fetchCheckRuns(provider, owner, repo, headSha, connectionId),
+    fetchClassicStatuses(provider, owner, repo, headSha, connectionId),
+  ]);
+  const complete =
+    reviewsResult.status === 'fulfilled' &&
+    checkRunsResult.status === 'fulfilled' &&
+    statusesResult.status === 'fulfilled';
+  if (!complete) {
+    return {
+      complete: false,
+      reviewDecision: 'REVIEW_REQUIRED',
+      statusCheckRollup: [
+        { name: 'relayfile/gate-data', status: 'PENDING', conclusion: null, detailsUrl: null },
+      ],
+    };
+  }
+  return {
+    complete: true,
+    reviewDecision: deriveReviewDecision(reviewsResult.value),
+    statusCheckRollup: [
+      ...checkRunsResult.value.check_runs.map((checkRun, index) => ({
+        name: readString(checkRun, 'name', `Check runs response[${index}]`),
+        status: readString(checkRun, 'status', `Check runs response[${index}]`).toUpperCase(),
+        conclusion:
+          readNullableString(checkRun, 'conclusion', `Check runs response[${index}]`)?.toUpperCase() ?? null,
+        detailsUrl: readNullableString(checkRun, 'details_url', `Check runs response[${index}]`),
+      })),
+      ...statusesResult.value.map((status, index) => {
+        const state = readString(status, 'state', `Commit statuses response[${index}]`).toUpperCase();
+        return {
+          name: readString(status, 'context', `Commit statuses response[${index}]`),
+          status: state === 'PENDING' ? 'PENDING' : 'COMPLETED',
+          conclusion: state === 'PENDING' ? null : state,
+          detailsUrl: readNullableString(status, 'target_url', `Commit statuses response[${index}]`),
+        };
+      }),
+    ],
+  };
+}
+
+async function fetchClassicStatuses(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  sha: string,
+  connectionId: string,
+): Promise<JsonObject[]> {
+  const response = await withProxyRetry(provider).proxy({
+    method: 'GET',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/commits/${sha}/status`,
+    connectionId,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': GITHUB_API_VERSION,
+    },
+  });
+  if (response.status >= 400) {
+    throw new PullRequestProviderError(
+      `GitHub commit status fetch failed for ${owner}/${repo}@${sha}: ${formatProviderError(response)}`,
+      { response, status: response.status },
+    );
+  }
+  const payload = expectObject(response.data, 'Combined commit status response');
+  if (!Array.isArray(payload.statuses)) {
+    throw new PullRequestParseError('Combined commit status response.statuses must be an array');
+  }
+  return payload.statuses.map((status, index) =>
+    expectObject(status, `Combined commit status response.statuses[${index}]`),
+  );
+}
+
+function deriveReviewDecision(reviews: readonly JsonObject[]): PullRequestMetadata['reviewDecision'] {
+  const latestByReviewer = new Map<string, string>();
+  for (const [index, review] of reviews.entries()) {
+    const state = readString(review, 'state', `Reviews response[${index}]`).toUpperCase();
+    const user = expectObject(review.user, `Reviews response[${index}].user`);
+    const login = readString(user, 'login', `Reviews response[${index}].user`);
+    if (state === 'DISMISSED') latestByReviewer.delete(login);
+    else if (state !== 'COMMENTED' && state !== 'PENDING') latestByReviewer.set(login, state);
+  }
+  const states = [...latestByReviewer.values()];
+  if (states.includes('CHANGES_REQUESTED')) return 'CHANGES_REQUESTED';
+  if (states.includes('APPROVED')) return 'APPROVED';
+  return 'REVIEW_REQUIRED';
 }
 
 function toPullRequestRef(ref: GitHubPullRequestRef): PullRequestRef {
@@ -403,6 +547,15 @@ function readString(object: JsonObject, key: string, context: string): string {
   return value;
 }
 
+function readOptionalString(object: JsonObject, key: string, context: string): string | undefined {
+  const value = object[key];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new PullRequestParseError(`${context}.${key} must be a string when provided`);
+  }
+  return value;
+}
+
 function readNullableString(object: JsonObject, key: string, context: string): null | string {
   const value = object[key];
   if (value === null || value === undefined) {
@@ -422,6 +575,15 @@ function readBoolean(object: JsonObject, key: string, context: string): boolean 
     throw new PullRequestParseError(`${context}.${key} must be a boolean`);
   }
 
+  return value;
+}
+
+function readNullableBoolean(object: JsonObject, key: string, context: string): boolean | null {
+  const value = object[key];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'boolean') {
+    throw new PullRequestParseError(`${context}.${key} must be a boolean or null`);
+  }
   return value;
 }
 

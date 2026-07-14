@@ -482,7 +482,7 @@ describe('bulk ingest', () => {
         errors: 0,
       },
     ]);
-    assert.strictEqual(provider.proxy.mock.calls.length, 9);
+    assert.strictEqual(provider.proxy.mock.calls.length, 12);
   });
 
   it('bulkIngestPR preserves both pull rows when separate PRs are ingested sequentially', async () => {
@@ -669,7 +669,7 @@ describe('bulk ingest', () => {
     assert.strictEqual(result.filesUpdated, 0);
     assert.strictEqual(result.paths.length, 246);
     assert.strictEqual(writes.size, 249);
-    assert.strictEqual(provider.proxy.mock.calls.length, 244);
+    assert.strictEqual(provider.proxy.mock.calls.length, 247);
   });
   it('bulkIngestPR deletes the stale by-title alias when the title changes on re-ingest (issue #106)', async () => {
     const { vfs, writes, deletes } = createMemoryVfs();

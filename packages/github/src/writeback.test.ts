@@ -444,6 +444,42 @@ describe('writeback', () => {
     });
   });
 
+  it('resolves pull request create, ref push, and pull request close writebacks', () => {
+    const create = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pull-requests/factory.json',
+      JSON.stringify({ title: 'Factory change', head: 'factory/52', base: 'main', draft: true }),
+    );
+    const push = resolveWritebackRequest(
+      '/github/repos/acme/widgets/refs/factory.json',
+      JSON.stringify({ ref: 'factory/52', sha: 'abc123' }),
+    );
+    const update = resolveWritebackRequest(
+      '/github/repos/acme/widgets/refs/update.json',
+      JSON.stringify({ ref: 'refs/heads/factory/52', sha: 'def456', update: true, force: false }),
+    );
+    const close = resolveWritebackRequest(
+      '/github/repos/acme/widgets/pulls/42/close.json',
+      '{}',
+    );
+
+    assert.deepStrictEqual(
+      { method: create.method, endpoint: create.endpoint, body: create.body },
+      { method: 'POST', endpoint: '/repos/acme/widgets/pulls', body: { title: 'Factory change', head: 'factory/52', base: 'main', draft: true } },
+    );
+    assert.deepStrictEqual(
+      { method: push.method, endpoint: push.endpoint, body: push.body },
+      { method: 'POST', endpoint: '/repos/acme/widgets/git/refs', body: { ref: 'refs/heads/factory/52', sha: 'abc123' } },
+    );
+    assert.deepStrictEqual(
+      { method: update.method, endpoint: update.endpoint, body: update.body },
+      { method: 'PATCH', endpoint: '/repos/acme/widgets/git/refs/heads/factory/52', body: { sha: 'def456', force: false } },
+    );
+    assert.deepStrictEqual(
+      { method: close.method, endpoint: close.endpoint, body: close.body },
+      { method: 'PATCH', endpoint: '/repos/acme/widgets/pulls/42', body: { state: 'closed' } },
+    );
+  });
+
   it('rejects read-only fields in issue writebacks', () => {
     assert.throws(
       () =>

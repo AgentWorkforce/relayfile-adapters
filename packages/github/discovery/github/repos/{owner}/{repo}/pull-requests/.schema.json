@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Create GitHub pull request",
+  "type": "object",
+  "required": ["title", "head", "base"],
+  "properties": {
+    "title": { "type": "string" },
+    "head": { "type": "string", "description": "Head branch or owner:branch." },
+    "base": { "type": "string", "description": "Base branch." },
+    "body": { "type": "string" },
+    "draft": { "type": "boolean" },
+    "maintainerCanModify": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

@@ -10,6 +10,8 @@ import {
   type AgentReviewMetadata,
   type GitHubIssueCommentWritebackInput,
   type GitHubIssueWritebackInput,
+  type GitHubCreatePullRequestWritebackInput,
+  type GitHubPushRefWritebackInput,
   type GitHubMergeMethod,
   type GitHubMergePullRequestWritebackInput,
   type GitHubRequestProvider,
@@ -32,6 +34,12 @@ const REVIEW_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/reviews\/([^/]+?)(?:\.json)?$/;
 const MERGE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/merge\.json$/;
+const CLOSE_PULL_REQUEST_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)(?:__[^/]+)?\/close\.json$/;
+const CREATE_PULL_REQUEST_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/pull-requests(?:\/[^/]+(?:\.json)?)?$/;
+const PUSH_REF_WRITEBACK_PATH =
+  /^\/github\/repos\/([^/]+)\/([^/]+)\/refs(?:\/[^/]+(?:\.json)?)?$/;
 const ISSUE_WRITEBACK_PATH =
   /^\/github\/repos\/([^/]+)\/([^/]+)\/issues\/([^/]+?)(?:\.json)?$/;
 // Issue comments are directory records (`comments/<id>/meta.json`); accept the
@@ -182,6 +190,31 @@ export class GitHubWritebackHandler {
     content: string,
   ): Promise<WritebackResult> {
     try {
+      const directRoute = classifyWrite(path, resources);
+      if (
+        directRoute &&
+        ['pull-requests', 'refs', 'close-pull-request'].includes(directRoute.resource.name)
+      ) {
+        const request = resolveWritebackRequest(path, content);
+        const connectionId = await this.resolveConnectionIdFromMetadata(workspaceId);
+        const response = await withProxyRetry(this.provider).proxy({
+          ...request,
+          connectionId,
+          headers: {
+            ...request.headers,
+            'Provider-Config-Key': this.defaultProviderConfigKey,
+          },
+        });
+        if (response.status >= 400) {
+          return {
+            success: false,
+            error: formatProviderError(response, 'GitHub writeback failed'),
+          };
+        }
+        const externalId = extractReviewId(response.data) ?? extractMergeSha(response.data);
+        return { success: true, ...(externalId ? { externalId } : {}) };
+      }
+
       const mergeTarget = extractMergeTarget(path);
       if (mergeTarget) {
         const payload = parseMergePayload(content);
@@ -410,6 +443,42 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
 
   const route = classifyWrite(path, resources);
 
+  if (route?.resource.name === 'pull-requests' && route.kind === 'create') {
+    const match = path.match(CREATE_PULL_REQUEST_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2]) {
+      throw new Error(`Unsupported GitHub pull request create writeback path: ${path}`);
+    }
+    return buildCreatePullRequest(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      parseCreatePullRequestPayload(content),
+    );
+  }
+
+  if (route?.resource.name === 'refs' && route.kind === 'create') {
+    const match = path.match(PUSH_REF_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2]) {
+      throw new Error(`Unsupported GitHub ref writeback path: ${path}`);
+    }
+    return buildPushRef(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      parsePushRefPayload(content),
+    );
+  }
+
+  if (route?.resource.name === 'close-pull-request') {
+    const match = path.match(CLOSE_PULL_REQUEST_WRITEBACK_PATH);
+    if (!match?.[1] || !match[2] || !match[3]) {
+      throw new Error(`Unsupported GitHub pull request close writeback path: ${path}`);
+    }
+    return buildClosePullRequest(
+      decodeGitHubPathSegment(match[1], 'owner'),
+      decodeGitHubPathSegment(match[2], 'repo'),
+      Number.parseInt(match[3], 10),
+    );
+  }
+
   if (route?.resource.name === 'issues') {
     const match = path.match(ISSUE_WRITEBACK_PATH);
     if (!match?.[1] || !match[2] || !match[3]) {
@@ -456,8 +525,60 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
   }
 
   throw new Error(
-    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request review, pull request merge file, or pull request review comment reply.`,
+    `Unsupported GitHub writeback path: ${path}. Expected an issue, issue comment, pull request create/close/merge, ref push, review, or review comment reply.`,
   );
+}
+
+function buildCreatePullRequest(
+  owner: string,
+  repo: string,
+  payload: GitHubCreatePullRequestWritebackInput,
+): ProxyRequest {
+  return {
+    method: 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/pulls`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: {
+      title: payload.title,
+      head: payload.head,
+      base: payload.base,
+      ...(payload.body !== undefined ? { body: payload.body } : {}),
+      ...(payload.draft !== undefined ? { draft: payload.draft } : {}),
+      ...(payload.maintainerCanModify !== undefined
+        ? { maintainer_can_modify: payload.maintainerCanModify }
+        : {}),
+    },
+  };
+}
+
+function buildPushRef(owner: string, repo: string, payload: GitHubPushRefWritebackInput): ProxyRequest {
+  const normalizedRef = payload.ref.startsWith('refs/') ? payload.ref : `refs/heads/${payload.ref}`;
+  const updatePath = normalizedRef.replace(/^refs\//u, '');
+  return {
+    method: payload.update ? 'PATCH' : 'POST',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: payload.update
+      ? `/repos/${owner}/${repo}/git/refs/${encodeURI(updatePath)}`
+      : `/repos/${owner}/${repo}/git/refs`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: payload.update
+      ? { sha: payload.sha, ...(payload.force !== undefined ? { force: payload.force } : {}) }
+      : { ref: normalizedRef, sha: payload.sha },
+  };
+}
+
+function buildClosePullRequest(owner: string, repo: string, prNumber: number): ProxyRequest {
+  return {
+    method: 'PATCH',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}`,
+    connectionId: '',
+    headers: githubJsonHeaders(),
+    body: { state: 'closed' },
+  };
 }
 
 function extractMergeTarget(path: string): { owner: string; repo: string; prNumber: number } | undefined {
@@ -681,6 +802,46 @@ function parseMergePayload(content: string): GitHubMergePullRequestWritebackInpu
     ...(sha ? { sha } : {}),
     ...(metadata ? { metadata } : {}),
   };
+}
+
+function parseCreatePullRequestPayload(content: string): GitHubCreatePullRequestWritebackInput {
+  const object = parseJsonObject(content, 'Pull request create payload');
+  rejectReadOnlyFields(object);
+  const title = readString(object, 'title', 'Pull request create payload');
+  const head = readString(object, 'head', 'Pull request create payload');
+  const base = readString(object, 'base', 'Pull request create payload');
+  const body = optionalTrimmedString(object.body, 'Pull request create payload.body');
+  const draft = optionalBoolean(object.draft, 'Pull request create payload.draft');
+  const maintainerCanModify = optionalBoolean(
+    object.maintainerCanModify ?? object.maintainer_can_modify,
+    'Pull request create payload.maintainerCanModify',
+  );
+  return { title, head, base, body, draft, maintainerCanModify };
+}
+
+function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
+  const object = parseJsonObject(content, 'Git ref push payload');
+  rejectReadOnlyFields(object);
+  const ref = readString(object, 'ref', 'Git ref push payload');
+  const sha = readString(object, 'sha', 'Git ref push payload');
+  const force = optionalBoolean(object.force, 'Git ref push payload.force');
+  const update = optionalBoolean(object.update, 'Git ref push payload.update');
+  return { ref, sha, force, update };
+}
+
+function parseJsonObject(content: string, context: string): JsonObject {
+  try {
+    return expectObject(JSON.parse(content) as JsonValue, context);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown JSON parse failure';
+    throw new Error(`Invalid ${context.toLowerCase()} JSON: ${message}`);
+  }
+}
+
+function optionalBoolean(value: JsonValue | undefined, context: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw new Error(`${context} must be a boolean`);
+  return value;
 }
 
 function compactIssuePayload(payload: GitHubIssueWritebackInput): JsonObject {
