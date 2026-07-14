@@ -249,9 +249,12 @@ function isWorkspaceBusyAdmissionError(value: unknown): value is RelayFileApiErr
 }
 
 function retryAfterDelayMs(value: string): number | undefined {
-  const seconds = Number.parseInt(value, 10);
-  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
-  const timestamp = Date.parse(value);
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    if (Number.isFinite(seconds)) return seconds * 1_000;
+  }
+  const timestamp = Date.parse(trimmed);
   return Number.isNaN(timestamp) ? undefined : Math.max(0, timestamp - Date.now());
 }
 
@@ -264,13 +267,10 @@ async function responseIsWorkspaceBusyAdmission(response: Response): Promise<boo
   }
 }
 
-async function responseWithRetryAfter(
-  response: Response,
-  retryAfter: string
-): Promise<Response> {
+function responseWithRetryAfter(response: Response, retryAfter: string): Response {
   const headers = new Headers(response.headers);
   headers.set("Retry-After", retryAfter);
-  return new Response(await response.arrayBuffer(), {
+  return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers
@@ -281,7 +281,7 @@ function isDirectWriteAdmissionRequest(input: RequestInfo | URL, init?: RequestI
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const url = input instanceof Request ? input.url : String(input);
   try {
-    return method === "PUT" && new URL(url).pathname.endsWith("/fs/file");
+    return method === "PUT" && new URL(url, "http://relayfile.invalid").pathname.endsWith("/fs/file");
   } catch {
     return false;
   }
@@ -300,14 +300,16 @@ function directRetryFetch(fetchImpl: typeof fetch): typeof fetch {
     }
     const retryAfter = response.headers.get("Retry-After");
     if (!retryAfter) return response;
+    const delayMs = retryAfterDelayMs(retryAfter);
     if (
       isDirectWriteAdmissionRequest(input, init) &&
       (await responseIsWorkspaceBusyAdmission(response))
     ) {
-      return response;
+      return delayMs === undefined
+        ? response
+        : responseWithRetryAfter(response, String(Math.ceil(delayMs / 1_000)));
     }
 
-    const delayMs = retryAfterDelayMs(retryAfter);
     if (delayMs === undefined || delayMs <= SDK_LEGACY_RETRY_MAX_DELAY_MS) {
       return response;
     }

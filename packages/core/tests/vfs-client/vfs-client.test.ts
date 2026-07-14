@@ -382,6 +382,43 @@ test("writeJsonFile direct mode preserves the existing two-second cap for 5xx re
   assert.equal(attempts, 4);
 });
 
+test("writeJsonFile direct mode parses a digit-leading Retry-After date as a date", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy",
+        reason: "write_admission_limit"
+      },
+      { status: 429, headers: { "Retry-After": "1 Jan 1970 00:00:00 GMT" } }
+    );
+  };
+
+  await withImmediateTimeouts(async (delays) => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_date_retry_after",
+            fetchImpl,
+            writebackTimeoutMs: 0
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--date-retry-after.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackError
+    );
+    assert.deepEqual(delays, []);
+  });
+  assert.equal(attempts, 4);
+});
+
 test("writeJsonFile direct admission deadline aborts an advertised retry without an orphan attempt", async () => {
   let attempts = 0;
   const fetchImpl: typeof fetch = async () => {
