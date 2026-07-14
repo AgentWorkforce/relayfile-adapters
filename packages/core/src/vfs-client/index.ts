@@ -85,6 +85,33 @@ export class RelayfileWritebackPendingError extends RelayfileWritebackError {
   }
 }
 
+export interface RelayfileWritebackAdmissionTimeoutErrorOptions {
+  provider: string;
+  operation: string;
+  path: string;
+  timeoutMs: number;
+}
+
+/** Direct HTTP admission never minted an op before the caller's admission deadline. */
+export class RelayfileWritebackAdmissionTimeoutError extends RelayfileWritebackError {
+  readonly path: string;
+  readonly timeoutMs: number;
+
+  constructor(options: RelayfileWritebackAdmissionTimeoutErrorOptions) {
+    super({
+      provider: options.provider,
+      operation: options.operation,
+      cause: new Error(
+        `writeback_admission_timeout: no operation admitted for ${options.path} after ${options.timeoutMs}ms`
+      ),
+      retryable: true
+    });
+    this.name = "RelayfileWritebackAdmissionTimeoutError";
+    this.path = options.path;
+    this.timeoutMs = options.timeoutMs;
+  }
+}
+
 export interface RelayfileWritebackTerminalErrorOptions {
   provider: string;
   operation: string;
@@ -148,7 +175,9 @@ export interface IntegrationClientOptions {
   /**
    * Max wait, in ms, for the Relayfile writeback worker to emit a receipt onto
    * the just-written draft. Defaults to 3000ms. `0` means fire-and-forget — the
-   * client returns immediately without a receipt.
+   * client returns immediately without a receipt. In direct HTTP mode, the
+   * same bound also governs write admission so admission backoff cannot wait
+   * indefinitely before a receipt operation exists.
    */
   writebackTimeoutMs?: number;
   /** Poll interval while waiting for a receipt. Default 250ms. */
@@ -197,6 +226,8 @@ export interface WritebackResult {
 }
 
 const DEFAULT_WRITEBACK_TIMEOUT_MS = 3_000;
+const SDK_LEGACY_RETRY_MAX_DELAY_MS = 2_000;
+const WORKSPACE_BUSY_RETRY_MAX_DELAY_MS = 30_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -205,6 +236,83 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function isWorkspaceBusyAdmission(value: unknown): boolean {
+  if (!isRecord(value) || value.code !== "workspace_busy") return false;
+  const reason = value.reason ?? (isRecord(value.details) ? value.details.reason : undefined);
+  return reason === "write_admission_limit";
+}
+
+function isWorkspaceBusyAdmissionError(value: unknown): value is RelayFileApiError {
+  return value instanceof RelayFileApiError && value.status === 429 && isWorkspaceBusyAdmission(value);
+}
+
+function retryAfterDelayMs(value: string): number | undefined {
+  const seconds = Number.parseInt(value, 10);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : Math.max(0, timestamp - Date.now());
+}
+
+async function responseIsWorkspaceBusyAdmission(response: Response): Promise<boolean> {
+  if (response.status !== 429) return false;
+  try {
+    return isWorkspaceBusyAdmission(await response.clone().json());
+  } catch {
+    return false;
+  }
+}
+
+async function responseWithRetryAfter(
+  response: Response,
+  retryAfter: string
+): Promise<Response> {
+  const headers = new Headers(response.headers);
+  headers.set("Retry-After", retryAfter);
+  return new Response(await response.arrayBuffer(), {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+function isDirectWriteAdmissionRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const url = input instanceof Request ? input.url : String(input);
+  try {
+    return method === "PUT" && new URL(url).pathname.endsWith("/fs/file");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The SDK owns the only retry loop. Raising its max delay lets workspace write
+ * admission honor Retry-After; this adapter keeps the SDK's previous 2s cap for
+ * every other retryable response so unrelated 429/5xx behavior does not move.
+ */
+function directRetryFetch(fetchImpl: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const response = await fetchImpl(input, init);
+    if (response.status !== 429 && (response.status < 500 || response.status > 599)) {
+      return response;
+    }
+    const retryAfter = response.headers.get("Retry-After");
+    if (!retryAfter) return response;
+    if (
+      isDirectWriteAdmissionRequest(input, init) &&
+      (await responseIsWorkspaceBusyAdmission(response))
+    ) {
+      return response;
+    }
+
+    const delayMs = retryAfterDelayMs(retryAfter);
+    if (delayMs === undefined || delayMs <= SDK_LEGACY_RETRY_MAX_DELAY_MS) {
+      return response;
+    }
+    return responseWithRetryAfter(response, String(SDK_LEGACY_RETRY_MAX_DELAY_MS / 1_000));
+  };
 }
 
 function mountRootCandidate(value: string | undefined): string | undefined {
@@ -304,12 +412,16 @@ function directClientConfig(
     nonEmpty(process.env.RELAYFILE_WORKSPACE) ??
     nonEmpty(process.env.RELAY_WORKSPACE_ID);
   if (!baseUrl || !token || !workspaceId) return undefined;
+  const fetchImpl = directRetryFetch(client.fetchImpl ?? globalThis.fetch);
   return {
     workspaceId,
     relayfile: new RelayFileClient({
       baseUrl,
       token,
-      fetchImpl: client.fetchImpl
+      fetchImpl,
+      retry: {
+        maxDelayMs: WORKSPACE_BUSY_RETRY_MAX_DELAY_MS
+      }
     })
   };
 }
@@ -423,30 +535,53 @@ async function writeJsonFileViaRelayfileApi(
   body: unknown,
   direct: { workspaceId: string; relayfile: RelayFileClient }
 ): Promise<WritebackResult> {
-  const queued = await direct.relayfile.writeFile({
-    workspaceId: direct.workspaceId,
-    path: relayPath,
-    baseRevision: "*",
-    contentType: "application/json",
-    content: `${JSON.stringify(body, null, 2)}\n`
-  });
-  if (queued.writeback && !nonEmpty(queued.opId)) {
-    throw new RelayfileWritebackReceiptError({
-      provider,
-      operation,
-      opId: "(missing)",
-      reason: "queued writeback response did not include opId"
-    });
-  }
-  const receipt = queued.opId
-    ? await waitForOperationReceipt(client, provider, operation, direct, queued.opId, relayPath)
+  const timeoutMs = client.writebackTimeoutMs ?? DEFAULT_WRITEBACK_TIMEOUT_MS;
+  const controller = timeoutMs > 0 ? new AbortController() : undefined;
+  const deadlineTimer = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
     : undefined;
-  return {
-    path: relayPath,
-    absolutePath: relayPath,
-    opId: queued.opId,
-    ...(receipt ? { receipt } : {})
-  };
+  let admitted = false;
+  try {
+    const queued = await direct.relayfile.writeFile({
+      workspaceId: direct.workspaceId,
+      path: relayPath,
+      baseRevision: "*",
+      contentType: "application/json",
+      content: `${JSON.stringify(body, null, 2)}\n`,
+      signal: controller?.signal
+    });
+    admitted = true;
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+    if (queued.writeback && !nonEmpty(queued.opId)) {
+      throw new RelayfileWritebackReceiptError({
+        provider,
+        operation,
+        opId: "(missing)",
+        reason: "queued writeback response did not include opId"
+      });
+    }
+    const receipt = queued.opId
+      ? await waitForOperationReceipt(client, provider, operation, direct, queued.opId, relayPath)
+      : undefined;
+    return {
+      path: relayPath,
+      absolutePath: relayPath,
+      opId: queued.opId,
+      ...(receipt ? { receipt } : {})
+    };
+  } catch (error) {
+    if (controller?.signal.aborted && !admitted && !(error instanceof RelayfileWritebackError)) {
+      throw new RelayfileWritebackAdmissionTimeoutError({
+        provider,
+        operation,
+        path: relayPath,
+        timeoutMs
+      });
+    }
+    throw error;
+  } finally {
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+  }
 }
 
 function toAbsolutePath(client: IntegrationClientOptions, relayPath: string): string {
@@ -612,7 +747,12 @@ export async function writeJsonFile(
     if (cause instanceof RelayfileWritebackError) {
       throw cause;
     }
-    throw new RelayfileWritebackError({ provider, operation, cause, retryable: false });
+    throw new RelayfileWritebackError({
+      provider,
+      operation,
+      cause,
+      retryable: isWorkspaceBusyAdmissionError(cause)
+    });
   }
 }
 
