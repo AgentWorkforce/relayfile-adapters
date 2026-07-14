@@ -57,6 +57,19 @@ function createContentResponse(path: string, ref: string, content: string): Prox
   });
 }
 
+function emptyGateResponse(request: ProxyRequest): ProxyResponse | undefined {
+  if (/\/pulls\/\d+\/reviews$/u.test(request.endpoint)) {
+    return jsonResponse([]);
+  }
+  if (/\/commits\/[^/]+\/check-runs$/u.test(request.endpoint)) {
+    return jsonResponse({ total_count: 0, check_runs: [] });
+  }
+  if (/\/commits\/[^/]+\/status$/u.test(request.endpoint)) {
+    return jsonResponse({ state: 'pending', statuses: [] });
+  }
+  return undefined;
+}
+
 function createMemoryVfs(initialEntries: Record<string, string> = {}) {
   const writes = new Map(Object.entries(initialEntries));
   const deletes: string[] = [];
@@ -542,6 +555,9 @@ describe('bulk ingest', () => {
     ]);
 
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       const match = request.endpoint.match(
         new RegExp(`^/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/(\\d+)(/files)?$`),
       );
@@ -656,6 +672,9 @@ describe('bulk ingest', () => {
     const { vfs, writes } = createMemoryVfs();
 
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
       ) {
@@ -714,6 +733,9 @@ describe('bulk ingest', () => {
     const { vfs, writes, deletes } = createMemoryVfs();
     const createBulkProvider = (prPayload: Record<string, unknown>) =>
       createProvider(async (request) => {
+        const gateResponse = emptyGateResponse(request);
+        if (gateResponse) return gateResponse;
+
         if (
           request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
         ) {
@@ -798,6 +820,9 @@ describe('bulk ingest', () => {
   it('bulkIngestPR deletes nothing when re-ingested with an unchanged title', async () => {
     const { vfs, writes, deletes } = createMemoryVfs();
     const provider = createProvider(async (request) => {
+      const gateResponse = emptyGateResponse(request);
+      if (gateResponse) return gateResponse;
+
       if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42/files`
       ) {

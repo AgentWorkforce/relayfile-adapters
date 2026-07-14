@@ -226,11 +226,15 @@ export class GitHubWritebackHandler {
           : { connectionId: await this.resolveConnectionIdFromMetadata(workspaceId, metadata) };
         const response = await withProxyRetry(selection.provider ?? this.provider).proxy({
           ...request,
-          connectionId: metadata?.connectionId?.trim() || selection.connectionId,
+          connectionId: createPayload?.author
+            ? selection.connectionId
+            : metadata?.connectionId?.trim() || selection.connectionId,
           headers: {
             ...request.headers,
             'Provider-Config-Key':
-              metadata?.providerConfigKey ?? selection.providerConfigKey ?? this.defaultProviderConfigKey,
+              createPayload?.author
+                ? selection.providerConfigKey ?? this.defaultProviderConfigKey
+                : metadata?.providerConfigKey ?? selection.providerConfigKey ?? this.defaultProviderConfigKey,
           },
         });
         if (response.status >= 400) {

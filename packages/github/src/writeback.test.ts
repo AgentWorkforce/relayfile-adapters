@@ -538,20 +538,37 @@ describe('writeback', () => {
             assert.deepEqual(input, {
               workspaceId: 'workspace-1', owner: 'acme', repo: 'widgets', author,
             });
-            return { connectionId: `conn-${author}`, provider: selectedProvider };
+            return {
+              connectionId: `conn-${author}`,
+              provider: selectedProvider,
+              providerConfigKey: `github-${author}`,
+            };
           },
         });
 
         const result = await handler.handleWriteback(
           'workspace-1',
           '/github/repos/acme/widgets/pull-requests/factory.json',
-          JSON.stringify({ title: 'Factory change', head: 'factory/52', base: 'main', author }),
+          JSON.stringify({
+            title: 'Factory change',
+            head: 'factory/52',
+            base: 'main',
+            author,
+            metadata: {
+              connectionId: 'conn-payload',
+              providerConfigKey: 'github-payload',
+            },
+          }),
         );
 
         assert.equal(result.success, true);
         assert.equal(defaultProvider.requests.length, 0);
         assert.equal(selectedProvider.requests.length, 1);
         assert.equal(selectedProvider.requests[0]?.connectionId, `conn-${author}`);
+        assert.equal(
+          selectedProvider.requests[0]?.headers?.['Provider-Config-Key'],
+          `github-${author}`,
+        );
         assert.deepEqual(selectedProvider.requests[0]?.body, {
           title: 'Factory change', head: 'factory/52', base: 'main',
         });
