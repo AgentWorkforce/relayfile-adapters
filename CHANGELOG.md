@@ -17,6 +17,10 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 - See `docs/migration/file-native-writeback.md` for the new read/edit/create/delete contract, schema discovery flow, writeback status surface, and per-adapter draft filename examples.
 - See `docs/migration/new-json-callers.md` for the Cloud and demo caller scan that identifies `new.json` write paths to migrate.
 
+### Fixed
+
+- Direct HTTP write admission now honors `Retry-After` up to 30 seconds for `workspace_busy` / `write_admission_limit` responses in the SDK's existing four-attempt retry layer, while preserving the prior two-second cap for other retryable responses. Implicit defaults are three seconds for receipt polling and 90 seconds for admission; an explicit `writebackTimeoutMs` bounds each phase independently, with `0` leaving admission unbounded and receipt polling disabled.
+
 ### Added
 
 - GitHub pull indexes now surface `merged` and `mergedAt` across webhook, direct, and bulk ingestion paths so time-windowed consumers can identify merged pull requests without opening every `meta.json`.

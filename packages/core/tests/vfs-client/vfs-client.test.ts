@@ -3,7 +3,9 @@ import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { RelayFileApiError } from "@relayfile/sdk";
 import {
+  RelayfileWritebackAdmissionTimeoutError,
   RelayfileWritebackError,
   RelayfileWritebackPendingError,
   RelayfileWritebackReceiptError,
@@ -20,6 +22,25 @@ import {
 async function mount(): Promise<{ root: string; opts: { relayfileMountRoot: string; writebackTimeoutMs: number } }> {
   const root = await mkdtemp(path.join(tmpdir(), "vfs-client-"));
   return { root, opts: { relayfileMountRoot: root, writebackTimeoutMs: 0 } };
+}
+
+async function withImmediateTimeouts<T>(fn: (delays: number[]) => Promise<T>): Promise<T> {
+  const delays: number[] = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    queueMicrotask(() => callback(...args));
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout;
+  try {
+    return await fn(delays);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
 }
 
 test("writeJsonFile drops a draft atomically under the mount path", async () => {
@@ -204,6 +225,427 @@ test("writeJsonFile can wait on direct Relayfile op providerResult instead of mo
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
   assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_1$/);
+});
+
+test("writeJsonFile direct mode honors workspace_busy Retry-After in one four-attempt SDK retry layer", async () => {
+  const requests: Array<{ url: string; body: BodyInit | null | undefined }> = [];
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async (input, init = {}) => {
+    attempts += 1;
+    requests.push({ url: String(input), body: init.body });
+    if (attempts < 4) {
+      return Response.json(
+        {
+          code: "workspace_busy",
+          message: "workspace write path is busy; retry after the advertised delay",
+          reason: "write_admission_limit",
+          retryAfterSeconds: 5
+        },
+        { status: 429, headers: { "Retry-After": "5" } }
+      );
+    }
+    return Response.json({ status: "queued", targetRevision: "rev_1" });
+  };
+
+  const result = await withImmediateTimeouts(async (delays) => {
+    const write = await writeJsonFile(
+      {
+        relayfileBaseUrl: "https://relayfile.example.test",
+        relayfileApiToken: "test-token",
+        workspaceId: "rw_busy",
+        fetchImpl,
+        writebackTimeoutMs: 0
+      },
+      "slack",
+      "post",
+      "/slack/channels/C1/messages/relayfile-writeback--busy.json",
+      { text: "hello", idempotencyKey: "tick:delivery-1:1" }
+    );
+    assert.deepEqual(delays, [5_000, 5_000, 5_000]);
+    return write;
+  });
+
+  assert.equal(result.opId, undefined);
+  assert.equal(requests.length, 4, "the SDK layer must own exactly four total attempts");
+  assert.equal(new Set(requests.map((request) => request.url)).size, 1);
+  assert.equal(new Set(requests.map((request) => String(request.body))).size, 1);
+  assert.equal(requests.some((request) => request.url.includes("/ops/")), false);
+  assert.match(String(requests[0].body), /tick:delivery-1:1/);
+});
+
+test("writeJsonFile direct mode marks only exhausted workspace_busy admission as retryable", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy",
+        reason: "write_admission_limit"
+      },
+      { status: 429, headers: { "Retry-After": "5" } }
+    );
+  };
+
+  await withImmediateTimeouts(async (delays) => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_busy_exhausted",
+            fetchImpl,
+            writebackTimeoutMs: 0
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--busy-exhausted.json",
+          { text: "hello" }
+        ),
+      (error: unknown) =>
+        error instanceof RelayfileWritebackError &&
+        error.retryable &&
+        error.cause instanceof RelayFileApiError &&
+        error.cause.status === 429 &&
+        error.cause.code === "workspace_busy" &&
+        error.cause.details?.reason === "write_admission_limit"
+    );
+    assert.deepEqual(delays, [5_000, 5_000, 5_000]);
+  });
+  assert.equal(attempts, 4);
+});
+
+test("writeJsonFile direct mode preserves the two-second cap for workspace_busy with another reason", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      { code: "workspace_busy", reason: "another_limit", message: "ordinary rate limit" },
+      { status: 429, headers: { "Retry-After": "5" } }
+    );
+  };
+
+  await withImmediateTimeouts(async (delays) => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_rate_limited",
+            fetchImpl,
+            writebackTimeoutMs: 0
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--rate-limited.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackError
+    );
+    assert.deepEqual(delays, [2_000, 2_000, 2_000]);
+  });
+  assert.equal(attempts, 4);
+});
+
+test("writeJsonFile direct mode preserves the existing two-second cap for 5xx retries", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      { code: "service_unavailable", message: "try later" },
+      { status: 503, headers: { "Retry-After": "5" } }
+    );
+  };
+
+  await withImmediateTimeouts(async (delays) => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_unavailable",
+            fetchImpl,
+            writebackTimeoutMs: 0
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--unavailable.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackError
+    );
+    assert.deepEqual(delays, [2_000, 2_000, 2_000]);
+  });
+  assert.equal(attempts, 4);
+});
+
+test("writeJsonFile direct mode preserves the SDK backoff schedule without Retry-After", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      { code: "rate_limited", message: "retry without an advertised delay" },
+      { status: 429 }
+    );
+  };
+  const realRandom = Math.random;
+  Math.random = () => 0.5;
+  try {
+    await withImmediateTimeouts(async (delays) => {
+      await assert.rejects(
+        () =>
+          writeJsonFile(
+            {
+              relayfileBaseUrl: "https://relayfile.example.test",
+              relayfileApiToken: "test-token",
+              workspaceId: "rw_no_retry_after",
+              fetchImpl,
+              writebackTimeoutMs: 0
+            },
+            "slack",
+            "post",
+            "/slack/channels/C1/messages/relayfile-writeback--no-retry-after.json",
+            { text: "hello" }
+          ),
+        RelayfileWritebackError
+      );
+      assert.deepEqual(delays, [100, 200, 400]);
+    });
+  } finally {
+    Math.random = realRandom;
+  }
+  assert.equal(attempts, 4);
+});
+
+test("writeJsonFile direct mode parses a digit-leading Retry-After date as a date", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy",
+        reason: "write_admission_limit"
+      },
+      { status: 429, headers: { "Retry-After": "1 Jan 1970 00:00:00 GMT" } }
+    );
+  };
+
+  await withImmediateTimeouts(async (delays) => {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_date_retry_after",
+            fetchImpl,
+            writebackTimeoutMs: 0
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--date-retry-after.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackError
+    );
+    assert.deepEqual(delays, []);
+  });
+  assert.equal(attempts, 4);
+});
+
+test("writeJsonFile direct admission deadline aborts an advertised retry without an orphan attempt", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy; retry after the advertised delay",
+        reason: "write_admission_limit",
+        retryAfterSeconds: 30
+      },
+      { status: 429, headers: { "Retry-After": "30" } }
+    );
+  };
+  const deadlineHandle = 20 as unknown as ReturnType<typeof setTimeout>;
+  const retryHandle = 30_000 as unknown as ReturnType<typeof setTimeout>;
+  const clearedHandles: Array<ReturnType<typeof setTimeout>> = [];
+  let deadlineCallback: (() => void) | undefined;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    if (delay === 20) {
+      deadlineCallback = () => callback(...args);
+      return deadlineHandle;
+    }
+    assert.equal(delay, 30_000);
+    queueMicrotask(() => deadlineCallback?.());
+    return retryHandle;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    clearedHandles.push(handle);
+  }) as typeof clearTimeout;
+  try {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_deadline",
+            fetchImpl,
+            writebackTimeoutMs: 20
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--deadline.json",
+          { text: "hello" }
+        ),
+      (error: unknown) =>
+        error instanceof RelayfileWritebackAdmissionTimeoutError &&
+        error.retryable &&
+        /writeback_admission_timeout/.test(error.message)
+    );
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+
+  assert.equal(attempts, 1);
+  assert.equal(
+    clearedHandles.includes(retryHandle),
+    true,
+    "the SDK retry timer must be canceled when the client deadline wins"
+  );
+});
+
+test("writeJsonFile direct mode uses a 90s admission default when receipt timeout is omitted", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      return Response.json(
+        {
+          code: "workspace_busy",
+          message: "workspace write path is busy",
+          reason: "write_admission_limit"
+        },
+        { status: 429, headers: { "Retry-After": "5" } }
+      );
+    }
+    return Response.json({ status: "queued", targetRevision: "rev_default_admitted" });
+  };
+  const delays: number[] = [];
+  const deadlineHandle = 90_000 as unknown as ReturnType<typeof setTimeout>;
+  let deadlineCleared = false;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    if (delay === 90_000) return deadlineHandle;
+    queueMicrotask(() => callback(...args));
+    return 5_000 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: ReturnType<typeof setTimeout>) => {
+    if (handle === deadlineHandle) deadlineCleared = true;
+  }) as typeof clearTimeout;
+  try {
+    const result = await writeJsonFile(
+      {
+        relayfileBaseUrl: "https://relayfile.example.test",
+        relayfileApiToken: "test-token",
+        workspaceId: "rw_default_admission",
+        fetchImpl
+      },
+      "slack",
+      "post",
+      "/slack/channels/C1/messages/relayfile-writeback--default-admission.json",
+      { text: "hello" }
+    );
+    assert.equal(result.opId, undefined);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+  assert.equal(attempts, 2);
+  assert.deepEqual(delays, [90_000, 5_000]);
+  assert.equal(deadlineCleared, true);
+});
+
+test("writeJsonFile direct mode bounds repeated 30s admission delays at the 90s default", async () => {
+  let attempts = 0;
+  const fetchImpl: typeof fetch = async () => {
+    attempts += 1;
+    return Response.json(
+      {
+        code: "workspace_busy",
+        message: "workspace write path is busy",
+        reason: "write_admission_limit"
+      },
+      { status: 429, headers: { "Retry-After": "30" } }
+    );
+  };
+  const delays: number[] = [];
+  let deadlineCallback: (() => void) | undefined;
+  let retryTimers = 0;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    delays.push(delay ?? 0);
+    if (delay === 90_000) {
+      deadlineCallback = () => callback(...args);
+      return 90_000 as unknown as ReturnType<typeof setTimeout>;
+    }
+    retryTimers += 1;
+    if (retryTimers < 3) {
+      queueMicrotask(() => callback(...args));
+    } else {
+      queueMicrotask(() => deadlineCallback?.());
+    }
+    return retryTimers as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = (() => {}) as typeof clearTimeout;
+  try {
+    await assert.rejects(
+      () =>
+        writeJsonFile(
+          {
+            relayfileBaseUrl: "https://relayfile.example.test",
+            relayfileApiToken: "test-token",
+            workspaceId: "rw_default_admission_bound",
+            fetchImpl
+          },
+          "slack",
+          "post",
+          "/slack/channels/C1/messages/relayfile-writeback--default-admission-bound.json",
+          { text: "hello" }
+        ),
+      RelayfileWritebackAdmissionTimeoutError
+    );
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [90_000, 30_000, 30_000, 30_000]);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(attempts, 3, "the default admission deadline must not leave an orphan fourth attempt");
 });
 
 test("writeJsonFile direct mode reports a pending op as retryable writeback_pending", async () => {
