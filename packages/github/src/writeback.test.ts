@@ -454,8 +454,8 @@ describe('writeback', () => {
       JSON.stringify({ ref: 'factory/52', sha: 'abc123' }),
     );
     const update = resolveWritebackRequest(
-      '/github/repos/acme/widgets/refs/update.json',
-      JSON.stringify({ ref: 'refs/heads/factory/52', sha: 'def456', update: true, force: false }),
+      '/github/repos/acme/widgets/refs/refs%2Fheads%2Ffactory%2F52.json',
+      JSON.stringify({ ref: 'refs/heads/factory/52', sha: 'def456', force: false }),
     );
     const close = resolveWritebackRequest(
       '/github/repos/acme/widgets/pulls/42/close.json',
@@ -477,6 +477,16 @@ describe('writeback', () => {
     assert.deepStrictEqual(
       { method: close.method, endpoint: close.endpoint, body: close.body },
       { method: 'PATCH', endpoint: '/repos/acme/widgets/pulls/42', body: { state: 'closed' } },
+    );
+  });
+
+  it('rejects a ref update whose payload identity differs from its canonical path', () => {
+    assert.throws(
+      () => resolveWritebackRequest(
+        '/github/repos/acme/widgets/refs/refs%2Fheads%2Fmain.json',
+        JSON.stringify({ ref: 'refs/heads/other', sha: 'def456' }),
+      ),
+      /must match canonical ref refs\/heads\/main/u,
     );
   });
 

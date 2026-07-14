@@ -1,6 +1,7 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
 import { GITHUB_API_BASE_URL } from './config.js';
+import { normalizeGitHubRef } from './path-mapper.js';
 import { resources } from './resources.js';
 import {
   GITHUB_REVIEW_EVENTS,
@@ -502,7 +503,7 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
     );
   }
 
-  if (route?.resource.name === 'refs' && route.kind === 'create') {
+  if (route?.resource.name === 'refs' && (route.kind === 'create' || route.kind === 'patch')) {
     const match = path.match(PUSH_REF_WRITEBACK_PATH);
     if (!match?.[1] || !match[2]) {
       throw new Error(`Unsupported GitHub ref writeback path: ${path}`);
@@ -511,6 +512,8 @@ export function resolveWritebackRequest(path: string, content: string): ProxyReq
       decodeGitHubPathSegment(match[1], 'owner'),
       decodeGitHubPathSegment(match[2], 'repo'),
       parsePushRefPayload(content),
+      route.kind,
+      route.id,
     );
   }
 
@@ -602,18 +605,27 @@ function buildCreatePullRequest(
   };
 }
 
-function buildPushRef(owner: string, repo: string, payload: GitHubPushRefWritebackInput): ProxyRequest {
-  const normalizedRef = payload.ref.startsWith('refs/') ? payload.ref : `refs/heads/${payload.ref}`;
+function buildPushRef(
+  owner: string,
+  repo: string,
+  payload: GitHubPushRefWritebackInput,
+  kind: 'create' | 'patch',
+  canonicalId?: string,
+): ProxyRequest {
+  const normalizedRef = normalizeGitHubRef(payload.ref);
+  if (kind === 'patch' && canonicalId !== normalizedRef) {
+    throw new Error(`Git ref push payload.ref must match canonical ref ${canonicalId}`);
+  }
   const updatePath = normalizedRef.replace(/^refs\//u, '');
   return {
-    method: payload.update ? 'PATCH' : 'POST',
+    method: kind === 'patch' ? 'PATCH' : 'POST',
     baseUrl: GITHUB_API_BASE_URL,
-    endpoint: payload.update
+    endpoint: kind === 'patch'
       ? `/repos/${owner}/${repo}/git/refs/${encodeURI(updatePath)}`
       : `/repos/${owner}/${repo}/git/refs`,
     connectionId: '',
     headers: githubJsonHeaders(),
-    body: payload.update
+    body: kind === 'patch'
       ? { sha: payload.sha, ...(payload.force !== undefined ? { force: payload.force } : {}) }
       : { ref: normalizedRef, sha: payload.sha },
   };
@@ -877,10 +889,9 @@ function parsePushRefPayload(content: string): GitHubPushRefWritebackInput {
   const ref = readString(object, 'ref', 'Git ref push payload');
   const sha = readString(object, 'sha', 'Git ref push payload');
   const force = optionalBoolean(object.force, 'Git ref push payload.force');
-  const update = optionalBoolean(object.update, 'Git ref push payload.update');
   const metadataValue = object.metadata;
   const metadata = metadataValue === undefined ? undefined : parseReviewMetadata(metadataValue);
-  return { ref, sha, force, update, metadata };
+  return { ref, sha, force, metadata };
 }
 
 function parseJsonObject(content: string, context: string): JsonObject {

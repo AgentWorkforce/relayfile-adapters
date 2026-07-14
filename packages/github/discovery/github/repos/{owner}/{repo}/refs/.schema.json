@@ -6,7 +6,6 @@
   "properties": {
     "ref": { "type": "string", "description": "Full ref or branch name." },
     "sha": { "type": "string", "description": "Git object SHA already present in the repository." },
-    "update": { "type": "boolean", "description": "Update an existing ref." },
     "force": { "type": "boolean", "description": "Allow a non-fast-forward update." }
   },
   "additionalProperties": false

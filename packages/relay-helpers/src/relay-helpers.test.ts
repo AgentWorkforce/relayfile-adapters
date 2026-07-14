@@ -173,6 +173,17 @@ test('githubClient exposes pull request create, ref push, and close operations',
     { ref: 'factory/52', sha: 'abc123' },
   );
 
+  await github.updateRef({
+    owner: 'AgentWorkforce', repo: 'factory', ref: 'factory/52', sha: 'def456', force: true,
+  });
+  assert.deepEqual(
+    JSON.parse(await readFile(path.join(
+      root,
+      'github/repos/AgentWorkforce/factory/refs/refs%2Fheads%2Ffactory%2F52.json',
+    ), 'utf8')),
+    { ref: 'refs/heads/factory/52', sha: 'def456', force: true },
+  );
+
   await github.closePullRequest({ owner: 'AgentWorkforce', repo: 'factory', number: 52 });
   assert.deepEqual(
     JSON.parse(await readFile(path.join(root, 'github/repos/AgentWorkforce/factory/pulls/52/close.json'), 'utf8')),

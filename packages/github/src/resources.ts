@@ -44,7 +44,7 @@ export const resources = [
     name: "refs",
     path: "/github/repos/{owner}/{repo}/refs",
     pathPattern: /^\/github\/repos\/[^\/]+\/[^\/]+\/refs(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[1-9]\d*$/,
+    idPattern: /^refs\/[^\/]+\/[^\/].*$/,
     schema: "discovery/github/repos/{owner}/{repo}/refs/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/refs/.create.example.json",
   },

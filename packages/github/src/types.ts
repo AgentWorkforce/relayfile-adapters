@@ -120,8 +120,6 @@ export interface GitHubPushRefWritebackInput {
   ref: string;
   sha: string;
   force?: boolean;
-  /** Update an existing ref instead of creating it. */
-  update?: boolean;
   metadata?: AgentReviewMetadata;
 }
 

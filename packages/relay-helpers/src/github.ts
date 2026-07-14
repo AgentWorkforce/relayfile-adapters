@@ -1,4 +1,8 @@
-import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
+import {
+  encodeSegment,
+  writeJsonFile,
+  type IntegrationClientOptions,
+} from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
 
@@ -30,13 +34,19 @@ export interface GithubClient extends ProviderClient<'github'> {
     draft?: boolean;
     author?: 'app' | 'user';
   }): Promise<{ id: string; url: string }>;
-  /** Create or update a Git ref. */
+  /** Create a Git ref through a non-canonical draft. */
   pushRef(args: {
     owner: string;
     repo: string;
     ref: string;
     sha: string;
-    update?: boolean;
+  }): Promise<void>;
+  /** Update a Git ref through its deterministic canonical resource path. */
+  updateRef(args: {
+    owner: string;
+    repo: string;
+    ref: string;
+    sha: string;
     force?: boolean;
   }): Promise<void>;
   /** Close a pull request without merging it. */
@@ -117,15 +127,32 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
       repo: string;
       ref: string;
       sha: string;
-      update?: boolean;
-      force?: boolean;
     }) {
       await base.refs.write(
         { owner: args.owner, repo: args.repo },
         {
           ref: args.ref,
+          sha: args.sha
+        }
+      );
+    },
+    async updateRef(args: {
+      owner: string;
+      repo: string;
+      ref: string;
+      sha: string;
+      force?: boolean;
+    }) {
+      const normalizedRef = normalizeGitHubRef(args.ref);
+      const collectionPath = base.refs.path({ owner: args.owner, repo: args.repo });
+      await writeJsonFile(
+        opts,
+        'github',
+        'write.refs',
+        `${collectionPath}/${encodeSegment(normalizedRef)}.json`,
+        {
+          ref: normalizedRef,
           sha: args.sha,
-          ...(args.update !== undefined ? { update: args.update } : {}),
           ...(args.force !== undefined ? { force: args.force } : {})
         }
       );
@@ -180,4 +207,13 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
       );
     }
   }) as GithubClient;
+}
+
+function normalizeGitHubRef(ref: string): string {
+  const trimmed = ref.trim();
+  const normalized = trimmed.startsWith('refs/') ? trimmed : `refs/heads/${trimmed}`;
+  if (!/^refs\/[^/]+\/[^/].*$/u.test(normalized) || normalized.includes('//')) {
+    throw new Error('GitHub ref must name a non-empty ref such as refs/heads/main');
+  }
+  return normalized;
 }

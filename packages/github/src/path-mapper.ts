@@ -20,6 +20,10 @@ export interface ParsedGitHubRepoPath {
   rest: string;
 }
 
+export interface ParsedGitHubRefPath extends ParsedGitHubRepoPath {
+  ref: string;
+}
+
 export type GitHubIssuePullPathShape =
   | 'alias'
   | 'directory-record'
@@ -73,6 +77,15 @@ export function encodeGitHubPathSegment(value: string): string {
     throw new Error('Path segment must be non-empty');
   }
   return encodeURIComponent(trimmed);
+}
+
+export function normalizeGitHubRef(ref: string): string {
+  const trimmed = ref.trim();
+  const normalized = trimmed.startsWith('refs/') ? trimmed : `refs/heads/${trimmed}`;
+  if (!/^refs\/[^/]+\/[^/].*$/u.test(normalized) || normalized.includes('//')) {
+    throw new Error('GitHub ref must name a non-empty ref such as refs/heads/main');
+  }
+  return normalized;
 }
 
 // GitHub uses `<id>__<slug>` segments so `parseNameWithId` round-trips correctly:
@@ -477,6 +490,23 @@ export function githubPullRequestRoot(
   title?: string,
 ): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(owner)}/${encodeRepoSegment(repo)}/pulls/${githubNumberSlug(prNumber, title)}`;
+}
+
+export function githubRefPath(owner: string, repo: string, ref: string): string {
+  return `${githubRepoPrefix(owner, repo)}/refs/${encodeGitHubPathSegment(normalizeGitHubRef(ref))}.json`;
+}
+
+export function parseGitHubRefPath(path: string): ParsedGitHubRefPath | undefined {
+  const parsedRepo = parseGitHubRepoPath(path);
+  const match = parsedRepo?.rest.match(/^refs\/([^/]+)\.json$/u);
+  if (!parsedRepo || !match?.[1]) return undefined;
+  try {
+    const ref = decodeURIComponent(match[1]);
+    if (normalizeGitHubRef(ref) !== ref) return undefined;
+    return { ...parsedRepo, ref };
+  } catch {
+    return undefined;
+  }
 }
 
 export function githubReviewPath(owner: string, repo: string, reviewId: number | string): string {

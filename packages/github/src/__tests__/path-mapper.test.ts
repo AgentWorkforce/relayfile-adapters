@@ -22,6 +22,7 @@ import {
   githubLegacyByTitleAliasPath,
   githubNumberedByTitleAliasPath,
   githubPullRequestPath,
+  githubRefPath,
   tryNormalizeGitHubObjectType,
   githubRepoPrefix,
   githubRepositoryMetaPath,
@@ -33,8 +34,10 @@ import {
   normalizeNangoGitHubModel,
   parseGitHubIssuePath,
   parseGitHubPullPath,
+  parseGitHubRefPath,
   parseGitHubRepoPath,
   GITHUB_PATH_ROOT,
+  normalizeGitHubRef,
 } from '../path-mapper.js';
 import { mapIssueComment } from '../issues/comment-mapper.js';
 
@@ -54,6 +57,28 @@ describe('path-mapper', () => {
 
     it('throws on whitespace-only string', () => {
       assert.throws(() => encodeGitHubPathSegment('   '), /non-empty/);
+    });
+  });
+
+  describe('GitHub ref paths', () => {
+    it('normalizes branch names and round-trips canonical ref identities', () => {
+      assert.equal(normalizeGitHubRef('feature/52'), 'refs/heads/feature/52');
+      const path = githubRefPath('octocat', 'hello-world', 'feature/52');
+      assert.equal(
+        path,
+        '/github/repos/octocat/hello-world/refs/refs%2Fheads%2Ffeature%2F52.json',
+      );
+      assert.deepEqual(parseGitHubRefPath(path), {
+        owner: 'octocat',
+        repo: 'hello-world',
+        rest: 'refs/refs%2Fheads%2Ffeature%2F52.json',
+        ref: 'refs/heads/feature/52',
+      });
+    });
+
+    it('rejects draft and malformed ref paths', () => {
+      assert.equal(parseGitHubRefPath('/github/repos/octocat/hello-world/refs/draft.json'), undefined);
+      assert.throws(() => normalizeGitHubRef(''), /non-empty ref/u);
     });
   });
 

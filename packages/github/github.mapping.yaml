@@ -98,7 +98,10 @@ writebacks:
   create_pull_request:
     match: /github/repos/*/*/pull-requests/*.json
     endpoint: POST /repos/{owner}/{repo}/pulls
-  push_ref:
+  update_ref:
+    match: /github/repos/*/*/refs/refs%2F*%2F*.json
+    endpoint: PATCH /repos/{owner}/{repo}/git/refs/{namespace}/{ref}
+  create_ref:
     match: /github/repos/*/*/refs/*.json
     endpoint: POST /repos/{owner}/{repo}/git/refs
   close_pull_request:
