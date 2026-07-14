@@ -35,6 +35,16 @@ test('redditClient.posts.path strips the `r/` prefix', () => {
   );
 });
 
+test('redditClient.posts.path rejects subreddit values that normalize to empty', () => {
+  const reddit = redditClient();
+  for (const subreddit of ['   ', ' r/ ', 'R/   ']) {
+    assert.throws(
+      () => reddit.posts.path({ subreddit }),
+      /Reddit subreddit must be non-empty/,
+    );
+  }
+});
+
 test('redditClient.posts.list reads the lowercased path where records live', async () => {
   const { root, opts } = await mount();
   // The adapter's canonical write path lowercases the subreddit; a record ends
@@ -61,6 +71,16 @@ test('redditClient.posts.write drops a draft in the lowercased collection', asyn
   assert.equal(entries.length, 1, `expected one draft in ${dir}, saw ${entries.join(', ') || 'none'}`);
   const body = JSON.parse(await readFile(path.join(dir, entries[0]), 'utf8')) as unknown;
   assert.deepEqual(body, { title: 'draft', text: 'body' });
+});
+
+test('redditClient.posts.write rejects a whitespace-only subreddit', async () => {
+  const { opts } = await mount();
+  const reddit = redditClient(opts);
+
+  await assert.rejects(
+    async () => reddit.posts.write({ subreddit: '   ' }, { title: 'draft', text: 'body' }),
+    /Reddit subreddit must be non-empty/,
+  );
 });
 
 test('redditClient preserves the generic subreddits resource (no params to normalize)', async () => {

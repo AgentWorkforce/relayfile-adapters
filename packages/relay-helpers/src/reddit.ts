@@ -1,25 +1,21 @@
 import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
+import { normalizeSubreddit } from '@relayfile/adapter-reddit/path-mapper';
 import { providerClient, type ProviderClient, type ResourceClient } from './provider-client.js';
 import type { RelayParams } from './generic.js';
 
 /**
- * Normalize a subreddit param the same way `@relayfile/adapter-reddit`'s
- * `normalizeSubreddit` does at write time. The reddit adapter lowercases the
+ * Normalize a subreddit param with `@relayfile/adapter-reddit`'s canonical
+ * path helper. The reddit adapter lowercases the
  * subreddit segment when materializing records (`/reddit/subreddits/<lower>/…`),
  * so a reader passing `LocalLLaMA` without normalization would read from a
  * capitalized directory that never gets any records and see an empty list.
- * Keep this in lockstep with `packages/reddit/src/path-mapper.ts#normalizeSubreddit`.
  */
-function normalizeSubredditName(value: string): string {
-  return value.trim().replace(/^r\//i, '').toLowerCase();
-}
-
 function normalizeRedditParams(params?: RelayParams): RelayParams {
   if (!params) return {};
   const out: RelayParams = { ...params };
   const raw = out.subreddit;
-  if (typeof raw === 'string' && raw.trim().length > 0) {
-    out.subreddit = normalizeSubredditName(raw);
+  if (typeof raw === 'string') {
+    out.subreddit = normalizeSubreddit(raw);
   }
   return out;
 }
@@ -43,8 +39,7 @@ function withSubredditNormalization(resource: ResourceClient): ResourceClient {
  */
 export function redditClient(opts: IntegrationClientOptions = {}): ProviderClient<'reddit'> {
   const base = providerClient('reddit', opts);
-  return {
-    ...base,
+  return Object.assign(base, {
     posts: withSubredditNormalization(base.posts),
-  };
+  });
 }
