@@ -177,9 +177,10 @@ export interface IntegrationClientOptions {
    * the just-written draft. Defaults to 3000ms. `0` means fire-and-forget — the
    * client returns immediately without a receipt. In direct HTTP mode, an
    * explicit value also bounds write admission as an independent phase. When
-   * omitted, receipt waiting defaults to 3s while admission defaults to 90s so
-   * the SDK can honor three server-advertised delays of up to 30s before an
-   * operation exists.
+   * omitted, receipt waiting defaults to 3s while admission defaults to 90s.
+   * Advertised delays are honored while they fit inside that admission budget;
+   * after three consecutive 30s delays, the deadline wins at t+90s before a
+   * fourth request.
    */
   writebackTimeoutMs?: number;
   /** Poll interval while waiting for a receipt. Default 250ms. */
