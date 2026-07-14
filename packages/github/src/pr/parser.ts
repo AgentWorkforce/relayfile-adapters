@@ -21,6 +21,11 @@ export interface ParsePullRequestOptions {
   headers?: Record<string, string>;
 }
 
+export interface PullRequestGateContext {
+  authoritativeReviewDecision?: string;
+  baseRef?: string;
+}
+
 export interface GitHubLabel {
   color: string;
   default: boolean;
@@ -72,6 +77,7 @@ export interface GitHubPR {
   user: GitHubUser | null;
   mergeable: boolean | null;
   mergeable_state: string;
+  review_decision?: string;
 }
 
 export interface PullRequestLabel {
@@ -224,6 +230,10 @@ export async function parsePullRequest(
     pullRequest.head.sha,
     connectionId,
     options.headers,
+    {
+      baseRef: pullRequest.base.ref,
+      authoritativeReviewDecision: pullRequest.review_decision,
+    },
   );
   return toPullRequestMetadata(
     pullRequest,
@@ -254,6 +264,9 @@ function parseGitHubPullRequest(value: JsonValue | null): GitHubPR {
     base: readPullRequestRef(prObject.base, 'Pull request response.base'),
     mergeable: readNullableBoolean(prObject, 'mergeable', 'Pull request response'),
     mergeable_state: readOptionalString(prObject, 'mergeable_state', 'Pull request response') ?? 'unknown',
+    review_decision:
+      readOptionalString(prObject, 'reviewDecision', 'Pull request response') ??
+      readOptionalString(prObject, 'review_decision', 'Pull request response'),
   };
 }
 
@@ -315,11 +328,15 @@ export async function fetchPullRequestGateMetadata(
   headSha: string,
   connectionId: string,
   headers?: Record<string, string>,
+  context: PullRequestGateContext = {},
 ): Promise<PullRequestGateMetadata> {
-  const [reviewsResult, checkRunsResult, statusesResult] = await Promise.allSettled([
+  const [reviewsResult, checkRunsResult, statusesResult, requirementsResult] = await Promise.allSettled([
     fetchReviews(provider, owner, repo, prNumber, { connectionId, headers }),
     fetchCheckRuns(provider, owner, repo, headSha, connectionId, headers),
     fetchClassicStatuses(provider, owner, repo, headSha, connectionId, headers),
+    context.baseRef
+      ? fetchReviewRequirements(provider, owner, repo, context.baseRef, connectionId, headers)
+      : Promise.resolve(undefined),
   ]);
   const complete =
     reviewsResult.status === 'fulfilled' &&
@@ -331,7 +348,11 @@ export async function fetchPullRequestGateMetadata(
   try {
     return {
       complete: true,
-      reviewDecision: deriveReviewDecision(reviewsResult.value),
+      reviewDecision: deriveReviewDecision(
+        reviewsResult.value,
+        context.authoritativeReviewDecision,
+        requirementsResult.status === 'fulfilled' ? requirementsResult.value : undefined,
+      ),
       statusCheckRollup: [
         ...checkRunsResult.value.check_runs.map((checkRun, index) => ({
           name: readString(checkRun, 'name', `Check runs response[${index}]`),
@@ -354,6 +375,51 @@ export async function fetchPullRequestGateMetadata(
   } catch {
     return incompleteGateMetadata();
   }
+}
+
+interface PullRequestReviewRequirements {
+  requireCodeOwnerReviews: boolean;
+  requiredApprovingReviewCount: number;
+}
+
+async function fetchReviewRequirements(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  baseRef: string,
+  connectionId: string,
+  headers?: Record<string, string>,
+): Promise<PullRequestReviewRequirements | undefined> {
+  const response = await withProxyRetry(provider).proxy({
+    method: 'GET',
+    baseUrl: GITHUB_API_BASE_URL,
+    endpoint: `/repos/${owner}/${repo}/branches/${encodeURIComponent(baseRef)}/protection/required_pull_request_reviews`,
+    connectionId,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': GITHUB_API_VERSION,
+      ...headers,
+    },
+  });
+  if (response.status === 403 || response.status === 404) return undefined;
+  if (response.status >= 400) {
+    throw new PullRequestProviderError(
+      `GitHub review requirements fetch failed for ${owner}/${repo}@${baseRef}: ${formatProviderError(response)}`,
+      { response, status: response.status },
+    );
+  }
+  const payload = expectObject(response.data, 'Required pull request reviews response');
+  const requiredApprovingReviewCount = payload.required_approving_review_count;
+  const requireCodeOwnerReviews = payload.require_code_owner_reviews;
+  if (
+    typeof requiredApprovingReviewCount !== 'number' ||
+    !Number.isInteger(requiredApprovingReviewCount) ||
+    requiredApprovingReviewCount < 0 ||
+    typeof requireCodeOwnerReviews !== 'boolean'
+  ) {
+    return undefined;
+  }
+  return { requiredApprovingReviewCount, requireCodeOwnerReviews };
 }
 
 function incompleteGateMetadata(): PullRequestGateMetadata {
@@ -400,7 +466,11 @@ async function fetchClassicStatuses(
   );
 }
 
-function deriveReviewDecision(reviews: readonly JsonObject[]): PullRequestMetadata['reviewDecision'] {
+function deriveReviewDecision(
+  reviews: readonly JsonObject[],
+  authoritativeDecision?: string,
+  requirements?: PullRequestReviewRequirements,
+): PullRequestMetadata['reviewDecision'] {
   const latestByReviewer = new Map<string, string>();
   for (const [index, review] of reviews.entries()) {
     const state = readString(review, 'state', `Reviews response[${index}]`).toUpperCase();
@@ -412,7 +482,17 @@ function deriveReviewDecision(reviews: readonly JsonObject[]): PullRequestMetada
   }
   const states = [...latestByReviewer.values()];
   if (states.includes('CHANGES_REQUESTED')) return 'CHANGES_REQUESTED';
-  if (states.includes('APPROVED')) return 'APPROVED';
+  const normalizedAuthoritativeDecision = authoritativeDecision?.trim().toUpperCase();
+  if (normalizedAuthoritativeDecision === 'CHANGES_REQUESTED') return 'CHANGES_REQUESTED';
+  if (normalizedAuthoritativeDecision === 'APPROVED') return 'APPROVED';
+  if (
+    requirements &&
+    !requirements.requireCodeOwnerReviews &&
+    requirements.requiredApprovingReviewCount > 0 &&
+    states.filter((state) => state === 'APPROVED').length >= requirements.requiredApprovingReviewCount
+  ) {
+    return 'APPROVED';
+  }
   return 'REVIEW_REQUIRED';
 }
 

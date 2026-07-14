@@ -334,6 +334,7 @@ async function fetchPullRequestMetadata(
   assertSuccessfulResponse(response, `Failed to fetch pull request metadata for ${owner}/${repo}#${number}`);
   const pullRequest = expectObject(response.data, 'GitHub pull request response');
   const head = expectObject(pullRequest.head, 'GitHub pull request response.head');
+  const base = expectObject(pullRequest.base, 'GitHub pull request response.base');
   const gate = await fetchPullRequestGateMetadata(
     provider,
     owner,
@@ -342,6 +343,11 @@ async function fetchPullRequestMetadata(
     readRequiredString(head, 'sha', 'GitHub pull request response.head'),
     connectionId,
     headers,
+    {
+      baseRef: readRequiredString(base, 'ref', 'GitHub pull request response.base'),
+      authoritativeReviewDecision:
+        readString(pullRequest, 'reviewDecision') ?? readString(pullRequest, 'review_decision'),
+    },
   );
   return toPullRequestMetadata(pullRequest, number, gate);
 }

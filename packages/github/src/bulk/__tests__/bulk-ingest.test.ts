@@ -390,6 +390,16 @@ describe('bulk ingest', () => {
       }
 
       if (
+        request.endpoint ===
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/branches/${encodeURIComponent(mockPRPayload.base.ref)}/protection/required_pull_request_reviews`
+      ) {
+        return jsonResponse({
+          required_approving_review_count: 1,
+          require_code_owner_reviews: false,
+        });
+      }
+
+      if (
         request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/check-runs`
       ) {
         assert.equal(request.headers?.Authorization, 'Bearer bulk-token');
@@ -534,7 +544,7 @@ describe('bulk ingest', () => {
         errors: 0,
       },
     ]);
-    assert.strictEqual(provider.proxy.mock.calls.length, 12);
+    assert.strictEqual(provider.proxy.mock.calls.length, 13);
   });
 
   it('bulkIngestPR preserves both pull rows when separate PRs are ingested sequentially', async () => {
@@ -727,7 +737,7 @@ describe('bulk ingest', () => {
     assert.strictEqual(result.filesUpdated, 0);
     assert.strictEqual(result.paths.length, 246);
     assert.strictEqual(writes.size, 249);
-    assert.strictEqual(provider.proxy.mock.calls.length, 247);
+    assert.strictEqual(provider.proxy.mock.calls.length, 248);
   });
   it('bulkIngestPR deletes the stale by-title alias when the title changes on re-ingest (issue #106)', async () => {
     const { vfs, writes, deletes } = createMemoryVfs();

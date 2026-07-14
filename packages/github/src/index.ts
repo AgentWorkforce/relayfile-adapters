@@ -35,7 +35,7 @@ import {
 import { extractRepoInfo, EVENT_MAP, type WebhookAdapter } from './webhook/event-map.js';
 import { createRouter } from './webhook/router.js';
 import { GitHubWritebackHandler } from './writeback.js';
-import { ingestPullRequest as reconcilePullRequestRecord } from './pr/diff-writer.js';
+import { fetchPullRequestGateMetadata } from './pr/parser.js';
 
 export * from './emit-auxiliary-files.js';
 export * from './digest.js';
@@ -55,6 +55,7 @@ const EMPTY_RESULT: IngestResult = {
 };
 
 const GITHUB_PAGE_SIZE = 100;
+const GITHUB_STATUS_PULL_REQUEST_MAX_PAGES = 100;
 
 export const adapterName = 'github' as const;
 export const GITHUB_ADAPTER_NAME = adapterName;
@@ -421,14 +422,13 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
           // Invalidate any previously-ready snapshot before the network refresh.
           // If GitHub is unavailable, Factory sees this fail-closed state rather
           // than merging against stale successful checks or approvals.
-          await markPullRequestGatePending(vfs, target.owner, target.repo, target.number);
-          return await reconcilePullRequestRecord(
+          return await reconcilePullRequestGateRecord(
             this.provider as unknown as GitHubRequestProvider,
             target.owner,
             target.repo,
             target.number,
             vfs,
-            { connectionId: this.config.connectionId },
+            this.config.connectionId,
           );
         } catch (error) {
           return {
@@ -469,16 +469,27 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
     const owner = repoInfo.owner || this.config.owner;
     const repo = repoInfo.repo || this.config.repo;
     const sha = readString(payload.sha);
-    if (!owner || !repo || !sha || !this.config.connectionId) return [];
+    const connectionId = this.config.connectionId;
+    const missing = [
+      !owner ? 'owner' : undefined,
+      !repo ? 'repo' : undefined,
+      !sha ? 'sha' : undefined,
+      !connectionId ? 'connectionId' : undefined,
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0) {
+      throw new Error(`Cannot resolve GitHub status pull request targets: missing ${missing.join(', ')}`);
+    }
+    if (!owner || !repo || !sha || !connectionId) {
+      throw new Error('Cannot resolve GitHub status pull request targets: invalid configuration');
+    }
     try {
       const targets = new Map<number, { owner: string; repo: string; number: number }>();
-      let page = 1;
-      while (true) {
+      for (let page = 1; page <= GITHUB_STATUS_PULL_REQUEST_MAX_PAGES; page += 1) {
         const response = await withProxyRetry(this.provider as unknown as GitHubRequestProvider).proxy({
           method: 'GET',
           baseUrl: GITHUB_API_BASE_URL,
           endpoint: `/repos/${owner}/${repo}/commits/${sha}/pulls`,
-          connectionId: this.config.connectionId,
+          connectionId,
           headers: {
             Accept: 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28',
@@ -499,7 +510,11 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
           if (number && Number.isInteger(number)) targets.set(number, { owner, repo, number });
         }
         if (!hasNextPage(response.headers) && response.data.length < GITHUB_PAGE_SIZE) break;
-        page += 1;
+        if (page === GITHUB_STATUS_PULL_REQUEST_MAX_PAGES) {
+          throw new Error(
+            `GitHub pull request lookup for status ${sha} exceeded ${GITHUB_STATUS_PULL_REQUEST_MAX_PAGES} pages`,
+          );
+        }
       }
       return [...targets.values()];
     } catch (error) {
@@ -689,6 +704,71 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 function readNumber(record: Record<string, unknown> | undefined, key: string): number | undefined {
   const value = record?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+async function reconcilePullRequestGateRecord(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  number: number,
+  vfs: VfsLike,
+  connectionId?: string,
+): Promise<IngestResult> {
+  if (!connectionId?.trim()) {
+    throw new Error(`Missing GitHub connection id while refreshing ${owner}/${repo}#${number} gate metadata`);
+  }
+  const aliasPath = githubByIdAliasPath(owner, repo, 'pulls', number);
+  const raw = await readVfsText(vfs, aliasPath);
+  if (!raw) {
+    throw new Error(`Cannot refresh GitHub gate metadata before ${aliasPath} is materialized`);
+  }
+  const record = asRecord(JSON.parse(raw));
+  if (!record) throw new Error(`GitHub pull request record at ${aliasPath} is malformed`);
+  const wrappedPayload = asRecord(record.payload);
+  const current = wrappedPayload ?? record;
+  const headSha = readString(current.headRefOid) ?? readNestedString(current, 'head', 'sha');
+  if (!headSha) throw new Error(`GitHub pull request record at ${aliasPath} is missing headRefOid`);
+  const baseRef = readNestedString(current, 'base', 'ref');
+  const title = readString(current.title);
+  const canonicalPath = githubPullRequestPath(owner, repo, number, title);
+
+  // Fail closed before any provider request, then restore only the refreshed
+  // gate fields. The rest of the mounted PR snapshot remains byte-for-byte
+  // equivalent at the value level and no files, diff, indexes, or layout are
+  // re-ingested for review/check/status events.
+  await markPullRequestGatePending(vfs, owner, repo, number);
+  const gate = await fetchPullRequestGateMetadata(
+    provider,
+    owner,
+    repo,
+    number,
+    headSha,
+    connectionId.trim(),
+    undefined,
+    { baseRef },
+  );
+  if (!gate.complete) {
+    throw new Error(`GitHub gate refresh was incomplete for ${owner}/${repo}#${number}`);
+  }
+  const refreshedPayload = {
+    ...current,
+    reviewDecision: gate.reviewDecision,
+    statusCheckRollup: gate.statusCheckRollup,
+  };
+  const refreshed = JSON.stringify(
+    wrappedPayload ? { ...record, payload: refreshedPayload } : refreshedPayload,
+    null,
+    2,
+  );
+  await writeVfsText(vfs, aliasPath, refreshed);
+  await writeVfsText(vfs, canonicalPath, refreshed);
+  return {
+    filesWritten: 0,
+    filesUpdated: 2,
+    filesDeleted: 0,
+    paths: [aliasPath, canonicalPath],
+    errors: [],
+  };
 }
 
 async function markPullRequestGatePending(

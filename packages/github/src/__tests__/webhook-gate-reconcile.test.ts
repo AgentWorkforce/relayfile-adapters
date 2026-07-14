@@ -20,7 +20,7 @@ function memoryProvider(exposeConnectionId = true) {
   let checkConclusion: string | null = null;
   let classicState = 'pending';
   let mergeableState = 'blocked';
-  let malformedPull = false;
+  let malformedGate = false;
   let statusPullPages: Array<Array<{ number: number }>> | undefined;
 
   const provider: GitHubRequestProvider & {
@@ -40,7 +40,7 @@ function memoryProvider(exposeConnectionId = true) {
         return {
           status: 200,
           headers: {},
-          data: malformedPull ? { number } : {
+          data: {
             ...mockPRPayload,
             head: {
               ...mockPRPayload.head,
@@ -60,7 +60,18 @@ function memoryProvider(exposeConnectionId = true) {
         return { status: 200, headers: {}, data: mockPRFiles };
       }
       if (request.endpoint === `${pullPrefix}/reviews`) {
+        if (malformedGate) return { status: 200, headers: {}, data: { malformed: true } };
         return { status: 200, headers: {}, data: [{ id: 1, state: reviewState, user: { login: 'reviewer' } }] };
+      }
+      if (
+        request.endpoint ===
+        `/repos/${owner}/${repo}/branches/${encodeURIComponent(mockPRPayload.base.ref)}/protection/required_pull_request_reviews`
+      ) {
+        return {
+          status: 200,
+          headers: {},
+          data: { required_approving_review_count: 1, require_code_owner_reviews: false },
+        };
       }
       if (request.endpoint === `/repos/${owner}/${repo}/commits/${mockRepoContext.headSha}/check-runs`) {
         return {
@@ -101,7 +112,21 @@ function memoryProvider(exposeConnectionId = true) {
       classicState = 'success';
       mergeableState = 'clean';
     },
-    failPullRefresh() { malformedPull = true; },
+    failGateRefresh() { malformedGate = true; },
+    seedParent(overrides: Record<string, unknown> = {}) {
+      const payload = {
+        ...mockPRPayload,
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'BLOCKED',
+        reviewDecision: 'REVIEW_REQUIRED',
+        statusCheckRollup: [],
+        headRefOid: mockRepoContext.headSha,
+        ...overrides,
+      };
+      const content = JSON.stringify(payload);
+      files.set(byId, content);
+      files.set(canonical, content);
+    },
     setStatusPullPages(pages: Array<Array<{ number: number }>>) { statusPullPages = pages; },
   };
 }
@@ -116,6 +141,7 @@ function parseMeta(files: Map<string, string>) {
 
 test('review, check-run, and classic-status webhooks refresh the mounted parent gate metadata', async () => {
   const fixture = memoryProvider();
+  fixture.seedParent();
   const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-gate' });
   const repository = { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` };
 
@@ -135,7 +161,7 @@ test('review, check-run, and classic-status webhooks refresh the mounted parent 
   }, 'check_run.completed');
   meta = parseMeta(fixture.files);
   assert.equal(meta.mergeable, 'MERGEABLE');
-  assert.equal(meta.mergeStateStatus, 'CLEAN');
+  assert.equal(meta.mergeStateStatus, 'BLOCKED');
   assert.equal(meta.reviewDecision, 'APPROVED');
   assert.deepEqual(
     (meta.statusCheckRollup as Array<Record<string, unknown>>).map((check) => check.conclusion),
@@ -151,6 +177,7 @@ test('review, check-run, and classic-status webhooks refresh the mounted parent 
 
 test('webhook gate reconciliation uses the adapter-configured connection id', async () => {
   const fixture = memoryProvider(false);
+  fixture.seedParent();
   const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-config-only' });
 
   const result = await adapter.routeWebhook({
@@ -163,6 +190,25 @@ test('webhook gate reconciliation uses the adapter-configured connection id', as
   assert.deepEqual(result.errors, []);
   assert.ok(fixture.requests.length > 0);
   assert.ok(fixture.requests.every((request) => request.connectionId === 'conn-config-only'));
+});
+
+test('gate-only webhooks do not refresh pull request metadata or child artifacts', async () => {
+  const fixture = memoryProvider();
+  fixture.seedParent({ body: 'preserve this metadata' });
+  const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-gate' });
+
+  const result = await adapter.routeWebhook({
+    action: 'submitted',
+    repository: { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` },
+    pull_request: { number },
+    review: { id: 10, state: 'approved', user: { login: 'reviewer' } },
+  }, 'pull_request_review.submitted');
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(parseMeta(fixture.files).body, 'preserve this metadata');
+  assert.ok(!fixture.requests.some((request) => request.endpoint === `/repos/${owner}/${repo}/pulls/${number}`));
+  assert.ok(!fixture.requests.some((request) => request.endpoint === `/repos/${owner}/${repo}/pulls/${number}/files`));
+  assert.ok(!fixture.requests.some((request) => request.headers?.Accept === 'application/vnd.github.diff'));
 });
 
 test('classic-status reconciliation follows every pull-request lookup page', async () => {
@@ -190,6 +236,40 @@ test('classic-status reconciliation follows every pull-request lookup page', asy
   assert.ok(result.errors.some((error) => error.path === githubPullRequestPath(owner, repo, 31)));
 });
 
+test('classic-status reconciliation reports missing lookup configuration', async () => {
+  const fixture = memoryProvider(false);
+  const adapter = new GitHubAdapter(fixture.provider, {});
+
+  const result = await adapter.routeWebhook({
+    repository: { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` },
+    sha: mockRepoContext.headSha,
+    state: 'success',
+    context: 'legacy-ci',
+  }, 'status');
+
+  assert.equal(fixture.requests.length, 0);
+  assert.match(result.errors[0]?.error ?? '', /missing connectionId/u);
+});
+
+test('classic-status pull-request lookup stops at the finite page cap', async () => {
+  const fixture = memoryProvider();
+  fixture.setStatusPullPages(Array.from({ length: 101 }, () => [{ number }]));
+  const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-gate' });
+
+  const result = await adapter.routeWebhook({
+    repository: { name: repo, owner: { login: owner }, full_name: `${owner}/${repo}` },
+    sha: mockRepoContext.headSha,
+    state: 'success',
+    context: 'legacy-ci',
+  }, 'status');
+
+  assert.equal(
+    fixture.requests.filter((request) => request.endpoint.endsWith('/pulls')).length,
+    100,
+  );
+  assert.match(result.errors[0]?.error ?? '', /exceeded 100 pages/u);
+});
+
 test('a failed gate refresh invalidates flat and wrapped previously-ready parents', async (t) => {
   for (const wrapped of [false, true]) {
     await t.test(wrapped ? 'wrapped' : 'flat', async () => {
@@ -207,7 +287,7 @@ test('a failed gate refresh invalidates flat and wrapped previously-ready parent
         : readyPayload);
       fixture.files.set(byId, ready);
       fixture.files.set(canonical, ready);
-      fixture.failPullRefresh();
+      fixture.failGateRefresh();
       const adapter = new GitHubAdapter(fixture.provider, { connectionId: 'conn-gate' });
 
       const result = await adapter.routeWebhook({
