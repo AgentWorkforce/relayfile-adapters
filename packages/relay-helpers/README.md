@@ -61,7 +61,7 @@ const slack = slackClient({ transport: preview });
 const header = await slack.post('C123', 'Daily digest');
 await slack.post('C123', 'First item', { replyTo: header.ref });
 
-console.log(preview.actions); // typed read/list/write PreviewAction records
+console.log(preview.actions); // typed read/list/write TransportPreviewAction records
 ```
 
 Simulated receipts use deterministic fake IDs, so later operations can refer

@@ -4,9 +4,9 @@ import type {
 } from '@relayfile/adapter-core/vfs-client';
 import type {
   PreviewAccess,
-  PreviewAction,
   PreviewParameters,
   PreviewSimulatedReceipt,
+  TransportPreviewAction,
 } from './types.js';
 
 export type {
@@ -15,6 +15,7 @@ export type {
   PreviewAction,
   PreviewParameters,
   PreviewSimulatedReceipt,
+  TransportPreviewAction,
 } from './types.js';
 
 export type RelayTransportParameters = PreviewParameters;
@@ -87,7 +88,7 @@ function collectionRecordPath(path: string, id: string): string {
  * later writes can safely refer to earlier ones.
  */
 export class PreviewTransport implements RelayTransport {
-  readonly actions: PreviewAction[] = [];
+  readonly actions: TransportPreviewAction[] = [];
   readonly accesses: PreviewAccess[] = [];
 
   private sequence = 0;
@@ -162,7 +163,7 @@ export class PreviewTransport implements RelayTransport {
     const path = collectionRecordPath(request.path, simulatedReceipt.id);
     const body = this.resolveParentReference(request.body);
     const parameters = { ...request.parameters };
-    const action: PreviewAction = {
+    const action: TransportPreviewAction = {
       ...request,
       id: simulatedReceipt.id,
       kind: 'provider.write',

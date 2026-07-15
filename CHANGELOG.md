@@ -24,6 +24,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/relay-helpers` now names its rich recorded transport action `TransportPreviewAction`, matching the cross-package ownership boundary; the former `PreviewAction` export remains as a deprecated compatibility alias and does not claim the provider-neutral runtime type.
 - `@relayfile/relay-helpers` now delegates Reddit subreddit parameters to `@relayfile/adapter-reddit`'s `normalizeSubreddit` helper, preserving lowercase canonical paths and optional `r/` prefixes while rejecting empty normalized values.
 - Direct HTTP write admission now honors `Retry-After` up to 30 seconds for `workspace_busy` / `write_admission_limit` responses in the SDK's existing four-attempt retry layer, while preserving the prior two-second cap for other retryable responses. Implicit defaults are three seconds for receipt polling and 90 seconds for admission; an explicit `writebackTimeoutMs` bounds each phase independently, with `0` leaving admission unbounded and receipt polling disabled.
 
