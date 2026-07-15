@@ -1,10 +1,11 @@
-import type { IntegrationClientOptions, WritebackResult } from '@relayfile/adapter-core/vfs-client';
+import type { WritebackResult } from '@relayfile/adapter-core/vfs-client';
 import {
   WRITEBACK_PATH_CATALOG,
   type WritebackProvider,
   type WritebackResource
 } from '@relayfile/adapter-core/writeback-paths';
 import { relayClient, type RelayParams } from './generic.js';
+import type { RelayClientOptions } from './transport.js';
 
 /**
  * One resource of a provider, bound to a client. Every path is resolved from
@@ -41,7 +42,7 @@ export type ProviderClient<P extends WritebackProvider> = {
  */
 export function providerClient<P extends WritebackProvider>(
   provider: P,
-  opts: IntegrationClientOptions = {}
+  opts: RelayClientOptions = {}
 ): ProviderClient<P> {
   const relay = relayClient(provider, opts);
   const out: Record<string, ResourceClient> = {};

@@ -1,13 +1,16 @@
 import {
   readJsonFile,
   writeJsonFile,
-  type IntegrationClientOptions
 } from '@relayfile/adapter-core/vfs-client';
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
 import type { LinearAgentActivity } from '@relayfile/adapter-linear/types';
+import {
+  createRelayTransportResolver,
+  type RelayClientOptions,
+} from './transport.js';
 
 export interface LinearCreateIssueArgs {
   teamId: string;
@@ -68,8 +71,9 @@ export interface LinearClient extends ProviderClient<'linear'> {
  * `ctx.linear.comment(...)` shape removed from the runtime, plus the uniform
  * resource-keyed access (`.issues`, `.comments`) every provider client has.
  */
-export function linearClient(opts: IntegrationClientOptions = {}): LinearClient {
+export function linearClient(opts: RelayClientOptions = {}): LinearClient {
   const base = providerClient('linear', opts);
+  const resolveTransport = createRelayTransportResolver(opts);
   const issuePath = (issueId: string) => `${base.issues.path()}/${encodeSegment(issueId)}.json`;
   const labelPath = (labelId: string) => `${base.labels.path()}/${encodeSegment(labelId)}.json`;
   // Read lookup follows the adapter's stable UUID alias. Writeback keeps the
@@ -92,16 +96,32 @@ export function linearClient(opts: IntegrationClientOptions = {}): LinearClient 
       return created(await base.issues.write({}, args));
     },
     async updateIssue(issueId: string, args: Record<string, unknown>) {
-      await writeJsonFile(opts, 'linear', 'updateIssue', issuePath(issueId), args);
+      const path = issuePath(issueId);
+      const transport = resolveTransport();
+      if (transport) {
+        await transport.write({ provider: 'linear', resource: 'issues', parameters: { issueId }, path, body: args });
+      } else {
+        await writeJsonFile(opts, 'linear', 'updateIssue', path, args);
+      }
     },
     async createLabel(args: LinearCreateLabelArgs) {
       return created(await base.labels.write({}, args));
     },
     async updateLabel(labelId: string, args: Record<string, unknown>) {
-      await writeJsonFile(opts, 'linear', 'updateLabel', labelPath(labelId), args);
+      const path = labelPath(labelId);
+      const transport = resolveTransport();
+      if (transport) {
+        await transport.write({ provider: 'linear', resource: 'labels', parameters: { labelId }, path, body: args });
+      } else {
+        await writeJsonFile(opts, 'linear', 'updateLabel', path, args);
+      }
     },
     getIssue<T = Record<string, unknown>>(issueId: string): Promise<T> {
-      return readJsonFile<T>(opts, 'linear', 'getIssue', issueUuidPath(issueId));
+      const path = issueUuidPath(issueId);
+      const transport = resolveTransport();
+      return transport
+        ? transport.read<T>({ provider: 'linear', resource: 'issues', parameters: { issueId }, path })
+        : readJsonFile<T>(opts, 'linear', 'getIssue', path);
     },
     listIssues<T = Record<string, unknown>>(): Promise<T[]> {
       return base.issues.list<T>();

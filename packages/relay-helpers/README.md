@@ -46,3 +46,39 @@ await notion.pages.list({ databaseId });               // list a collection
 clients **plus** named ergonomic methods (`comment`, `post`, `mergePullRequest`,
 …). `relayClient(provider)` is the dynamic, string-keyed escape hatch when the
 provider isn't known at author time.
+
+## Side-effect-free previews
+
+Inject `PreviewTransport` when a local run must record intended provider
+operations without touching a Relayfile mount or network API. Explicit
+transport injection always wins over ambient credentials:
+
+```ts
+import { PreviewTransport, slackClient } from '@relayfile/relay-helpers';
+
+const preview = new PreviewTransport();
+const slack = slackClient({ transport: preview });
+const header = await slack.post('C123', 'Daily digest');
+await slack.post('C123', 'First item', { replyTo: header.ref });
+
+console.log(preview.actions); // typed read/list/write PreviewAction records
+```
+
+Simulated receipts use deterministic fake IDs, so later operations can refer
+to earlier previewed writes. Seed reads and lists by canonical path through the
+constructor's `fixtures` option or `preview.seed(path, value)`.
+
+For existing handlers that call `slackClient()` (or another client factory)
+without options, bind the preview for the process and restore it after the run:
+
+```ts
+import { PreviewTransport, bindPreviewTransport } from '@relayfile/relay-helpers/transport';
+
+const preview = new PreviewTransport();
+const restore = bindPreviewTransport(preview);
+try {
+  await handler();
+} finally {
+  restore();
+}
+```
