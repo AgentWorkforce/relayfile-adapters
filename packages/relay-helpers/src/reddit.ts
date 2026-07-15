@@ -1,7 +1,7 @@
-import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
 import { normalizeSubreddit } from '@relayfile/adapter-reddit/path-mapper';
 import { providerClient, type ProviderClient, type ResourceClient } from './provider-client.js';
 import type { RelayParams } from './generic.js';
+import type { RelayClientOptions } from './transport.js';
 
 /**
  * Normalize a subreddit param with `@relayfile/adapter-reddit`'s canonical
@@ -37,7 +37,7 @@ function withSubredditNormalization(resource: ResourceClient): ResourceClient {
  * 'LocalLLaMA' })` resolves to `/reddit/subreddits/LocalLLaMA/posts` and misses
  * every synced record, which lives under the lowercased subdirectory.
  */
-export function redditClient(opts: IntegrationClientOptions = {}): ProviderClient<'reddit'> {
+export function redditClient(opts: RelayClientOptions = {}): ProviderClient<'reddit'> {
   const base = providerClient('reddit', opts);
   return Object.assign(base, {
     posts: withSubredditNormalization(base.posts),

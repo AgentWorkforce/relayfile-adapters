@@ -33,12 +33,12 @@ export function renderClients() {
     `// linear / github / slack / telegram / reddit have bespoke ergonomic clients in their own modules;\n` +
     `// every other catalog provider gets a uniform resource-keyed client here.\n`;
   const imports =
-    `import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';\n` +
+    `import type { RelayClientOptions } from '../transport.js';\n` +
     `import { providerClient, type ProviderClient } from '../provider-client.js';\n`;
   const body = generatedProviders()
     .map(
       (provider) =>
-        `export const ${clientName(provider)} = (opts?: IntegrationClientOptions): ProviderClient<'${provider}'> =>\n` +
+        `export const ${clientName(provider)} = (opts?: RelayClientOptions): ProviderClient<'${provider}'> =>\n` +
         `  providerClient('${provider}', opts);`
     )
     .join('\n\n');

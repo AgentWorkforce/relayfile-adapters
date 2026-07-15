@@ -5,101 +5,101 @@
 // linear / github / slack / telegram / reddit have bespoke ergonomic clients in their own modules;
 // every other catalog provider gets a uniform resource-keyed client here.
 
-import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
+import type { RelayClientOptions } from '../transport.js';
 import { providerClient, type ProviderClient } from '../provider-client.js';
 
-export const asanaClient = (opts?: IntegrationClientOptions): ProviderClient<'asana'> =>
+export const asanaClient = (opts?: RelayClientOptions): ProviderClient<'asana'> =>
   providerClient('asana', opts);
 
-export const azureBlobClient = (opts?: IntegrationClientOptions): ProviderClient<'azure-blob'> =>
+export const azureBlobClient = (opts?: RelayClientOptions): ProviderClient<'azure-blob'> =>
   providerClient('azure-blob', opts);
 
-export const boxClient = (opts?: IntegrationClientOptions): ProviderClient<'box'> =>
+export const boxClient = (opts?: RelayClientOptions): ProviderClient<'box'> =>
   providerClient('box', opts);
 
-export const calendlyClient = (opts?: IntegrationClientOptions): ProviderClient<'calendly'> =>
+export const calendlyClient = (opts?: RelayClientOptions): ProviderClient<'calendly'> =>
   providerClient('calendly', opts);
 
-export const clickupClient = (opts?: IntegrationClientOptions): ProviderClient<'clickup'> =>
+export const clickupClient = (opts?: RelayClientOptions): ProviderClient<'clickup'> =>
   providerClient('clickup', opts);
 
-export const cloudflareClient = (opts?: IntegrationClientOptions): ProviderClient<'cloudflare'> =>
+export const cloudflareClient = (opts?: RelayClientOptions): ProviderClient<'cloudflare'> =>
   providerClient('cloudflare', opts);
 
-export const confluenceClient = (opts?: IntegrationClientOptions): ProviderClient<'confluence'> =>
+export const confluenceClient = (opts?: RelayClientOptions): ProviderClient<'confluence'> =>
   providerClient('confluence', opts);
 
-export const daytonaClient = (opts?: IntegrationClientOptions): ProviderClient<'daytona'> =>
+export const daytonaClient = (opts?: RelayClientOptions): ProviderClient<'daytona'> =>
   providerClient('daytona', opts);
 
-export const dropboxClient = (opts?: IntegrationClientOptions): ProviderClient<'dropbox'> =>
+export const dropboxClient = (opts?: RelayClientOptions): ProviderClient<'dropbox'> =>
   providerClient('dropbox', opts);
 
-export const gcsClient = (opts?: IntegrationClientOptions): ProviderClient<'gcs'> =>
+export const gcsClient = (opts?: RelayClientOptions): ProviderClient<'gcs'> =>
   providerClient('gcs', opts);
 
-export const gitlabClient = (opts?: IntegrationClientOptions): ProviderClient<'gitlab'> =>
+export const gitlabClient = (opts?: RelayClientOptions): ProviderClient<'gitlab'> =>
   providerClient('gitlab', opts);
 
-export const gmailClient = (opts?: IntegrationClientOptions): ProviderClient<'gmail'> =>
+export const gmailClient = (opts?: RelayClientOptions): ProviderClient<'gmail'> =>
   providerClient('gmail', opts);
 
-export const googleCalendarClient = (opts?: IntegrationClientOptions): ProviderClient<'google-calendar'> =>
+export const googleCalendarClient = (opts?: RelayClientOptions): ProviderClient<'google-calendar'> =>
   providerClient('google-calendar', opts);
 
-export const googleDriveClient = (opts?: IntegrationClientOptions): ProviderClient<'google-drive'> =>
+export const googleDriveClient = (opts?: RelayClientOptions): ProviderClient<'google-drive'> =>
   providerClient('google-drive', opts);
 
-export const granolaClient = (opts?: IntegrationClientOptions): ProviderClient<'granola'> =>
+export const granolaClient = (opts?: RelayClientOptions): ProviderClient<'granola'> =>
   providerClient('granola', opts);
 
-export const hubspotClient = (opts?: IntegrationClientOptions): ProviderClient<'hubspot'> =>
+export const hubspotClient = (opts?: RelayClientOptions): ProviderClient<'hubspot'> =>
   providerClient('hubspot', opts);
 
-export const intercomClient = (opts?: IntegrationClientOptions): ProviderClient<'intercom'> =>
+export const intercomClient = (opts?: RelayClientOptions): ProviderClient<'intercom'> =>
   providerClient('intercom', opts);
 
-export const jiraClient = (opts?: IntegrationClientOptions): ProviderClient<'jira'> =>
+export const jiraClient = (opts?: RelayClientOptions): ProviderClient<'jira'> =>
   providerClient('jira', opts);
 
-export const mailgunClient = (opts?: IntegrationClientOptions): ProviderClient<'mailgun'> =>
+export const mailgunClient = (opts?: RelayClientOptions): ProviderClient<'mailgun'> =>
   providerClient('mailgun', opts);
 
-export const mixpanelClient = (opts?: IntegrationClientOptions): ProviderClient<'mixpanel'> =>
+export const mixpanelClient = (opts?: RelayClientOptions): ProviderClient<'mixpanel'> =>
   providerClient('mixpanel', opts);
 
-export const notionClient = (opts?: IntegrationClientOptions): ProviderClient<'notion'> =>
+export const notionClient = (opts?: RelayClientOptions): ProviderClient<'notion'> =>
   providerClient('notion', opts);
 
-export const onedriveClient = (opts?: IntegrationClientOptions): ProviderClient<'onedrive'> =>
+export const onedriveClient = (opts?: RelayClientOptions): ProviderClient<'onedrive'> =>
   providerClient('onedrive', opts);
 
-export const pipedriveClient = (opts?: IntegrationClientOptions): ProviderClient<'pipedrive'> =>
+export const pipedriveClient = (opts?: RelayClientOptions): ProviderClient<'pipedrive'> =>
   providerClient('pipedrive', opts);
 
-export const postgresClient = (opts?: IntegrationClientOptions): ProviderClient<'postgres'> =>
+export const postgresClient = (opts?: RelayClientOptions): ProviderClient<'postgres'> =>
   providerClient('postgres', opts);
 
-export const recallClient = (opts?: IntegrationClientOptions): ProviderClient<'recall'> =>
+export const recallClient = (opts?: RelayClientOptions): ProviderClient<'recall'> =>
   providerClient('recall', opts);
 
-export const redisClient = (opts?: IntegrationClientOptions): ProviderClient<'redis'> =>
+export const redisClient = (opts?: RelayClientOptions): ProviderClient<'redis'> =>
   providerClient('redis', opts);
 
-export const s3Client = (opts?: IntegrationClientOptions): ProviderClient<'s3'> =>
+export const s3Client = (opts?: RelayClientOptions): ProviderClient<'s3'> =>
   providerClient('s3', opts);
 
-export const salesforceClient = (opts?: IntegrationClientOptions): ProviderClient<'salesforce'> =>
+export const salesforceClient = (opts?: RelayClientOptions): ProviderClient<'salesforce'> =>
   providerClient('salesforce', opts);
 
-export const sendgridClient = (opts?: IntegrationClientOptions): ProviderClient<'sendgrid'> =>
+export const sendgridClient = (opts?: RelayClientOptions): ProviderClient<'sendgrid'> =>
   providerClient('sendgrid', opts);
 
-export const sharepointClient = (opts?: IntegrationClientOptions): ProviderClient<'sharepoint'> =>
+export const sharepointClient = (opts?: RelayClientOptions): ProviderClient<'sharepoint'> =>
   providerClient('sharepoint', opts);
 
-export const teamsClient = (opts?: IntegrationClientOptions): ProviderClient<'teams'> =>
+export const teamsClient = (opts?: RelayClientOptions): ProviderClient<'teams'> =>
   providerClient('teams', opts);
 
-export const zendeskClient = (opts?: IntegrationClientOptions): ProviderClient<'zendesk'> =>
+export const zendeskClient = (opts?: RelayClientOptions): ProviderClient<'zendesk'> =>
   providerClient('zendesk', opts);

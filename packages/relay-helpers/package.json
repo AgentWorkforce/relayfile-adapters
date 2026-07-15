@@ -17,6 +17,16 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "import": "./dist/transport.js",
+      "default": "./dist/transport.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

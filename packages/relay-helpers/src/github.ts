@@ -1,10 +1,13 @@
 import {
   encodeSegment,
   writeJsonFile,
-  type IntegrationClientOptions,
 } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
+import {
+  createRelayTransportResolver,
+  type RelayClientOptions,
+} from './transport.js';
 
 export interface GithubTarget {
   owner: string;
@@ -79,8 +82,9 @@ export interface GithubClient extends ProviderClient<'github'> {
  * Ergonomic GitHub client over the writeback-path catalog, plus the uniform
  * resource-keyed access (`.issues`, `.["issue-comments"]`, `.merge`, `.reviews`).
  */
-export function githubClient(opts: IntegrationClientOptions = {}): GithubClient {
+export function githubClient(opts: RelayClientOptions = {}): GithubClient {
   const base = providerClient('github', opts);
+  const resolveTransport = createRelayTransportResolver(opts);
   return Object.assign(base, {
     async comment(target: GithubTarget, body: string) {
       return created(
@@ -145,17 +149,24 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
     }) {
       const normalizedRef = normalizeGitHubRef(args.ref);
       const collectionPath = base.refs.path({ owner: args.owner, repo: args.repo });
-      await writeJsonFile(
-        opts,
-        'github',
-        'write.refs',
-        `${collectionPath}/${encodeSegment(normalizedRef)}.json`,
-        {
-          ref: normalizedRef,
-          sha: args.sha,
-          ...(args.force !== undefined ? { force: args.force } : {})
-        }
-      );
+      const path = `${collectionPath}/${encodeSegment(normalizedRef)}.json`;
+      const body = {
+        ref: normalizedRef,
+        sha: args.sha,
+        ...(args.force !== undefined ? { force: args.force } : {})
+      };
+      const transport = resolveTransport();
+      if (transport) {
+        await transport.write({
+          provider: 'github',
+          resource: 'refs',
+          parameters: { owner: args.owner, repo: args.repo, ref: normalizedRef },
+          path,
+          body,
+        });
+      } else {
+        await writeJsonFile(opts, 'github', 'write.refs', path, body);
+      }
     },
     async closePullRequest(target: GithubTarget) {
       await base['close-pull-request'].write(

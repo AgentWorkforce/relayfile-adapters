@@ -23,6 +23,28 @@
 export { relayClient, encodeSegment, type RelayClient, type RelayParams } from './generic.js';
 export { providerClient, type ProviderClient, type ResourceClient } from './provider-client.js';
 export { created } from './receipt.js';
+export {
+  PreviewTransport,
+  bindPreviewTransport,
+  bindRelayTransport,
+  clearPreviewTransport,
+  createRelayTransportResolver,
+  getProcessRelayTransport,
+  setPreviewTransport,
+  setProcessRelayTransport,
+  type PreviewTransportOptions,
+  type RelayClientOptions,
+  type RelayTransport,
+  type RelayTransportParameters,
+  type RelayTransportRequest,
+  type RelayTransportWriteRequest,
+} from './transport.js';
+export type {
+  EffectPolicyV1,
+  PreviewAccess,
+  PreviewAction,
+  PreviewSimulatedReceipt,
+} from './types.js';
 
 // Ergonomic clients (resource-keyed access + named methods).
 export { linearClient, type LinearClient, type LinearCreateIssueArgs } from './linear.js';

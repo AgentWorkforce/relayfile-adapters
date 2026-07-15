@@ -1,5 +1,6 @@
-import type { IntegrationClientOptions, WritebackReceipt } from '@relayfile/adapter-core/vfs-client';
+import type { WritebackReceipt } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
+import type { RelayClientOptions } from './transport.js';
 import { withProcessWritebackIdempotency } from './writeback-idempotency.js';
 
 export type TelegramChatId = string | number;
@@ -123,7 +124,7 @@ export interface TelegramClient extends ProviderClient<'telegram'> {
  * Ergonomic Telegram client over the writeback-path catalog, plus the uniform
  * resource-keyed access (`.messages`, `.reactions`, `.callback-queries`, ...).
  */
-export function telegramClient(opts: IntegrationClientOptions = {}): TelegramClient {
+export function telegramClient(opts: RelayClientOptions = {}): TelegramClient {
   const base = providerClient('telegram', opts);
   return Object.assign(base, {
     async sendMessage(chatId: TelegramChatId, text: string, opts: TelegramSendMessageOptions = {}) {
