@@ -11,6 +11,8 @@ import {
   slackClient,
   setPreviewTransport,
   telegramClient,
+  type PreviewAction,
+  type TransportPreviewAction,
 } from './index.js';
 
 function failOnNetwork(counter: { calls: number }): typeof fetch {
@@ -54,6 +56,15 @@ test('Slack preview records a post and threaded reply with stable simulated rece
     parentRef: header.ref,
     thread_ts: preview.actions[0]?.simulatedReceipt?.id,
   });
+});
+
+test('TransportPreviewAction is the canonical recorded action type', async () => {
+  const preview = new PreviewTransport();
+  await slackClient({ transport: preview }).post('C123', 'Ownership check');
+
+  const canonical: TransportPreviewAction = preview.actions[0]!;
+  const compatibilityAlias: PreviewAction = canonical;
+  assert.strictEqual(compatibilityAlias, canonical);
 });
 
 test('Slack explicit thread replies record thread_ts from the parent simulated receipt', async () => {
