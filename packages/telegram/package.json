@@ -58,7 +58,7 @@
     "directory": "packages/telegram"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.1"
+    "@relayfile/adapter-core": "^0.5.2"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
