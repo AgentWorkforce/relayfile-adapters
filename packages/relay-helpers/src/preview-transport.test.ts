@@ -40,7 +40,7 @@ test('Slack preview records a post and threaded reply with stable simulated rece
   assert.equal(reply.ts, 'preview-slack-messages-0002');
   assert.deepEqual(preview.actions[0]?.simulatedReceipt, {
     id: 'preview-slack-messages-0001',
-    timestamp: '1970-01-01T00:00:00.000Z',
+    timestamp: '2000-01-01T00:00:00.000Z',
   });
   assert.equal(preview.actions[0]?.kind, 'provider.write');
   assert.equal(preview.actions[0]?.status, 'previewed');

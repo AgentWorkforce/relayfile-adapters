@@ -15,6 +15,8 @@ export interface PreviewSimulatedReceipt {
   timestamp: string;
 }
 
+export type PreviewParameters = Record<string, string | number>;
+
 export interface PreviewAction {
   id?: string;
   kind: 'provider.read' | 'provider.write';
@@ -25,7 +27,7 @@ export interface PreviewAction {
   extensions?: Record<string, unknown>;
   method: 'read' | 'list' | 'write';
   path: string;
-  parameters?: Record<string, unknown>;
+  parameters?: PreviewParameters;
   body?: unknown;
   simulatedReceipt?: PreviewSimulatedReceipt;
 }

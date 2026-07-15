@@ -5,6 +5,7 @@ import type {
 import type {
   PreviewAccess,
   PreviewAction,
+  PreviewParameters,
   PreviewSimulatedReceipt,
 } from './types.js';
 
@@ -12,10 +13,11 @@ export type {
   EffectPolicyV1,
   PreviewAccess,
   PreviewAction,
+  PreviewParameters,
   PreviewSimulatedReceipt,
 } from './types.js';
 
-export type RelayTransportParameters = Record<string, string | number>;
+export type RelayTransportParameters = PreviewParameters;
 
 export interface RelayTransportRequest {
   provider: string;
@@ -71,7 +73,7 @@ function defaultId(request: RelayTransportWriteRequest, sequence: number): strin
 }
 
 function defaultTimestamp(sequence: number): string {
-  return new Date(sequence - 1).toISOString();
+  return new Date(Date.UTC(2000, 0, 1) + sequence - 1).toISOString();
 }
 
 function collectionRecordPath(path: string, id: string): string {

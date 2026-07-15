@@ -85,6 +85,8 @@ export function slackClient(opts: RelayClientOptions = {}): SlackClient {
     async reply(channel: string, threadTs: string, text: string) {
       const result = await base.replies.write(
         { channelId: channel, messageTs: tsParam(threadTs) },
+        // Mirror the path parameter so preview records expose the resolved thread explicitly.
+        // The live Slack resolver treats the identical body value as an idempotent override.
         withIdempotency({ text, thread_ts: threadTs })
       );
       return { channel, ts: slackReceiptTs(result.receipt) };

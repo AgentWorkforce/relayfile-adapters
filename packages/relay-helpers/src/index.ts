@@ -43,6 +43,7 @@ export type {
   EffectPolicyV1,
   PreviewAccess,
   PreviewAction,
+  PreviewParameters,
   PreviewSimulatedReceipt,
   TransportPreviewAction,
 } from './types.js';
