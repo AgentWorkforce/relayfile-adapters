@@ -27,3 +27,17 @@ test('parseRedditPostScopedId normalizes subreddit casing and prefix', () => {
 test('redditRootIndexPath is stable', () => {
   assert.equal(redditRootIndexPath(), '/reddit/_index.json');
 });
+
+test('computeRedditPathFromModel caps the slug for very long post titles so the filename stays under NAME_MAX', () => {
+  const title =
+    "I just don't get it, these big tech companies can illegally scrape the entire internet and " +
+    'gatekeep their better models behind higher prices so it is natural that people look for ' +
+    'affordable options and there will be providers who apparently distill models from them';
+  const path = computeRedditPathFromModel('redditpost', 'localllama/1uvwn9q', { title });
+  const filename = path.split('/').pop() ?? '';
+  assert.ok(
+    Buffer.byteLength(filename, 'utf8') <= 100,
+    `expected filename to stay well under NAME_MAX, got ${Buffer.byteLength(filename, 'utf8')} bytes: ${filename}`,
+  );
+  assert.match(filename, /^[a-z0-9-]+__1uvwn9q\.json$/);
+});
