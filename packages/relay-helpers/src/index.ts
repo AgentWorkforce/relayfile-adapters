@@ -44,6 +44,7 @@ export type {
   PreviewAccess,
   PreviewAction,
   PreviewSimulatedReceipt,
+  TransportPreviewAction,
 } from './types.js';
 
 // Ergonomic clients (resource-keyed access + named methods).

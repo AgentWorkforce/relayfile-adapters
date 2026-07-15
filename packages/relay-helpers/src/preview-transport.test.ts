@@ -42,6 +42,13 @@ test('Slack preview records a post and threaded reply with stable simulated rece
     id: 'preview-slack-messages-0001',
     timestamp: '1970-01-01T00:00:00.000Z',
   });
+  assert.equal(preview.actions[0]?.kind, 'provider.write');
+  assert.equal(preview.actions[0]?.status, 'previewed');
+  assert.equal(preview.actions[0]?.data.operation, 'write');
+  assert.equal(preview.actions[0]?.data.path, preview.actions[0]?.path);
+  assert.deepEqual(preview.actions[0]?.data.parameters, preview.actions[0]?.parameters);
+  assert.deepEqual(preview.actions[0]?.data.body, preview.actions[0]?.body);
+  assert.deepEqual(preview.actions[0]?.data.simulatedReceipt, preview.actions[0]?.simulatedReceipt);
   assert.deepEqual(preview.actions[1]?.body, {
     text: 'First item',
     parentRef: header.ref,
@@ -205,4 +212,7 @@ test('preview reads and lists use seeded data and record accesses', async () => 
   assert.deepEqual(issues, [{ id: 'ISS-1', title: 'Seeded issue' }]);
   assert.deepEqual(preview.accesses.map((access) => access.method), ['read', 'list']);
   assert.deepEqual(preview.actions.map((action) => action.method), ['read', 'list']);
+  assert.deepEqual(preview.actions.map((action) => action.kind), ['provider.read', 'provider.read']);
+  assert.deepEqual(preview.actions.map((action) => action.status), ['previewed', 'previewed']);
+  assert.deepEqual(preview.actions.map((action) => action.data.operation), ['read', 'list']);
 });

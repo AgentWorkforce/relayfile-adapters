@@ -1,5 +1,4 @@
-// @sync @agentworkforce/events WS-C
-// Keep these lightweight wire types aligned until the shared events package is published.
+// relay-helpers owns this type; @agentworkforce/runtime maps it when consuming.
 
 export interface EffectPolicyV1 {
   reads: 'deny' | 'fixtures' | 'live';
@@ -17,8 +16,13 @@ export interface PreviewSimulatedReceipt {
 }
 
 export interface PreviewAction {
+  id?: string;
+  kind: 'provider.read' | 'provider.write';
   provider: string;
   resource: string;
+  status: 'previewed';
+  data: Record<string, unknown>;
+  extensions?: Record<string, unknown>;
   method: 'read' | 'list' | 'write';
   path: string;
   parameters?: Record<string, unknown>;
@@ -26,7 +30,10 @@ export interface PreviewAction {
   simulatedReceipt?: PreviewSimulatedReceipt;
 }
 
+export type TransportPreviewAction = PreviewAction;
+
 export type PreviewAccess = PreviewAction & {
+  kind: 'provider.read';
   method: 'read' | 'list';
   body?: never;
   simulatedReceipt?: never;

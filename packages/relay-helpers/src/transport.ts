@@ -112,14 +112,30 @@ export class PreviewTransport implements RelayTransport {
   }
 
   async read<T = unknown>(request: RelayTransportRequest): Promise<T> {
-    const action: PreviewAccess = { ...request, parameters: { ...request.parameters }, method: 'read' };
+    const parameters = { ...request.parameters };
+    const action: PreviewAccess = {
+      ...request,
+      kind: 'provider.read',
+      status: 'previewed',
+      data: { operation: 'read', parameters, path: request.path },
+      parameters,
+      method: 'read',
+    };
     this.accesses.push(action);
     this.actions.push(action);
     return this.data.get(request.path) as T;
   }
 
   async list<T = unknown>(request: RelayTransportRequest): Promise<T[]> {
-    const action: PreviewAccess = { ...request, parameters: { ...request.parameters }, method: 'list' };
+    const parameters = { ...request.parameters };
+    const action: PreviewAccess = {
+      ...request,
+      kind: 'provider.read',
+      status: 'previewed',
+      data: { operation: 'list', parameters, path: request.path },
+      parameters,
+      method: 'list',
+    };
     this.accesses.push(action);
     this.actions.push(action);
     const fixture = this.data.get(request.path);
@@ -143,10 +159,15 @@ export class PreviewTransport implements RelayTransport {
     };
     const path = collectionRecordPath(request.path, simulatedReceipt.id);
     const body = this.resolveParentReference(request.body);
+    const parameters = { ...request.parameters };
     const action: PreviewAction = {
       ...request,
+      id: simulatedReceipt.id,
+      kind: 'provider.write',
+      status: 'previewed',
+      data: { operation: 'write', parameters, path, body, simulatedReceipt },
       method: 'write',
-      parameters: { ...request.parameters },
+      parameters,
       path,
       body,
       simulatedReceipt,
