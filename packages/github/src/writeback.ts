@@ -231,7 +231,10 @@ export class GitHubWritebackHandler {
             error: formatProviderError(response, 'GitHub writeback failed'),
           };
         }
-        const externalId = extractReviewId(response.data) ?? extractMergeSha(response.data);
+        const externalId = extractDirectWritebackExternalId(
+          directRoute.resource.name,
+          response.data,
+        );
         return { success: true, ...(externalId ? { externalId } : {}) };
       }
 
@@ -1183,6 +1186,43 @@ function extractMergeSha(value: JsonValue | null): string | undefined {
   const responseObject = value as JsonObject;
   const sha = responseObject.sha;
   return typeof sha === 'string' && sha.trim().length > 0 ? sha : undefined;
+}
+
+function extractDirectWritebackExternalId(
+  resourceName: string,
+  value: JsonValue | null,
+): string | undefined {
+  if (resourceName === 'refs') {
+    return extractRefSha(value);
+  }
+  if (resourceName === 'pull-requests') {
+    return extractPullRequestNumber(value);
+  }
+  return extractReviewId(value) ?? extractMergeSha(value);
+}
+
+function extractRefSha(value: JsonValue | null): string | undefined {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') {
+    return undefined;
+  }
+  const object = value.object;
+  if (object === null || Array.isArray(object) || typeof object !== 'object') {
+    return extractMergeSha(value);
+  }
+  const sha = object.sha;
+  return typeof sha === 'string' && sha.trim().length > 0
+    ? sha.trim()
+    : extractMergeSha(value);
+}
+
+function extractPullRequestNumber(value: JsonValue | null): string | undefined {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') {
+    return undefined;
+  }
+  const number = value.number;
+  return typeof number === 'number' && Number.isInteger(number) && number > 0
+    ? String(number)
+    : undefined;
 }
 
 function formatProviderError(

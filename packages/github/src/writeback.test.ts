@@ -481,6 +481,56 @@ describe('writeback', () => {
     );
   });
 
+  it('returns the nested GitHub ref SHA as the writeback external id', async () => {
+    const { handler } = createHandler(() => ({
+      status: 200,
+      headers: {},
+      data: {
+        ref: 'refs/heads/factory/52',
+        object: { sha: 'def456' },
+      } satisfies JsonObject,
+    }));
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/refs/refs%2Fheads%2Ffactory%2F52.json',
+      JSON.stringify({ ref: 'refs/heads/factory/52', sha: 'def456', force: false }),
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.externalId, 'def456');
+  });
+
+  it('returns the pull request number as the create writeback external id', async () => {
+    const provider = new FakeProvider(() => ({
+      status: 201,
+      headers: {},
+      data: {
+        id: 2_345_678,
+        number: 52,
+        html_url: 'https://github.com/acme/widgets/pull/52',
+      } satisfies JsonObject,
+    }));
+    const handler = new GitHubWritebackHandler(provider, {
+      defaultConnectionId: 'conn-default',
+      resolveAuthorship: () => ({ connectionId: 'conn-app' }),
+    });
+
+    const result = await handler.handleWriteback(
+      'workspace-1',
+      '/github/repos/acme/widgets/pull-requests/factory.json',
+      JSON.stringify({
+        title: 'Factory change',
+        head: 'factory/52',
+        base: 'main',
+        author: 'app',
+      }),
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.externalId, '52');
+  });
+
   it('rejects a ref update whose payload identity differs from its canonical path', () => {
     assert.throws(
       () => resolveWritebackRequest(
