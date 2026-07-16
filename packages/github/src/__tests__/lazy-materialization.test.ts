@@ -695,4 +695,37 @@ describe('GitHub lazy materialization', () => {
     assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-a/meta.json'), false);
     assert.deepStrictEqual(result.paths, ['/github/repos/octocat/repo-a/issues/10__repo-a-issue/meta.json']);
   });
+
+  it('does not let an implicit commit default enable webhook writes for an effectively lazy repo', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'eager',
+        webhookWritesForLazyRepos: false,
+        rules: [{
+          repos: ['octocat/repo-a'],
+          issues: 'lazy',
+          pulls: 'lazy',
+        }],
+      },
+    });
+
+    await adapter.sync('workspace-1');
+    const result = await adapter.ingestWebhook('workspace-1', {
+      provider: 'github',
+      connectionId: 'conn-lazy',
+      eventType: 'issues.labeled',
+      objectType: 'issue',
+      objectId: '10',
+      payload: {
+        action: 'labeled',
+        issue: createIssue('repo-a', 10, 'repo-a issue', { labels: ['factory'] }),
+        repository: createRepository('repo-a'),
+        label: { name: 'factory' },
+      },
+    });
+
+    assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-a/meta.json'), false);
+    assert.deepStrictEqual(result.paths, ['/github/repos/octocat/repo-a/issues/10__repo-a-issue/meta.json']);
+  });
 });

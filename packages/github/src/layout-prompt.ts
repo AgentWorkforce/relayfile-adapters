@@ -38,7 +38,7 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 { "id": "<full-sha>", "title": "<first-line>", "updated": "<iso8601>", "sha": "<full-sha>", "message": "<first-line>", "authorLogin": "<login>", "committedAt": "<iso8601>", "canonicalPath": "/github/repos/<owner>/<repo>/commits/<sha>/metadata.json" }
 \`\`\`
 
-The full GitHub commit API payload is available at \`canonicalPath\`. Repo history is bounded by the adapter's \`maxCommits\` config (500 by default); use a \`since\` materialization filter to narrow the window.
+REST-backfilled rows expose the full GitHub commit API payload at \`canonicalPath\`; webhook-only rows expose the reduced normalized shape described above. Repo history is bounded by the adapter's \`maxCommits\` config (500 by default); use a \`since\` materialization filter to narrow the window.
 
 ## JSONL And Querying
 

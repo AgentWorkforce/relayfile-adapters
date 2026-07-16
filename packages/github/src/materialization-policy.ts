@@ -1,7 +1,6 @@
 import {
   matchesMaterializationTarget,
   resolveTargetMaterialization,
-  shouldWriteWebhookForTarget,
   type ResolvedResourceMaterialization as CoreResolvedResourceMaterialization,
   type ResolvedTargetMaterialization,
 } from '@relayfile/adapter-core';
@@ -18,7 +17,7 @@ export type ResolvedRepoMaterialization =
   ResolvedTargetMaterialization<GitHubBulkMaterializationResource, GitHubMaterializationState>;
 
 const BULK_RESOURCES = ['issues', 'pulls', 'commits'] as const satisfies readonly GitHubBulkMaterializationResource[];
-const DEFAULT_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
+export const DEFAULT_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
   issues: { mode: 'eager' },
   pulls: { mode: 'eager' },
   commits: { mode: 'lazy' },
@@ -75,10 +74,10 @@ export function shouldWriteWebhookForRepo(
   owner: string,
   repo: string,
 ): boolean {
-  return shouldWriteWebhookForTarget(config.materialization, `${owner}/${repo}`, {
-    defaultMode: config.lazy ? 'lazy' : 'eager',
-    resources: BULK_RESOURCES,
-    targetKey: 'repos',
-    webhookWritesKey: 'webhookWritesForLazyRepos',
-  });
+  if (config.materialization?.webhookWritesForLazyRepos !== false) {
+    return true;
+  }
+
+  const plan = resolveRepoMaterialization(config, owner, repo);
+  return BULK_RESOURCES.some((resource) => plan[resource].mode === 'eager');
 }

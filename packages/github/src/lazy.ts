@@ -6,6 +6,7 @@ import { buildGitHubCommitIndexRow, buildRepoCommitsIndexFile } from './index-em
 import { ingestIssue } from './issues/issue-mapper.js';
 import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
 import {
+  DEFAULT_REPO_MATERIALIZATION,
   resolveRepoMaterialization,
   type ResolvedRepoMaterialization,
   type ResolvedResourceMaterialization,
@@ -63,12 +64,6 @@ const JSON_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
 } as const;
-const DEFAULT_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
-  issues: { mode: 'eager' },
-  pulls: { mode: 'eager' },
-  commits: { mode: 'lazy' },
-};
-
 export async function syncGitHubWorkspace(
   workspaceId: string,
   provider: GitHubRequestProvider,
