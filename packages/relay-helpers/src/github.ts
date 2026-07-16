@@ -1,7 +1,4 @@
-import {
-  encodeSegment,
-  writeJsonFile,
-} from '@relayfile/adapter-core/vfs-client';
+import { encodeSegment } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
 import {
@@ -166,7 +163,7 @@ export function githubClient(opts: RelayClientOptions = {}): GithubClient {
           path,
           body,
         },
-        () => writeJsonFile(opts, 'github', 'write.refs', path, body),
+        { options: opts, integration: 'github', operation: 'write.refs', path, data: body },
       );
     },
     async closePullRequest(target: GithubTarget) {

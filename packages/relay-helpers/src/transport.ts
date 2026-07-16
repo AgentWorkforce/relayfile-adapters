@@ -64,6 +64,7 @@ export interface PreviewTransportOptions {
 export {
   RelayWriteAuthorizationError,
   bindRelayWriteAuthorizer,
+  runWithRelayWriteAuthorizer,
   type RelayWriteAuthorizationDecision,
   type RelayWriteAuthorizer,
 } from './write-authorizer.js';

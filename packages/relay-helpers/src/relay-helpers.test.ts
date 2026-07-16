@@ -470,27 +470,65 @@ test('src/generated/clients.ts is in sync with the catalog', async () => {
 test('all helper write sites converge on the final-write authorization boundary', async () => {
   const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const srcRoot = path.join(pkgRoot, 'src');
-  const sourceNames = (await readdir(srcRoot)).filter(
-    (name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== 'write-authorizer.ts',
+  const { findWriteBoundaryViolations, formatWriteBoundaryViolations } = await import(
+    pathToFileURL(path.join(pkgRoot, 'scripts/verify-write-boundary.mjs')).href
   );
-  const violations: string[] = [];
-
-  for (const sourceName of sourceNames) {
-    const source = await readFile(path.join(srcRoot, sourceName), 'utf8');
-    if (/\btransport\.write\s*\(/u.test(source)) {
-      violations.push(`${sourceName}: calls transport.write outside executeRelayWrite`);
-    }
-    for (const [index, line] of source.split('\n').entries()) {
-      if (line.includes('writeJsonFile(') && !line.includes('() => writeJsonFile(')) {
-        violations.push(`${sourceName}:${index + 1}: calls writeJsonFile outside executeRelayWrite fallback`);
-      }
-    }
-  }
+  const violations = await findWriteBoundaryViolations({ sourceRoot: srcRoot });
 
   assert.deepEqual(
     violations,
     [],
-    `helper write paths bypass the final-write authorizer:\n${violations.join('\n')}`,
+    `helper write paths bypass the final-write authorizer:\n${formatWriteBoundaryViolations(violations)}`,
+  );
+});
+
+test('write-boundary guard rejects nested renamed, bracket, destructured, aliased, and VFS canaries', async () => {
+  const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const { findWriteBoundaryViolations } = await import(
+    pathToFileURL(path.join(pkgRoot, 'scripts/verify-write-boundary.mjs')).href
+  );
+  const canaryRoot = await mkdtemp(path.join(tmpdir(), 'relay-write-boundary-canary-'));
+  const nestedRoot = path.join(canaryRoot, 'future/nested');
+  await mkdir(nestedRoot, { recursive: true });
+  await writeFile(path.join(nestedRoot, 'bypass.ts'), `
+import { writeJsonFile as persist } from '@relayfile/adapter-core/vfs-client';
+
+interface Request {
+  provider: string;
+  resource: string;
+  parameters: Record<string, string>;
+  path: string;
+  body: unknown;
+}
+interface FutureTransport {
+  write(request: Request): Promise<unknown>;
+}
+
+export async function renamed(selectedTransport: FutureTransport, request: Request) {
+  await selectedTransport.write(request);
+  await selectedTransport['write'](request);
+  const { write: destructured } = selectedTransport;
+  await destructured(request);
+  const aliased = selectedTransport.write;
+  await aliased(request);
+  await persist(
+    {},
+    'future',
+    'write.future',
+    '/future/path.json',
+    request.body,
+  );
+}
+`);
+
+  const violations = await findWriteBoundaryViolations({ sourceRoot: canaryRoot });
+  assert.ok(
+    violations.filter((violation: { kind: string }) => violation.kind === 'raw-transport-write').length >= 4,
+    `expected every raw transport canary to fail: ${JSON.stringify(violations)}`,
+  );
+  assert.ok(
+    violations.some((violation: { kind: string }) => violation.kind.startsWith('native-vfs-write')),
+    `expected multiline aliased VFS canary to fail: ${JSON.stringify(violations)}`,
   );
 });
 

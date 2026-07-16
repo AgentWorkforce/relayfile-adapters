@@ -91,6 +91,7 @@ authorizer. It runs after explicit/process transport selection, so authored
 import {
   PreviewTransport,
   bindRelayWriteAuthorizer,
+  runWithRelayWriteAuthorizer,
 } from '@relayfile/relay-helpers/transport';
 
 const canonicalPreview = new PreviewTransport();
@@ -106,5 +107,25 @@ try {
 ```
 
 Returning `{ allowed: false }` rejects before any selected transport or native
-VFS write. Reads and lists are unaffected. Bindings are process-scoped,
-nest safely, and must always be restored in `finally`.
+VFS write. Authorizers compose from outermost to innermost: any denial wins,
+and the first transport override remains authoritative, so Agent code cannot
+relax a runtime denial or redirect its canonical preview. Reads and lists are
+unaffected. Cleanup callbacks are idempotent and safe out of order, but should
+still be restored in `finally`.
+
+When one process can host overlapping Runs, use an isolated async scope rather
+than an imperative binding. Bindings created by code inside the operation still
+compose with the outer policy:
+
+```ts
+await runWithRelayWriteAuthorizer(
+  () => ({ allowed: true, transport: canonicalPreview }),
+  async () => {
+    await importAndRunAgent();
+  },
+);
+```
+
+The execution coordinator is shared across installed package copies and its
+global reference cannot be overwritten or deleted. This lets the runtime bind
+before importing authored code without exposing last-writer-wins policy state.

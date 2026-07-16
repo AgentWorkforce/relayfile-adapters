@@ -1,7 +1,4 @@
-import {
-  readJsonFile,
-  writeJsonFile,
-} from '@relayfile/adapter-core/vfs-client';
+import { readJsonFile } from '@relayfile/adapter-core/vfs-client';
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
@@ -102,7 +99,7 @@ export function linearClient(opts: RelayClientOptions = {}): LinearClient {
       await executeRelayWrite(
         transport,
         { provider: 'linear', resource: 'issues', parameters: { issueId }, path, body: args },
-        () => writeJsonFile(opts, 'linear', 'updateIssue', path, args),
+        { options: opts, integration: 'linear', operation: 'updateIssue', path, data: args },
       );
     },
     async createLabel(args: LinearCreateLabelArgs) {
@@ -114,7 +111,7 @@ export function linearClient(opts: RelayClientOptions = {}): LinearClient {
       await executeRelayWrite(
         transport,
         { provider: 'linear', resource: 'labels', parameters: { labelId }, path, body: args },
-        () => writeJsonFile(opts, 'linear', 'updateLabel', path, args),
+        { options: opts, integration: 'linear', operation: 'updateLabel', path, data: args },
       );
     },
     getIssue<T = Record<string, unknown>>(issueId: string): Promise<T> {

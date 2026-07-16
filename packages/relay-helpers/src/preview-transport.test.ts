@@ -13,6 +13,7 @@ import {
   slackClient,
   setPreviewTransport,
   telegramClient,
+  runWithRelayWriteAuthorizer,
   type PreviewAction,
   type RelayTransport,
   type TransportPreviewAction,
@@ -23,6 +24,19 @@ function failOnNetwork(counter: { calls: number }): typeof fetch {
   return async () => {
     counter.calls += 1;
     throw new Error('preview transport attempted a network request');
+  };
+}
+
+function barrier(parties: number): () => Promise<void> {
+  let waiting = 0;
+  let release: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return async () => {
+    waiting += 1;
+    if (waiting === parties) release?.();
+    await ready;
   };
 }
 
@@ -262,6 +276,180 @@ test('final-write authorization redirects an explicit transport to the canonical
   assert.equal(canonicalPreview.actions[0]?.resource, 'messages');
 });
 
+test('outer denial cannot be relaxed or redirected by later public bindings across package copies', async () => {
+  const duplicate = await import(`./write-authorizer.js?copy=${Date.now()}`);
+  const authoredPreview = new PreviewTransport();
+  const maliciousPreview = new PreviewTransport();
+  let outerCalls = 0;
+  let maliciousCalls = 0;
+  const restoreOuter = bindRelayWriteAuthorizer(async () => {
+    outerCalls += 1;
+    await Promise.resolve();
+    return { allowed: false, reason: 'immutable outer denial' };
+  });
+  const restoreMalicious = bindRelayWriteAuthorizer(() => {
+    maliciousCalls += 1;
+    return { allowed: true, transport: maliciousPreview };
+  });
+
+  try {
+    await assert.rejects(
+      () => duplicate.executeRelayWrite(authoredPreview, {
+        provider: 'slack',
+        resource: 'messages',
+        parameters: { channelId: 'C-malicious' },
+        path: '/slack/channels/C-malicious/messages',
+        body: { text: 'must not escape' },
+      }),
+      (error: unknown) => {
+        assert.equal((error as { code?: unknown }).code, 'RELAY_WRITE_DENIED');
+        return true;
+      },
+    );
+  } finally {
+    restoreMalicious();
+    restoreOuter();
+  }
+
+  assert.equal(outerCalls, 1);
+  assert.equal(maliciousCalls, 0);
+  assert.equal(authoredPreview.actions.length, 0);
+  assert.equal(maliciousPreview.actions.length, 0);
+});
+
+test('outer canonical transport cannot be replaced by a later public transport binding', async () => {
+  const transportEntry = await import('./transport.js');
+  const authoredPreview = new PreviewTransport();
+  const canonicalPreview = new PreviewTransport();
+  const maliciousPreview = new PreviewTransport();
+  let outerCalls = 0;
+  let maliciousCalls = 0;
+  const restoreOuter = bindRelayWriteAuthorizer(async () => {
+    outerCalls += 1;
+    await Promise.resolve();
+    return { allowed: true, transport: canonicalPreview };
+  });
+  const restoreMalicious = transportEntry.bindRelayWriteAuthorizer(async () => {
+    maliciousCalls += 1;
+    await Promise.resolve();
+    return { allowed: true, transport: maliciousPreview };
+  });
+
+  try {
+    const result = await slackClient({ transport: authoredPreview }).post('C123', 'outer wins');
+    assert.equal(result.ts, 'preview-slack-messages-0001');
+  } finally {
+    restoreMalicious();
+    restoreOuter();
+  }
+
+  assert.equal(outerCalls, 1);
+  assert.equal(maliciousCalls, 1);
+  assert.equal(authoredPreview.actions.length, 0);
+  assert.equal(maliciousPreview.actions.length, 0);
+  assert.equal(canonicalPreview.actions.length, 1);
+});
+
+test('later bindings may tighten an outer canonical preview decision', async () => {
+  const authoredPreview = new PreviewTransport();
+  const canonicalPreview = new PreviewTransport();
+  let outerCalls = 0;
+  let innerCalls = 0;
+  const restoreOuter = bindRelayWriteAuthorizer(() => {
+    outerCalls += 1;
+    return { allowed: true, transport: canonicalPreview };
+  });
+  const restoreInner = bindRelayWriteAuthorizer(async () => {
+    innerCalls += 1;
+    await Promise.resolve();
+    return { allowed: false, reason: 'nested policy is stricter' };
+  });
+
+  try {
+    await assert.rejects(
+      () => slackClient({ transport: authoredPreview }).post('C123', 'tightened'),
+      RelayWriteAuthorizationError,
+    );
+  } finally {
+    restoreInner();
+    restoreOuter();
+  }
+
+  assert.equal(outerCalls, 1);
+  assert.equal(innerCalls, 1);
+  assert.equal(authoredPreview.actions.length, 0);
+  assert.equal(canonicalPreview.actions.length, 0);
+});
+
+test('known global authorization symbol cannot be overwritten or cleared', async () => {
+  const key = Symbol.for('agentworkforce.relay-write-authorizer');
+  const registry = globalThis as unknown as Record<symbol, unknown>;
+  const coordinator = registry[key];
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+  const canonicalPreview = new PreviewTransport();
+  const authoredPreview = new PreviewTransport();
+  const restore = bindRelayWriteAuthorizer(() => ({ allowed: true, transport: canonicalPreview }));
+
+  try {
+    assert.ok(coordinator);
+    assert.equal(Object.isFrozen(coordinator), true);
+    assert.equal(descriptor?.configurable, false);
+    assert.equal(descriptor?.writable, false);
+    assert.throws(() => {
+      registry[key] = () => ({ allowed: true });
+    }, TypeError);
+    assert.equal(Reflect.deleteProperty(globalThis, key), false);
+    assert.strictEqual(registry[key], coordinator);
+    await slackClient({ transport: authoredPreview }).post('C123', 'registry survived');
+  } finally {
+    restore();
+  }
+  assert.equal(canonicalPreview.actions.length, 1);
+  assert.equal(authoredPreview.actions.length, 0);
+});
+
+test('overlapping authorization scopes isolate deny and canonical preview decisions', async () => {
+  const synchronize = barrier(2);
+  const deniedAuthored = new PreviewTransport();
+  const previewAuthored = new PreviewTransport();
+  const canonicalPreview = new PreviewTransport();
+  let denyCalls = 0;
+  let previewCalls = 0;
+  let denialCaught = false;
+
+  await Promise.all([
+    runWithRelayWriteAuthorizer(async () => {
+      denyCalls += 1;
+      await Promise.resolve();
+      return { allowed: false, reason: 'deny scope' };
+    }, async () => {
+      await synchronize();
+      try {
+        await slackClient({ transport: deniedAuthored }).post('C-deny', 'blocked');
+      } catch (error) {
+        denialCaught = error instanceof RelayWriteAuthorizationError;
+      }
+    }),
+    runWithRelayWriteAuthorizer(async () => {
+      previewCalls += 1;
+      await Promise.resolve();
+      return { allowed: true, transport: canonicalPreview };
+    }, async () => {
+      await synchronize();
+      const result = await slackClient({ transport: previewAuthored }).post('C-preview', 'isolated');
+      assert.equal(result.ts, 'preview-slack-messages-0001');
+    }),
+  ]);
+
+  assert.equal(denialCaught, true);
+  assert.equal(denyCalls, 1);
+  assert.equal(previewCalls, 1);
+  assert.equal(deniedAuthored.actions.length, 0);
+  assert.equal(previewAuthored.actions.length, 0);
+  assert.equal(canonicalPreview.actions.length, 1);
+  assert.equal(canonicalPreview.actions[0]?.parameters?.channelId, 'C-preview');
+});
+
 test('custom transports and unknown provider/resource requests are denied before mutation', async () => {
   const customCalls = { reads: 0, lists: 0, writes: 0 };
   const customTransport: RelayTransport = {
@@ -387,7 +575,7 @@ test('bespoke direct write paths also honor the canonical preview override', asy
   );
 });
 
-test('write authorizer bindings nest and restore without affecting reads or lists', async () => {
+test('write authorizer bindings restore in LIFO order without affecting reads or lists', async () => {
   const authoredPreview = new PreviewTransport({
     fixtures: {
       '/linear/issues': [{ id: 'ISS-1' }],
@@ -399,7 +587,7 @@ test('write authorizer bindings nest and restore without affecting reads or list
   let innerCalls = 0;
   const restoreOuter = bindRelayWriteAuthorizer(() => {
     outerCalls += 1;
-    return { allowed: false };
+    return { allowed: true, transport: canonicalPreview };
   });
   const restoreInner = bindRelayWriteAuthorizer(() => {
     innerCalls += 1;
@@ -417,12 +605,9 @@ test('write authorizer bindings nest and restore without affecting reads or list
     assert.equal(innerCalls, 0);
     assert.equal(outerCalls, 0);
 
-    await slackClient({ transport: authoredPreview }).post('C1', 'inner preview');
+    await slackClient({ transport: authoredPreview }).post('C1', 'nested preview');
     restoreInner();
-    await assert.rejects(
-      () => slackClient({ transport: authoredPreview }).post('C1', 'outer denial'),
-      RelayWriteAuthorizationError,
-    );
+    await slackClient({ transport: authoredPreview }).post('C1', 'outer preview');
   } finally {
     restoreInner();
     restoreOuter();
@@ -430,9 +615,34 @@ test('write authorizer bindings nest and restore without affecting reads or list
 
   await slackClient({ transport: authoredPreview }).post('C1', 'restored authored transport');
   assert.equal(innerCalls, 1);
-  assert.equal(outerCalls, 1);
-  assert.equal(canonicalPreview.actions.length, 1);
+  assert.equal(outerCalls, 2);
+  assert.equal(canonicalPreview.actions.length, 2);
   assert.equal(authoredPreview.actions.filter((action) => action.kind === 'provider.write').length, 1);
+});
+
+test('out-of-order idempotent restores leave no stale authorizer', async () => {
+  const authoredPreview = new PreviewTransport();
+  let outerCalls = 0;
+  let innerCalls = 0;
+  const restoreOuter = bindRelayWriteAuthorizer(() => {
+    outerCalls += 1;
+    return { allowed: false };
+  });
+  const restoreInner = bindRelayWriteAuthorizer(() => {
+    innerCalls += 1;
+    return { allowed: true };
+  });
+
+  restoreOuter();
+  restoreOuter();
+  restoreInner();
+  restoreInner();
+
+  const result = await slackClient({ transport: authoredPreview }).post('C1', 'after cleanup');
+  assert.equal(result.ts, 'preview-slack-messages-0001');
+  assert.equal(outerCalls, 0);
+  assert.equal(innerCalls, 0);
+  assert.equal(authoredPreview.actions.length, 1);
 });
 
 test('clearPreviewTransport fully clears the shared symbol binding', () => {

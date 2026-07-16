@@ -27,6 +27,7 @@ export {
   PreviewTransport,
   RelayWriteAuthorizationError,
   bindRelayWriteAuthorizer,
+  runWithRelayWriteAuthorizer,
   bindPreviewTransport,
   bindRelayTransport,
   clearPreviewTransport,

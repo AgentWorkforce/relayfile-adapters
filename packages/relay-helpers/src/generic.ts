@@ -3,7 +3,6 @@ import {
   encodeSegment,
   listJsonFiles,
   readJsonFile,
-  writeJsonFile,
   type WritebackResult
 } from '@relayfile/adapter-core/vfs-client';
 import {
@@ -80,7 +79,13 @@ export function relayClient<P extends WritebackProvider>(
       return executeRelayWrite(
         transport,
         request,
-        () => writeJsonFile(opts, provider, `write.${String(resource)}`, target, body),
+        {
+          options: opts,
+          integration: provider,
+          operation: `write.${String(resource)}`,
+          path: target,
+          data: body,
+        },
       );
     },
     async read<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T> {
