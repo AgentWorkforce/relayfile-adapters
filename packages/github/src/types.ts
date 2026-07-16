@@ -272,6 +272,8 @@ export interface GitHubAdapterConfig {
   /** @deprecated Use materialization.default instead. */
   lazy?: boolean;
   materialization?: GitHubMaterializationPolicy;
+  /** Maximum repository commits fetched per materialization run. */
+  maxCommits: number;
   maxFileSizeBytes: number;
   supportedEvents: string[];
   owner?: string;

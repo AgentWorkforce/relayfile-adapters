@@ -635,7 +635,7 @@ describe('GitHub lazy materialization', () => {
     );
     assert.deepStrictEqual(
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/commits/_index.json')),
-      { commits: [] },
+      [],
     );
   });
 

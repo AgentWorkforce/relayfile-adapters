@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { GitHubAdapter } from '../index.js';
+import { fetchRepoCommits, GitHubAdapter } from '../index.js';
 import { githubCommitPath, githubRepoCommitsIndexPath } from '../path-mapper.js';
 import type { GitHubAdapterConfig, ProxyRequest, ProxyResponse } from '../types.js';
 
@@ -143,6 +143,71 @@ describe('GitHub repo-level commit materialization', () => {
     );
   });
 
+  it('fetchRepoCommits follows Link-header pagination and respects maxCommits', async () => {
+    const requests: ProxyRequest[] = [];
+    const pages = [
+      [createRepoCommit(SHA_A, 'first commit')],
+      [createRepoCommit(SHA_B, 'second commit')],
+    ];
+    const provider = {
+      connectionId: 'conn-commits',
+      async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+        requests.push(request);
+        const page = requests.length;
+        return {
+          status: 200,
+          headers: page === 1
+            ? { link: `<https://api.github.com/repos/${OWNER}/${REPO}/commits?page=2&per_page=1>; rel="next"` }
+            : {},
+          data: pages[page - 1],
+        } as ProxyResponse<T>;
+      },
+    };
+
+    const commits = await fetchRepoCommits(provider, OWNER, REPO, {
+      maxCommits: 2,
+      perPage: 1,
+      since: '2026-05-01T00:00:00Z',
+    });
+
+    assert.deepStrictEqual(commits.map((commit) => commit.sha), [SHA_A, SHA_B]);
+    assert.strictEqual(requests.length, 2);
+    assert.match(requests[0]?.endpoint ?? '', new RegExp(`^/repos/${OWNER}/${REPO}/commits\\?`));
+    assert.strictEqual(
+      new URL(requests[0]?.endpoint ?? '', 'https://api.github.com').searchParams.get('since'),
+      '2026-05-01T00:00:00Z',
+    );
+    assert.strictEqual(
+      requests[1]?.endpoint,
+      `/repos/${OWNER}/${REPO}/commits?page=2&per_page=1`,
+    );
+  });
+
+  it('fetchRepoCommits stops before following another Link when maxCommits is reached', async () => {
+    const requests: ProxyRequest[] = [];
+    const provider = {
+      connectionId: 'conn-commits',
+      async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+        requests.push(request);
+        return {
+          status: 200,
+          headers: {
+            link: `<https://api.github.com/repos/${OWNER}/${REPO}/commits?page=2&per_page=100>; rel="next"`,
+          },
+          data: [
+            createRepoCommit(SHA_A, 'first commit'),
+            createRepoCommit(SHA_B, 'second commit'),
+          ],
+        } as ProxyResponse<T>;
+      },
+    };
+
+    const commits = await fetchRepoCommits(provider, OWNER, REPO, { maxCommits: 1 });
+
+    assert.deepStrictEqual(commits.map((commit) => commit.sha), [SHA_A]);
+    assert.strictEqual(requests.length, 1);
+  });
+
   it('materializeRepoInternal with commits plan emits commits/_index.json', async () => {
     const commits = [
       createRepoCommit(SHA_A, 'first commit', '2026-05-01T00:00:00Z'),
@@ -159,17 +224,26 @@ describe('GitHub repo-level commit materialization', () => {
 
     const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
     assert.ok(provider.writes.has(indexPath), `Expected ${indexPath} to exist`);
-    const index = JSON.parse(await provider.readFile(indexPath)) as {
-      commits: Array<{
-        sha: string;
-        message: string;
-        authorLogin: string;
-        committedAt: string;
-        canonicalPath: string;
-      }>;
-    };
-    assert.ok(Array.isArray(index.commits), 'commits/_index.json must have a "commits" array');
-    assert.strictEqual(index.commits.length, 2);
+    const index = JSON.parse(await provider.readFile(indexPath)) as Array<{
+      id: string;
+      title: string;
+      updated: string;
+      sha: string;
+      message: string;
+      authorLogin: string;
+      committedAt: string;
+      canonicalPath: string;
+    }>;
+    assert.ok(Array.isArray(index), 'commits/_index.json must be an array');
+    assert.strictEqual(index.length, 2);
+    assert.deepStrictEqual(index.map((entry) => entry.sha), [SHA_B, SHA_A]);
+    assert.deepStrictEqual(
+      index.map(({ id, title, updated }) => ({ id, title, updated })),
+      [
+        { id: SHA_B, title: 'second commit', updated: '2026-05-02T00:00:00Z' },
+        { id: SHA_A, title: 'first commit', updated: '2026-05-01T00:00:00Z' },
+      ],
+    );
   });
 
   it('commits/_index.json entries have canonicalPath pointing to metadata.json', async () => {
@@ -184,10 +258,11 @@ describe('GitHub repo-level commit materialization', () => {
     await adapter.sync('workspace-1');
 
     const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
-    const index = JSON.parse(await provider.readFile(indexPath)) as {
-      commits: Array<{ sha: string; canonicalPath: string }>;
-    };
-    const entry = index.commits[0];
+    const index = JSON.parse(await provider.readFile(indexPath)) as Array<{
+      sha: string;
+      canonicalPath: string;
+    }>;
+    const entry = index[0];
     assert.ok(entry, 'Expected at least one commit in the index');
     assert.strictEqual(entry.sha, SHA_A);
     assert.strictEqual(entry.canonicalPath, githubCommitPath(OWNER, REPO, SHA_A));
@@ -212,6 +287,22 @@ describe('GitHub repo-level commit materialization', () => {
     assert.ok(provider.writes.has(canonicalPath), `Expected ${canonicalPath} to exist`);
     const record = JSON.parse(await provider.readFile(canonicalPath)) as Record<string, unknown>;
     assert.strictEqual(record.sha, SHA_A);
+  });
+
+  it('skips commit rows with empty SHAs instead of constructing an invalid canonical path', async () => {
+    const provider = new CommitRecordingProvider([createRepoCommit('', 'malformed commit')]);
+    const adapter = new GitHubAdapter(provider as never, {
+      owner: OWNER,
+      repo: REPO,
+      connectionId: 'conn-commits',
+    });
+
+    await adapter.sync('workspace-1');
+
+    const index = JSON.parse(
+      await provider.readFile(githubRepoCommitsIndexPath(OWNER, REPO)),
+    ) as unknown[];
+    assert.deepStrictEqual(index, []);
   });
 
   it('commits materialization respects since filter', async () => {
@@ -246,6 +337,26 @@ describe('GitHub repo-level commit materialization', () => {
       firstRequest.endpoint?.includes('since='),
       'Commits request must pass the since filter',
     );
+  });
+
+  it('commits materialization respects the adapter maxCommits bound', async () => {
+    const provider = new CommitRecordingProvider([
+      createRepoCommit(SHA_A, 'first commit'),
+      createRepoCommit(SHA_B, 'second commit'),
+    ]);
+    const adapter = new GitHubAdapter(provider as never, {
+      owner: OWNER,
+      repo: REPO,
+      connectionId: 'conn-commits',
+      maxCommits: 1,
+    });
+
+    await adapter.sync('workspace-1');
+
+    const index = JSON.parse(
+      await provider.readFile(githubRepoCommitsIndexPath(OWNER, REPO)),
+    ) as Array<{ sha: string }>;
+    assert.deepStrictEqual(index.map((entry) => entry.sha), [SHA_A]);
   });
 
   it('commits materialization can be disabled with mode=lazy', async () => {
@@ -318,11 +429,13 @@ describe('GitHub repo-level commit materialization', () => {
           {
             id: SHA_A,
             message: 'fix: resolve issue',
+            timestamp: '2026-05-01T00:00:00Z',
             author: { name: 'octocat', email: 'octocat@github.com' },
           },
           {
             id: SHA_B,
             message: 'refactor: clean up',
+            timestamp: '2026-05-02T00:00:00Z',
             author: { name: 'octocat', email: 'octocat@github.com' },
           },
         ],
@@ -341,5 +454,18 @@ describe('GitHub repo-level commit materialization', () => {
     assert.ok(provider.writes.has(pathB), `Expected ${pathB} to be written`);
     assert.ok(result.paths.includes(pathA), `Result paths must include ${pathA}`);
     assert.ok(result.paths.includes(pathB), `Result paths must include ${pathB}`);
+    const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
+    assert.ok(result.paths.includes(indexPath), `Result paths must include ${indexPath}`);
+    const index = JSON.parse(await provider.readFile(indexPath)) as Array<{
+      id: string;
+      title: string;
+      canonicalPath: string;
+    }>;
+    assert.deepStrictEqual(index.map((entry) => entry.id), [SHA_B, SHA_A]);
+    assert.deepStrictEqual(index.map((entry) => entry.title), [
+      'refactor: clean up',
+      'fix: resolve issue',
+    ]);
+    assert.deepStrictEqual(index.map((entry) => entry.canonicalPath), [pathB, pathA]);
   });
 });

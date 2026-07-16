@@ -1,5 +1,5 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
-import { GITHUB_API_BASE_URL } from '../config.js';
+import { GITHUB_API_BASE_URL, GITHUB_DEFAULT_MAX_COMMITS } from '../config.js';
 import type {
   GitHubRequestProvider,
   JsonObject,
@@ -20,9 +20,18 @@ type ConnectionAwareProvider = GitHubRequestProvider & {
 
 export interface FetchCommitsOptions {
   apiVersion?: string;
+  baseUrl?: string;
   connectionId?: string;
   perPage?: number;
   providerConfigKey?: string;
+}
+
+export interface FetchRepoCommitsOptions extends FetchCommitsOptions {
+  maxCommits?: number;
+  path?: string;
+  sha?: string;
+  since?: string;
+  until?: string;
 }
 
 export type GitHubCommitParent = JsonObject & {
@@ -101,6 +110,37 @@ export async function fetchPRCommits(
   return commits;
 }
 
+/**
+ * Fetch a bounded slice of repository commit history.
+ *
+ * GitHub's repository commit list is unbounded, so this follows Link headers
+ * while enforcing maxCommits (500 by default). Use since/until to constrain
+ * the history window further.
+ */
+export async function fetchRepoCommits(
+  provider: GitHubRequestProvider,
+  owner: string,
+  repo: string,
+  options: FetchRepoCommitsOptions = {},
+): Promise<GitHubPullRequestCommit[]> {
+  const commits: GitHubPullRequestCommit[] = [];
+  const maxCommits = normalizeMaxCommits(options.maxCommits);
+  let endpoint: string | undefined = buildRepoCommitsEndpoint(owner, repo, options);
+
+  while (endpoint && commits.length < maxCommits) {
+    const response = await proxyGitHubRequest(provider, endpoint, options);
+    const pageCommits = parseCommitsResponse(
+      response,
+      endpoint,
+      'GitHub repository commits response',
+    );
+    commits.push(...pageCommits.slice(0, maxCommits - commits.length));
+    endpoint = extractNextPageEndpoint(response.headers, endpoint);
+  }
+
+  return commits;
+}
+
 export async function fetchCommitDetail(
   provider: GitHubRequestProvider,
   owner: string,
@@ -129,6 +169,24 @@ function buildPullRequestCommitsEndpoint(
   )}/pulls/${pullRequestNumber}/commits?${params.toString()}`;
 }
 
+function buildRepoCommitsEndpoint(
+  owner: string,
+  repo: string,
+  options: FetchRepoCommitsOptions,
+): string {
+  const params = new URLSearchParams({
+    page: '1',
+    per_page: String(normalizePerPage(options.perPage)),
+  });
+
+  appendOptionalParam(params, 'sha', options.sha);
+  appendOptionalParam(params, 'path', options.path);
+  appendOptionalParam(params, 'since', options.since);
+  appendOptionalParam(params, 'until', options.until);
+
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?${params.toString()}`;
+}
+
 function buildCommitDetailEndpoint(owner: string, repo: string, sha: string): string {
   return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
     repo,
@@ -145,7 +203,7 @@ async function proxyGitHubRequest(
 
   return withProxyRetry(provider).proxy({
     method: 'GET',
-    baseUrl: GITHUB_API_BASE_URL,
+    baseUrl: options.baseUrl ?? GITHUB_API_BASE_URL,
     endpoint,
     connectionId,
     headers: {
@@ -202,11 +260,19 @@ function parsePullRequestCommitsResponse(
   response: ProxyResponse,
   endpoint: string,
 ): GitHubPullRequestCommit[] {
+  return parseCommitsResponse(response, endpoint, 'GitHub pull request commits response');
+}
+
+function parseCommitsResponse(
+  response: ProxyResponse,
+  endpoint: string,
+  context: string,
+): GitHubPullRequestCommit[] {
   ensureSuccessStatus(response, endpoint);
 
   const commits = expectArray(
     response.data,
-    'GitHub pull request commits response',
+    context,
     endpoint,
     response,
   );
@@ -435,6 +501,25 @@ function normalizePerPage(perPage?: number): number {
   }
 
   return perPage;
+}
+
+function normalizeMaxCommits(maxCommits?: number): number {
+  if (maxCommits === undefined) {
+    return GITHUB_DEFAULT_MAX_COMMITS;
+  }
+
+  if (!Number.isInteger(maxCommits) || maxCommits < 1) {
+    throw new Error('maxCommits must be a positive integer');
+  }
+
+  return maxCommits;
+}
+
+function appendOptionalParam(params: URLSearchParams, name: string, value?: string): void {
+  const normalized = value?.trim();
+  if (normalized) {
+    params.set(name, normalized);
+  }
 }
 
 function describeResponseData(data: JsonValue | null): string {

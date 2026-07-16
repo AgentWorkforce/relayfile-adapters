@@ -43,12 +43,14 @@ const DEFAULT_SUPPORTED_EVENTS = [
 ] as const;
 export const GITHUB_MATERIALIZATION_RESOURCES = ['issues', 'pulls', 'commits'] as const satisfies readonly GitHubMaterializationResource[];
 const GITHUB_MATERIALIZATION_STATES = ['open', 'closed', 'all'] as const;
+export const GITHUB_DEFAULT_MAX_COMMITS = 500;
 
 export const DEFAULT_CONFIG: GitHubAdapterConfig = {
   baseUrl: 'https://api.github.com',
   defaultBranch: 'main',
   fetchFileContents: true,
   lazy: false,
+  maxCommits: GITHUB_DEFAULT_MAX_COMMITS,
   maxFileSizeBytes: 1024 * 1024,
   supportedEvents: [...DEFAULT_SUPPORTED_EVENTS],
 };
@@ -104,6 +106,11 @@ export const GITHUB_ADAPTER_CONFIG_SCHEMA = {
       minimum: 1,
       default: DEFAULT_CONFIG.maxFileSizeBytes,
     },
+    maxCommits: {
+      type: 'integer',
+      minimum: 1,
+      default: DEFAULT_CONFIG.maxCommits,
+    },
     supportedEvents: {
       type: 'array',
       default: [...DEFAULT_CONFIG.supportedEvents],
@@ -147,6 +154,10 @@ export function validateConfig<T extends Partial<GitHubAdapterConfig> & Record<s
       targetKey: 'repos',
       webhookWritesKey: 'webhookWritesForLazyRepos',
     }),
+    maxCommits: requirePositiveInteger(
+      config.maxCommits ?? DEFAULT_CONFIG.maxCommits,
+      'maxCommits',
+    ),
     maxFileSizeBytes: requirePositiveInteger(
       config.maxFileSizeBytes ?? DEFAULT_CONFIG.maxFileSizeBytes,
       'maxFileSizeBytes',

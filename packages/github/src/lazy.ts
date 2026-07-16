@@ -1,8 +1,10 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from './config.js';
+import { fetchRepoCommits } from './commits/fetcher.js';
 import type { VfsLike } from './files/content-fetcher.js';
+import { buildGitHubCommitIndexRow, buildRepoCommitsIndexFile } from './index-emitter.js';
 import { ingestIssue } from './issues/issue-mapper.js';
-import { listIssues, listPullRequests, listRepoCommits, listRepos, getRepository, type GitHubOperation } from './operations.js';
+import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
 import {
   resolveRepoMaterialization,
   type ResolvedRepoMaterialization,
@@ -66,14 +68,6 @@ const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
   pulls: { mode: 'eager' },
   commits: { mode: 'eager' },
 };
-
-/**
- * Maximum number of commits fetched during a repo-level backfill. Repo
- * commit history is unbounded; this cap prevents accidental N-page crawls on
- * repositories with tens of thousands of commits. Callers can pass a lower
- * `maxCommits` via materialization options to tighten the bound further.
- */
-const DEFAULT_MAX_COMMITS = 500;
 
 export async function syncGitHubWorkspace(
   workspaceId: string,
@@ -199,17 +193,14 @@ async function materializeRepoInternal(
 
   if (plan.commits.mode === 'eager') {
     const commits = await fetchRepoCommitList(provider, config, owner, repo, plan.commits);
+    const commitIndex = buildRepoCommitsIndexFile(
+      owner,
+      repo,
+      commits.map((commit) => buildGitHubCommitIndexRow(owner, repo, commit)),
+    );
     mergeIntoTracked(
       tracked,
-      await writeJsonFile(vfs, `${repoPrefix}/commits/_index.json`, {
-        commits: commits.map((commit) => ({
-          sha: commit.sha,
-          message: commit.message,
-          authorLogin: commit.authorLogin,
-          committedAt: commit.committedAt,
-          canonicalPath: githubCommitPath(owner, repo, commit.sha),
-        })),
-      }),
+      await writeTextFile(vfs, commitIndex.path, commitIndex.content),
     );
     for (const commit of commits) {
       const commitPath = githubCommitPath(owner, repo, commit.sha);
@@ -362,41 +353,21 @@ async function fetchRepoCommitList(
   repo: string,
   materialization: ResolvedResourceMaterialization,
 ): Promise<RepoCommitListItem[]> {
-  const commits: RepoCommitListItem[] = [];
-  const maxCommits = DEFAULT_MAX_COMMITS;
-  let page = 1;
+  const commits = await fetchRepoCommits(provider, owner, repo, {
+    baseUrl: config.baseUrl || GITHUB_API_BASE_URL,
+    connectionId: await resolveConnectionId(provider, config.connectionId),
+    providerConfigKey: config.providerConfigKey,
+    maxCommits: config.maxCommits,
+    since: materialization.since,
+  });
 
-  while (commits.length < maxCommits) {
-    const operation = listRepoCommits({
-      owner,
-      repo,
-      since: materialization.since,
-      page,
-      per_page: 100,
-    });
-    const response = await proxyOperation(provider, config, operation);
-    const pageItems = expectArray(response.data, `GitHub commits response for ${owner}/${repo}`);
-
-    for (const [index, item] of pageItems.entries()) {
-      if (commits.length >= maxCommits) {
-        break;
-      }
-      const commit = expectObject(item, `GitHub commits response[${index}]`);
-      commits.push(toRepoCommitListItem(commit));
-    }
-
-    if (pageItems.length < 100) {
-      return commits;
-    }
-
-    page += 1;
-  }
-
-  return commits;
+  return commits
+    .map(toRepoCommitListItem)
+    .filter((commit) => commit.sha.length > 0);
 }
 
 function toRepoCommitListItem(value: JsonObject): RepoCommitListItem {
-  const sha = readString(value, 'sha') ?? '';
+  const sha = (readString(value, 'sha') ?? '').trim();
   const commitData = readObject(value, 'commit');
   const message = readString(commitData, 'message') ?? '';
   const authorData = readObject(value, 'author');

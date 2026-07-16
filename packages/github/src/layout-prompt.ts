@@ -9,7 +9,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes issue and pull r
 \`/github/repos/<owner>/<repo>/issues/\` and \`/github/repos/<owner>/<repo>/pulls/\` each own a sibling \`_index.json\` plus per-record subdirectories named \`<number>__<slug>\`.
 \`issues/<number>__<slug>/comments/<commentId>/meta.json\` holds issue comment records (each a directory record, so per-comment children such as reactions can nest under \`comments/<commentId>/\` without a file/directory collision).
 \`pulls/<number>__<slug>/diff.patch\`, \`pulls/<number>__<slug>/files/**\`, and \`pulls/<number>__<slug>/base/**\` are nested artifacts and should not be treated as canonical records.
-\`/github/repos/<owner>/<repo>/commits/_index.json\` lists materialized commits (bounded by \`since\` / \`maxCommits\`). Each entry carries \`sha\`, \`message\` (first line), \`authorLogin\`, \`committedAt\`, and \`canonicalPath\`. The canonical record for each commit lives at \`commits/<sha>/metadata.json\` and contains the full GitHub commit payload.
+\`/github/repos/<owner>/<repo>/commits/_index.json\` lists materialized commits (bounded by the materialization \`since\` filter and adapter \`maxCommits\` config). Each entry carries the standard \`id\`, \`title\`, and \`updated\` fields plus \`sha\`, \`message\` (first line), \`authorLogin\`, \`committedAt\`, and \`canonicalPath\`. The canonical record for each commit lives at \`commits/<sha>/metadata.json\` and contains the full GitHub commit payload.
 Issue and pull request aliases are materialized under \`/github/repos/<owner>__<repo>/<issues|pulls>/...\`, distinct from the canonical \`/github/repos/<owner>/<repo>/...\` tree. Alias views include \`by-id/<number>.json\`, \`by-title/<slug>__<number>.json\`, \`by-state/<state>/<number>.json\`, \`by-assignee/<assignee>/<number>.json\`, \`by-creator/<creator>/<number>.json\`, \`by-priority/<priority>/<number>.json\`, and \`by-edited/YYYY-MM-DD/<number>.json\`. The edited-date bucket uses the provider update timestamp, or a merge/close timestamp when that is the most recent activity-summary fallback date.
 
 Programmatic consumers that need to parse issue or pull request read-mount paths should import \`parseGitHubRepoPath\`, \`parseGitHubIssuePath\`, or \`parseGitHubPullPath\` from \`@relayfile/adapter-github/path-mapper\`. \`@relayfile/relay-helpers\` is not the right abstraction for read-mount parsing; it provides ergonomic write clients, while these parser helpers are the adapter-owned path contract.
@@ -32,13 +32,13 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 
 \`labels\` carries the issue's label names inline so you can filter on the index without opening every \`meta.json\` (e.g. \`jq '.[] | select(.labels | index("factory"))'\`). It is present on issue rows; pull rows may omit it. Merged pull rows additionally carry \`"merged": true\` and \`"mergedAt": "<iso8601>"\`; issues and unmerged pulls omit both fields.
 
-\`commits/_index.json\` is an object \`{ "commits": [...] }\` where each row uses:
+\`commits/_index.json\` is an array sorted by \`updated\` descending where each row uses:
 
 \`\`\`json
-{ "sha": "<full-sha>", "message": "<first-line>", "authorLogin": "<login>", "committedAt": "<iso8601>", "canonicalPath": "/github/repos/<owner>/<repo>/commits/<sha>/metadata.json" }
+{ "id": "<full-sha>", "title": "<first-line>", "updated": "<iso8601>", "sha": "<full-sha>", "message": "<first-line>", "authorLogin": "<login>", "committedAt": "<iso8601>", "canonicalPath": "/github/repos/<owner>/<repo>/commits/<sha>/metadata.json" }
 \`\`\`
 
-The full GitHub commit API payload is available at \`canonicalPath\`. Repo history is bounded at 500 commits per backfill by default; use a \`since\` materialization filter to narrow the window.
+The full GitHub commit API payload is available at \`canonicalPath\`. Repo history is bounded by the adapter's \`maxCommits\` config (500 by default); use a \`since\` materialization filter to narrow the window.
 
 ## JSONL And Querying
 
@@ -52,8 +52,8 @@ jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
 jq '.[] | select(.mergedAt != null) | {number, title, mergedAt}' /github/repos/octocat/hello-world/pulls/_index.json
 jq '.[] | select(.labels | index("factory"))' /github/repos/octocat/hello-world/issues/_index.json
-jq '.commits[].sha' /github/repos/octocat/hello-world/commits/_index.json
-jq '.commits[] | {sha, message, authorLogin, committedAt}' /github/repos/octocat/hello-world/commits/_index.json
+jq '.[].sha' /github/repos/octocat/hello-world/commits/_index.json
+jq '.[] | {sha, message, authorLogin, committedAt}' /github/repos/octocat/hello-world/commits/_index.json
 cat /github/repos/octocat/hello-world/commits/<sha>/metadata.json
 ls /github/repos/octocat__hello-world/issues/by-state/open
 ls /github/repos/octocat__hello-world/issues/by-assignee/octocat

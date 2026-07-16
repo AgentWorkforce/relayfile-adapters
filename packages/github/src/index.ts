@@ -6,6 +6,12 @@ import { createGitHubSchemaAdapter } from './adapter.js';
 import { GITHUB_API_BASE_URL } from './config.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
+import {
+  buildGitHubCommitIndexRow,
+  buildRepoCommitsIndexFile,
+  readCommitIndexRows,
+  upsertCommitIndexRow,
+} from './index-emitter.js';
 import { mergeIngestResults, vfsPathExists } from './ingest-utils.js';
 import { isActualIssue } from './issues/fetcher.js';
 import {
@@ -39,6 +45,7 @@ import { GitHubWritebackHandler } from './writeback.js';
 import { fetchPullRequestGateMetadata } from './pr/parser.js';
 
 export * from './emit-auxiliary-files.js';
+export { fetchRepoCommits, type FetchRepoCommitsOptions } from './commits/fetcher.js';
 export * from './digest.js';
 export * from './index-emitter.js';
 export * from './layout.js';
@@ -269,6 +276,8 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
       const commits = readPushCommitsArray(payload);
       if (commits.length > 0) {
         const results: IngestResult[] = [];
+        let commitIndexRows = await readCommitIndexRows(vfs, owner, repo);
+        let commitIndexChanged = false;
         for (const commit of commits) {
           const commitRecord = asRecord(commit);
           const sha = readString(commitRecord?.sha) ?? readString(commitRecord?.id) ?? '';
@@ -277,17 +286,26 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
           try {
             const existed = await vfsPathExists(vfs, path);
             const content = `${JSON.stringify(commit, null, 2)}\n`;
-            const writer = vfs.writeFile ?? vfs.write ?? vfs.put ?? vfs.set ?? vfs.upsert;
-            if (writer) {
-              await writer.call(vfs, path, content);
-              results.push({
-                filesWritten: existed ? 0 : 1,
-                filesUpdated: existed ? 1 : 0,
-                filesDeleted: 0,
-                paths: [path],
-                errors: [],
-              });
-            }
+            await writeVfsText(vfs, path, content);
+            commitIndexRows = upsertCommitIndexRow(
+              commitIndexRows,
+              buildGitHubCommitIndexRow(owner, repo, {
+                sha,
+                message: readString(commitRecord?.message),
+                authorLogin:
+                  readNestedString(commitRecord ?? {}, 'author', 'username')
+                  ?? readNestedString(commitRecord ?? {}, 'author', 'name'),
+                committedAt: readString(commitRecord?.timestamp),
+              }),
+            );
+            commitIndexChanged = true;
+            results.push({
+              filesWritten: existed ? 0 : 1,
+              filesUpdated: existed ? 1 : 0,
+              filesDeleted: 0,
+              paths: [path],
+              errors: [],
+            });
           } catch (error) {
             results.push({
               filesWritten: 0,
@@ -295,6 +313,31 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
               filesDeleted: 0,
               paths: [],
               errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
+            });
+          }
+        }
+        if (commitIndexChanged) {
+          const indexFile = buildRepoCommitsIndexFile(owner, repo, commitIndexRows);
+          try {
+            const existed = await vfsPathExists(vfs, indexFile.path);
+            await writeVfsText(vfs, indexFile.path, indexFile.content);
+            results.push({
+              filesWritten: existed ? 0 : 1,
+              filesUpdated: existed ? 1 : 0,
+              filesDeleted: 0,
+              paths: [indexFile.path],
+              errors: [],
+            });
+          } catch (error) {
+            results.push({
+              filesWritten: 0,
+              filesUpdated: 0,
+              filesDeleted: 0,
+              paths: [],
+              errors: [{
+                path: indexFile.path,
+                error: error instanceof Error ? error.message : String(error),
+              }],
             });
           }
         }
@@ -896,7 +939,7 @@ async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefin
 
 async function writeVfsText(vfs: VfsLike, path: string, content: string): Promise<void> {
   const writer = vfs.writeFile ?? vfs.write ?? vfs.put ?? vfs.set ?? vfs.upsert;
-  if (!writer) throw new Error(`GitHub VFS cannot write fail-closed gate state at ${path}`);
+  if (!writer) throw new Error(`GitHub VFS cannot write ${path}`);
   await writer.call(vfs, path, content);
 }
 
