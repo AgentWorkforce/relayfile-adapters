@@ -51,7 +51,7 @@ provider isn't known at author time.
 
 Inject `PreviewTransport` when a local run must record intended provider
 operations without touching a Relayfile mount or network API. Explicit
-transport injection always wins over ambient credentials:
+transport injection normally wins over ambient credentials:
 
 ```ts
 import { PreviewTransport, slackClient } from '@relayfile/relay-helpers';
@@ -82,3 +82,29 @@ try {
   restore();
 }
 ```
+
+Local runtimes that enforce an immutable write policy can bind a final-write
+authorizer. It runs after explicit/process transport selection, so authored
+`transport` options cannot bypass denial or canonical preview routing:
+
+```ts
+import {
+  PreviewTransport,
+  bindRelayWriteAuthorizer,
+} from '@relayfile/relay-helpers/transport';
+
+const canonicalPreview = new PreviewTransport();
+const restoreAuthorization = bindRelayWriteAuthorizer(() => ({
+  allowed: true,
+  transport: canonicalPreview,
+}));
+try {
+  await handler();
+} finally {
+  restoreAuthorization();
+}
+```
+
+Returning `{ allowed: false }` rejects before any selected transport or native
+VFS write. Reads and lists are unaffected. Bindings are process-scoped,
+nest safely, and must always be restored in `finally`.

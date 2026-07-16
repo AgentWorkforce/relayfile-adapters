@@ -25,6 +25,8 @@ export { providerClient, type ProviderClient, type ResourceClient } from './prov
 export { created } from './receipt.js';
 export {
   PreviewTransport,
+  RelayWriteAuthorizationError,
+  bindRelayWriteAuthorizer,
   bindPreviewTransport,
   bindRelayTransport,
   clearPreviewTransport,
@@ -38,6 +40,8 @@ export {
   type RelayTransportParameters,
   type RelayTransportRequest,
   type RelayTransportWriteRequest,
+  type RelayWriteAuthorizationDecision,
+  type RelayWriteAuthorizer,
 } from './transport.js';
 export type {
   EffectPolicyV1,

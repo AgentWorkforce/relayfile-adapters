@@ -16,6 +16,7 @@ import {
   createRelayTransportResolver,
   type RelayClientOptions,
 } from './transport.js';
+import { executeRelayWrite } from './write-authorizer.js';
 
 export type RelayParams = Record<string, string | number>;
 
@@ -68,17 +69,19 @@ export function relayClient<P extends WritebackProvider>(
     async write(resource, params, body) {
       const base = writebackPath(provider, resource, params);
       const transport = resolveTransport();
-      if (transport) {
-        return transport.write({
-          provider,
-          resource: String(resource),
-          parameters: { ...params },
-          path: base,
-          body,
-        });
-      }
+      const request = {
+        provider,
+        resource: String(resource),
+        parameters: { ...params },
+        path: base,
+        body,
+      };
       const target = isItemPath(base) ? base : `${base}/${draftFile(String(resource))}`;
-      return writeJsonFile(opts, provider, `write.${String(resource)}`, target, body);
+      return executeRelayWrite(
+        transport,
+        request,
+        () => writeJsonFile(opts, provider, `write.${String(resource)}`, target, body),
+      );
     },
     async read<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T> {
       // `async` so a validation/path error rejects the promise rather than

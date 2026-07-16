@@ -9,6 +9,9 @@ import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths'
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import * as helpers from './index.js';
 import {
+  PreviewTransport,
+  RelayWriteAuthorizationError,
+  bindRelayWriteAuthorizer,
   githubClient,
   linearClient,
   notionClient,
@@ -42,6 +45,46 @@ test('relayClient.path resolves catalog paths and write drops a collection draft
   await linear.write('comments', { issueId: 'ISS-1' }, { body: 'hi' });
   const draft = await onlyJsonIn(path.join(root, 'linear/issues/ISS-1/comments'));
   assert.deepEqual(draft.body, { body: 'hi' });
+});
+
+test('final-write authorization redirects the native VFS fallback before filesystem mutation', async () => {
+  const { root, opts } = await mount();
+  const canonicalPreview = new PreviewTransport();
+  const restoreAuthorization = bindRelayWriteAuthorizer(() => ({
+    allowed: true,
+    transport: canonicalPreview,
+  }));
+
+  try {
+    await relayClient('linear', opts).write('comments', { issueId: 'ISS-redirect' }, { body: 'preview' });
+  } finally {
+    restoreAuthorization();
+  }
+
+  assert.deepEqual(await readdir(root), []);
+  assert.equal(canonicalPreview.actions.length, 1);
+  assert.equal(canonicalPreview.actions[0]?.path.startsWith('/linear/issues/ISS-redirect/comments/'), true);
+});
+
+test('final-write denial rejects the native VFS fallback before filesystem mutation', async () => {
+  const { root, opts } = await mount();
+  let deniedActions = 0;
+  const restoreAuthorization = bindRelayWriteAuthorizer(() => {
+    deniedActions += 1;
+    return { allowed: false };
+  });
+
+  try {
+    await assert.rejects(
+      () => relayClient('linear', opts).write('comments', { issueId: 'ISS-denied' }, { body: 'never written' }),
+      RelayWriteAuthorizationError,
+    );
+  } finally {
+    restoreAuthorization();
+  }
+
+  assert.equal(deniedActions, 1);
+  assert.deepEqual(await readdir(root), []);
 });
 
 test('relayClient.write writes item (.json) resources to the exact path', async () => {
@@ -421,6 +464,33 @@ test('src/generated/clients.ts is in sync with the catalog', async () => {
     committed,
     renderClients(),
     'generated clients are stale — run `npm run gen -w @relayfile/relay-helpers`'
+  );
+});
+
+test('all helper write sites converge on the final-write authorization boundary', async () => {
+  const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const srcRoot = path.join(pkgRoot, 'src');
+  const sourceNames = (await readdir(srcRoot)).filter(
+    (name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== 'write-authorizer.ts',
+  );
+  const violations: string[] = [];
+
+  for (const sourceName of sourceNames) {
+    const source = await readFile(path.join(srcRoot, sourceName), 'utf8');
+    if (/\btransport\.write\s*\(/u.test(source)) {
+      violations.push(`${sourceName}: calls transport.write outside executeRelayWrite`);
+    }
+    for (const [index, line] of source.split('\n').entries()) {
+      if (line.includes('writeJsonFile(') && !line.includes('() => writeJsonFile(')) {
+        violations.push(`${sourceName}:${index + 1}: calls writeJsonFile outside executeRelayWrite fallback`);
+      }
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `helper write paths bypass the final-write authorizer:\n${violations.join('\n')}`,
   );
 });
 

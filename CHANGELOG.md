@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/relay-helpers` now exposes a process-scoped final-write authorizer that can deny or redirect every generic and bespoke helper write after explicit transport selection, preventing authored transports from bypassing immutable local preview policy.
 - `@relayfile/relay-helpers` now exports an injectable `RelayTransport` and side-effect-free `PreviewTransport` with deterministic simulated receipts, seeded reads, process-scoped binding for existing no-argument clients, and cross-write thread-reference recording.
 - Add authenticated GitHub pull-request create, ref push/update, and pull-request close writeback resources, selectable app/user PR authorship, plus live fail-closed merge-gate metadata on mounted pull requests.
 
