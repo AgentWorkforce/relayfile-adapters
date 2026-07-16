@@ -2,13 +2,13 @@ import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
 import { ingestIssue } from './issues/issue-mapper.js';
-import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
+import { listIssues, listPullRequests, listRepoCommits, listRepos, getRepository, type GitHubOperation } from './operations.js';
 import {
   resolveRepoMaterialization,
   type ResolvedRepoMaterialization,
   type ResolvedResourceMaterialization,
 } from './materialization-policy.js';
-import { githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
+import { githubCommitPath, githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
 import { ingestPullRequest } from './pr/diff-writer.js';
 import type {
   GitHubAdapterConfig,
@@ -64,7 +64,16 @@ const JSON_HEADERS = {
 const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
   issues: { mode: 'eager' },
   pulls: { mode: 'eager' },
+  commits: { mode: 'eager' },
 };
+
+/**
+ * Maximum number of commits fetched during a repo-level backfill. Repo
+ * commit history is unbounded; this cap prevents accidental N-page crawls on
+ * repositories with tens of thousands of commits. Callers can pass a lower
+ * `maxCommits` via materialization options to tighten the bound further.
+ */
+const DEFAULT_MAX_COMMITS = 500;
 
 export async function syncGitHubWorkspace(
   workspaceId: string,
@@ -86,7 +95,7 @@ export async function syncGitHubWorkspace(
 
   for (const repo of repos) {
     const plan = resolveRepoMaterialization(config, repo.owner, repo.repo, options);
-    if (plan.issues.mode !== 'eager' && plan.pulls.mode !== 'eager') {
+    if (plan.issues.mode !== 'eager' && plan.pulls.mode !== 'eager' && plan.commits.mode !== 'eager') {
       continue;
     }
 
@@ -99,6 +108,9 @@ export async function syncGitHubWorkspace(
     }
     if (plan.pulls.mode === 'eager') {
       syncedObjectTypes.add('pull_request');
+    }
+    if (plan.commits.mode === 'eager') {
+      syncedObjectTypes.add('commit');
     }
   }
 
@@ -182,6 +194,29 @@ async function materializeRepoInternal(
     );
     for (const pull of pulls) {
       mergeIntoTracked(tracked, await ingestPullRequest(provider, owner, repo, pull.number, vfs));
+    }
+  }
+
+  if (plan.commits.mode === 'eager') {
+    const commits = await fetchRepoCommitList(provider, config, owner, repo, plan.commits);
+    mergeIntoTracked(
+      tracked,
+      await writeJsonFile(vfs, `${repoPrefix}/commits/_index.json`, {
+        commits: commits.map((commit) => ({
+          sha: commit.sha,
+          message: commit.message,
+          authorLogin: commit.authorLogin,
+          committedAt: commit.committedAt,
+          canonicalPath: githubCommitPath(owner, repo, commit.sha),
+        })),
+      }),
+    );
+    for (const commit of commits) {
+      const commitPath = githubCommitPath(owner, repo, commit.sha);
+      mergeIntoTracked(
+        tracked,
+        await writeJsonFile(vfs, commitPath, commit.record),
+      );
     }
   }
 
@@ -310,6 +345,72 @@ async function fetchRepoPullRequests(
 
     page += 1;
   }
+}
+
+interface RepoCommitListItem {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  committedAt: string;
+  record: JsonObject;
+}
+
+async function fetchRepoCommitList(
+  provider: GitHubRequestProvider,
+  config: GitHubAdapterConfig,
+  owner: string,
+  repo: string,
+  materialization: ResolvedResourceMaterialization,
+): Promise<RepoCommitListItem[]> {
+  const commits: RepoCommitListItem[] = [];
+  const maxCommits = DEFAULT_MAX_COMMITS;
+  let page = 1;
+
+  while (commits.length < maxCommits) {
+    const operation = listRepoCommits({
+      owner,
+      repo,
+      since: materialization.since,
+      page,
+      per_page: 100,
+    });
+    const response = await proxyOperation(provider, config, operation);
+    const pageItems = expectArray(response.data, `GitHub commits response for ${owner}/${repo}`);
+
+    for (const [index, item] of pageItems.entries()) {
+      if (commits.length >= maxCommits) {
+        break;
+      }
+      const commit = expectObject(item, `GitHub commits response[${index}]`);
+      commits.push(toRepoCommitListItem(commit));
+    }
+
+    if (pageItems.length < 100) {
+      return commits;
+    }
+
+    page += 1;
+  }
+
+  return commits;
+}
+
+function toRepoCommitListItem(value: JsonObject): RepoCommitListItem {
+  const sha = readString(value, 'sha') ?? '';
+  const commitData = readObject(value, 'commit');
+  const message = readString(commitData, 'message') ?? '';
+  const authorData = readObject(value, 'author');
+  const commitAuthorData = readObject(commitData, 'author');
+  const authorLogin = readString(authorData, 'login') ?? readString(commitAuthorData, 'name') ?? '';
+  const committedAt = readString(commitData ? readObject(commitData, 'committer') : undefined, 'date') ?? readString(commitAuthorData, 'date') ?? '';
+
+  return {
+    sha,
+    message: message.split('\n')[0] ?? message, // first line only for index
+    authorLogin,
+    committedAt,
+    record: value,
+  };
 }
 
 async function proxyOperation(

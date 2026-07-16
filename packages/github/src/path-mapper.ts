@@ -536,6 +536,10 @@ export function githubCommitPath(owner: string, repo: string, sha: string): stri
   return `${githubRepoPrefix(owner, repo)}/commits/${encodeGitHubPathSegment(sha)}/metadata.json`;
 }
 
+export function githubRepoCommitsIndexPath(owner: string, repo: string): string {
+  return `${githubRepoPrefix(owner, repo)}/commits/_index.json`;
+}
+
 export function githubAliasRepoPrefix(owner: string, repo: string): string {
   return `${GITHUB_ROOT}/${encodeRepoSegment(`${owner}__${repo}`)}`;
 }

@@ -142,6 +142,7 @@ describe('GitHubAdapter scaffold', () => {
             incremental: true,
           },
           pulls: 'lazy',
+          commits: undefined,
         },
       ],
     });
@@ -171,7 +172,7 @@ describe('GitHubAdapter scaffold', () => {
     );
     assert.throws(
       () => validateConfig({ materialization: { rules: [{ resources: ['unknown'] }] } as never }),
-      /materialization.rules\[0\].resources\[0\] must be "issues" or "pulls"/,
+      /materialization.rules\[0\].resources\[0\] must be one of: issues, pulls, commits/,
     );
   });
 

@@ -16,6 +16,7 @@ import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from '.
 import { shouldWriteWebhookForRepo } from './materialization-policy.js';
 import {
   githubByIdAliasPath,
+  githubCommitPath,
   githubDeploymentStatusPath,
   githubIssuePath,
   githubPullRequestPath,
@@ -255,6 +256,54 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult> {
+    const repoInfo = extractRepoInfo(payload);
+    const owner = repoInfo.owner || this.config.owner;
+    const repo = repoInfo.repo || this.config.repo;
+    const vfs = this.tryGetVfsProvider();
+
+    // When the provider supports VFS writes, materialize all commits in the
+    // push payload (not just head_commit) using the canonical path convention.
+    // This mirrors the repo-level backfill path and ensures forward-sync keeps
+    // the commits/ subtree current without requiring a full re-materialize.
+    if (vfs && owner && repo) {
+      const commits = readPushCommitsArray(payload);
+      if (commits.length > 0) {
+        const results: IngestResult[] = [];
+        for (const commit of commits) {
+          const commitRecord = asRecord(commit);
+          const sha = readString(commitRecord?.sha) ?? readString(commitRecord?.id) ?? '';
+          if (!sha) continue;
+          const path = githubCommitPath(owner, repo, sha);
+          try {
+            const existed = await vfsPathExists(vfs, path);
+            const content = `${JSON.stringify(commit, null, 2)}\n`;
+            const writer = vfs.writeFile ?? vfs.write ?? vfs.put ?? vfs.set ?? vfs.upsert;
+            if (writer) {
+              await writer.call(vfs, path, content);
+              results.push({
+                filesWritten: existed ? 0 : 1,
+                filesUpdated: existed ? 1 : 0,
+                filesDeleted: 0,
+                paths: [path],
+                errors: [],
+              });
+            }
+          } catch (error) {
+            results.push({
+              filesWritten: 0,
+              filesUpdated: 0,
+              filesDeleted: 0,
+              paths: [],
+              errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
+            });
+          }
+        }
+        if (results.length > 0) {
+          return mergeIngestResults(...results);
+        }
+      }
+    }
+
     return this.createIngestResult('push', 'commit', payload, 'write');
   }
 
@@ -690,6 +739,40 @@ function hasNextPage(headers: Record<string, string>): boolean {
   return Object.entries(headers).some(
     ([name, value]) => name.toLowerCase() === 'link' && value.includes('rel="next"'),
   );
+}
+
+/**
+ * Extract all commits from a GitHub push webhook payload. GitHub includes both
+ * a `commits[]` array (all commits in the push, up to ~20) and a `head_commit`
+ * (the newest commit). We return the full array, de-duplicated and with
+ * head_commit included to cover the case where `commits` is absent or truncated.
+ */
+function readPushCommitsArray(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const result: Record<string, unknown>[] = [];
+
+  const commitsRaw = payload.commits;
+  if (Array.isArray(commitsRaw)) {
+    for (const entry of commitsRaw) {
+      const commit = asRecord(entry);
+      if (!commit) continue;
+      const sha = readString(commit.id) ?? readString(commit.sha) ?? '';
+      if (!sha || seen.has(sha)) continue;
+      seen.add(sha);
+      result.push(commit);
+    }
+  }
+
+  const headCommit = asRecord(payload.head_commit);
+  if (headCommit) {
+    const headSha = readString(headCommit.id) ?? readString(headCommit.sha) ?? '';
+    if (headSha && !seen.has(headSha)) {
+      seen.add(headSha);
+      result.push(headCommit);
+    }
+  }
+
+  return result;
 }
 
 function readString(value: unknown): string | undefined {

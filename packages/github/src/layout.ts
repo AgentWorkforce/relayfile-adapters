@@ -43,5 +43,12 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
         { path: 'github/repos/*/*/pulls/*/merge.json', schemaId: 'github/pull-request-merge' },
       ],
     },
+    {
+      path: 'github/repos/*/*/commits',
+      title: 'Commits',
+      materialization: 'eager',
+      aliasSegments: [],
+      writebackResources: [],
+    },
   ],
 });

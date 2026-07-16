@@ -41,7 +41,7 @@ const DEFAULT_SUPPORTED_EVENTS = [
   'status', // a classic commit status changed — refreshes parent PR gate metadata without overwriting commit records
   'deployment_status.created', // a deployment's status changed — `deployment_status.state` is success / failure / error / pending / in_progress / … (powers deploy-watch agents)
 ] as const;
-const GITHUB_MATERIALIZATION_RESOURCES = ['issues', 'pulls'] as const satisfies readonly GitHubMaterializationResource[];
+export const GITHUB_MATERIALIZATION_RESOURCES = ['issues', 'pulls', 'commits'] as const satisfies readonly GitHubMaterializationResource[];
 const GITHUB_MATERIALIZATION_STATES = ['open', 'closed', 'all'] as const;
 
 export const DEFAULT_CONFIG: GitHubAdapterConfig = {

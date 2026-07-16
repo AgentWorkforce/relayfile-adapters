@@ -16,10 +16,11 @@ export type ResolvedResourceMaterialization = CoreResolvedResourceMaterializatio
 export type ResolvedRepoMaterialization =
   ResolvedTargetMaterialization<GitHubBulkMaterializationResource, GitHubMaterializationState>;
 
-const BULK_RESOURCES = ['issues', 'pulls'] as const satisfies readonly GitHubBulkMaterializationResource[];
+const BULK_RESOURCES = ['issues', 'pulls', 'commits'] as const satisfies readonly GitHubBulkMaterializationResource[];
 const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
   issues: { mode: 'eager' },
   pulls: { mode: 'eager' },
+  commits: { mode: 'eager' },
 };
 
 export function resolveRepoMaterialization(
@@ -32,6 +33,7 @@ export function resolveRepoMaterialization(
     return config.lazy ? {
       issues: { mode: 'lazy' },
       pulls: { mode: 'lazy' },
+      commits: { mode: 'lazy' },
     } : FULL_REPO_MATERIALIZATION;
   }
 

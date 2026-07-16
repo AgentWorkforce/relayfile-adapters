@@ -10,6 +10,7 @@ interface RecordingProviderOptions {
   delayMs?: number;
   issues?: Partial<Record<RepoName, ReturnType<typeof createIssue>[]>>;
   pulls?: Partial<Record<RepoName, ReturnType<typeof createPull>[]>>;
+  commits?: Partial<Record<RepoName, ReturnType<typeof createCommit>[]>>;
   repos?: RepoName[];
 }
 
@@ -69,6 +70,12 @@ class RecordingProvider {
 
     if (request.endpoint === '/repos/octocat/repo-b/pulls') {
       return this.json(this.options.pulls?.['repo-b'] ?? defaultPulls('repo-b')) as ProxyResponse<T>;
+    }
+
+    const commitsMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/commits/);
+    if (commitsMatch) {
+      const repo = commitsMatch[1] as RepoName;
+      return this.json(this.options.commits?.[repo] ?? defaultCommits(repo)) as ProxyResponse<T>;
     }
 
     const pullFilesMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/pulls\/(\d+)\/files$/);
@@ -259,6 +266,47 @@ function createPull(
       sha: 'fedcbafedcbafedcbafedcbafedcbafedcbafedc',
       repo: createRepository(repo),
     },
+  };
+}
+
+function defaultCommits(repo: RepoName): ReturnType<typeof createCommit>[] {
+  return repo === 'repo-a'
+    ? [createCommit('repo-a', 'aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111', 'initial commit')]
+    : [];
+}
+
+function createCommit(
+  _repo: RepoName,
+  sha: string,
+  message: string,
+  options: { authorLogin?: string; committedAt?: string } = {},
+) {
+  return {
+    sha,
+    commit: {
+      message,
+      author: {
+        name: options.authorLogin ?? 'octocat',
+        email: 'octocat@github.com',
+        date: options.committedAt ?? '2026-05-01T00:00:00Z',
+      },
+      committer: {
+        name: 'octocat',
+        email: 'octocat@github.com',
+        date: options.committedAt ?? '2026-05-01T00:00:00Z',
+      },
+    },
+    author: {
+      login: options.authorLogin ?? 'octocat',
+      id: 1,
+      type: 'User',
+    },
+    committer: {
+      login: options.authorLogin ?? 'octocat',
+      id: 1,
+      type: 'User',
+    },
+    parents: [],
   };
 }
 
@@ -564,7 +612,7 @@ describe('GitHub lazy materialization', () => {
     assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 1);
   });
 
-  it('materializeRepo writes repo meta plus empty issue and pull indexes for repos with no synced content', async () => {
+  it('materializeRepo writes repo meta plus empty issue, pull, and commit indexes for repos with no synced content', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider, { lazy: true });
 
@@ -572,6 +620,7 @@ describe('GitHub lazy materialization', () => {
     const result = await adapter.materializeRepo('workspace-1', 'octocat', 'repo-b');
 
     assert.deepStrictEqual(result.paths.sort(), [
+      '/github/repos/octocat/repo-b/commits/_index.json',
       '/github/repos/octocat/repo-b/issues/_index.json',
       '/github/repos/octocat/repo-b/meta.json',
       '/github/repos/octocat/repo-b/pulls/_index.json',
@@ -583,6 +632,10 @@ describe('GitHub lazy materialization', () => {
     assert.deepStrictEqual(
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/pulls/_index.json')),
       { pulls: [] },
+    );
+    assert.deepStrictEqual(
+      JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/commits/_index.json')),
+      { commits: [] },
     );
   });
 

@@ -228,7 +228,7 @@ export type GitHubWebhookEvent =
 
 export type GitHubMaterializationMode = AdapterMaterializationMode;
 
-export type GitHubBulkMaterializationResource = 'issues' | 'pulls';
+export type GitHubBulkMaterializationResource = 'issues' | 'pulls' | 'commits';
 
 export type GitHubMaterializationResource = GitHubBulkMaterializationResource;
 
