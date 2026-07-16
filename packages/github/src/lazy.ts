@@ -63,10 +63,10 @@ const JSON_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
 } as const;
-const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
+const DEFAULT_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
   issues: { mode: 'eager' },
   pulls: { mode: 'eager' },
-  commits: { mode: 'eager' },
+  commits: { mode: 'lazy' },
 };
 
 export async function syncGitHubWorkspace(
@@ -118,16 +118,20 @@ export async function materializeRepo(
   owner: string,
   repo: string,
   inFlight: Map<string, Promise<MaterializeResult>> = new Map(),
-  plan: ResolvedRepoMaterialization = FULL_REPO_MATERIALIZATION,
+  plan?: ResolvedRepoMaterialization,
 ): Promise<MaterializeResult> {
   void workspaceId;
-  const key = `${owner}/${repo}:${JSON.stringify(plan)}`.toLowerCase();
+  const effectivePlan = plan ?? {
+    ...DEFAULT_REPO_MATERIALIZATION,
+    commits: resolveRepoMaterialization(config, owner, repo).commits,
+  };
+  const key = `${owner}/${repo}:${JSON.stringify(effectivePlan)}`.toLowerCase();
   const existing = inFlight.get(key);
   if (existing) {
     return existing;
   }
 
-  const task = materializeRepoInternal(provider, config, owner, repo, plan).finally(() => {
+  const task = materializeRepoInternal(provider, config, owner, repo, effectivePlan).finally(() => {
     inFlight.delete(key);
   });
   inFlight.set(key, task);
@@ -372,7 +376,7 @@ function toRepoCommitListItem(value: JsonObject): RepoCommitListItem {
   const message = readString(commitData, 'message') ?? '';
   const authorData = readObject(value, 'author');
   const commitAuthorData = readObject(commitData, 'author');
-  const authorLogin = readString(authorData, 'login') ?? readString(commitAuthorData, 'name') ?? '';
+  const authorLogin = readString(authorData, 'login') ?? '';
   const committedAt = readString(commitData ? readObject(commitData, 'committer') : undefined, 'date') ?? readString(commitAuthorData, 'date') ?? '';
 
   return {

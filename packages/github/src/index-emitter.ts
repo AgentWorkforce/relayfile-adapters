@@ -158,16 +158,6 @@ export async function readRecordIndexRows(
   return parseIndexRows<GitHubRecordIndexRow>(await readVfsText(vfs, path));
 }
 
-export async function readCommitIndexRows(
-  vfs: VfsLike,
-  owner: string,
-  repo: string,
-): Promise<GitHubCommitIndexRow[]> {
-  return parseIndexRows<GitHubCommitIndexRow>(
-    await readVfsText(vfs, githubRepoCommitsIndexPath(owner, repo)),
-  );
-}
-
 export function upsertRepoIndexRow(
   rows: GitHubRepoIndexRow[],
   row: GitHubRepoIndexRow,

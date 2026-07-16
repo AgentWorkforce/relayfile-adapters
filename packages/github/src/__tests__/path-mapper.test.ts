@@ -25,6 +25,7 @@ import {
   githubRefPath,
   tryNormalizeGitHubObjectType,
   githubRepoPrefix,
+  githubRepoCommitsIndexPath,
   githubRepositoryMetaPath,
   githubRepositoryMetadataPath,
   githubReviewCommentPath,
@@ -221,6 +222,13 @@ describe('path-mapper', () => {
       const encoded = githubCommitPath('octocat', 'hello-world', 'a/b');
       assert.equal(encoded, '/github/repos/octocat/hello-world/commits/a%2Fb/metadata.json');
       assert.equal(encoded.includes('/a/b/'), false);
+    });
+
+    it('githubRepoCommitsIndexPath', () => {
+      assert.equal(
+        githubRepoCommitsIndexPath('octocat', 'hello-world'),
+        '/github/repos/octocat/hello-world/commits/_index.json',
+      );
     });
 
     it('githubRootIndexPath', () => {

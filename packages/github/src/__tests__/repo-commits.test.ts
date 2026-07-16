@@ -107,6 +107,77 @@ class CommitRecordingProvider {
   }
 }
 
+class ConcurrentCommitProvider {
+  readonly name = 'concurrent-github';
+  readonly connectionId = 'conn-commits';
+  readonly conflictPaths: string[] = [];
+  private readonly files = new Map<string, { content: string; revision: string }>();
+  private revisionCounter = 0;
+  private indexReadCount = 0;
+  private releaseIndexReads!: () => void;
+  private readonly indexReadBarrier = new Promise<void>((resolve) => {
+    this.releaseIndexReads = resolve;
+  });
+
+  async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+    throw new Error(`Unexpected request: ${request.method} ${request.endpoint}`);
+  }
+
+  async readFile(path: string): Promise<{ content: string; revision: string } | undefined> {
+    if (path === githubRepoCommitsIndexPath(OWNER, REPO) && this.indexReadCount < 2) {
+      this.indexReadCount += 1;
+      if (this.indexReadCount === 2) {
+        this.releaseIndexReads();
+      }
+      await this.indexReadBarrier;
+    }
+    const file = this.files.get(path);
+    return file ? { ...file } : undefined;
+  }
+
+  writeFile(
+    path: string,
+    content: string,
+    options?: { baseRevision?: string },
+  ): void {
+    const existing = this.files.get(path);
+    const currentRevision = existing?.revision ?? '0';
+    if (options?.baseRevision !== undefined && options.baseRevision !== currentRevision) {
+      this.conflictPaths.push(path);
+      const error = new Error('RevisionConflictError');
+      Object.assign(error, { name: 'RevisionConflictError', status: 409, code: 'revision_conflict' });
+      throw error;
+    }
+
+    this.revisionCounter += 1;
+    this.files.set(path, { content, revision: `r${this.revisionCounter}` });
+  }
+
+  exists(path: string): boolean {
+    return this.files.has(path);
+  }
+
+  text(path: string): string | undefined {
+    return this.files.get(path)?.content;
+  }
+}
+
+function createCommitMaterializingAdapter(
+  provider: CommitRecordingProvider,
+  config: Partial<GitHubAdapterConfig> = {},
+): GitHubAdapter {
+  return new GitHubAdapter(provider as never, {
+    owner: OWNER,
+    repo: REPO,
+    connectionId: 'conn-commits',
+    materialization: {
+      default: 'lazy',
+      rules: [{ repos: [`${OWNER}/${REPO}`], resources: ['commits'] }],
+    },
+    ...config,
+  });
+}
+
 describe('GitHub repo-level commit materialization', () => {
   it("'commits' is in GITHUB_MATERIALIZATION_RESOURCES", async () => {
     const { GITHUB_MATERIALIZATION_RESOURCES } = await import('../config.js');
@@ -125,11 +196,7 @@ describe('GitHub repo-level commit materialization', () => {
   it('fetchRepoCommits calls /repos/{o}/{r}/commits with correct endpoint', async () => {
     const commits = [createRepoCommit(SHA_A, 'first commit')];
     const provider = new CommitRecordingProvider(commits);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-    });
+    const adapter = createCommitMaterializingAdapter(provider);
 
     await adapter.sync('workspace-1');
 
@@ -214,17 +281,14 @@ describe('GitHub repo-level commit materialization', () => {
       createRepoCommit(SHA_B, 'second commit', '2026-05-02T00:00:00Z'),
     ];
     const provider = new CommitRecordingProvider(commits);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-    });
+    const adapter = createCommitMaterializingAdapter(provider);
 
     await adapter.sync('workspace-1');
 
     const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
     assert.ok(provider.writes.has(indexPath), `Expected ${indexPath} to exist`);
-    const index = JSON.parse(await provider.readFile(indexPath)) as Array<{
+    const rawIndex = await provider.readFile(indexPath);
+    const index = JSON.parse(rawIndex) as Array<{
       id: string;
       title: string;
       updated: string;
@@ -237,23 +301,36 @@ describe('GitHub repo-level commit materialization', () => {
     assert.ok(Array.isArray(index), 'commits/_index.json must be an array');
     assert.strictEqual(index.length, 2);
     assert.deepStrictEqual(index.map((entry) => entry.sha), [SHA_B, SHA_A]);
-    assert.deepStrictEqual(
-      index.map(({ id, title, updated }) => ({ id, title, updated })),
-      [
-        { id: SHA_B, title: 'second commit', updated: '2026-05-02T00:00:00Z' },
-        { id: SHA_A, title: 'first commit', updated: '2026-05-01T00:00:00Z' },
-      ],
-    );
+    const expectedIndex = [
+      {
+        id: SHA_B,
+        title: 'second commit',
+        updated: '2026-05-02T00:00:00Z',
+        sha: SHA_B,
+        message: 'second commit',
+        authorLogin: 'octocat',
+        committedAt: '2026-05-02T00:00:00Z',
+        canonicalPath: githubCommitPath(OWNER, REPO, SHA_B),
+      },
+      {
+        id: SHA_A,
+        title: 'first commit',
+        updated: '2026-05-01T00:00:00Z',
+        sha: SHA_A,
+        message: 'first commit',
+        authorLogin: 'octocat',
+        committedAt: '2026-05-01T00:00:00Z',
+        canonicalPath: githubCommitPath(OWNER, REPO, SHA_A),
+      },
+    ];
+    assert.deepStrictEqual(index, expectedIndex);
+    assert.strictEqual(rawIndex, `${JSON.stringify(expectedIndex)}\n`);
   });
 
   it('commits/_index.json entries have canonicalPath pointing to metadata.json', async () => {
     const commits = [createRepoCommit(SHA_A, 'add feature')];
     const provider = new CommitRecordingProvider(commits);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-    });
+    const adapter = createCommitMaterializingAdapter(provider);
 
     await adapter.sync('workspace-1');
 
@@ -275,11 +352,7 @@ describe('GitHub repo-level commit materialization', () => {
   it('canonical commit record is written at commits/<sha>/metadata.json', async () => {
     const commits = [createRepoCommit(SHA_A, 'fix bug')];
     const provider = new CommitRecordingProvider(commits);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-    });
+    const adapter = createCommitMaterializingAdapter(provider);
 
     await adapter.sync('workspace-1');
 
@@ -289,13 +362,77 @@ describe('GitHub repo-level commit materialization', () => {
     assert.strictEqual(record.sha, SHA_A);
   });
 
+  it('does not treat the Git author name as a GitHub authorLogin', async () => {
+    const commit = createRepoCommit(SHA_A, 'unlinked author');
+    commit.author = null as never;
+    commit.commit.author.name = 'Git Author Name';
+    const provider = new CommitRecordingProvider([commit]);
+    const adapter = createCommitMaterializingAdapter(provider);
+
+    await adapter.sync('workspace-1');
+
+    const index = JSON.parse(
+      await provider.readFile(githubRepoCommitsIndexPath(OWNER, REPO)),
+    ) as Array<{ authorLogin: string }>;
+    assert.strictEqual(index[0]?.authorLogin, '');
+  });
+
+  it('preserves a richer REST commit when a sparse push arrives for the same SHA', async () => {
+    const restCommit = createRepoCommit(SHA_A, 'authoritative REST message');
+    Object.assign(restCommit, {
+      stats: { additions: 4, deletions: 1, total: 5 },
+      files: [{ filename: 'src/index.ts', status: 'modified' }],
+    });
+    const provider = new CommitRecordingProvider([restCommit]);
+    const adapter = createCommitMaterializingAdapter(provider);
+    await adapter.sync('workspace-1');
+
+    await adapter.ingestWebhook('workspace-1', {
+      provider: 'github',
+      connectionId: 'conn-commits',
+      eventType: 'push',
+      objectType: 'commit',
+      objectId: SHA_A,
+      payload: {
+        ref: 'refs/heads/main',
+        commits: [{
+          id: SHA_A,
+          message: 'sparse webhook message',
+          timestamp: '2026-05-03T00:00:00Z',
+          author: { name: 'Git Author Name', email: 'author@example.com' },
+        }],
+        repository: {
+          name: REPO,
+          full_name: `${OWNER}/${REPO}`,
+          owner: { login: OWNER },
+        },
+      },
+    });
+
+    const canonicalPath = githubCommitPath(OWNER, REPO, SHA_A);
+    const canonical = JSON.parse(await provider.readFile(canonicalPath)) as {
+      sha: string;
+      commit: { message: string };
+      author: { login: string };
+      stats: { total: number };
+      files: Array<{ filename: string }>;
+    };
+    assert.strictEqual(canonical.sha, SHA_A);
+    assert.strictEqual(canonical.commit.message, 'authoritative REST message');
+    assert.strictEqual(canonical.author.login, 'octocat');
+    assert.strictEqual(canonical.stats.total, 5);
+    assert.strictEqual(canonical.files[0]?.filename, 'src/index.ts');
+
+    const index = JSON.parse(
+      await provider.readFile(githubRepoCommitsIndexPath(OWNER, REPO)),
+    ) as Array<{ authorLogin: string; message: string }>;
+    assert.strictEqual(index[0]?.authorLogin, 'octocat');
+    assert.strictEqual(index[0]?.message, 'authoritative REST message');
+  });
+
   it('skips commit rows with empty SHAs instead of constructing an invalid canonical path', async () => {
     const provider = new CommitRecordingProvider([createRepoCommit('', 'malformed commit')]);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-    });
+    const adapter = createCommitMaterializingAdapter(provider);
 
     await adapter.sync('workspace-1');
 
@@ -344,12 +481,7 @@ describe('GitHub repo-level commit materialization', () => {
       createRepoCommit(SHA_A, 'first commit'),
       createRepoCommit(SHA_B, 'second commit'),
     ]);
-    const adapter = new GitHubAdapter(provider as never, {
-      owner: OWNER,
-      repo: REPO,
-      connectionId: 'conn-commits',
-      maxCommits: 1,
-    });
+    const adapter = createCommitMaterializingAdapter(provider, { maxCommits: 1 });
 
     await adapter.sync('workspace-1');
 
@@ -402,6 +534,7 @@ describe('GitHub repo-level commit materialization', () => {
       commitsResource.path.includes('github/repos'),
       'commits resource path must be under github/repos',
     );
+    assert.strictEqual(commitsResource.materialization, 'lazy');
   });
 
   it('push webhook with commits array writes each commit to its canonical path', async () => {
@@ -454,6 +587,14 @@ describe('GitHub repo-level commit materialization', () => {
     assert.ok(provider.writes.has(pathB), `Expected ${pathB} to be written`);
     assert.ok(result.paths.includes(pathA), `Result paths must include ${pathA}`);
     assert.ok(result.paths.includes(pathB), `Result paths must include ${pathB}`);
+    const canonicalA = JSON.parse(await provider.readFile(pathA)) as {
+      sha: string;
+      commit: { message: string };
+      author: unknown;
+    };
+    assert.strictEqual(canonicalA.sha, SHA_A);
+    assert.strictEqual(canonicalA.commit.message, 'fix: resolve issue');
+    assert.strictEqual(canonicalA.author, null);
     const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
     assert.ok(result.paths.includes(indexPath), `Result paths must include ${indexPath}`);
     const index = JSON.parse(await provider.readFile(indexPath)) as Array<{
@@ -467,5 +608,56 @@ describe('GitHub repo-level commit materialization', () => {
       'fix: resolve issue',
     ]);
     assert.deepStrictEqual(index.map((entry) => entry.canonicalPath), [pathB, pathA]);
+  });
+
+  it('atomically preserves rows from concurrent push webhook index updates', async () => {
+    const provider = new ConcurrentCommitProvider();
+    const adapter = new GitHubAdapter(provider as never, {
+      owner: OWNER,
+      repo: REPO,
+      connectionId: 'conn-commits',
+    });
+    const event = (sha: string, message: string, timestamp: string) => ({
+      provider: 'github',
+      connectionId: 'conn-commits',
+      eventType: 'push',
+      objectType: 'commit',
+      objectId: sha,
+      payload: {
+        ref: 'refs/heads/main',
+        commits: [{
+          id: sha,
+          message,
+          timestamp,
+          author: {
+            name: 'octocat',
+            email: 'octocat@github.com',
+            username: 'octocat',
+          },
+        }],
+        repository: {
+          name: REPO,
+          full_name: `${OWNER}/${REPO}`,
+          owner: { login: OWNER },
+        },
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      adapter.ingestWebhook('workspace-1', event(SHA_A, 'first', '2026-05-01T00:00:00Z')),
+      adapter.ingestWebhook('workspace-1', event(SHA_B, 'second', '2026-05-02T00:00:00Z')),
+    ]);
+
+    assert.deepStrictEqual(first.errors, []);
+    assert.deepStrictEqual(second.errors, []);
+    const indexPath = githubRepoCommitsIndexPath(OWNER, REPO);
+    const rawIndex = provider.text(indexPath);
+    assert.ok(rawIndex);
+    const index = JSON.parse(rawIndex) as Array<{ id: string }>;
+    assert.deepStrictEqual(index.map((entry) => entry.id), [SHA_B, SHA_A]);
+    assert.ok(
+      provider.conflictPaths.includes(indexPath),
+      'the deterministic race must exercise a CAS conflict and retry',
+    );
   });
 });

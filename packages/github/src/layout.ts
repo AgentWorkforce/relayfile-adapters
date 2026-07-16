@@ -46,7 +46,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
     {
       path: 'github/repos/*/*/commits',
       title: 'Commits',
-      materialization: 'eager',
+      materialization: 'lazy',
       aliasSegments: [],
       writebackResources: [],
     },

@@ -326,7 +326,7 @@ async function maybeDelay(delayMs: number | undefined): Promise<void> {
 }
 
 describe('GitHub lazy materialization', () => {
-  it('lazy defaults to false and initial sync writes full repo subtrees', async () => {
+  it('lazy defaults to false but repository commit history remains opt-in', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider);
 
@@ -335,6 +335,16 @@ describe('GitHub lazy materialization', () => {
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
+    assert.strictEqual(
+      provider.writes.has('/github/repos/octocat/repo-a/commits/_index.json'),
+      false,
+    );
+    assert.strictEqual(
+      provider.requests.some((request) =>
+        /^\/repos\/octocat\/[^/]+\/commits(?:\?|$)/.test(request.endpoint),
+      ),
+      false,
+    );
   });
 
   it('lazy true initial sync writes only the repos index plus root marker', async () => {
@@ -612,7 +622,7 @@ describe('GitHub lazy materialization', () => {
     assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 1);
   });
 
-  it('materializeRepo writes repo meta plus empty issue, pull, and commit indexes for repos with no synced content', async () => {
+  it('materializeRepo writes repo meta plus issue and pull indexes without opt-in commits', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider, { lazy: true });
 
@@ -620,7 +630,6 @@ describe('GitHub lazy materialization', () => {
     const result = await adapter.materializeRepo('workspace-1', 'octocat', 'repo-b');
 
     assert.deepStrictEqual(result.paths.sort(), [
-      '/github/repos/octocat/repo-b/commits/_index.json',
       '/github/repos/octocat/repo-b/issues/_index.json',
       '/github/repos/octocat/repo-b/meta.json',
       '/github/repos/octocat/repo-b/pulls/_index.json',
@@ -633,10 +642,7 @@ describe('GitHub lazy materialization', () => {
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/pulls/_index.json')),
       { pulls: [] },
     );
-    assert.deepStrictEqual(
-      JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/commits/_index.json')),
-      [],
-    );
+    assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-b/commits/_index.json'), false);
   });
 
   it('webhook reconciliation in a never-materialized lazy repo writes repo meta.json', async () => {
