@@ -250,6 +250,50 @@ describe('GitHub repo-level commit materialization', () => {
     );
   });
 
+  it('fetchRepoCommits normalizes enterprise Link paths relative to an /api/v3 base URL', async () => {
+    const baseUrl = 'https://github.example.com/api/v3';
+    const requests: ProxyRequest[] = [];
+    const provider = {
+      connectionId: 'conn-enterprise-commits',
+      async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+        requests.push(request);
+        const page = requests.length;
+        return {
+          status: 200,
+          headers: page === 1
+            ? { link: `<${baseUrl}/repos/${OWNER}/${REPO}/commits?page=2&per_page=1>; rel="next"` }
+            : {},
+          data: [
+            page === 1
+              ? createRepoCommit(SHA_A, 'first commit')
+              : createRepoCommit(SHA_B, 'second commit'),
+          ],
+        } as ProxyResponse<T>;
+      },
+    };
+
+    const commits = await fetchRepoCommits(provider, OWNER, REPO, {
+      baseUrl,
+      maxCommits: 2,
+      perPage: 1,
+    });
+
+    assert.deepStrictEqual(commits.map((commit) => commit.sha), [SHA_A, SHA_B]);
+    assert.strictEqual(requests.length, 2);
+    assert.strictEqual(requests[1]?.baseUrl, baseUrl);
+    assert.strictEqual(
+      requests[1]?.endpoint,
+      `/repos/${OWNER}/${REPO}/commits?page=2&per_page=1`,
+    );
+    assert.strictEqual(
+      requests.filter(
+        (request) =>
+          request.endpoint === `/repos/${OWNER}/${REPO}/commits?page=2&per_page=1`,
+      ).length,
+      1,
+    );
+  });
+
   it('fetchRepoCommits stops before following another Link when maxCommits is reached', async () => {
     const requests: ProxyRequest[] = [];
     const provider = {

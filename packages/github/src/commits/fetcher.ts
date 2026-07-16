@@ -104,7 +104,7 @@ export async function fetchPRCommits(
   while (endpoint) {
     const response = await proxyGitHubRequest(provider, endpoint, options);
     commits.push(...parsePullRequestCommitsResponse(response, endpoint));
-    endpoint = extractNextPageEndpoint(response.headers, endpoint);
+    endpoint = extractNextPageEndpoint(response.headers, endpoint, options.baseUrl);
   }
 
   return commits;
@@ -135,7 +135,7 @@ export async function fetchRepoCommits(
       'GitHub repository commits response',
     );
     commits.push(...pageCommits.slice(0, maxCommits - commits.length));
-    endpoint = extractNextPageEndpoint(response.headers, endpoint);
+    endpoint = extractNextPageEndpoint(response.headers, endpoint, options.baseUrl);
   }
 
   return commits;
@@ -454,6 +454,7 @@ function readNumber(
 function extractNextPageEndpoint(
   headers: Record<string, string>,
   currentEndpoint: string,
+  baseUrl = GITHUB_API_BASE_URL,
 ): string | undefined {
   const linkHeader = readHeader(headers, 'link');
   if (!linkHeader) {
@@ -467,8 +468,23 @@ function extractNextPageEndpoint(
     }
 
     try {
-      const nextUrl = new URL(match[1], GITHUB_API_BASE_URL);
-      return `${nextUrl.pathname}${nextUrl.search}`;
+      const apiBaseUrl = new URL(baseUrl);
+      const apiBasePath = apiBaseUrl.pathname.replace(/\/+$/, '');
+      const currentUrl = new URL(
+        `${apiBaseUrl.origin}${apiBasePath}/${currentEndpoint.replace(/^\/+/, '')}`,
+      );
+      const nextUrl = new URL(match[1], currentUrl);
+      let nextPath = nextUrl.pathname;
+
+      if (
+        apiBasePath &&
+        apiBasePath !== '/' &&
+        (nextPath === apiBasePath || nextPath.startsWith(`${apiBasePath}/`))
+      ) {
+        nextPath = nextPath.slice(apiBasePath.length) || '/';
+      }
+
+      return `${nextPath}${nextUrl.search}`;
     } catch {
       throw new GitHubCommitFetchError('GitHub returned a malformed Link header for pagination', {
         endpoint: currentEndpoint,
