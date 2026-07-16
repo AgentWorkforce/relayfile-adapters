@@ -520,6 +520,23 @@ export async function renamed(selectedTransport: FutureTransport, request: Reque
   );
 }
 `);
+  const nestedAuthorizerPath = path.join(nestedRoot, 'write-authorizer.ts');
+  await writeFile(nestedAuthorizerPath, `
+interface Request {
+  provider: string;
+  resource: string;
+  parameters: Record<string, string>;
+  path: string;
+  body: unknown;
+}
+interface FutureTransport {
+  write(request: Request): Promise<unknown>;
+}
+
+export async function nestedAuthorizerBypass(transport: FutureTransport, request: Request) {
+  await transport.write(request);
+}
+`);
 
   const violations = await findWriteBoundaryViolations({ sourceRoot: canaryRoot });
   assert.ok(
@@ -529,6 +546,11 @@ export async function renamed(selectedTransport: FutureTransport, request: Reque
   assert.ok(
     violations.some((violation: { kind: string }) => violation.kind.startsWith('native-vfs-write')),
     `expected multiline aliased VFS canary to fail: ${JSON.stringify(violations)}`,
+  );
+  assert.ok(
+    violations.some((violation: { kind: string; file: string }) =>
+      violation.kind === 'raw-transport-write' && violation.file === nestedAuthorizerPath),
+    `expected nested write-authorizer.ts canary to fail: ${JSON.stringify(violations)}`,
   );
 });
 

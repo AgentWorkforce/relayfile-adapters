@@ -69,6 +69,7 @@ function importsWriteJsonFile(node) {
 
 export async function findWriteBoundaryViolations({ sourceRoot, allowedFile = 'write-authorizer.ts' }) {
   const rootNames = await collectProductionSources(sourceRoot);
+  const allowedPath = path.resolve(sourceRoot, allowedFile);
   const program = ts.createProgram(rootNames, {
     allowJs: false,
     module: ts.ModuleKind.NodeNext,
@@ -82,7 +83,7 @@ export async function findWriteBoundaryViolations({ sourceRoot, allowedFile = 'w
   const violations = [];
 
   for (const sourceFile of program.getSourceFiles()) {
-    if (!rootNames.includes(sourceFile.fileName) || path.basename(sourceFile.fileName) === allowedFile) continue;
+    if (!rootNames.includes(sourceFile.fileName) || sourceFile.fileName === allowedPath) continue;
     const visit = (node) => {
       if (importsWriteJsonFile(node)) {
         violations.push({
