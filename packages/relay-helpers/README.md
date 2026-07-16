@@ -51,7 +51,7 @@ provider isn't known at author time.
 
 Inject `PreviewTransport` when a local run must record intended provider
 operations without touching a Relayfile mount or network API. Explicit
-transport injection always wins over ambient credentials:
+transport injection normally wins over ambient credentials:
 
 ```ts
 import { PreviewTransport, slackClient } from '@relayfile/relay-helpers';
@@ -82,3 +82,50 @@ try {
   restore();
 }
 ```
+
+Local runtimes that enforce an immutable write policy can bind a final-write
+authorizer. It runs after explicit/process transport selection, so authored
+`transport` options cannot bypass denial or canonical preview routing:
+
+```ts
+import {
+  PreviewTransport,
+  bindRelayWriteAuthorizer,
+  runWithRelayWriteAuthorizer,
+} from '@relayfile/relay-helpers/transport';
+
+const canonicalPreview = new PreviewTransport();
+const restoreAuthorization = bindRelayWriteAuthorizer(() => ({
+  allowed: true,
+  transport: canonicalPreview,
+}));
+try {
+  await handler();
+} finally {
+  restoreAuthorization();
+}
+```
+
+Returning `{ allowed: false }` rejects before any selected transport or native
+VFS write. Authorizers compose from outermost to innermost: any denial wins,
+and the first transport override remains authoritative, so Agent code cannot
+relax a runtime denial or redirect its canonical preview. Reads and lists are
+unaffected. Cleanup callbacks are idempotent and safe out of order, but should
+still be restored in `finally`.
+
+When one process can host overlapping Runs, use an isolated async scope rather
+than an imperative binding. Bindings created by code inside the operation still
+compose with the outer policy:
+
+```ts
+await runWithRelayWriteAuthorizer(
+  () => ({ allowed: true, transport: canonicalPreview }),
+  async () => {
+    await importAndRunAgent();
+  },
+);
+```
+
+The execution coordinator is shared across installed package copies and its
+global reference cannot be overwritten or deleted. This lets the runtime bind
+before importing authored code without exposing last-writer-wins policy state.

@@ -9,6 +9,9 @@ import { WRITEBACK_PATH_CATALOG } from '@relayfile/adapter-core/writeback-paths'
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import * as helpers from './index.js';
 import {
+  PreviewTransport,
+  RelayWriteAuthorizationError,
+  bindRelayWriteAuthorizer,
   githubClient,
   linearClient,
   notionClient,
@@ -42,6 +45,46 @@ test('relayClient.path resolves catalog paths and write drops a collection draft
   await linear.write('comments', { issueId: 'ISS-1' }, { body: 'hi' });
   const draft = await onlyJsonIn(path.join(root, 'linear/issues/ISS-1/comments'));
   assert.deepEqual(draft.body, { body: 'hi' });
+});
+
+test('final-write authorization redirects the native VFS fallback before filesystem mutation', async () => {
+  const { root, opts } = await mount();
+  const canonicalPreview = new PreviewTransport();
+  const restoreAuthorization = bindRelayWriteAuthorizer(() => ({
+    allowed: true,
+    transport: canonicalPreview,
+  }));
+
+  try {
+    await relayClient('linear', opts).write('comments', { issueId: 'ISS-redirect' }, { body: 'preview' });
+  } finally {
+    restoreAuthorization();
+  }
+
+  assert.deepEqual(await readdir(root), []);
+  assert.equal(canonicalPreview.actions.length, 1);
+  assert.equal(canonicalPreview.actions[0]?.path.startsWith('/linear/issues/ISS-redirect/comments/'), true);
+});
+
+test('final-write denial rejects the native VFS fallback before filesystem mutation', async () => {
+  const { root, opts } = await mount();
+  let deniedActions = 0;
+  const restoreAuthorization = bindRelayWriteAuthorizer(() => {
+    deniedActions += 1;
+    return { allowed: false };
+  });
+
+  try {
+    await assert.rejects(
+      () => relayClient('linear', opts).write('comments', { issueId: 'ISS-denied' }, { body: 'never written' }),
+      RelayWriteAuthorizationError,
+    );
+  } finally {
+    restoreAuthorization();
+  }
+
+  assert.equal(deniedActions, 1);
+  assert.deepEqual(await readdir(root), []);
 });
 
 test('relayClient.write writes item (.json) resources to the exact path', async () => {
@@ -421,6 +464,93 @@ test('src/generated/clients.ts is in sync with the catalog', async () => {
     committed,
     renderClients(),
     'generated clients are stale — run `npm run gen -w @relayfile/relay-helpers`'
+  );
+});
+
+test('all helper write sites converge on the final-write authorization boundary', async () => {
+  const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const srcRoot = path.join(pkgRoot, 'src');
+  const { findWriteBoundaryViolations, formatWriteBoundaryViolations } = await import(
+    pathToFileURL(path.join(pkgRoot, 'scripts/verify-write-boundary.mjs')).href
+  );
+  const violations = await findWriteBoundaryViolations({ sourceRoot: srcRoot });
+
+  assert.deepEqual(
+    violations,
+    [],
+    `helper write paths bypass the final-write authorizer:\n${formatWriteBoundaryViolations(violations)}`,
+  );
+});
+
+test('write-boundary guard rejects nested renamed, bracket, destructured, aliased, and VFS canaries', async () => {
+  const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const { findWriteBoundaryViolations } = await import(
+    pathToFileURL(path.join(pkgRoot, 'scripts/verify-write-boundary.mjs')).href
+  );
+  const canaryRoot = await mkdtemp(path.join(tmpdir(), 'relay-write-boundary-canary-'));
+  const nestedRoot = path.join(canaryRoot, 'future/nested');
+  await mkdir(nestedRoot, { recursive: true });
+  await writeFile(path.join(nestedRoot, 'bypass.ts'), `
+import { writeJsonFile as persist } from '@relayfile/adapter-core/vfs-client';
+
+interface Request {
+  provider: string;
+  resource: string;
+  parameters: Record<string, string>;
+  path: string;
+  body: unknown;
+}
+interface FutureTransport {
+  write(request: Request): Promise<unknown>;
+}
+
+export async function renamed(selectedTransport: FutureTransport, request: Request) {
+  await selectedTransport.write(request);
+  await selectedTransport['write'](request);
+  const { write: destructured } = selectedTransport;
+  await destructured(request);
+  const aliased = selectedTransport.write;
+  await aliased(request);
+  await persist(
+    {},
+    'future',
+    'write.future',
+    '/future/path.json',
+    request.body,
+  );
+}
+`);
+  const nestedAuthorizerPath = path.join(nestedRoot, 'write-authorizer.ts');
+  await writeFile(nestedAuthorizerPath, `
+interface Request {
+  provider: string;
+  resource: string;
+  parameters: Record<string, string>;
+  path: string;
+  body: unknown;
+}
+interface FutureTransport {
+  write(request: Request): Promise<unknown>;
+}
+
+export async function nestedAuthorizerBypass(transport: FutureTransport, request: Request) {
+  await transport.write(request);
+}
+`);
+
+  const violations = await findWriteBoundaryViolations({ sourceRoot: canaryRoot });
+  assert.ok(
+    violations.filter((violation: { kind: string }) => violation.kind === 'raw-transport-write').length >= 4,
+    `expected every raw transport canary to fail: ${JSON.stringify(violations)}`,
+  );
+  assert.ok(
+    violations.some((violation: { kind: string }) => violation.kind.startsWith('native-vfs-write')),
+    `expected multiline aliased VFS canary to fail: ${JSON.stringify(violations)}`,
+  );
+  assert.ok(
+    violations.some((violation: { kind: string; file: string }) =>
+      violation.kind === 'raw-transport-write' && violation.file === nestedAuthorizerPath),
+    `expected nested write-authorizer.ts canary to fail: ${JSON.stringify(violations)}`,
   );
 });
 

@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/relay-helpers` now exposes a process-scoped final-write authorizer that can deny or redirect every generic and bespoke helper write after explicit transport selection, preventing authored transports from bypassing immutable local preview policy.
 - `@relayfile/relay-helpers` now exports an injectable `RelayTransport` and side-effect-free `PreviewTransport` with deterministic simulated receipts, seeded reads, process-scoped binding for existing no-argument clients, and cross-write thread-reference recording.
 - Add authenticated GitHub pull-request create, ref push/update, and pull-request close writeback resources, selectable app/user PR authorship, plus live fail-closed merge-gate metadata on mounted pull requests.
 
@@ -24,6 +25,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/relay-helpers` final-write policies now compose monotonically in shared async scopes: authored rebinding cannot relax an outer denial or replace its canonical preview transport, overlapping Runs can be isolated, and out-of-order cleanup cannot resurrect stale policy.
 - `@relayfile/relay-helpers` now names its rich recorded transport action `TransportPreviewAction`, matching the cross-package ownership boundary; the former `PreviewAction` export remains as a deprecated compatibility alias and does not claim the provider-neutral runtime type.
 - GitHub ref writebacks now surface the nested provider `object.sha` as their receipt id, and pull-request creates use the PR number, so file-native callers can confirm both operations against canonical provider identities.
 - `@relayfile/relay-helpers` now delegates Reddit subreddit parameters to `@relayfile/adapter-reddit`'s `normalizeSubreddit` helper, preserving lowercase canonical paths and optional `r/` prefixes while rejecting empty normalized values.

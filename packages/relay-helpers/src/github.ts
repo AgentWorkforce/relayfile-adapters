@@ -1,13 +1,11 @@
-import {
-  encodeSegment,
-  writeJsonFile,
-} from '@relayfile/adapter-core/vfs-client';
+import { encodeSegment } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
 import { created } from './receipt.js';
 import {
   createRelayTransportResolver,
   type RelayClientOptions,
 } from './transport.js';
+import { executeRelayWrite } from './write-authorizer.js';
 
 export interface GithubTarget {
   owner: string;
@@ -156,17 +154,17 @@ export function githubClient(opts: RelayClientOptions = {}): GithubClient {
         ...(args.force !== undefined ? { force: args.force } : {})
       };
       const transport = resolveTransport();
-      if (transport) {
-        await transport.write({
+      await executeRelayWrite(
+        transport,
+        {
           provider: 'github',
           resource: 'refs',
           parameters: { owner: args.owner, repo: args.repo, ref: normalizedRef },
           path,
           body,
-        });
-      } else {
-        await writeJsonFile(opts, 'github', 'write.refs', path, body);
-      }
+        },
+        { options: opts, integration: 'github', operation: 'write.refs', path, data: body },
+      );
     },
     async closePullRequest(target: GithubTarget) {
       await base['close-pull-request'].write(

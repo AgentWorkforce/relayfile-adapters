@@ -46,7 +46,8 @@ export interface RelayTransport {
 export interface RelayClientOptions extends IntegrationClientOptions {
   /**
    * Explicit helper transport. It takes precedence over mount and HTTP options
-   * and over every ambient Relayfile/provider credential.
+   * and over every ambient Relayfile/provider credential during selection. A
+   * process write authorizer may still deny or redirect the final write.
    */
   transport?: RelayTransport;
 }
@@ -59,6 +60,14 @@ export interface PreviewTransportOptions {
   /** Override deterministic timestamps. Sequence numbers start at one. */
   timestampFactory?: (sequence: number) => string;
 }
+
+export {
+  RelayWriteAuthorizationError,
+  bindRelayWriteAuthorizer,
+  runWithRelayWriteAuthorizer,
+  type RelayWriteAuthorizationDecision,
+  type RelayWriteAuthorizer,
+} from './write-authorizer.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
