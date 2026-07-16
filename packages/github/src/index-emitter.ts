@@ -1,4 +1,6 @@
 import {
+  githubCommitPath,
+  githubRepoCommitsIndexPath,
   githubRepoIssuesIndexPath,
   githubRepoPullsIndexPath,
   githubReposIndexPath,
@@ -29,6 +31,40 @@ export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   // omitted for issues and for unmerged PRs. Additive — older readers ignore it.
   merged?: boolean;
   mergedAt?: string;
+}
+
+export interface GitHubCommitIndexRow extends GitHubRepoIndexRow {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  committedAt: string;
+  canonicalPath: string;
+}
+
+export interface GitHubCommitIndexInput {
+  sha: string;
+  message?: string | null;
+  authorLogin?: string | null;
+  committedAt?: string | null;
+}
+
+export function buildGitHubCommitIndexRow(
+  owner: string,
+  repo: string,
+  input: GitHubCommitIndexInput,
+): GitHubCommitIndexRow {
+  const message = input.message?.split('\n')[0]?.trim() ?? '';
+  const committedAt = input.committedAt?.trim() ?? '';
+  return {
+    id: input.sha,
+    title: message || input.sha,
+    updated: committedAt,
+    sha: input.sha,
+    message,
+    authorLogin: input.authorLogin?.trim() ?? '',
+    committedAt,
+    canonicalPath: githubCommitPath(owner, repo, input.sha),
+  };
 }
 
 /** Add merge lifecycle fields to a pull-request index row when GitHub supplies a timestamp. */
@@ -97,6 +133,18 @@ export function buildRepoPullsIndexFile(
   };
 }
 
+export function buildRepoCommitsIndexFile(
+  owner: string,
+  repo: string,
+  rows: GitHubCommitIndexRow[],
+): GitHubIndexFile {
+  return {
+    path: githubRepoCommitsIndexPath(owner, repo),
+    contentType: 'application/json; charset=utf-8',
+    content: `${JSON.stringify([...rows].sort(compareRepoRows))}\n`,
+  };
+}
+
 export async function readRepoIndexRows(
   vfs: VfsLike,
 ): Promise<GitHubRepoIndexRow[]> {
@@ -121,6 +169,13 @@ export function upsertRecordIndexRow(
   rows: GitHubRecordIndexRow[],
   row: GitHubRecordIndexRow,
 ): GitHubRecordIndexRow[] {
+  return upsertIndexRow(rows, row);
+}
+
+export function upsertCommitIndexRow(
+  rows: GitHubCommitIndexRow[],
+  row: GitHubCommitIndexRow,
+): GitHubCommitIndexRow[] {
   return upsertIndexRow(rows, row);
 }
 

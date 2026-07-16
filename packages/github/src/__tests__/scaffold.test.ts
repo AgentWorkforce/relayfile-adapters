@@ -80,6 +80,7 @@ describe('GitHubAdapter scaffold', () => {
       default: 'eager',
       webhookWritesForLazyRepos: true,
     });
+    assert.strictEqual(config.maxCommits, DEFAULT_CONFIG.maxCommits);
     assert.strictEqual(config.maxFileSizeBytes, DEFAULT_CONFIG.maxFileSizeBytes);
     assert.deepStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
     assert.notStrictEqual(config.supportedEvents, DEFAULT_CONFIG.supportedEvents);
@@ -142,6 +143,7 @@ describe('GitHubAdapter scaffold', () => {
             incremental: true,
           },
           pulls: 'lazy',
+          commits: undefined,
         },
       ],
     });
@@ -158,6 +160,10 @@ describe('GitHubAdapter scaffold', () => {
       /fetchFileContents must be a boolean/,
     );
     assert.throws(
+      () => validateConfig({ maxCommits: 0 }),
+      /maxCommits must be a positive integer/,
+    );
+    assert.throws(
       () => validateConfig({ maxFileSizeBytes: 0 }),
       /maxFileSizeBytes must be a positive integer/,
     );
@@ -171,7 +177,7 @@ describe('GitHubAdapter scaffold', () => {
     );
     assert.throws(
       () => validateConfig({ materialization: { rules: [{ resources: ['unknown'] }] } as never }),
-      /materialization.rules\[0\].resources\[0\] must be "issues" or "pulls"/,
+      /materialization.rules\[0\].resources\[0\] must be one of: issues, pulls, commits/,
     );
   });
 

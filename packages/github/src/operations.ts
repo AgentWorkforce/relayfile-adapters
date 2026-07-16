@@ -38,6 +38,13 @@ export interface GitHubListPullRequestsInput extends GitHubRepoRef, GitHubPagina
   direction?: 'asc' | 'desc';
 }
 
+export interface GitHubListRepoCommitsInput extends GitHubRepoRef, GitHubPaginationInput {
+  sha?: string;
+  path?: string;
+  since?: string;
+  until?: string;
+}
+
 export interface GitHubListCommentsInput extends GitHubRepoRef, GitHubPaginationInput {
   number: number;
   since?: string;
@@ -95,6 +102,20 @@ export function listPullRequests(input: GitHubListPullRequestsInput): GitHubOper
       head: normalizeOptionalString(input.head),
       sort: normalizeOptionalString(input.sort),
       direction: input.direction,
+      ...paginationQuery(input),
+    }),
+  };
+}
+
+export function listRepoCommits(input: GitHubListRepoCommitsInput): GitHubOperation {
+  return {
+    method: 'GET',
+    path: buildRepoPath(input, '/commits'),
+    query: compactQuery({
+      sha: normalizeOptionalString(input.sha),
+      path: normalizeOptionalString(input.path),
+      since: normalizeOptionalString(input.since),
+      until: normalizeOptionalString(input.until),
       ...paginationQuery(input),
     }),
   };

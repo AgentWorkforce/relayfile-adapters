@@ -3,9 +3,16 @@ import { withProxyRetry } from '@relayfile/adapter-core/http';
 import type { ConnectionProvider } from '@relayfile/sdk';
 
 import { createGitHubSchemaAdapter } from './adapter.js';
+import { atomicUpsertCommitIndex, upsertIndexAtomic } from './atomic-index.js';
 import { GITHUB_API_BASE_URL } from './config.js';
 import { DEFAULT_CONFIG, validateConfig } from './config.js';
 import type { VfsLike } from './files/content-fetcher.js';
+import {
+  buildGitHubCommitIndexRow,
+  buildRepoCommitsIndexFile,
+  type GitHubCommitIndexRow,
+  upsertCommitIndexRow,
+} from './index-emitter.js';
 import { mergeIngestResults, vfsPathExists } from './ingest-utils.js';
 import { isActualIssue } from './issues/fetcher.js';
 import {
@@ -16,9 +23,11 @@ import { materializeRepo as materializeGitHubRepo, syncGitHubWorkspace } from '.
 import { shouldWriteWebhookForRepo } from './materialization-policy.js';
 import {
   githubByIdAliasPath,
+  githubCommitPath,
   githubDeploymentStatusPath,
   githubIssuePath,
   githubPullRequestPath,
+  githubRepoCommitsIndexPath,
 } from './path-mapper.js';
 import {
   type FileSemantics,
@@ -38,6 +47,7 @@ import { GitHubWritebackHandler } from './writeback.js';
 import { fetchPullRequestGateMetadata } from './pr/parser.js';
 
 export * from './emit-auxiliary-files.js';
+export { fetchRepoCommits, type FetchRepoCommitsOptions } from './commits/fetcher.js';
 export * from './digest.js';
 export * from './index-emitter.js';
 export * from './layout.js';
@@ -255,6 +265,85 @@ export class GitHubAdapter extends LocalIntegrationAdapter implements WebhookAda
   }
 
   async ingestPushCommits(payload: Record<string, unknown>): Promise<IngestResult> {
+    const repoInfo = extractRepoInfo(payload);
+    const owner = repoInfo.owner || this.config.owner;
+    const repo = repoInfo.repo || this.config.repo;
+    const vfs = this.tryGetVfsProvider();
+
+    // When the provider supports VFS writes, materialize all commits in the
+    // push payload (not just head_commit) using the canonical path convention.
+    // This mirrors the repo-level backfill path and ensures forward-sync keeps
+    // the commits/ subtree current without requiring a full re-materialize.
+    if (vfs && owner && repo) {
+      const commits = readPushCommitsArray(payload);
+      if (commits.length > 0) {
+        const results: IngestResult[] = [];
+        const commitIndexRows: GitHubCommitIndexRow[] = [];
+        for (const commit of commits) {
+          const commitRecord = asRecord(commit);
+          const sha = readString(commitRecord?.sha) ?? readString(commitRecord?.id) ?? '';
+          if (!sha) continue;
+          const path = githubCommitPath(owner, repo, sha);
+          try {
+            const webhookRecord = normalizePushCommitRecord(commitRecord ?? {}, sha);
+            let canonicalRecord = webhookRecord;
+            const { existedAtWrite } = await upsertIndexAtomic(
+              vfs,
+              path,
+              parseCanonicalCommitRecord,
+              (records) => {
+                canonicalRecord = mergeJsonObjectsPreferExisting(webhookRecord, records[0]);
+                return [canonicalRecord];
+              },
+              (records) => `${JSON.stringify(records[0], null, 2)}\n`,
+            );
+            commitIndexRows.push(
+              buildGitHubCommitIndexRow(owner, repo, {
+                sha,
+                message:
+                  readNestedString(canonicalRecord, 'commit', 'message')
+                  ?? readString(canonicalRecord.message),
+                authorLogin: readNestedString(canonicalRecord, 'author', 'login'),
+                committedAt:
+                  readNestedString(canonicalRecord, 'commit', 'committer', 'date')
+                  ?? readNestedString(canonicalRecord, 'commit', 'author', 'date')
+                  ?? readString(canonicalRecord.timestamp),
+              }),
+            );
+            results.push({
+              filesWritten: existedAtWrite ? 0 : 1,
+              filesUpdated: existedAtWrite ? 1 : 0,
+              filesDeleted: 0,
+              paths: [path],
+              errors: [],
+            });
+          } catch (error) {
+            results.push({
+              filesWritten: 0,
+              filesUpdated: 0,
+              filesDeleted: 0,
+              paths: [],
+              errors: [{ path, error: error instanceof Error ? error.message : String(error) }],
+            });
+          }
+        }
+        if (commitIndexRows.length > 0) {
+          const indexPath = githubRepoCommitsIndexPath(owner, repo);
+          results.push(
+            await atomicUpsertCommitIndex(
+              vfs,
+              indexPath,
+              (rows) => commitIndexRows.reduce(upsertCommitIndexRow, rows),
+              (rows) => buildRepoCommitsIndexFile(owner, repo, rows).content,
+            ),
+          );
+        }
+        if (results.length > 0) {
+          return mergeIngestResults(...results);
+        }
+      }
+    }
+
     return this.createIngestResult('push', 'commit', payload, 'write');
   }
 
@@ -692,6 +781,115 @@ function hasNextPage(headers: Record<string, string>): boolean {
   );
 }
 
+function normalizePushCommitRecord(
+  record: Record<string, unknown>,
+  sha: string,
+): JsonObject {
+  const author = asRecord(record.author);
+  const committer = asRecord(record.committer) ?? author;
+  const timestamp = readString(record.timestamp);
+  const authorLogin = readString(author?.username);
+  const committerLogin = readString(committer?.username);
+
+  return {
+    ...record,
+    sha,
+    commit: {
+      message: readString(record.message) ?? '',
+      author: {
+        name: readString(author?.name) ?? '',
+        email: readString(author?.email) ?? '',
+        date: timestamp ?? '',
+      },
+      committer: {
+        name: readString(committer?.name) ?? '',
+        email: readString(committer?.email) ?? '',
+        date: timestamp ?? '',
+      },
+    },
+    author: authorLogin ? { login: authorLogin } : null,
+    committer: committerLogin ? { login: committerLogin } : null,
+    parents: Array.isArray(record.parents) ? record.parents : [],
+  } as JsonObject;
+}
+
+function parseCanonicalCommitRecord(content: string | undefined): JsonObject[] {
+  if (!content) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return isPlainObject(parsed) ? [parsed as JsonObject] : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Merge a sparse webhook snapshot into an existing canonical record without
+ * allowing it to erase richer REST fields. Existing values win recursively;
+ * the webhook-normalized record only fills keys that are absent.
+ */
+function mergeJsonObjectsPreferExisting(
+  incoming: JsonObject,
+  existing: JsonObject | undefined,
+): JsonObject {
+  if (!existing) {
+    return incoming;
+  }
+
+  const merged: Record<string, unknown> = { ...incoming };
+  for (const [key, existingValue] of Object.entries(existing)) {
+    const incomingValue = merged[key];
+    merged[key] = isPlainObject(existingValue) && isPlainObject(incomingValue)
+      ? mergeJsonObjectsPreferExisting(
+          incomingValue as JsonObject,
+          existingValue as JsonObject,
+        )
+      : existingValue;
+  }
+  return merged as JsonObject;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Extract all commits from a GitHub push webhook payload. GitHub includes both
+ * a `commits[]` array (all commits in the push, up to ~20) and a `head_commit`
+ * (the newest commit). We return the full array, de-duplicated and with
+ * head_commit included to cover the case where `commits` is absent or truncated.
+ */
+function readPushCommitsArray(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const result: Record<string, unknown>[] = [];
+
+  const commitsRaw = payload.commits;
+  if (Array.isArray(commitsRaw)) {
+    for (const entry of commitsRaw) {
+      const commit = asRecord(entry);
+      if (!commit) continue;
+      const sha = readString(commit.id) ?? readString(commit.sha) ?? '';
+      if (!sha || seen.has(sha)) continue;
+      seen.add(sha);
+      result.push(commit);
+    }
+  }
+
+  const headCommit = asRecord(payload.head_commit);
+  if (headCommit) {
+    const headSha = readString(headCommit.id) ?? readString(headCommit.sha) ?? '';
+    if (headSha && !seen.has(headSha)) {
+      seen.add(headSha);
+      result.push(headCommit);
+    }
+  }
+
+  return result;
+}
+
 function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -808,12 +1006,18 @@ async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefin
   const reader = vfs.readFile ?? vfs.read ?? vfs.get;
   if (!reader) return undefined;
   const value = await reader.call(vfs, path);
-  return typeof value === 'string' ? value : undefined;
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (isPlainObject(value) && typeof value.content === 'string') {
+    return value.content;
+  }
+  return undefined;
 }
 
 async function writeVfsText(vfs: VfsLike, path: string, content: string): Promise<void> {
   const writer = vfs.writeFile ?? vfs.write ?? vfs.put ?? vfs.set ?? vfs.upsert;
-  if (!writer) throw new Error(`GitHub VFS cannot write fail-closed gate state at ${path}`);
+  if (!writer) throw new Error(`GitHub VFS cannot write ${path}`);
   await writer.call(vfs, path, content);
 }
 
