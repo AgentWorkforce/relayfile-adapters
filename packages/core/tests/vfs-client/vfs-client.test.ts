@@ -163,6 +163,7 @@ test("a draft carrying a monitored field is not mistaken for a receipt", async (
     { id: "ISS-1", title: "still a draft" }
   );
   assert.equal(result.receipt, undefined);
+  assert.equal(result.deliveryStatus, "pending");
 
   // normalize makes no-receipt first class (for W6 / RFC 2291)
   const n = normalizeWritebackStatus(result);
@@ -221,6 +222,7 @@ test("writeJsonFile can wait on direct Relayfile op providerResult instead of mo
   );
 
   assert.equal(result.opId, "op_slack_1");
+  assert.equal(result.deliveryStatus, "confirmed");
   assert.equal(result.receipt?.externalId, "1781870464.800039");
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);

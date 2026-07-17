@@ -116,12 +116,15 @@ export interface RelayfileWritebackTerminalErrorOptions {
   provider: string;
   operation: string;
   opId: string;
+  /** Relayfile path when the caller has it; optional for constructor compatibility. */
+  path?: string;
   status: string;
   lastError?: string | null;
 }
 
 export class RelayfileWritebackTerminalError extends RelayfileWritebackError {
   readonly opId: string;
+  readonly path?: string;
   readonly status: string;
 
   constructor(options: RelayfileWritebackTerminalErrorOptions) {
@@ -137,6 +140,7 @@ export class RelayfileWritebackTerminalError extends RelayfileWritebackError {
     });
     this.name = "RelayfileWritebackTerminalError";
     this.opId = options.opId;
+    this.path = options.path;
     this.status = options.status;
   }
 }
@@ -221,11 +225,27 @@ export interface WritebackReceipt {
   [key: string]: unknown;
 }
 
+/**
+ * Delivery knowledge available when a transport returns from a write.
+ *
+ * `pending` means the draft was accepted but no provider receipt was observed
+ * inside the caller's wait window. It must not be treated as a failed write:
+ * retrying it can duplicate a provider-side effect. `dropped` is reserved for
+ * transports that have positive evidence that the draft will not be handled.
+ */
+export type WritebackDeliveryStatus = "confirmed" | "pending" | "dropped";
+
 export interface WritebackResult {
   path: string;
   absolutePath: string;
   opId?: string;
   receipt?: WritebackReceipt;
+  /**
+   * Explicit delivery knowledge. Optional so existing custom transports remain
+   * source-compatible; consumers may infer confirmed/pending from receipt
+   * presence when an older transport omits it.
+   */
+  deliveryStatus?: WritebackDeliveryStatus;
 }
 
 const DEFAULT_WRITEBACK_TIMEOUT_MS = 3_000;
@@ -503,6 +523,7 @@ async function waitForOperationReceipt(
           provider,
           operation,
           opId,
+          path: relayPath,
           status: op.status,
           lastError: op.lastError
         });
@@ -573,6 +594,7 @@ async function writeJsonFileViaRelayfileApi(
       path: relayPath,
       absolutePath: relayPath,
       opId: queued.opId,
+      deliveryStatus: receipt ? "confirmed" : "pending",
       ...(receipt ? { receipt } : {})
     };
   } catch (error) {
@@ -748,7 +770,12 @@ export async function writeJsonFile(
     await writeFile(tempPath, `${JSON.stringify(body, null, 2)}\n`, "utf8");
     await rename(tempPath, absolutePath);
     const receipt = await waitForReceipt(absolutePath, client, body);
-    return { path: relayPath, absolutePath, ...(receipt ? { receipt } : {}) };
+    return {
+      path: relayPath,
+      absolutePath,
+      deliveryStatus: receipt ? "confirmed" : "pending",
+      ...(receipt ? { receipt } : {})
+    };
   } catch (cause) {
     if (cause instanceof RelayfileWritebackError) {
       throw cause;

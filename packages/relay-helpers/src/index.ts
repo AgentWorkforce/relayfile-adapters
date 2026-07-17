@@ -22,7 +22,13 @@
  */
 export { relayClient, encodeSegment, type RelayClient, type RelayParams } from './generic.js';
 export { providerClient, type ProviderClient, type ResourceClient } from './provider-client.js';
-export { created } from './receipt.js';
+export {
+  created,
+  type CreatedConfirmed,
+  type CreatedDropped,
+  type CreatedPending,
+  type CreatedResult,
+} from './receipt.js';
 export {
   PreviewTransport,
   RelayWriteAuthorizationError,
@@ -77,4 +83,8 @@ export {
 // `export *` so a newly-added provider needs only a re-`gen`, no edit here.
 export * from './generated/clients.js';
 
-export type { IntegrationClientOptions, WritebackResult } from '@relayfile/adapter-core/vfs-client';
+export type {
+  IntegrationClientOptions,
+  WritebackDeliveryStatus,
+  WritebackResult,
+} from '@relayfile/adapter-core/vfs-client';

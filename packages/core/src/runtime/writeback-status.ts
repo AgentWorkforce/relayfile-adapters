@@ -98,12 +98,14 @@ export interface WritebackResultLike {
   path: string;
   absolutePath?: string;
   receipt?: WritebackReceiptLike;
+  deliveryStatus?: "confirmed" | "pending" | "dropped";
 }
 
 /** Unified state enum for runtime wrappers, W6 logging, and W2 terminal taxonomy. */
 export type NormalizedWritebackState =
   | "succeeded"
   | "no_receipt"
+  | "dropped"
   | WritebackOutcome;
 
 export interface NormalizedWritebackStatus {
@@ -125,6 +127,7 @@ export interface NormalizedWritebackStatus {
  *
  * - receipt absent (or explicit) -> 'no_receipt'
  * - receipt present + ok -> 'succeeded'
+ * - explicit transport drop evidence -> 'dropped'
  * - otherwise maps the outcome
  *
  * This lets workforce runtime do:
@@ -138,6 +141,19 @@ export function normalizeWritebackStatus(
 ): NormalizedWritebackStatus {
   const path = result?.path ?? entry?.path ?? "";
   const receipt = result?.receipt;
+
+  if (result?.deliveryStatus === "dropped") {
+    return {
+      state: "dropped",
+      path,
+      op: entry?.op,
+      error: entry?.error ?? "transport confirmed the writeback was dropped",
+      field: entry?.field,
+      receipt,
+      timestamp: entry?.timestamp,
+      ...(entry ? { entry } : {}),
+    };
+  }
 
   if (!receipt) {
     return {
