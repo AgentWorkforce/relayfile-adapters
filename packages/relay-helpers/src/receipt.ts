@@ -59,18 +59,25 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function receiptIdentifier(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return nonEmptyString(value);
+}
+
 function hasReceiptEvidence(receipt: WritebackReceipt): boolean {
   return (
-    nonEmptyString(receipt.created) !== undefined ||
-    nonEmptyString(receipt.id) !== undefined ||
-    nonEmptyString(receipt.externalId) !== undefined ||
-    nonEmptyString(receipt.identifier) !== undefined ||
+    receiptIdentifier(receipt.created) !== undefined ||
+    receiptIdentifier(receipt.id) !== undefined ||
+    receiptIdentifier(receipt.externalId) !== undefined ||
+    receiptIdentifier(receipt.identifier) !== undefined ||
     nonEmptyString(receipt.path) !== undefined ||
     nonEmptyString(receipt.url) !== undefined ||
-    nonEmptyString(receipt.ts) !== undefined ||
+    receiptIdentifier(receipt.ts) !== undefined ||
     typeof receipt.merged === 'boolean' ||
     nonEmptyString(receipt.merged) !== undefined ||
-    nonEmptyString(receipt.sha) !== undefined ||
+    receiptIdentifier(receipt.sha) !== undefined ||
     receipt.ok === true
   );
 }
@@ -144,10 +151,12 @@ export function created(result: WritebackResult | PromiseLike<WritebackResult>):
     return {
       status,
       id:
-        nonEmptyString(receipt.created) ??
-        nonEmptyString(receipt.id) ??
-        nonEmptyString(receipt.externalId) ??
-        nonEmptyString(receipt.identifier) ??
+        receiptIdentifier(receipt.created) ??
+        receiptIdentifier(receipt.id) ??
+        receiptIdentifier(receipt.externalId) ??
+        receiptIdentifier(receipt.identifier) ??
+        receiptIdentifier(receipt.sha) ??
+        receiptIdentifier(receipt.ts) ??
         path,
       url: nonEmptyString(receipt.url) ?? '',
       path,

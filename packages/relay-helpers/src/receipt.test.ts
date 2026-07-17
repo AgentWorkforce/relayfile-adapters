@@ -9,6 +9,7 @@ import {
 } from '@relayfile/adapter-core/vfs-client';
 import type {
   WritebackDeliveryStatus,
+  WritebackReceipt,
   WritebackResult,
 } from '@relayfile/adapter-core/vfs-client';
 import {
@@ -70,6 +71,27 @@ test('created infers confirmed for legacy transports that return a receipt', () 
   assert.equal(result.url, 'https://linear.example/legacy-123');
 });
 
+test('created normalizes runtime numeric ids and uses sha or ts as primary receipt identifiers', () => {
+  const numeric = created({
+    path,
+    absolutePath: path,
+    deliveryStatus: 'confirmed',
+    receipt: { id: 123 } as unknown as WritebackReceipt,
+  });
+  assert.equal(numeric.status, 'confirmed');
+  assert.equal(numeric.id, '123');
+
+  for (const [receipt, expected] of [
+    [{ sha: 'commit-abc123' }, 'commit-abc123'],
+    [{ ts: '1781870464.800039' }, '1781870464.800039'],
+  ] as const) {
+    const result = created({ path, absolutePath: path, deliveryStatus: 'confirmed', receipt });
+    assert.equal(result.status, 'confirmed');
+    assert.equal(result.id, expected);
+    assert.notEqual(result.id, path);
+  }
+});
+
 test('created returns pending without throwing when a receipt is not yet visible', () => {
   const explicit = created({ path, absolutePath: path, deliveryStatus: 'pending' });
   const legacy = created({ path, absolutePath: path });
@@ -105,6 +127,7 @@ test('created rejects malformed or unknown runtime transport results clearly', (
     { path, absolutePath: path, deliveryStatus: 'confirmed' },
     { path, absolutePath: path, receipt: {} },
     { path, absolutePath: path, receipt: { provider: 'github' } },
+    { path, absolutePath: path, receipt: { id: Number.NaN } },
     { path, absolutePath: path, deliveryStatus: 'pending', receipt: { id: 'contradiction' } },
   ];
 
