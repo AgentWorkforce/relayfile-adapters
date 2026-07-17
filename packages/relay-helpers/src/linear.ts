@@ -2,7 +2,7 @@ import { readJsonFile } from '@relayfile/adapter-core/vfs-client';
 import { linearByUuidAliasPath } from '@relayfile/adapter-linear/path-mapper';
 import { encodeSegment } from './generic.js';
 import { providerClient, type ProviderClient } from './provider-client.js';
-import { created } from './receipt.js';
+import { created, type CreatedResult } from './receipt.js';
 import type { LinearAgentActivity } from '@relayfile/adapter-linear/types';
 import {
   createRelayTransportResolver,
@@ -43,19 +43,19 @@ export type LinearUpdateLabelArgs = Partial<Pick<LinearCreateLabelArgs, 'name' |
 
 export interface LinearClient extends ProviderClient<'linear'> {
   /** Post an activity to a Linear Agent Session. */
-  agentActivity(sessionId: string, activity: LinearAgentActivity): Promise<{ id: string; url: string }>;
+  agentActivity(sessionId: string, activity: LinearAgentActivity): Promise<CreatedResult>;
   /** Send a response activity to a Linear Agent Session. */
-  respond(sessionId: string, body: string): Promise<{ id: string; url: string }>;
+  respond(sessionId: string, body: string): Promise<CreatedResult>;
   /** Send a quick thought activity so Linear knows the agent is working. */
-  acknowledge(sessionId: string): Promise<{ id: string; url: string }>;
+  acknowledge(sessionId: string): Promise<CreatedResult>;
   /** Comment on an issue. */
-  comment(issueId: string, body: string): Promise<{ id: string; url: string }>;
+  comment(issueId: string, body: string): Promise<CreatedResult>;
   /** Create an issue. */
-  createIssue(args: LinearCreateIssueArgs): Promise<{ id: string; url: string }>;
+  createIssue(args: LinearCreateIssueArgs): Promise<CreatedResult>;
   /** Patch an existing issue. */
   updateIssue(issueId: string, args: LinearUpdateIssueArgs): Promise<void>;
   /** Create a label. */
-  createLabel(args: LinearCreateLabelArgs): Promise<{ id: string; url: string }>;
+  createLabel(args: LinearCreateLabelArgs): Promise<CreatedResult>;
   /** Patch an existing label. */
   updateLabel(labelId: string, args: LinearUpdateLabelArgs): Promise<void>;
   /** Read one issue by id. */
@@ -78,7 +78,7 @@ export function linearClient(opts: RelayClientOptions = {}): LinearClient {
   // canonical issue item path until its contract is separately proven.
   const issueUuidPath = (issueId: string) => linearByUuidAliasPath(base.issues.path(), issueId);
   const agentActivity = async (sessionId: string, activity: LinearAgentActivity) =>
-    created(await base['agent-activities'].write({ sessionId }, activity));
+    created(base['agent-activities'].write({ sessionId }, activity));
   return Object.assign(base, {
     agentActivity,
     async respond(sessionId: string, body: string) {
@@ -88,10 +88,10 @@ export function linearClient(opts: RelayClientOptions = {}): LinearClient {
       return agentActivity(sessionId, { type: 'thought', body: 'Acknowledged.' });
     },
     async comment(issueId: string, body: string) {
-      return created(await base.comments.write({ issueId }, { body }));
+      return created(base.comments.write({ issueId }, { body }));
     },
     async createIssue(args: LinearCreateIssueArgs) {
-      return created(await base.issues.write({}, args));
+      return created(base.issues.write({}, args));
     },
     async updateIssue(issueId: string, args: Record<string, unknown>) {
       const path = issuePath(issueId);
@@ -103,7 +103,7 @@ export function linearClient(opts: RelayClientOptions = {}): LinearClient {
       );
     },
     async createLabel(args: LinearCreateLabelArgs) {
-      return created(await base.labels.write({}, args));
+      return created(base.labels.write({}, args));
     },
     async updateLabel(labelId: string, args: Record<string, unknown>) {
       const path = labelPath(labelId);

@@ -193,6 +193,7 @@ export class PreviewTransport implements RelayTransport {
     return {
       path,
       absolutePath: path,
+      deliveryStatus: 'confirmed',
       receipt: {
         id: simulatedReceipt.id,
         created: simulatedReceipt.id,

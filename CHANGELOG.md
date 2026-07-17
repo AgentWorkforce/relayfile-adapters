@@ -26,6 +26,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/relay-helpers` GitHub and Linear create helpers now return a discriminated `confirmed`/`pending`/`dropped` result, preserve late-receipt writes as non-throwing `pending`, and never disguise a Relayfile draft path as a provider URL.
 - `@relayfile/relay-helpers` final-write policies now compose monotonically in shared async scopes: authored rebinding cannot relax an outer denial or replace its canonical preview transport, overlapping Runs can be isolated, and out-of-order cleanup cannot resurrect stale policy.
 - `@relayfile/relay-helpers` now names its rich recorded transport action `TransportPreviewAction`, matching the cross-package ownership boundary; the former `PreviewAction` export remains as a deprecated compatibility alias and does not claim the provider-neutral runtime type.
 - GitHub ref writebacks now surface the nested provider `object.sha` as their receipt id, and pull-request creates use the PR number, so file-native callers can confirm both operations against canonical provider identities.

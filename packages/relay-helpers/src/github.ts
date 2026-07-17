@@ -1,6 +1,6 @@
 import { encodeSegment } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
-import { created } from './receipt.js';
+import { created, type CreatedResult } from './receipt.js';
 import {
   createRelayTransportResolver,
   type RelayClientOptions,
@@ -15,7 +15,7 @@ export interface GithubTarget {
 
 export interface GithubClient extends ProviderClient<'github'> {
   /** Comment on an issue or pull request. */
-  comment(target: GithubTarget, body: string): Promise<{ id: string; url: string }>;
+  comment(target: GithubTarget, body: string): Promise<CreatedResult>;
   /** Create an issue. */
   createIssue(args: {
     owner: string;
@@ -23,7 +23,7 @@ export interface GithubClient extends ProviderClient<'github'> {
     title: string;
     body: string;
     labels?: string[];
-  }): Promise<{ id: string; url: string }>;
+  }): Promise<CreatedResult>;
   /** Create a pull request from a branch already present on GitHub. */
   createPullRequest(args: {
     owner: string;
@@ -34,7 +34,7 @@ export interface GithubClient extends ProviderClient<'github'> {
     body?: string;
     draft?: boolean;
     author?: 'app' | 'user';
-  }): Promise<{ id: string; url: string }>;
+  }): Promise<CreatedResult>;
   /** Create a Git ref through a non-canonical draft. */
   pushRef(args: {
     owner: string;
@@ -86,7 +86,7 @@ export function githubClient(opts: RelayClientOptions = {}): GithubClient {
   return Object.assign(base, {
     async comment(target: GithubTarget, body: string) {
       return created(
-        await base['issue-comments'].write(
+        base['issue-comments'].write(
           { owner: target.owner, repo: target.repo, issueNumber: target.number },
           { body }
         )
@@ -94,7 +94,7 @@ export function githubClient(opts: RelayClientOptions = {}): GithubClient {
     },
     async createIssue(args: { owner: string; repo: string; title: string; body: string; labels?: string[] }) {
       return created(
-        await base.issues.write(
+        base.issues.write(
           { owner: args.owner, repo: args.repo },
           { title: args.title, body: args.body, ...(args.labels ? { labels: args.labels } : {}) }
         )
@@ -111,7 +111,7 @@ export function githubClient(opts: RelayClientOptions = {}): GithubClient {
       author?: 'app' | 'user';
     }) {
       return created(
-        await base['pull-requests'].write(
+        base['pull-requests'].write(
           { owner: args.owner, repo: args.repo },
           {
             title: args.title,

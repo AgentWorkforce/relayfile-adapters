@@ -20,6 +20,43 @@ await githubClient().mergePullRequest({ owner, repo, number });
 await slackClient().post('#eng', 'shipped');
 ```
 
+## Create delivery status
+
+GitHub and Linear create helpers return a discriminated `CreatedResult` instead
+of making a missing receipt look confirmed:
+
+```ts
+const posted = await githubClient().comment({ owner, repo, number }, body);
+
+switch (posted.status) {
+  case 'confirmed':
+    console.log('provider receipt received', posted.id, posted.url);
+    break;
+  case 'pending':
+    // The draft was accepted and may still be delivered. Do not throw/retry:
+    // doing so can duplicate the provider-side effect.
+    console.log('write accepted; receipt not observed yet', posted.path);
+    break;
+  case 'dropped':
+    console.error('transport confirmed the write was dropped', posted.path);
+    break;
+}
+```
+
+`path` is always the Relayfile draft handle. For compatibility, `id` also
+falls back to that path until a provider receipt supplies an id. `url` is an
+empty string when no provider URL exists; it is never populated with a
+filesystem path. Older custom transports need no changes: a receipt implies
+`confirmed`, while no receipt implies `pending`. A transport should report
+`dropped` only with positive evidence that the draft will not be handled.
+Mount receipt timeouts and direct-HTTP operations that are still running are
+therefore `pending`; a direct operation explicitly reported as failed,
+dead-lettered, or canceled is `dropped`. Ambiguous failures such as an admission
+timeout still throw because the server may have accepted the request before the
+client lost the response—calling that dropped would make an unsafe retry look
+safe. A missing receipt alone can never distinguish pending from an unmounted
+draft, so callers must not promote `pending` to `dropped` themselves.
+
 ## A named client for every provider
 
 Every provider in the catalog has a named client (`asanaClient`, `notionClient`,

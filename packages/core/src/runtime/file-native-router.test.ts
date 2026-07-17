@@ -241,6 +241,15 @@ test("normalizeWritebackStatus bridges no-receipt and outcomes for W6", () => {
   assert.equal(noReceipt.path, "/linear/issues/draft.json");
   assert.match(noReceipt.error || "", /no receipt/);
 
+  // A transport may report dropped only from positive lower-layer evidence;
+  // the normalizer must not collapse that state back into no_receipt.
+  const dropped = normalizeWritebackStatus({
+    path: "/linear/issues/dropped.json",
+    deliveryStatus: "dropped",
+  });
+  assert.equal(dropped.state, "dropped");
+  assert.match(dropped.error || "", /confirmed.*dropped/);
+
   // with receipt -> succeeded (unless entry says otherwise)
   const withReceipt = normalizeWritebackStatus({
     path: "/linear/issues/123.json",
