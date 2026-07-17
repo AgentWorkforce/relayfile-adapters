@@ -17,6 +17,7 @@ import {
   githubClient,
   linearClient,
   PreviewTransport,
+  providerClient,
   type CreatedConfirmed,
   type CreatedDropped,
   type CreatedPending,
@@ -28,7 +29,12 @@ import {
   type RelayTransportWriteRequest,
 } from './index.js';
 
-const path = '/github/repos/o/r/issues/1/comments/issue-comments draft.json';
+const issueCommentsPath = providerClient('github')['issue-comments'].path({
+  owner: 'o',
+  repo: 'r',
+  issueNumber: 1,
+});
+const path = `${issueCommentsPath}/issue-comments draft.json`;
 
 test('created preserves confirmed receipts and never substitutes a path for url', () => {
   assert.deepEqual(
@@ -245,7 +251,7 @@ test('direct HTTP receipt timeout becomes pending instead of a retry-triggering 
   }).comment({ owner: 'o', repo: 'r', number: 1 }, 'pending');
 
   assert.equal(result.status, 'pending');
-  assert.match(result.path, /^\/github\/repos\/o\/r\/issues\/1\/comments\//u);
+  assert.equal(result.path.startsWith(`${issueCommentsPath}/`), true);
   assert.equal(result.url, '');
 });
 
