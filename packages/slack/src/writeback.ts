@@ -7,6 +7,22 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 type JsonPrimitive = boolean | number | null | string;
 type JsonValue = JsonValue[] | { [key: string]: JsonValue } | JsonPrimitive;
 
+export interface SlackRunCost {
+  /** Formatted USD amount for the current run, without the leading `$`. */
+  thisRun: string;
+  /** Formatted seven-day daily USD trend, without the leading `$`. */
+  perDay: string;
+  /** Seven-day cache-hit percentage, rounded to a whole percent. */
+  cachePct: number;
+}
+
+export interface SlackRunCostResolverOptions {
+  /** Runtime environment override, primarily for non-Node runtimes and tests. */
+  env?: Record<string, string | undefined>;
+  /** Fetch implementation override, primarily for tests. */
+  fetch?: typeof globalThis.fetch;
+}
+
 const MESSAGE_RECORD_PATH_PATTERN =
   /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)(?:\.json|\/meta\.json)$/;
 
@@ -34,12 +50,42 @@ const MESSAGE_RECORD_PATH_PATTERN =
  * recover the canonical `1234567890.001234` form Slack expects.
  */
 export function resolveWritebackRequest(path: string, content: string): SlackWritebackRequest {
+  return resolveWritebackRequestWithCost(path, content);
+}
+
+/**
+ * Resolve a Slack writeback and enrich agent-authored message creates with the
+ * current proactive run's cost footer when cloud usage data is available.
+ *
+ * This async entry point is additive so existing synchronous writeback bridges
+ * remain compatible. Agent runtimes should use it when they provide
+ * `RELAY_RUN_ID`, `WORKFORCE_USAGE_URL`, and `WORKFORCE_DEPLOYMENT_TOKEN`.
+ * Missing credentials, an unavailable usage callback, or zero recorded spend
+ * all silently preserve the original Slack payload.
+ */
+export async function resolveWritebackRequestWithRunCost(
+  path: string,
+  content: string,
+  options: SlackRunCostResolverOptions = {},
+): Promise<SlackWritebackRequest> {
+  const request = resolveWritebackRequestWithCost(path, content);
+  if (!isMessageCreateRequest(request)) return request;
+
+  const cost = await fetchSlackRunCost(options);
+  return cost ? resolveWritebackRequestWithCost(path, content, cost) : request;
+}
+
+function resolveWritebackRequestWithCost(
+  path: string,
+  content: string,
+  cost?: SlackRunCost,
+): SlackWritebackRequest {
   const route = classifyWrite(path, resources);
 
   if (route?.resource.name === 'messages') {
     const messageMatch = path.match(MESSAGE_RECORD_PATH_PATTERN);
     if (route.kind === 'create' && messageMatch?.[1]) {
-      return buildPostMessage(messageMatch[1], undefined, content);
+      return buildPostMessage(messageMatch[1], undefined, content, cost);
     }
     if (route.kind === 'patch' && messageMatch?.[1] && messageMatch[2]) {
       return buildUpdateMessage(messageMatch[1], extractMessageTimestamp(messageMatch[2]), content);
@@ -49,7 +95,7 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
   if (route?.resource.name === 'direct-messages') {
     const dmMatch = path.match(/^\/slack\/users\/([^/]+)\/messages\/([^/]+)\.json$/);
     if (route.kind === 'create' && dmMatch?.[1]) {
-      return buildPostDirectMessage(dmMatch[1], content);
+      return buildPostDirectMessage(dmMatch[1], content, cost);
     }
   }
 
@@ -58,7 +104,7 @@ export function resolveWritebackRequest(path: string, content: string): SlackWri
       /^\/slack\/channels\/([^/]+)\/messages\/([^/]+)\/replies\/([^/]+)\.json$/,
     );
     if (route.kind === 'create' && replyMatch?.[1] && replyMatch[2]) {
-      return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content);
+      return buildPostMessage(replyMatch[1], extractMessageTimestamp(replyMatch[2]), content, cost);
     }
     if (route.kind === 'patch' && replyMatch?.[1] && replyMatch[3]) {
       return buildUpdateMessage(replyMatch[1], extractMessageTimestamp(replyMatch[3]), content);
@@ -221,6 +267,7 @@ function buildPostMessage(
   channelSegment: string,
   threadTs: string | undefined,
   content: string,
+  cost?: SlackRunCost,
 ): SlackWritebackRequest {
   const pathChannel = extractSlackChannel(channelSegment);
   const parsed = safeParseJson(content);
@@ -235,6 +282,7 @@ function buildPostMessage(
       body: {
         channel: pathChannel,
         text: parsed,
+        ...(cost ? { blocks: [buildCostFooter(cost)] } : {}),
         ...(threadTs ? { thread_ts: threadTs } : {}),
       },
     };
@@ -261,7 +309,7 @@ function buildPostMessage(
   const explicitChannel = readString(parsed, 'channel');
   const body: Record<string, unknown> = { channel: explicitChannel ?? pathChannel };
   if (text) body.text = text;
-  if (blocks) body.blocks = blocks;
+  if (blocks || cost) body.blocks = [...(blocks ?? []), ...(cost ? [buildCostFooter(cost)] : [])];
   if (attachments) body.attachments = attachments;
 
   // Thread context: URL-derived first, then payload override.
@@ -317,9 +365,13 @@ function buildPostMessage(
   };
 }
 
-function buildPostDirectMessage(userSegment: string, content: string): SlackWritebackRequest {
+function buildPostDirectMessage(
+  userSegment: string,
+  content: string,
+  cost?: SlackRunCost,
+): SlackWritebackRequest {
   const user = extractSlackUser(userSegment);
-  const message = buildPostMessage(user, undefined, content);
+  const message = buildPostMessage(user, undefined, content, cost);
   const messageBody = { ...message.body };
   delete messageBody.channel;
   return {
@@ -333,6 +385,137 @@ function buildPostDirectMessage(userSegment: string, content: string): SlackWrit
     },
     ...(message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : {}),
   };
+}
+
+function buildCostFooter(cost: SlackRunCost): Record<string, unknown> {
+  return {
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `$${cost.thisRun} · trending $${cost.perDay}/day · cache ${cost.cachePct}%`,
+      },
+    ],
+  };
+}
+
+function isMessageCreateRequest(request: SlackWritebackRequest): boolean {
+  return (
+    request.action === 'post_message' ||
+    request.action === 'reply_in_thread' ||
+    request.action === 'post_dm'
+  );
+}
+
+/**
+ * Fetch cost data from the proactive runtime's deployment usage endpoint. The
+ * endpoint aggregates `harness_spend_events` by `run_id`, so it can expose
+ * spend while the agent run is still active and before its final run row is
+ * persisted.
+ */
+async function fetchSlackRunCost(
+  options: SlackRunCostResolverOptions,
+): Promise<SlackRunCost | undefined> {
+  const env = options.env ?? process.env;
+  const runId = readEnv(env, 'RELAY_RUN_ID');
+  const usageUrl = resolveUsageUrl(env);
+  const token =
+    readEnv(env, 'WORKFORCE_DEPLOYMENT_TOKEN') ??
+    readEnv(env, 'CLOUD_API_ACCESS_TOKEN') ??
+    readEnv(env, 'WORKFORCE_WORKSPACE_TOKEN') ??
+    readEnv(env, 'WORKFORCE_AGENT_TOKEN');
+  const fetchImpl = options.fetch ?? globalThis.fetch;
+  if (!runId || !usageUrl || !token || !fetchImpl) return undefined;
+
+  try {
+    const separator = usageUrl.includes('?') ? '&' : '?';
+    const url = `${usageUrl}${separator}runId=${encodeURIComponent(runId)}`;
+    const response = await fetchImpl(url, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return undefined;
+
+    const payload: unknown = await response.json();
+    return runCostFromUsagePayload(payload);
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveUsageUrl(env: Record<string, string | undefined>): string | undefined {
+  const explicit = readEnv(env, 'WORKFORCE_USAGE_URL');
+  if (explicit) return explicit;
+
+  const cloudApiUrl = readEnv(env, 'CLOUD_API_URL') ?? readEnv(env, 'WORKFORCE_CLOUD_BASE_URL');
+  const workspaceId = readEnv(env, 'WORKFORCE_WORKSPACE_ID');
+  const agentId = readEnv(env, 'WORKFORCE_AGENT_ID');
+  if (!cloudApiUrl || !workspaceId || !agentId) return undefined;
+  return (
+    `${cloudApiUrl.replace(/\/+$/, '')}/api/v1/workspaces/${encodeURIComponent(workspaceId)}` +
+    `/deployments/${encodeURIComponent(agentId)}/usage`
+  );
+}
+
+function runCostFromUsagePayload(payload: unknown): SlackRunCost | undefined {
+  if (!isRecord(payload)) return undefined;
+  const cost = isRecord(payload.cost) ? payload.cost : payload;
+  const thisRun =
+    formatUsd(cost.thisRun, false) ??
+    formatUsdMicros(cost.thisRunUsdMicros ?? cost.costUsdMicros, false);
+  const perDay =
+    formatUsd(cost.perDay, true) ??
+    formatUsdMicros(cost.perDayUsdMicros ?? cost.dailyCostUsdMicros, true);
+  const cachePct = readPercentage(cost.cachePct ?? cost.cacheHitPct);
+  if (!thisRun || !perDay || cachePct === undefined) return undefined;
+  return { thisRun, perDay, cachePct };
+}
+
+function formatUsd(value: unknown, allowZero: boolean): string | undefined {
+  const amount =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value)
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(amount) || amount < 0 || (!allowZero && amount === 0)) return undefined;
+  const formatted = amount.toFixed(2);
+  return !allowZero && formatted === '0.00' ? undefined : formatted;
+}
+
+function formatUsdMicros(value: unknown, allowZero: boolean): string | undefined {
+  const micros = readUsdMicros(value);
+  if (micros === undefined || (!allowZero && micros === 0n)) return undefined;
+  const cents = (micros + 5_000n) / 10_000n;
+  if (!allowZero && cents === 0n) return undefined;
+  return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
+}
+
+function readUsdMicros(value: unknown): bigint | undefined {
+  if (typeof value === 'bigint') return value >= 0n ? value : undefined;
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && /^\d+$/.test(value)) return BigInt(value);
+  return undefined;
+}
+
+function readPercentage(value: unknown): number | undefined {
+  const percentage =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value)
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return undefined;
+  return Math.round(percentage);
+}
+
+function readEnv(
+  env: Record<string, string | undefined>,
+  key: string,
+): string | undefined {
+  const value = env[key]?.trim();
+  return value || undefined;
 }
 
 /**

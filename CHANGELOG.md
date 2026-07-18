@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-slack` can now append a per-run cost, daily trend, and cache-hit context footer to agent-authored messages when proactive runtime usage data is available, while silently preserving messages without recorded spend.
 - `@relayfile/adapter-github` can now backfill bounded repository commit history into a discoverable, newest-first `commits/_index.json` with canonical commit metadata paths, while push webhooks keep that index current.
 - `@relayfile/relay-helpers` now exposes a process-scoped final-write authorizer that can deny or redirect every generic and bespoke helper write after explicit transport selection, preventing authored transports from bypassing immutable local preview policy.
 - `@relayfile/relay-helpers` now exports an injectable `RelayTransport` and side-effect-free `PreviewTransport` with deterministic simulated receipts, seeded reads, process-scoped binding for existing no-argument clients, and cross-write thread-reference recording.

@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from '../writeback.js';
+import {
+  ReadOnlyFieldError,
+  resolveDeleteRequest,
+  resolveWritebackRequest,
+  resolveWritebackRequestWithRunCost,
+} from '../writeback.js';
 
 describe('slack writeback', () => {
   describe('post_message', () => {
@@ -94,6 +99,136 @@ describe('slack writeback', () => {
           ),
         (error: unknown) => error instanceof ReadOnlyFieldError && error.field === 'id',
       );
+    });
+  });
+
+  describe('run cost footer', () => {
+    const env = {
+      RELAY_RUN_ID: 'run-123',
+      WORKFORCE_USAGE_URL:
+        'https://cloud.example/api/v1/workspaces/workspace-1/deployments/agent-456/usage',
+      WORKFORCE_DEPLOYMENT_TOKEN: 'deployment-token',
+    };
+    const usagePayload = {
+      cost: { thisRun: 0.125, perDay: '0.142', cachePct: 49.6 },
+    };
+    const footer = {
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '$0.13 · trending $0.14/day · cache 50%',
+        },
+      ],
+    };
+
+    it('appends aggregated run cost to a plain-text post', async () => {
+      let requestedUrl: string | undefined;
+      let authorization: string | null | undefined;
+      const req = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        'Ship it!',
+        {
+          env,
+          fetch: async (input, init) => {
+            requestedUrl = String(input);
+            authorization = new Headers(init?.headers).get('authorization');
+            return Response.json(usagePayload);
+          },
+        },
+      );
+
+      assert.strictEqual(
+        requestedUrl,
+        'https://cloud.example/api/v1/workspaces/workspace-1/deployments/agent-456/usage?runId=run-123',
+      );
+      assert.strictEqual(authorization, 'Bearer deployment-token');
+      assert.deepStrictEqual(req.body, {
+        channel: '#general',
+        text: 'Ship it!',
+        blocks: [footer],
+      });
+    });
+
+    it('preserves authored blocks and appends the footer last', async () => {
+      const authoredBlock = { type: 'section', text: { type: 'mrkdwn', text: '*Status*' } };
+      const req = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        JSON.stringify({ text: 'Status', blocks: [authoredBlock] }),
+        { env, fetch: async () => Response.json(usagePayload) },
+      );
+
+      assert.deepStrictEqual(req.body.blocks, [authoredBlock, footer]);
+    });
+
+    it('carries the footer into the nested chat.postMessage body for direct messages', async () => {
+      const req = await resolveWritebackRequestWithRunCost(
+        '/slack/users/U01ABC1234/messages/create.json',
+        'Private update',
+        { env, fetch: async () => Response.json(usagePayload) },
+      );
+
+      assert.deepStrictEqual(req.body, {
+        users: 'U01ABC1234',
+        return_im: true,
+        message: { text: 'Private update', blocks: [footer] },
+      });
+    });
+
+    it('silently omits the footer when usage is missing or unavailable', async () => {
+      const zeroSpend = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        'No callback yet',
+        {
+          env,
+          fetch: async () => Response.json({ cost: { ...usagePayload.cost, thisRun: 0 } }),
+        },
+      );
+      const unavailable = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        'Usage API down',
+        { env, fetch: async () => new Response(null, { status: 503 }) },
+      );
+      const subCent = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        'Below display precision',
+        {
+          env,
+          fetch: async () =>
+            Response.json({ cost: { ...usagePayload.cost, thisRunUsdMicros: 4_999, thisRun: undefined } }),
+        },
+      );
+      const missingEnv = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/draft@message.json',
+        'No run context',
+        {
+          env: {},
+          fetch: async () => {
+            throw new Error('fetch must not be called without run context');
+          },
+        },
+      );
+
+      assert.deepStrictEqual(zeroSpend.body, { channel: '#general', text: 'No callback yet' });
+      assert.deepStrictEqual(unavailable.body, { channel: '#general', text: 'Usage API down' });
+      assert.deepStrictEqual(subCent.body, { channel: '#general', text: 'Below display precision' });
+      assert.deepStrictEqual(missingEnv.body, { channel: '#general', text: 'No run context' });
+    });
+
+    it('does not fetch usage for non-message writebacks', async () => {
+      const req = await resolveWritebackRequestWithRunCost(
+        '/slack/channels/general/messages/1762445678_001234/reactions/draft@reaction.json',
+        'eyes',
+        {
+          env,
+          fetch: async () => {
+            throw new Error('fetch must not be called for reactions');
+          },
+        },
+      );
+
+      assert.strictEqual(req.action, 'add_reaction');
+      assert.strictEqual(req.body.name, 'eyes');
     });
   });
 

@@ -125,7 +125,8 @@ export {
   SLACK_REACTION_ITEM_TYPES,
 } from './types.js';
 
-export { resolveWritebackRequest } from './writeback.js';
+export { resolveWritebackRequest, resolveWritebackRequestWithRunCost } from './writeback.js';
+export type { SlackRunCost, SlackRunCostResolverOptions } from './writeback.js';
 
 export type {
   ConnectionProvider,
