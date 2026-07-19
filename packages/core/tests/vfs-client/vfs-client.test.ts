@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -227,6 +228,107 @@ test("writeJsonFile can wait on direct Relayfile op providerResult instead of mo
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/v1\/workspaces\/rw_7ccfea89\/fs\/file\?/);
   assert.match(requests[1].url, /\/v1\/workspaces\/rw_7ccfea89\/ops\/op_slack_1$/);
+});
+
+test("writeJsonFile direct mode and a later mount echo coalesce onto one writeback op", async () => {
+  const workspaceId = "rw_mount_echo";
+  const relayPath =
+    "/slack/channels/C1/messages/messages e9bed5ab-6127-48ff-b4ce-b2a6e62d2abe.json";
+  const content = `${JSON.stringify({ text: "hello" }, null, 2)}\n`;
+  const contentHash = createHash("sha256").update(content).digest("hex");
+  const mountIdentity = {
+    kind: "mount-writeback-create-draft",
+    key: `${workspaceId}:${relayPath}:${contentHash}`,
+    ttlSeconds: 2_592_000
+  };
+
+  let revisionCount = 0;
+  let opCount = 0;
+  let directIdentity: unknown;
+  let mountEcho: { opId: string; revision: string; deduplicated: boolean } | undefined;
+  const identities = new Map<string, { opId: string; revision: string }>();
+  const readableOps = new Map<string, string>();
+
+  const admit = (identity: unknown): { opId: string; revision: string; deduplicated: boolean } => {
+    const candidate = identity as { kind?: unknown; key?: unknown } | undefined;
+    const identityKey =
+      typeof candidate?.kind === "string" && typeof candidate.key === "string"
+        ? `${candidate.kind}:${candidate.key}`
+        : undefined;
+    const existing = identityKey ? identities.get(identityKey) : undefined;
+    if (existing) return { ...existing, deduplicated: true };
+
+    revisionCount += 1;
+    opCount += 1;
+    const created = { opId: `op_${opCount}`, revision: `rev_${revisionCount}` };
+    // Model the production failure: a non-deduplicated mount echo advances the
+    // path revision, so the direct write's revision-scoped context is no longer
+    // readable and its op polling returns 404.
+    readableOps.clear();
+    readableOps.set(created.opId, created.revision);
+    if (identityKey) identities.set(identityKey, created);
+    return { ...created, deduplicated: false };
+  };
+
+  const fetchImpl: typeof fetch = async (input, init = {}) => {
+    const url = String(input);
+    if (url.includes("/fs/file")) {
+      const request = JSON.parse(String(init.body)) as {
+        content: string;
+        contentIdentity?: unknown;
+      };
+      assert.equal(request.content, content);
+      directIdentity = request.contentIdentity;
+      const direct = admit(directIdentity);
+      // The daemon sees the same draft shortly after the direct HTTP write and
+      // uploads it through the bulk mount path with its established identity.
+      mountEcho = admit(mountIdentity);
+      return Response.json({
+        opId: direct.opId,
+        status: "queued",
+        targetRevision: direct.revision,
+        writeback: { provider: "slack", state: "pending" }
+      });
+    }
+
+    const opId = url.split("/").at(-1) ?? "";
+    const revision = readableOps.get(opId);
+    if (!revision) return Response.json({ code: "not_found" }, { status: 404 });
+    return Response.json({
+      opId,
+      revision,
+      status: "succeeded",
+      attemptCount: 1,
+      providerResult: {
+        provider: "slack",
+        externalId: "1784443563.707669",
+        ts: "1784443563.707669",
+        channel: "C1"
+      }
+    });
+  };
+
+  const result = await writeJsonFile(
+    {
+      relayfileBaseUrl: "https://relayfile.example.test",
+      relayfileApiToken: "test-token",
+      workspaceId,
+      fetchImpl,
+      writebackTimeoutMs: 25,
+      writebackPollMs: 1
+    },
+    "slack",
+    "post",
+    relayPath,
+    { text: "hello" }
+  );
+
+  assert.deepEqual(directIdentity, mountIdentity);
+  assert.deepEqual(mountEcho, { opId: "op_1", revision: "rev_1", deduplicated: true });
+  assert.equal(revisionCount, 1);
+  assert.equal(opCount, 1);
+  assert.equal(result.opId, "op_1");
+  assert.equal(result.receipt?.ts, "1784443563.707669");
 });
 
 test("writeJsonFile direct mode honors workspace_busy Retry-After in one four-attempt SDK retry layer", async () => {
