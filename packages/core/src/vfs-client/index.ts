@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { RelayFileApiError, RelayFileClient, type OperationStatusResponse } from "@relayfile/sdk";
@@ -252,6 +252,47 @@ const DEFAULT_WRITEBACK_TIMEOUT_MS = 3_000;
 const SDK_LEGACY_RETRY_MAX_DELAY_MS = 2_000;
 const WORKSPACE_BUSY_RETRY_MAX_DELAY_MS = 30_000;
 const DEFAULT_WRITEBACK_ADMISSION_TIMEOUT_MS = WORKSPACE_BUSY_RETRY_MAX_DELAY_MS * 3;
+const MOUNT_WRITEBACK_CREATE_DRAFT_IDENTITY_KIND = "mount-writeback-create-draft";
+const MOUNT_WRITEBACK_CREATE_DRAFT_IDENTITY_TTL_SECONDS = 30 * 24 * 60 * 60;
+const RELAYFILE_DRAFT_BASENAME_PATTERN =
+  /^.+ [0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.json$/;
+
+interface MountWritebackCreateDraftContentIdentity {
+  kind: typeof MOUNT_WRITEBACK_CREATE_DRAFT_IDENTITY_KIND;
+  key: string;
+  ttlSeconds: number;
+}
+
+function serializeJsonFile(body: unknown): string {
+  return `${JSON.stringify(body, null, 2)}\n`;
+}
+
+function normalizeRelayfileRemotePath(relayPath: string): string {
+  const trimmed = relayPath.trim();
+  if (!trimmed) return "/";
+  const normalized = path.posix.normalize(trimmed.startsWith("/") ? trimmed : `/${trimmed}`);
+  return normalized.length > 1 ? normalized.replace(/\/+$/, "") : normalized;
+}
+
+function mountWritebackCreateDraftContentIdentity(
+  workspaceId: string,
+  relayPath: string,
+  content: string
+): MountWritebackCreateDraftContentIdentity | undefined {
+  const normalizedPath = normalizeRelayfileRemotePath(relayPath);
+  const basename = path.posix.basename(normalizedPath);
+  const isCreateDraft =
+    RELAYFILE_DRAFT_BASENAME_PATTERN.test(basename) ||
+    (basename.startsWith("factory-create-") && basename.endsWith(".json"));
+  if (!isCreateDraft) return undefined;
+
+  const contentHash = createHash("sha256").update(content).digest("hex");
+  return {
+    kind: MOUNT_WRITEBACK_CREATE_DRAFT_IDENTITY_KIND,
+    key: `${workspaceId.trim()}:${normalizedPath}:${contentHash}`,
+    ttlSeconds: MOUNT_WRITEBACK_CREATE_DRAFT_IDENTITY_TTL_SECONDS
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -563,6 +604,12 @@ async function writeJsonFileViaRelayfileApi(
   direct: { workspaceId: string; relayfile: RelayFileClient }
 ): Promise<WritebackResult> {
   const timeoutMs = client.writebackTimeoutMs ?? DEFAULT_WRITEBACK_ADMISSION_TIMEOUT_MS;
+  const content = serializeJsonFile(body);
+  const contentIdentity = mountWritebackCreateDraftContentIdentity(
+    direct.workspaceId,
+    relayPath,
+    content
+  );
   const controller = timeoutMs > 0 ? new AbortController() : undefined;
   const deadlineTimer = controller
     ? setTimeout(() => controller.abort(), timeoutMs)
@@ -574,7 +621,8 @@ async function writeJsonFileViaRelayfileApi(
       path: relayPath,
       baseRevision: "*",
       contentType: "application/json",
-      content: `${JSON.stringify(body, null, 2)}\n`,
+      content,
+      ...(contentIdentity ? { contentIdentity } : {}),
       signal: controller?.signal
     });
     admitted = true;
@@ -767,7 +815,7 @@ export async function writeJsonFile(
     const absolutePath = toAbsolutePath(client, relayPath);
     await mkdir(path.dirname(absolutePath), { recursive: true });
     const tempPath = `${absolutePath}.tmp-${randomUUID()}`;
-    await writeFile(tempPath, `${JSON.stringify(body, null, 2)}\n`, "utf8");
+    await writeFile(tempPath, serializeJsonFile(body), "utf8");
     await rename(tempPath, absolutePath);
     const receipt = await waitForReceipt(absolutePath, client, body);
     return {
