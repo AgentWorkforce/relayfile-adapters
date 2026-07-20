@@ -780,6 +780,7 @@ function buildRecordIndexRow(
     updated: readLifecycleEditedAt(record) ?? readUpdatedAt(record),
     number: Number(number),
     state: state ?? '',
+    labels: readGitHubLabelNames(record),
     ...withOptionalArray('assigneeKeys', readGitHubAssigneeKeys(record)),
     ...withOptionalString('creatorKey', readGitHubCreatorKey(record)),
     ...withOptionalString('priority', readPriority(record)),
@@ -972,6 +973,15 @@ function extractPriorNumberedState(parsed: Record<string, unknown>): PriorNumber
 function readGitHubAssigneeKeys(record: Record<string, unknown>): string[] {
   const assignees = Array.isArray(record.assignees) ? record.assignees : [];
   return uniqueStrings(assignees.map((entry) => readUserKey(entry)).filter((entry): entry is string => Boolean(entry)));
+}
+
+function readGitHubLabelNames(record: Record<string, unknown>): string[] {
+  const labels = Array.isArray(record.labels) ? record.labels : [];
+  return uniqueStrings(
+    labels
+      .map((label) => readNonEmptyString(label) ?? readNonEmptyString(isRecord(label) ? label.name : undefined))
+      .filter((label): label is string => Boolean(label)),
+  );
 }
 
 function readGitHubCreatorKey(record: Record<string, unknown>): string | undefined {

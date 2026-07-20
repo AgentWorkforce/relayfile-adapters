@@ -425,6 +425,20 @@ describe('emitGitHubAuxiliaryFiles', () => {
     );
     assert.equal(client.files.get(githubByStateAliasPath('acme', 'widgets', 'issues', 'open', 7)), canonicalBytes);
     assert.equal(client.files.get(githubByEditedAliasPath('acme', 'widgets', 'issues', '2026-05-12', 7)), canonicalBytes);
+    const issueRows = JSON.parse(client.files.get(indexPath) ?? '[]') as Array<Record<string, unknown>>;
+    assert.deepEqual(issueRows, [
+      {
+        id: '7',
+        title: 'Bug report',
+        updated: '2026-05-12T00:00:00Z',
+        number: 7,
+        state: 'open',
+        labels: ['P0 Critical'],
+        assigneeKeys: ['octocat'],
+        creatorKey: 'monalisa',
+        priority: 'P0 Critical',
+      },
+    ]);
 
     // No writes leaked into the pulls index for this repo.
     assert.ok(!writtenPaths.includes(githubRepoPullsIndexPath('acme', 'widgets')));
