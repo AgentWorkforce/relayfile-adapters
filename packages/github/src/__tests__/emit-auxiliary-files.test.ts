@@ -444,6 +444,29 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.ok(!writtenPaths.includes(githubRepoPullsIndexPath('acme', 'widgets')));
   });
 
+  it('retains an explicit empty label array in issue index rows', async () => {
+    const client = createClient();
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 8,
+          title: 'Unlabeled issue',
+          state: 'open',
+          labels: [],
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const rows = JSON.parse(client.files.get(githubRepoIssuesIndexPath('acme', 'widgets')) ?? '[]') as Array<
+      Record<string, unknown>
+    >;
+    assert.deepEqual(rows[0]?.labels, []);
+  });
+
   it('uses the newest lifecycle timestamp for PR by-edited aliases', async () => {
     const client = createClient();
 
