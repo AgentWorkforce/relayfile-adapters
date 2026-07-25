@@ -10,6 +10,7 @@ import {
   generateInboundCapabilityCatalog,
   inboundCapabilityCatalogPaths,
   renderInboundCapabilityCatalogModule,
+  validateAdapterPackageInboundCapabilities,
   validateInboundCapabilityCatalog,
 } from "../../src/inbound/catalog-generator.js";
 import { findRepoRoot } from "../../src/triggers/catalog-generator.js";
@@ -75,5 +76,29 @@ test("catalog rejects one path root claimed by different provider ids", () => {
   assert.throws(
     () => validateInboundCapabilityCatalog([gmail, conflicting]),
     /path root \/gmail is claimed by both gmail and google-mail/u,
+  );
+});
+
+test("adapter package rejects declarations with mixed provider ids", () => {
+  const gmail = defineNangoInboundCapability({
+    id: "gmail.nango",
+    providerId: "gmail",
+    pathRoot: "/gmail",
+    providerConfigAliases: ["gmail"],
+  });
+  const googleMail = defineNangoInboundCapability({
+    id: "google-mail.nango",
+    providerId: "google-mail",
+    pathRoot: "/google-mail",
+    providerConfigAliases: ["google-mail"],
+  });
+
+  assert.throws(
+    () =>
+      validateAdapterPackageInboundCapabilities("packages/gmail", [
+        gmail,
+        googleMail,
+      ]),
+    /packages\/gmail\/src\/inbound\.ts must declare exactly one provider id; found gmail, google-mail/u,
   );
 });

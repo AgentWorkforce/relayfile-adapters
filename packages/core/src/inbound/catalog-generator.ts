@@ -71,8 +71,8 @@ export async function generateInboundCapabilityCatalog(
       );
     }
     validateInboundCapabilityCatalog(declarations);
-    const providerId = requireAdapterProviderId(
-      adapterPackage,
+    const providerId = validateAdapterPackageInboundCapabilities(
+      adapterPackage.relativePath,
       declarations,
     );
     catalog.push(...declarations);
@@ -423,8 +423,8 @@ export function validateInboundCapabilityCatalog(
   }
 }
 
-function requireAdapterProviderId(
-  adapterPackage: AdapterPackage,
+export function validateAdapterPackageInboundCapabilities(
+  packagePath: string,
   declarations: readonly InboundCapabilityDeclaration[],
 ): string {
   const providerIds = [
@@ -432,7 +432,7 @@ function requireAdapterProviderId(
   ];
   if (providerIds.length !== 1) {
     throw new Error(
-      `${adapterPackage.relativePath}/src/inbound.ts must declare exactly one provider id; found ${providerIds.join(", ")}`,
+      `${packagePath}/src/inbound.ts must declare exactly one provider id; found ${providerIds.join(", ")}`,
     );
   }
   return providerIds[0]!;
