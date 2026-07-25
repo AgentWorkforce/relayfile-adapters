@@ -1,0 +1,31 @@
+adapter:
+  name: posthog
+  version: "1.0.0"
+  baseUrl: https://us.posthog.com
+webhooks:
+  # Normalized forward-webhook events currently supported by the cloud ingress.
+  # These are alert lifecycle payloads materialized under /posthog/projects/<id>/alert-events/.
+  posthog.alert.triggered:
+    path: /posthog/projects/{{project_id}}/alert-events/{{id}}.json
+    extract:
+      - id
+      - project_id
+      - title
+      - severity
+      - state
+      - event_type
+      - occurred_at
+      - timestamp
+      - url
+  posthog.alert.resolved:
+    path: /posthog/projects/{{project_id}}/alert-events/{{id}}.json
+    extract:
+      - id
+      - project_id
+      - title
+      - severity
+      - state
+      - event_type
+      - occurred_at
+      - timestamp
+      - url
