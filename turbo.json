@@ -67,6 +67,7 @@
         "@relayfile/adapter-mixpanel#build",
         "@relayfile/adapter-neon#build",
         "@relayfile/adapter-notion#build",
+        "@relayfile/adapter-posthog#build",
         "@relayfile/adapter-pipedrive#build",
         "@relayfile/adapter-recall#build",
         "@relayfile/adapter-reddit#build",
