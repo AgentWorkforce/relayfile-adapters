@@ -1,9 +1,8 @@
-import { GMAIL_PATH_ROOT, GMAIL_PROVIDER_ID } from "./identity.js";
+import { GMAIL_PATH_ROOT, GMAIL_PATH_ROOTS } from "./identity.js";
 
 export const RELAYFILE_ROOT = GMAIL_PATH_ROOT;
-export const OBJECT_RESOURCE_PATH = "/gmail/{account}/threads";
-export const LIFECYCLE_RESOURCE_PATH = "/gmail/watches";
-const PROVIDER_SLUG: string = GMAIL_PROVIDER_ID;
+export const OBJECT_RESOURCE_PATH = `${RELAYFILE_ROOT}/{account}/threads`;
+export const LIFECYCLE_RESOURCE_PATH = `${RELAYFILE_ROOT}/watches`;
 
 export interface ObjectPathInput {
   accountId?: string | number;
@@ -31,20 +30,14 @@ export function encodePathSegment(value: string | number): string {
 
 export function toObjectRelayfilePath(input: ObjectPathInput): string {
   const id = readIdentifier(input);
-  switch (PROVIDER_SLUG) {
-    case 'google-drive': return "/gmail" + '/' + encodePathSegment(input.accountId ?? input.account ?? 'default') + '/' + encodePathSegment(input.path ?? input.name ?? id);
-    case 'gcs': return "/gmail" + '/' + encodePathSegment(input.bucket ?? input.account ?? 'bucket') + '/' + encodePathSegment(input.key ?? input.name ?? input.path ?? id);
-    case 'sharepoint': return "/gmail" + '/' + encodePathSegment(input.siteId ?? 'site') + '/' + encodePathSegment(input.driveId ?? 'drive') + '/' + encodePathSegment(input.path ?? input.name ?? id);
-    case 'onedrive': return "/gmail" + '/' + encodePathSegment(input.accountId ?? input.account ?? 'me') + '/' + encodePathSegment(input.path ?? input.name ?? id);
-    case 'azure-blob': return "/gmail" + '/' + encodePathSegment(input.account ?? 'account') + '/' + encodePathSegment(input.container ?? 'container') + '/' + encodePathSegment(input.name ?? input.key ?? input.path ?? id);
-    case 'dropbox': return "/gmail" + '/' + encodePathSegment(input.accountId ?? input.account ?? 'default') + '/' + encodePathSegment(input.path ?? input.name ?? id).replace(/^\//, '');
-    case 'gmail': return "/gmail" + '/' + encodePathSegment(input.account ?? input.accountId ?? 'me') + '/threads/' + encodePathSegment(input.threadId ?? id) + '.json';
-    case 's3': return "/gmail" + '/' + encodePathSegment(input.bucket ?? input.account ?? 'bucket') + '/' + encodePathSegment(input.key ?? input.name ?? input.path ?? id);
-    case 'box': return "/gmail" + '/' + encodePathSegment(input.accountId ?? input.account ?? 'default') + '/files/' + encodePathSegment(id) + '.json';
-    case 'postgres': return "/gmail" + '/' + encodePathSegment(input.db ?? 'db') + '/' + encodePathSegment(input.schema ?? 'public') + '/' + encodePathSegment(input.table ?? 'table') + '/' + encodePathSegment(input.primaryKey ?? id) + '.json';
-    case 'redis': return "/gmail" + '/' + encodePathSegment(input.db ?? 0) + '/' + encodePathSegment(input.key ?? input.name ?? id);
-    default: return "/gmail" + '/' + encodePathSegment(id);
-  }
+  return (
+    RELAYFILE_ROOT +
+    '/' +
+    encodePathSegment(input.account ?? input.accountId ?? 'me') +
+    '/threads/' +
+    encodePathSegment(input.threadId ?? id) +
+    '.json'
+  );
 }
 
 export function toLifecycleRelayfilePath(id: string | number): string {
@@ -54,14 +47,23 @@ export function toLifecycleRelayfilePath(id: string | number): string {
 export function parseRelayfilePath(path: string): { resource: 'object' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
   const normalized = path.startsWith('/') ? path : '/' + path;
   const segments = normalized.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment.replace(/\.json$/, '')));
-  const lifecycleSegments = LIFECYCLE_RESOURCE_PATH.split('/').filter(Boolean);
-  if (lifecycleSegments.every((segment, index) => segment.startsWith('{') || segment === segments[index])) {
+  const lifecycleSuffix = LIFECYCLE_RESOURCE_PATH.slice(RELAYFILE_ROOT.length);
+  if (
+    GMAIL_PATH_ROOTS.some((root) =>
+      matchesPathPrefix(segments, `${root}${lifecycleSuffix}`),
+    )
+  ) {
     return { resource: 'lifecycle', id: segments.at(-1) ?? null, segments };
   }
-  if (segments[0] === RELAYFILE_ROOT.slice(1)) {
+  if (GMAIL_PATH_ROOTS.some((root) => matchesPathPrefix(segments, root))) {
     return { resource: 'object', id: segments.at(-1) ?? null, segments };
   }
   return { resource: 'unknown', id: null, segments };
+}
+
+function matchesPathPrefix(segments: readonly string[], pathPrefix: string): boolean {
+  const prefixSegments = pathPrefix.split('/').filter(Boolean);
+  return prefixSegments.every((segment, index) => segment === segments[index]);
 }
 
 function readIdentifier(input: ObjectPathInput): string {

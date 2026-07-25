@@ -70,17 +70,22 @@ export async function generateInboundCapabilityCatalog(
         `${adapterPackage.relativePath}/src/inbound.ts exports no inboundCapabilities`,
       );
     }
+    validateInboundCapabilityCatalog(declarations);
+    const providerId = requireAdapterProviderId(
+      adapterPackage,
+      declarations,
+    );
     catalog.push(...declarations);
     sources.push({
       packageName: adapterPackage.packageName,
       packagePath: adapterPackage.relativePath,
-      providerId: declarations[0]!.providerId,
+      providerId,
       capabilityIds: declarations.map(({ id }) => id).sort(),
     });
   }
 
   catalog.sort((left, right) => left.id.localeCompare(right.id));
-  validateCatalog(catalog);
+  validateInboundCapabilityCatalog(catalog);
   const catalogVersion = catalogDigest(catalog);
   return {
     catalog,
@@ -352,17 +357,35 @@ function normalizeCapability(
   };
 }
 
-function validateCatalog(
+export function validateInboundCapabilityCatalog(
   catalog: readonly InboundCapabilityDeclaration[],
 ): void {
   const ids = new Set<string>();
   const aliases = new Map<string, string>();
   const detectionHeaders = new Map<string, string>();
+  const providerPathRoots = new Map<string, string>();
+  const pathRootProviders = new Map<string, string>();
   for (const capability of catalog) {
     if (ids.has(capability.id)) {
       throw new Error(`Duplicate inbound capability id: ${capability.id}`);
     }
     ids.add(capability.id);
+    const priorPathRoot = providerPathRoots.get(capability.providerId);
+    if (priorPathRoot && priorPathRoot !== capability.pathRoot) {
+      throw new Error(
+        `${capability.providerId} declares conflicting path roots: ${priorPathRoot} and ${capability.pathRoot}`,
+      );
+    }
+    providerPathRoots.set(capability.providerId, capability.pathRoot);
+
+    const priorProviderId = pathRootProviders.get(capability.pathRoot);
+    if (priorProviderId && priorProviderId !== capability.providerId) {
+      throw new Error(
+        `path root ${capability.pathRoot} is claimed by both ${priorProviderId} and ${capability.providerId}`,
+      );
+    }
+    pathRootProviders.set(capability.pathRoot, capability.providerId);
+
     if (!capability.eventKinds.length) {
       throw new Error(`${capability.id} must declare at least one event kind`);
     }
@@ -398,6 +421,21 @@ function validateCatalog(
       detectionHeaders.set(key, capability.id);
     }
   }
+}
+
+function requireAdapterProviderId(
+  adapterPackage: AdapterPackage,
+  declarations: readonly InboundCapabilityDeclaration[],
+): string {
+  const providerIds = [
+    ...new Set(declarations.map((declaration) => declaration.providerId)),
+  ];
+  if (providerIds.length !== 1) {
+    throw new Error(
+      `${adapterPackage.relativePath}/src/inbound.ts must declare exactly one provider id; found ${providerIds.join(", ")}`,
+    );
+  }
+  return providerIds[0]!;
 }
 
 function catalogDigest(
