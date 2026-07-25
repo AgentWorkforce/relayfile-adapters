@@ -80,6 +80,9 @@ export const pipedriveClient = (opts?: RelayClientOptions): ProviderClient<'pipe
 export const postgresClient = (opts?: RelayClientOptions): ProviderClient<'postgres'> =>
   providerClient('postgres', opts);
 
+export const posthogClient = (opts?: RelayClientOptions): ProviderClient<'posthog'> =>
+  providerClient('posthog', opts);
+
 export const recallClient = (opts?: RelayClientOptions): ProviderClient<'recall'> =>
   providerClient('recall', opts);
 
