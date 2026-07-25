@@ -10,7 +10,7 @@ Every adapter under `packages/<name>` MUST:
 - Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path must resolve to the same record as the canonical path. Alias content may be either a minimal pointer `{ id, canonicalPath, ...minimal pointer fields }` or a materialized canonical mirror, but the choice must be consistent within a resource and covered by tests.
 - Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
 
-### Declared catalogs: triggers, scope keys, and writeback paths
+### Declared catalogs: triggers, scope keys, writeback paths, and inbound capabilities
 
 An adapter declares part of its contract as **data** so consumers
 (`@agentworkforce/persona-kit`, which types persona authoring, and the in-repo
@@ -40,6 +40,12 @@ supports, keep these current:
   resolver disambiguates by the exact param set. Read-only adapters with no
   writeback resources are listed in `ADAPTERS_WITHOUT_WRITEBACK_PATHS`, not
   silently dropped.
+- **`inbound.ts`** (`inboundCapabilities`) — canonical provider ID/root,
+  provider-config aliases, accepted Nango/Hookdeck event kinds, source
+  detection, and logical-key policy. Feeds
+  `@relayfile/adapter-core/inbound` (`INBOUND_CAPABILITY_CATALOG`,
+  `INBOUND_CAPABILITY_CATALOG_VERSION`, and `logicalEventKey`). Do not add a
+  consumer-local provider allowlist when this declaration can own it.
 
 > "scope" is overloaded here: `docs/integration-scopes.yaml` tracks **OAuth
 > permission scopes** (`data.records:read`) for app registration — a different
@@ -53,19 +59,20 @@ npx turbo build
 npx adapter-core triggers generate
 npx adapter-core scope-keys generate
 npx adapter-core writeback-paths generate
+npx adapter-core inbound generate
 ```
 
 This is **CI-enforced**: `npm test` (→ `turbo test`) runs an in-sync test per
 catalog that regenerates and diffs the committed files, so changing a declaration
 without regenerating fails the build. Ad-hoc check form:
 `npx adapter-core triggers check` / `npx adapter-core scope-keys check` /
-`npx adapter-core writeback-paths check`.
+`npx adapter-core writeback-paths check` / `npx adapter-core inbound check`.
 
 Cross-repo: a catalog change reaches `@agentworkforce/persona-kit` only on its
 next `@relayfile/adapter-core` dep bump (release coordination — see
 [Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers`,
-`/scope-keys`, or `/writeback-paths` export hard-fails the consumer's build; a
-*stale* catalog merely lags until the bump.
+`/scope-keys`, `/writeback-paths`, or `/inbound` export hard-fails the consumer's
+build; a *stale* catalog merely lags until the bump.
 
 In-repo: `@relayfile/relay-helpers` (`packages/relay-helpers`) consumes
 `/writeback-paths` directly as a workspace dep, so a new writeback-capable

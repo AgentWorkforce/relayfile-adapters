@@ -1,7 +1,9 @@
-export const RELAYFILE_ROOT = "/gmail";
+import { GMAIL_PATH_ROOT, GMAIL_PROVIDER_ID } from "./identity.js";
+
+export const RELAYFILE_ROOT = GMAIL_PATH_ROOT;
 export const OBJECT_RESOURCE_PATH = "/gmail/{account}/threads";
 export const LIFECYCLE_RESOURCE_PATH = "/gmail/watches";
-const PROVIDER_SLUG: string = "gmail";
+const PROVIDER_SLUG: string = GMAIL_PROVIDER_ID;
 
 export interface ObjectPathInput {
   accountId?: string | number;
