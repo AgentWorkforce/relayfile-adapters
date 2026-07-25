@@ -13,12 +13,39 @@ const encoder = new TextEncoder();
 
 test("published logical-event golden vectors remain byte exact", async () => {
   for (const vector of INBOUND_LOGICAL_EVENT_GOLDEN_VECTORS) {
-    const actual = await logicalEventKey({
+    const input = {
       source: vector.source,
       ...("headers" in vector ? { headers: vector.headers } : {}),
       payload: JSON.parse(vector.rawBody),
       rawBody: vector.rawBody,
-    });
+    };
+    if ("expectedError" in vector) {
+      await assert.rejects(
+        logicalEventKey(input),
+        (error: unknown) => {
+          assert.equal(
+            error instanceof Error ? error.name : undefined,
+            vector.expectedError.name,
+          );
+          assert.deepEqual(
+            error && typeof error === "object"
+              ? {
+                  code: Reflect.get(error, "code"),
+                  missingFields: Reflect.get(error, "missingFields"),
+                }
+              : undefined,
+            {
+              code: vector.expectedError.code,
+              missingFields: vector.expectedError.missingFields,
+            },
+          );
+          return true;
+        },
+        vector.id,
+      );
+      continue;
+    }
+    const actual = await logicalEventKey(input);
     assert.deepEqual(actual, vector.expected, vector.id);
   }
 });
@@ -102,6 +129,32 @@ test("Nango sync pages key by provider config, connection, sync, model, window, 
   assert.equal(
     first.evidence.sourceCursor,
     "2026-07-25T00:00:00.000Z/cursor-2",
+  );
+});
+
+test("Nango sync pages reject identities without a window or cursor", async () => {
+  const payload = {
+    type: "sync",
+    providerConfigKey: "github-relay",
+    payload: {
+      connectionId: "conn-1",
+      syncName: "fetch-issues",
+      model: "Issue",
+      records: [{ id: 1 }],
+    },
+  };
+
+  await assert.rejects(
+    logicalEventKey({
+      source: "nango",
+      payload,
+      rawBody: encoder.encode(JSON.stringify(payload)),
+    }),
+    {
+      name: "IncompleteNangoSyncPageIdentityError",
+      code: "incomplete_nango_sync_page_identity",
+      missingFields: ["windowOrCursor"],
+    },
   );
 });
 

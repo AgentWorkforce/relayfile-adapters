@@ -10,6 +10,17 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 
+export class IncompleteNangoSyncPageIdentityError extends Error {
+  readonly code = "incomplete_nango_sync_page_identity";
+
+  constructor(readonly missingFields: readonly string[]) {
+    super(
+      `Incomplete Nango sync page identity: missing ${missingFields.join(", ")}`,
+    );
+    this.name = "IncompleteNangoSyncPageIdentityError";
+  }
+}
+
 export function resolveInboundCapability(
   input: InboundLogicalEventInput,
 ): InboundCapabilityDeclaration | undefined {
@@ -85,8 +96,7 @@ export async function logicalEventKey(
 
     if (strategy === "nango-sync-page") {
       if (input.source !== "nango" || eventKind !== "sync") continue;
-      const identity = readNangoSyncPageIdentity(input.payload);
-      if (!identity) continue;
+      const identity = requireNangoSyncPageIdentity(input.payload);
       const sourceCursor = [identity.window, identity.cursor]
         .filter((value) => value.length > 0)
         .join("/");
@@ -186,14 +196,14 @@ async function buildResult(
   };
 }
 
-function readNangoSyncPageIdentity(payload: unknown): {
+function requireNangoSyncPageIdentity(payload: unknown): {
   providerConfigKey: string;
   connectionId: string;
   syncName: string;
   model: string;
   window: string;
   cursor: string;
-} | undefined {
+} {
   const root = asRecord(payload);
   const nested = asRecord(root?.payload);
   const providerConfigKey = firstString(
@@ -216,26 +226,48 @@ function readNangoSyncPageIdentity(payload: unknown): {
     root?.sync_name,
   );
   const model = firstString(nested?.model, root?.model);
-  if (!providerConfigKey || !connectionId || !syncName || !model) {
-    return undefined;
+  const window =
+    firstString(
+      nested?.queryTimeStamp,
+      nested?.queryTimestamp,
+      nested?.windowKey,
+      nested?.window,
+      root?.queryTimeStamp,
+      root?.queryTimestamp,
+      root?.windowKey,
+      root?.window,
+    ) ?? "";
+  const cursor =
+    firstString(
+      nested?.cursor,
+      nested?.cursorKey,
+      root?.cursor,
+      root?.cursorKey,
+    ) ?? "";
+  const missingFields = [
+    ...(!providerConfigKey ? ["providerConfigKey"] : []),
+    ...(!connectionId ? ["connectionId"] : []),
+    ...(!syncName ? ["syncName"] : []),
+    ...(!model ? ["model"] : []),
+    ...(!window && !cursor ? ["windowOrCursor"] : []),
+  ];
+  if (
+    !providerConfigKey ||
+    !connectionId ||
+    !syncName ||
+    !model ||
+    (!window && !cursor)
+  ) {
+    throw new IncompleteNangoSyncPageIdentityError(missingFields);
   }
+
   return {
     providerConfigKey,
     connectionId,
     syncName,
     model,
-    window:
-      firstString(
-        nested?.queryTimeStamp,
-        nested?.queryTimestamp,
-        nested?.windowKey,
-        nested?.window,
-        root?.queryTimeStamp,
-        root?.queryTimestamp,
-        root?.windowKey,
-        root?.window,
-      ) ?? "",
-    cursor: firstString(nested?.cursor, nested?.cursorKey, root?.cursor, root?.cursorKey) ?? "",
+    window,
+    cursor,
   };
 }
 

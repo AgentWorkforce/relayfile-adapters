@@ -3,13 +3,30 @@ import type {
   LogicalEventKeyResult,
 } from "./types.js";
 
-export interface InboundLogicalEventGoldenVector {
+interface InboundLogicalEventGoldenVectorBase {
   readonly id: string;
   readonly source: InboundSource;
   readonly headers?: Readonly<Record<string, string>>;
   readonly rawBody: string;
+}
+
+export interface InboundLogicalEventSuccessGoldenVector
+  extends InboundLogicalEventGoldenVectorBase {
   readonly expected: LogicalEventKeyResult;
 }
+
+export interface InboundLogicalEventRejectionGoldenVector
+  extends InboundLogicalEventGoldenVectorBase {
+  readonly expectedError: {
+    readonly name: "IncompleteNangoSyncPageIdentityError";
+    readonly code: "incomplete_nango_sync_page_identity";
+    readonly missingFields: readonly string[];
+  };
+}
+
+export type InboundLogicalEventGoldenVector =
+  | InboundLogicalEventSuccessGoldenVector
+  | InboundLogicalEventRejectionGoldenVector;
 
 /**
  * Cross-runtime vectors for Cloud, relayfile-cloud, and generated edge
@@ -70,6 +87,17 @@ export const INBOUND_LOGICAL_EVENT_GOLDEN_VECTORS = [
           "1f5b6d35a4efe6bb86f112a50a919697dd422a26b54d3025028df2227eece879",
         sourceCursor: "2026-07-25T00:00:00.000Z/cursor-2",
       },
+    },
+  },
+  {
+    id: "github-sync-incomplete-page-identity",
+    source: "nango",
+    rawBody:
+      '{"type":"sync","providerConfigKey":"github-relay","payload":{"connectionId":"conn-gh","syncName":"fetch-issues","model":"Issue","records":[{"id":1}]}}',
+    expectedError: {
+      name: "IncompleteNangoSyncPageIdentityError",
+      code: "incomplete_nango_sync_page_identity",
+      missingFields: ["windowOrCursor"],
     },
   },
   {

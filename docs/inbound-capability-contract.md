@@ -24,8 +24,10 @@ Known adapter event kinds use this ordered hierarchy:
 
 1. Immutable provider/source delivery ID scoped by canonical provider,
    provider-config key, connection, and provider object scope.
-2. Nango sync-page identity: provider-config key, connection, sync, model,
-   source window/query timestamp, and cursor.
+2. Nango sync-page identity: provider-config key, connection, sync, model, and
+   at least one page discriminator (source window/query timestamp or cursor).
+   Known Nango sync payloads with incomplete page identity throw
+   `IncompleteNangoSyncPageIdentityError` instead of emitting a colliding key.
 3. Hookdeck source/delivery identity declared by the adapter.
 4. SHA-256 of canonical JSON payload semantics.
 
