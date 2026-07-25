@@ -25,6 +25,16 @@
       "types": "./dist/resources.d.ts",
       "import": "./dist/resources.js",
       "default": "./dist/resources.js"
+    },
+    "./identity": {
+      "types": "./dist/identity.d.ts",
+      "import": "./dist/identity.js",
+      "default": "./dist/identity.js"
+    },
+    "./inbound": {
+      "types": "./dist/inbound.d.ts",
+      "import": "./dist/inbound.js",
+      "default": "./dist/inbound.js"
     }
   },
   "files": [

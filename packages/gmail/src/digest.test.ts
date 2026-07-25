@@ -113,3 +113,41 @@ test('digest treats unsent as updated not as sent (word boundary)', async () => 
   const result = await digest(ctx);
   assert.equal(result?.bullets[0]?.text, 'thread thread-004 was updated');
 });
+
+test('digest accepts canonical Gmail and legacy google-mail paths during migration', async () => {
+  const ctx: DigestContext = {
+    provider: 'gmail',
+    window: { from: '2026-05-12T00:00:00.000Z', to: '2026-05-13T00:00:00.000Z' },
+    async changeEvents(filter) {
+      assert.deepEqual(filter, { providers: ['gmail'] });
+      return [
+        {
+          id: 'evt-canonical',
+          timestamp: '2026-05-12T08:00:00.000Z',
+          action: 'created',
+          canonicalPath: '/gmail/me/threads/thread-canonical.json',
+        },
+        {
+          id: 'evt-legacy',
+          timestamp: '2026-05-12T09:00:00.000Z',
+          action: 'updated',
+          canonicalPath: '/google-mail/messages/message-legacy.json',
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: 'gmail',
+    bullets: [
+      {
+        text: 'thread thread-canonical was created',
+        canonicalPath: 'gmail/me/threads/thread-canonical.json',
+      },
+      {
+        text: 'message-legacy was updated',
+        canonicalPath: 'google-mail/messages/message-legacy.json',
+      },
+    ],
+  });
+});

@@ -20,6 +20,11 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",
       "default": "./dist/types.js"
+    },
+    "./inbound": {
+      "types": "./dist/inbound.d.ts",
+      "import": "./dist/inbound.js",
+      "default": "./dist/inbound.js"
     }
   },
   "files": [
