@@ -199,6 +199,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
+    "packageName": "@relayfile/adapter-posthog",
+    "packagePath": "packages/posthog",
+    "provider": "posthog",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
     "packageName": "@relayfile/adapter-recall",
     "packagePath": "packages/recall",
     "provider": "recall",
