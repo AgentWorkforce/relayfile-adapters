@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/gmail",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Gmail storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -25,6 +25,16 @@
       "types": "./dist/resources.d.ts",
       "import": "./dist/resources.js",
       "default": "./dist/resources.js"
+    },
+    "./identity": {
+      "types": "./dist/identity.d.ts",
+      "import": "./dist/identity.js",
+      "default": "./dist/identity.js"
+    },
+    "./inbound": {
+      "types": "./dist/inbound.d.ts",
+      "import": "./dist/inbound.js",
+      "default": "./dist/inbound.js"
     }
   },
   "files": [
@@ -61,6 +71,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.11"
+    "@relayfile/adapter-core": "^0.5.12"
   }
 }

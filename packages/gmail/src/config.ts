@@ -1,6 +1,7 @@
 import type { GmailConfig } from './types.js';
+import { GMAIL_PROVIDER_ID } from './identity.js';
 
-export const GMAIL_SOURCE = "gmail";
+export const GMAIL_SOURCE = GMAIL_PROVIDER_ID;
 export const GMAIL_PROVIDER_CONFIG_KEY = "google-mail";
 export const GMAIL_NANGO_FALLBACK_SYNC = "google-mail-emails";
 export const GMAIL_SCOPES = [

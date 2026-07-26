@@ -35,6 +35,13 @@
       ],
       "outputs": []
     },
+    "@relayfile/adapter-core#test": {
+      "dependsOn": [
+        "build",
+        "@relayfile/adapter-core#catalog:check"
+      ],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": [
         "^build"

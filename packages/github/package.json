@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-github",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "GitHub adapter scaffold for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -35,6 +35,11 @@
       "types": "./dist/proactive/review-adapter.github.d.ts",
       "import": "./dist/proactive/review-adapter.github.js",
       "default": "./dist/proactive/review-adapter.github.js"
+    },
+    "./inbound": {
+      "types": "./dist/inbound.d.ts",
+      "import": "./dist/inbound.js",
+      "default": "./dist/inbound.js"
     }
   },
   "files": [
@@ -53,7 +58,7 @@
     "@relayfile/sdk": ">=0.6.0 <1"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.11"
+    "@relayfile/adapter-core": "^0.5.12"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.6.0",
