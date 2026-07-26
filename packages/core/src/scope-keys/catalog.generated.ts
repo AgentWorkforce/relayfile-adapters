@@ -27,6 +27,9 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
     "organizationId",
     "projectId"
   ],
+  "posthog": [
+    "project_id"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"
@@ -196,12 +199,6 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "packageName": "@relayfile/postgres",
     "packagePath": "packages/postgres",
     "provider": "postgres",
-    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
-  },
-  {
-    "packageName": "@relayfile/adapter-posthog",
-    "packagePath": "packages/posthog",
-    "provider": "posthog",
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {

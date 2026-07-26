@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-posthog` now provides read-only project-scoped materialization with canonical slug-and-ID paths, stable indexes and aliases, alert webhook normalization, digest visibility, and generated trigger and scope-key catalogs.
 - `@relayfile/adapter-github` can now backfill bounded repository commit history into a discoverable, newest-first `commits/_index.json` with canonical commit metadata paths, while push webhooks keep that index current.
 - `@relayfile/relay-helpers` now exposes a process-scoped final-write authorizer that can deny or redirect every generic and bespoke helper write after explicit transport selection, preventing authored transports from bypassing immutable local preview policy.
 - `@relayfile/relay-helpers` now exports an injectable `RelayTransport` and side-effect-free `PreviewTransport` with deterministic simulated receipts, seeded reads, process-scoped binding for existing no-argument clients, and cross-write thread-reference recording.

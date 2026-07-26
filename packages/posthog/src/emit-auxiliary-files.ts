@@ -9,6 +9,8 @@ import {
   computePostHogPath,
   posthogAggregateCollection,
   posthogAggregateIndexPath,
+  posthogDashboardByNameAliasPath,
+  posthogExperimentByNameAliasPath,
   posthogFeatureFlagByKeyAliasPath,
   posthogGlobalByIdAliasPath,
   posthogInsightByShortIdAliasPath,
@@ -17,15 +19,20 @@ import {
   posthogProjectLocalByIdAliasPath,
   posthogProjectLocalIndexPath,
   posthogProjectsIndexPath,
+  posthogRecordDisplayName,
   posthogRootIndexPath,
+  posthogSurveyByNameAliasPath,
 } from "./path-mapper.js";
 import { type PostHogPathObjectType } from "./types.js";
 
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
+const EMIT_CONCURRENCY = 8;
 
 type PostHogRecord = Record<string, unknown> & {
-  id?: string;
-  project_id?: string;
+  id?: string | number;
+  project_id?: string | number;
+  projectId?: string | number;
+  alert_id?: string | number;
   project_name?: string;
   name?: string;
   title?: string;
@@ -56,6 +63,15 @@ type IndexRow = {
 } & Record<string, unknown>;
 
 type ProjectScopedObjectType = Exclude<PostHogPathObjectType, "project">;
+
+type IndexSnapshot = {
+  rows: IndexRow[];
+  available: boolean;
+};
+
+type JsonReadResult =
+  | { available: true; value: unknown }
+  | { available: false; value: null };
 
 export interface EmitPostHogAuxiliaryFilesInput {
   workspaceId: string;
@@ -117,13 +133,13 @@ async function emitProjects(
   connectionId: string | undefined,
 ): Promise<void> {
   const indexPath = posthogProjectsIndexPath();
-  const existingRows = await readIndex(client, workspaceId, indexPath, aggregate);
-  const rows = new Map(existingRows.map((row) => [row.id, row]));
+  const existing = await readIndex(client, workspaceId, indexPath, aggregate);
+  const rows = new Map(existing.rows.map((row) => [row.id, row]));
 
-  for (const record of records) {
+  await runWithConcurrencyLimit(records, EMIT_CONCURRENCY, async (record) => {
     const projectId = readProjectId(record, "project");
     if (!projectId) {
-      continue;
+      return;
     }
 
     const byIdPath = posthogProjectByIdAliasPath(projectId);
@@ -144,15 +160,16 @@ async function emitProjects(
           aggregate,
         );
       }
-      continue;
+      return;
     }
 
+    const previousRow = rows.get(projectId);
     rows.set(projectId, {
       id: projectId,
       title: currentName,
-      updated: readUpdated(record),
+      updated: readUpdated(record, previousRow?.updated),
       canonicalPath,
-      organization_id: readString(record.organization_id),
+      organization_id: readIdentifier(record.organization_id),
       archived: record.archived === true,
     });
 
@@ -188,9 +205,11 @@ async function emitProjects(
         aggregate,
       );
     }
-  }
+  });
 
-  await writeSortedIndex(client, workspaceId, indexPath, rows, aggregate);
+  if (existing.available) {
+    await writeSortedIndex(client, workspaceId, indexPath, rows, aggregate);
+  }
 }
 
 async function emitProjectScopedCollection(
@@ -204,29 +223,36 @@ async function emitProjectScopedCollection(
   const aggregateIndexPath = posthogAggregateIndexPath(
     posthogAggregateCollection(objectType),
   );
-  const aggregateExistingRows = await readIndex(
+  const aggregateExisting = await readIndex(
     client,
     workspaceId,
     aggregateIndexPath,
     aggregate,
   );
-  const aggregateRows = new Map(aggregateExistingRows.map((row) => [row.id, row]));
+  const aggregateRows = new Map(
+    aggregateExisting.rows.map((row) => [row.id, row]),
+  );
 
-  const grouped = groupByProject(records);
+  const grouped = groupByProject(records, objectType);
   for (const [projectId, projectRecords] of grouped.entries()) {
     const projectIndexPath = posthogProjectLocalIndexPath(objectType, projectId);
-    const projectExistingRows = await readIndex(
+    const projectExisting = await readIndex(
       client,
       workspaceId,
       projectIndexPath,
       aggregate,
     );
-    const projectRows = new Map(projectExistingRows.map((row) => [row.id, row]));
+    const projectRows = new Map(
+      projectExisting.rows.map((row) => [row.id, row]),
+    );
 
-    for (const record of projectRecords) {
+    await runWithConcurrencyLimit(
+      projectRecords,
+      EMIT_CONCURRENCY,
+      async (record) => {
       const objectId = readObjectId(record, objectType);
       if (!objectId) {
-        continue;
+        return;
       }
 
       const globalAliasPath = posthogGlobalByIdAliasPath(
@@ -245,10 +271,25 @@ async function emitProjectScopedCollection(
         globalAliasPath,
         aggregate,
       );
+      const title = posthogRecordDisplayName(
+        objectType,
+        record,
+        objectId,
+      );
       const canonicalPath = computePostHogPath(objectType, objectId, {
         projectId,
+        displayName: title,
       });
-      const title = readObjectTitle(record, objectType, objectId);
+      const previousCanonicalPath = previousRecord
+        ? computePostHogPath(objectType, objectId, {
+            projectId,
+            displayName: posthogRecordDisplayName(
+              objectType,
+              previousRecord,
+              objectId,
+            ),
+          })
+        : null;
       const aggregateId = composeProjectScopedId(projectId, objectId);
       const aliasPayload = buildAliasPayload({
         provider: "posthog",
@@ -272,13 +313,23 @@ async function emitProjectScopedCollection(
         )) {
           await safeDelete(client, workspaceId, extraAlias, aggregate);
         }
-        continue;
+        if (previousCanonicalPath) {
+          await safeDelete(
+            client,
+            workspaceId,
+            previousCanonicalPath,
+            aggregate,
+          );
+        }
+        return;
       }
 
+      const previousAggregateRow = aggregateRows.get(aggregateId);
+      const previousProjectRow = projectRows.get(objectId);
       aggregateRows.set(aggregateId, {
         id: aggregateId,
         title,
-        updated: readUpdated(record),
+        updated: readUpdated(record, previousAggregateRow?.updated),
         canonicalPath,
         project_id: projectId,
         project_name: readString(record.project_name),
@@ -289,7 +340,7 @@ async function emitProjectScopedCollection(
       projectRows.set(objectId, {
         id: objectId,
         title,
-        updated: readUpdated(record),
+        updated: readUpdated(record, previousProjectRow?.updated),
         canonicalPath,
         state: readString(record.state),
         status: readString(record.status),
@@ -331,32 +382,49 @@ async function emitProjectScopedCollection(
           aggregate,
         );
       }
-    }
+      if (
+        previousCanonicalPath &&
+        previousCanonicalPath !== canonicalPath
+      ) {
+        await safeDelete(
+          client,
+          workspaceId,
+          previousCanonicalPath,
+          aggregate,
+        );
+      }
+    },
+    );
 
+    if (projectExisting.available) {
+      await writeSortedIndex(
+        client,
+        workspaceId,
+        projectIndexPath,
+        projectRows,
+        aggregate,
+      );
+    }
+  }
+
+  if (aggregateExisting.available) {
     await writeSortedIndex(
       client,
       workspaceId,
-      projectIndexPath,
-      projectRows,
+      aggregateIndexPath,
+      aggregateRows,
       aggregate,
     );
   }
-
-  await writeSortedIndex(
-    client,
-    workspaceId,
-    aggregateIndexPath,
-    aggregateRows,
-    aggregate,
-  );
 }
 
 function groupByProject(
   records: readonly PostHogRecord[],
+  objectType: ProjectScopedObjectType,
 ): Map<string, PostHogRecord[]> {
   const grouped = new Map<string, PostHogRecord[]>();
   for (const record of records) {
-    const projectId = readProjectId(record, "insight");
+    const projectId = readProjectId(record, objectType);
     if (!projectId) {
       continue;
     }
@@ -373,9 +441,9 @@ function readProjectId(
   objectType: PostHogPathObjectType,
 ): string | undefined {
   if (objectType === "project") {
-    return readString(record.project_id) ?? readString(record.id);
+    return readIdentifier(record.project_id) ?? readIdentifier(record.id);
   }
-  return readString(record.project_id) ?? readString(record.projectId);
+  return readIdentifier(record.project_id) ?? readIdentifier(record.projectId);
 }
 
 function readObjectId(
@@ -383,9 +451,9 @@ function readObjectId(
   objectType: ProjectScopedObjectType,
 ): string | undefined {
   if (objectType === "alert-event") {
-    return readString(record.id) ?? readString(record.alert_id);
+    return readIdentifier(record.id) ?? readIdentifier(record.alert_id);
   }
-  return readString(record.id);
+  return readIdentifier(record.id);
 }
 
 function readProjectTitle(record: PostHogRecord, projectId: string): string {
@@ -395,34 +463,6 @@ function readProjectTitle(record: PostHogRecord, projectId: string): string {
     readString(record.slug) ??
     projectId
   );
-}
-
-function readObjectTitle(
-  record: PostHogRecord,
-  objectType: ProjectScopedObjectType,
-  objectId: string,
-): string {
-  switch (objectType) {
-    case "insight":
-      return (
-        readString(record.name) ??
-        readString(record.derived_name) ??
-        readString(record.short_id) ??
-        objectId
-      );
-    case "dashboard":
-      return readString(record.name) ?? readString(record.description) ?? objectId;
-    case "feature-flag":
-      return readString(record.name) ?? readString(record.key) ?? objectId;
-    case "annotation":
-      return readString(record.content) ?? readString(record.scope) ?? objectId;
-    case "experiment":
-      return readString(record.name) ?? readString(record.feature_flag_key) ?? objectId;
-    case "survey":
-      return readString(record.name) ?? readString(record.type) ?? objectId;
-    case "alert-event":
-      return readString(record.title) ?? readString(record.event_type) ?? objectId;
-  }
 }
 
 function extraAliasPaths(
@@ -442,12 +482,36 @@ function extraAliasPaths(
       const key = readString(record.key);
       return key ? [posthogFeatureFlagByKeyAliasPath(projectId, key)] : [];
     }
+    case "dashboard": {
+      const name = readString(record.name);
+      const id = readObjectId(record, objectType);
+      return name && id
+        ? [posthogDashboardByNameAliasPath(projectId, name, id)]
+        : [];
+    }
+    case "experiment": {
+      const name = readString(record.name);
+      const id = readObjectId(record, objectType);
+      return name && id
+        ? [posthogExperimentByNameAliasPath(projectId, name, id)]
+        : [];
+    }
+    case "survey": {
+      const name = readString(record.name);
+      const id = readObjectId(record, objectType);
+      return name && id
+        ? [posthogSurveyByNameAliasPath(projectId, name, id)]
+        : [];
+    }
     default:
       return [];
   }
 }
 
-function readUpdated(record: PostHogRecord): string {
+function readUpdated(
+  record: PostHogRecord,
+  previousUpdated: string | undefined,
+): string {
   return (
     readString(record.updated_at) ??
     readString(record.updatedAt) ??
@@ -459,7 +523,8 @@ function readUpdated(record: PostHogRecord): string {
     readString(record.start_date) ??
     readString(record.created_at) ??
     readString(record.createdAt) ??
-    new Date().toISOString()
+    previousUpdated ??
+    ""
   );
 }
 
@@ -510,9 +575,15 @@ async function readIndex(
   workspaceId: string,
   path: string,
   aggregate: EmitAuxiliaryFilesResult,
-): Promise<IndexRow[]> {
-  const value = await safeReadJson(client, workspaceId, path, aggregate);
-  return Array.isArray(value) ? (value as IndexRow[]) : [];
+): Promise<IndexSnapshot> {
+  const result = await safeReadJson(client, workspaceId, path, aggregate);
+  return {
+    available: result.available,
+    rows:
+      result.available && Array.isArray(result.value)
+        ? (result.value as IndexRow[])
+        : [],
+  };
 }
 
 async function readAliasRecord(
@@ -521,11 +592,13 @@ async function readAliasRecord(
   path: string,
   aggregate: EmitAuxiliaryFilesResult,
 ): Promise<PostHogRecord | null> {
-  const value = await safeReadJson(client, workspaceId, path, aggregate);
-  if (!isRecord(value)) {
+  const result = await safeReadJson(client, workspaceId, path, aggregate);
+  if (!result.available || !isRecord(result.value)) {
     return null;
   }
-  const payload = isRecord(value.payload) ? value.payload : value;
+  const payload = isRecord(result.value.payload)
+    ? result.value.payload
+    : result.value;
   return payload as PostHogRecord;
 }
 
@@ -534,9 +607,9 @@ async function safeReadJson(
   workspaceId: string,
   path: string,
   aggregate: EmitAuxiliaryFilesResult,
-): Promise<unknown> {
+): Promise<JsonReadResult> {
   if (!client.readFile) {
-    return null;
+    return { available: false, value: null };
   }
   try {
     const value = await client.readFile({ workspaceId, path });
@@ -547,9 +620,9 @@ async function safeReadJson(
           ? value.content
           : null;
     if (!content) {
-      return null;
+      return { available: true, value: null };
     }
-    return JSON.parse(content) as unknown;
+    return { available: true, value: JSON.parse(content) as unknown };
   } catch (error) {
     const message = String(error);
     if (
@@ -557,10 +630,10 @@ async function safeReadJson(
       message.includes("ENOENT") ||
       message.includes("404")
     ) {
-      return null;
+      return { available: true, value: null };
     }
     aggregate.errors.push({ path, error: message });
-    return null;
+    return { available: false, value: null };
   }
 }
 
@@ -614,6 +687,36 @@ function readString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
+}
+
+function readIdentifier(value: unknown): string | undefined {
+  const text = readString(value);
+  if (text) {
+    return text;
+  }
+  return typeof value === "number" && Number.isFinite(value)
+    ? String(value)
+    : undefined;
+}
+
+async function runWithConcurrencyLimit<T>(
+  values: readonly T[],
+  limit: number,
+  worker: (value: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(limit, 1), values.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < values.length) {
+        const value = values[nextIndex];
+        nextIndex += 1;
+        if (value !== undefined) {
+          await worker(value);
+        }
+      }
+    }),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

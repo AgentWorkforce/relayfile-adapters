@@ -749,79 +749,6 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
-  "posthog": {
-    "alert-events": [
-      {
-        "path": "/posthog/projects/{projectId}/alert-events/{eventId}.json",
-        "params": [
-          "projectId",
-          "eventId"
-        ]
-      }
-    ],
-    "annotations": [
-      {
-        "path": "/posthog/projects/{projectId}/annotations/{annotationId}.json",
-        "params": [
-          "projectId",
-          "annotationId"
-        ]
-      }
-    ],
-    "dashboards": [
-      {
-        "path": "/posthog/projects/{projectId}/dashboards/{dashboardId}.json",
-        "params": [
-          "projectId",
-          "dashboardId"
-        ]
-      }
-    ],
-    "experiments": [
-      {
-        "path": "/posthog/projects/{projectId}/experiments/{experimentId}.json",
-        "params": [
-          "projectId",
-          "experimentId"
-        ]
-      }
-    ],
-    "feature-flags": [
-      {
-        "path": "/posthog/projects/{projectId}/feature-flags/{featureFlagId}.json",
-        "params": [
-          "projectId",
-          "featureFlagId"
-        ]
-      }
-    ],
-    "insights": [
-      {
-        "path": "/posthog/projects/{projectId}/insights/{insightId}.json",
-        "params": [
-          "projectId",
-          "insightId"
-        ]
-      }
-    ],
-    "projects": [
-      {
-        "path": "/posthog/projects/{projectId}.json",
-        "params": [
-          "projectId"
-        ]
-      }
-    ],
-    "surveys": [
-      {
-        "path": "/posthog/projects/{projectId}/surveys/{surveyId}.json",
-        "params": [
-          "projectId",
-          "surveyId"
-        ]
-      }
-    ]
-  },
   "recall": {
     "recordings": [
       {
@@ -1103,6 +1030,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "packageName": "@relayfile/adapter-neon",
     "packagePath": "packages/neon",
     "provider": "neon",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-posthog",
+    "packagePath": "packages/posthog",
+    "provider": "posthog",
     "reason": "No resources.ts with writeback path templates"
   },
   {
