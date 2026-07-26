@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/gmail",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Gmail storage bridge adapter for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -71,6 +71,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.11"
+    "@relayfile/adapter-core": "^0.5.12"
   }
 }
