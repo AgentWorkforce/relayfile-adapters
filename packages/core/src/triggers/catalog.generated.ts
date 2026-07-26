@@ -388,6 +388,10 @@ export const KNOWN_TRIGGER_CATALOG = {
     "file.deleted",
     "file.updated"
   ],
+  "posthog": [
+    "posthog.alert.resolved",
+    "posthog.alert.triggered"
+  ],
   "recall": [
     "file.created",
     "recording.created",

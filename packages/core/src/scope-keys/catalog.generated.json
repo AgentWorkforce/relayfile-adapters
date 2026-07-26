@@ -19,6 +19,9 @@
     "organizationId",
     "projectId"
   ],
+  "posthog": [
+    "project_id"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

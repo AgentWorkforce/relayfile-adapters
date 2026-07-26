@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-posthog` now provides read-only project-scoped materialization with canonical slug-and-ID paths, stable indexes and aliases, alert webhook normalization, digest visibility, and generated trigger and scope-key catalogs.
 - `@relayfile/adapter-core/inbound` now publishes a version-hashed, provider-owned Nango/Hookdeck capability catalog, deterministic cross-runtime `logicalEventKey`, and exact golden vectors; incomplete Nango sync-page identities are rejected, and GitLab Hookdeck prefers `x-gitlab-event-uuid` before falling back to the Hookdeck delivery id.
 - `@relayfile/gmail/identity` now declares `gmail` + `/gmail` as canonical, publishes `google-mail` provider/path migration aliases, and keeps compatibility digests readable across both roots while canonical resyncs drain legacy mounts.
 - `@relayfile/adapter-github` can now backfill bounded repository commit history into a discoverable, newest-first `commits/_index.json` with canonical commit metadata paths, while push webhooks keep that index current.

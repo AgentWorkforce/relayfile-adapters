@@ -27,6 +27,9 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
     "organizationId",
     "projectId"
   ],
+  "posthog": [
+    "project_id"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

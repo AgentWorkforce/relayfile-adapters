@@ -1033,6 +1033,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "reason": "No resources.ts with writeback path templates"
   },
   {
+    "packageName": "@relayfile/adapter-posthog",
+    "packagePath": "packages/posthog",
+    "provider": "posthog",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
     "packageName": "@relayfile/adapter-segment",
     "packagePath": "packages/segment",
     "provider": "segment",

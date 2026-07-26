@@ -1,0 +1,50 @@
+adapter:
+  name: posthog
+  version: "1.0.0"
+  baseUrl: https://us.posthog.com
+scopeKeys:
+  - project_id
+resources:
+  projects:
+    path: /posthog/projects/{projectId}.json
+  insights:
+    path: /posthog/projects/{projectId}/insights/{slug}__{insightId}.json
+  dashboards:
+    path: /posthog/projects/{projectId}/dashboards/{slug}__{dashboardId}.json
+  feature-flags:
+    path: /posthog/projects/{projectId}/feature-flags/{slug}__{featureFlagId}.json
+  annotations:
+    path: /posthog/projects/{projectId}/annotations/{slug}__{annotationId}.json
+  experiments:
+    path: /posthog/projects/{projectId}/experiments/{slug}__{experimentId}.json
+  surveys:
+    path: /posthog/projects/{projectId}/surveys/{slug}__{surveyId}.json
+  alert-events:
+    path: /posthog/projects/{projectId}/alert-events/{slug}__{eventId}.json
+webhooks:
+  # Normalized forward-webhook events currently supported by the cloud ingress.
+  # These are alert lifecycle payloads materialized under /posthog/projects/<id>/alert-events/.
+  posthog.alert.triggered:
+    path: /posthog/projects/{{project_id}}/alert-events/{{id}}.json
+    extract:
+      - id
+      - project_id
+      - title
+      - severity
+      - state
+      - event_type
+      - occurred_at
+      - timestamp
+      - url
+  posthog.alert.resolved:
+    path: /posthog/projects/{{project_id}}/alert-events/{{id}}.json
+    extract:
+      - id
+      - project_id
+      - title
+      - severity
+      - state
+      - event_type
+      - occurred_at
+      - timestamp
+      - url
