@@ -70,6 +70,8 @@ test("numeric ids materialize stable indexes and named aliases", async () => {
       "/posthog/projects/17/dashboards/checkout-funnel__73.json",
     archived: false,
   });
+  assert.equal(Object.hasOwn(rows[0]!, "state"), false);
+  assert.equal(Object.hasOwn(rows[0]!, "status"), false);
   assert.ok(
     files.has(
       posthogDashboardByNameAliasPath("17", "Checkout funnel", "73"),

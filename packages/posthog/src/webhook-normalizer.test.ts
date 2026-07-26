@@ -45,14 +45,17 @@ test("explicit upstream event type remains authoritative", () => {
   const normalized = normalizePostHogWebhook({
     alert_id: "alert-1",
     projectId: "project-1",
-    status: "open",
+    status: "resolved",
     event_type: "posthog.alert.triggered",
   });
 
   assert.ok(normalized);
   assert.equal(normalized.eventType, "posthog.alert.triggered");
-  assert.equal(normalized.state, "triggered");
-  assert.equal(normalized.fileEventType, "file.created");
+  assert.equal(normalized.state, "resolved");
+  assert.equal(normalized.record.state, "resolved");
+  assert.equal(normalized.record.event_type, "posthog.alert.triggered");
+  assert.equal(normalized.fileEventType, "file.updated");
+  assert.equal(normalized.shouldDelete, false);
 });
 
 test("rejects missing and non-finite identifiers", () => {

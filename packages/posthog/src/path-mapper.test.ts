@@ -6,6 +6,11 @@ import {
   parsePostHogPath,
   posthogDashboardByNameAliasPath,
   posthogExperimentByNameAliasPath,
+  posthogFeatureFlagByKeyAliasPath,
+  posthogGlobalByIdAliasPath,
+  posthogInsightByShortIdAliasPath,
+  posthogProjectByIdAliasPath,
+  posthogProjectLocalByIdAliasPath,
   posthogProjectByNameAliasPath,
   posthogSurveyByNameAliasPath,
 } from "./path-mapper.js";
@@ -75,6 +80,24 @@ test("named aliases use deterministic collision suffixes", () => {
     assert.equal(first, repeated);
     assert.notEqual(first, collision);
     assert.match(first, /\/by-name\/revenue-[a-f0-9]{8}__1\.json$/u);
+  }
+});
+
+test("provider-unique aliases preserve opaque identifiers without collision suffixes", () => {
+  const helpers = [
+    (value: string) => posthogProjectByIdAliasPath(value),
+    (value: string) =>
+      posthogGlobalByIdAliasPath("dashboard", "17", value),
+    (value: string) =>
+      posthogProjectLocalByIdAliasPath("dashboard", "17", value),
+    (value: string) => posthogInsightByShortIdAliasPath("17", value),
+    (value: string) => posthogFeatureFlagByKeyAliasPath("17", value),
+  ];
+
+  for (const helper of helpers) {
+    assert.equal(helper("opaque/value"), helper("opaque/value"));
+    assert.notEqual(helper("opaque/value"), helper("other/value"));
+    assert.match(helper("opaque/value"), /opaque%2Fvalue\.json$/u);
   }
 });
 
