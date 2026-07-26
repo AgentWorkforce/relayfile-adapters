@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-posthog",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "PostHog adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -59,7 +59,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.12"
+    "@relayfile/adapter-core": "^0.5.13"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
