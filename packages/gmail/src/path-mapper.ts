@@ -3,6 +3,9 @@ import { GMAIL_PATH_ROOT, GMAIL_PATH_ROOTS } from "./identity.js";
 export const RELAYFILE_ROOT = GMAIL_PATH_ROOT;
 export const OBJECT_RESOURCE_PATH = `${RELAYFILE_ROOT}/{account}/threads`;
 export const LIFECYCLE_RESOURCE_PATH = `${RELAYFILE_ROOT}/watches`;
+export const DRAFTS_RESOURCE_PATH = `${RELAYFILE_ROOT}/drafts`;
+
+const DRAFTS_SEGMENT = 'drafts';
 
 export interface ObjectPathInput {
   accountId?: string | number;
@@ -44,7 +47,56 @@ export function toLifecycleRelayfilePath(id: string | number): string {
   return LIFECYCLE_RESOURCE_PATH + '/' + encodePathSegment(id) + '.json';
 }
 
-export function parseRelayfilePath(path: string): { resource: 'object' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
+export interface DraftPathInput {
+  /** Draft id for a canonical edit, or the create-draft filename stem. */
+  readonly id: string | number;
+  /** Mounted drafts live under an account segment; the collection form omits it. */
+  readonly account?: string | number;
+}
+
+/**
+ * Compose a Gmail draft path. Both accepted shapes are produced here so callers
+ * never concatenate them by hand:
+ *
+ * - `toDraftRelayfilePath({ id })` → `/gmail/drafts/<id>.json`
+ * - `toDraftRelayfilePath({ account, id })` → `/gmail/<account>/drafts/<id>.json`
+ *
+ * A stem matching the drafts `idPattern` edits that draft; any other stem is a
+ * create draft (see `docs/migration/file-native-writeback.md`).
+ */
+export function toDraftRelayfilePath(input: DraftPathInput): string {
+  const stem = String(input.id).trim();
+  if (!stem) throw new Error('Gmail draft path requires an id');
+  const prefix =
+    input.account === undefined
+      ? DRAFTS_RESOURCE_PATH
+      : `${RELAYFILE_ROOT}/${encodeAccountSegment(input.account)}/${DRAFTS_SEGMENT}`;
+  return prefix + '/' + encodeSingleSegment(stem) + '.json';
+}
+
+/**
+ * Encode exactly one path segment. Unlike `encodePathSegment`, a `/` in the
+ * value stays percent-encoded: a draft stem or account that expanded into two
+ * segments would shift the id the parser reads off the end of the path, so a
+ * write or delete could address a different draft.
+ */
+function encodeSingleSegment(value: string | number): string {
+  const segment = String(value).trim();
+  if (!segment) throw new Error('Gmail path segments must be non-empty');
+  return encodeURIComponent(segment);
+}
+
+/**
+ * Account segments are email addresses and materialize with a literal `@`
+ * (`/gmail/me@example.com/threads/...`). Percent-encoding it would compose a
+ * path that never matches a mounted file, so `@` alone is restored — `/` stays
+ * encoded per `encodeSingleSegment`.
+ */
+function encodeAccountSegment(value: string | number): string {
+  return encodeSingleSegment(value).replace(/%40/gi, '@');
+}
+
+export function parseRelayfilePath(path: string): { resource: 'object' | 'drafts' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
   const normalized = path.startsWith('/') ? path : '/' + path;
   const segments = normalized.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment.replace(/\.json$/, '')));
   const lifecycleSuffix = LIFECYCLE_RESOURCE_PATH.slice(RELAYFILE_ROOT.length);
@@ -55,10 +107,26 @@ export function parseRelayfilePath(path: string): { resource: 'object' | 'lifecy
   ) {
     return { resource: 'lifecycle', id: segments.at(-1) ?? null, segments };
   }
-  if (GMAIL_PATH_ROOTS.some((root) => matchesPathPrefix(segments, root))) {
+  if (matchedRoot(segments) !== null && isDraftsPath(segments)) {
+    return { resource: 'drafts', id: segments.at(-1) ?? null, segments };
+  }
+  if (matchedRoot(segments) !== null) {
     return { resource: 'object', id: segments.at(-1) ?? null, segments };
   }
   return { resource: 'unknown', id: null, segments };
+}
+
+function matchedRoot(segments: readonly string[]): string | null {
+  return GMAIL_PATH_ROOTS.find((root) => matchesPathPrefix(segments, root)) ?? null;
+}
+
+/**
+ * Drafts are addressed both with and without an account segment:
+ * `/gmail/drafts/<id>.json` (the writeback-discovery form) and
+ * `/gmail/<account>/drafts/<id>.json` (the mounted form).
+ */
+function isDraftsPath(segments: readonly string[]): boolean {
+  return segments[1] === DRAFTS_SEGMENT || segments[2] === DRAFTS_SEGMENT;
 }
 
 function matchesPathPrefix(segments: readonly string[], pathPrefix: string): boolean {

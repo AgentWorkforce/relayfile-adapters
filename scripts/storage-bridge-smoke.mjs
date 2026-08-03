@@ -256,13 +256,13 @@ for (const item of cases) {
 }
 
 for (const item of writebackCases) {
-  assert.deepEqual(resolveWriteback(item, "create"), {
+  assert.deepEqual(expectedWriteback(item, "create"), {
     operation: "create",
     providerOperation: item.createOperation,
     path: item.draftPath,
     canonical: false
   });
-  assert.deepEqual(resolveWriteback(item, "delete"), {
+  assert.deepEqual(expectedWriteback(item, "delete"), {
     operation: "delete",
     providerOperation: item.deleteOperation,
     path: item.canonicalPath,
@@ -282,7 +282,17 @@ for (const item of nangoFallbackCases) {
 
 console.log(`storage-bridge-smoke: ${cases.length} mocked provider events normalized, fetched, ingested, deduped; ${writebackCases.length} writeback mappings checked; ${nangoFallbackCases.length} Nango fallbacks checked`);
 
-function resolveWriteback(item, operation) {
+/**
+ * Fixture-consistency helper ONLY — it echoes the case's own expected values, so
+ * the assertions below check that the writeback table is internally coherent
+ * (create uses the draft path, delete uses the canonical path). It does NOT
+ * exercise any adapter's writeback resolver.
+ *
+ * Real per-adapter resolution is asserted in the adapter packages, e.g.
+ * `packages/gmail/src/writeback.test.ts`, which pins action, method, and
+ * endpoint for every resource.
+ */
+function expectedWriteback(item, operation) {
   return {
     operation,
     providerOperation: operation === "delete" ? item.deleteOperation : item.createOperation,
