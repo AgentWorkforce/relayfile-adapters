@@ -71,16 +71,29 @@ export function toDraftRelayfilePath(input: DraftPathInput): string {
     input.account === undefined
       ? DRAFTS_RESOURCE_PATH
       : `${RELAYFILE_ROOT}/${encodeAccountSegment(input.account)}/${DRAFTS_SEGMENT}`;
-  return prefix + '/' + encodePathSegment(stem) + '.json';
+  return prefix + '/' + encodeSingleSegment(stem) + '.json';
+}
+
+/**
+ * Encode exactly one path segment. Unlike `encodePathSegment`, a `/` in the
+ * value stays percent-encoded: a draft stem or account that expanded into two
+ * segments would shift the id the parser reads off the end of the path, so a
+ * write or delete could address a different draft.
+ */
+function encodeSingleSegment(value: string | number): string {
+  const segment = String(value).trim();
+  if (!segment) throw new Error('Gmail path segments must be non-empty');
+  return encodeURIComponent(segment);
 }
 
 /**
  * Account segments are email addresses and materialize with a literal `@`
  * (`/gmail/me@example.com/threads/...`). Percent-encoding it would compose a
- * path that never matches a mounted file, so `@` is preserved here.
+ * path that never matches a mounted file, so `@` alone is restored — `/` stays
+ * encoded per `encodeSingleSegment`.
  */
 function encodeAccountSegment(value: string | number): string {
-  return encodePathSegment(value).replace(/%40/gi, '@');
+  return encodeSingleSegment(value).replace(/%40/gi, '@');
 }
 
 export function parseRelayfilePath(path: string): { resource: 'object' | 'drafts' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {

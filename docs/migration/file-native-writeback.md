@@ -73,6 +73,7 @@ Use the status surface before retrying a write. For example, if a create fails b
 | ClickUp | `^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$` | `/clickup/lists/<listId>/tasks/<draft>.json` |
 | GitHub | `^\d+$` | `/github/repos/<owner>/<repo>/pulls/<pullNumber>/reviews/<draft>.json` |
 | GitLab | `^[A-Za-z0-9_.:-]+$` | `/gitlab/projects/<namespace>/<project>/merge_requests/<iid>/discussions/<draft>.json` |
+| Gmail | drafts: `^r-?\d+$` — Gmail draft ids are an `r` followed by digits, optionally hyphenated (`r-4692061400304996596`, `r1234567890`). **Drafts only**: threads and watches still use the legacy reserved-prefix heuristic and are not file-native yet. | `/gmail/<account>/drafts/<draft>.json` |
 | HubSpot | `^(?:[A-Za-z0-9_.~-]+--)?\d+$` | `/hubspot/contacts/<draft>.json` |
 | Intercom | `^[A-Za-z0-9_-]+$` | `/intercom/conversations/<draft>.json` |
 | Jira | comments: `^(?:[A-Za-z0-9_.~-]+(?:--\|__))?\d+$`; issues/projects: bare `KEY-123` or `\d+`, plus slug-prefixed `<slug>__<id>` and legacy `<slug>--<id>` forms | `/jira/issues/<draft>.json` |

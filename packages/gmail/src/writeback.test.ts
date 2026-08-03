@@ -56,6 +56,34 @@ test("draft path composition round-trips through the parser", () => {
   assert.throws(() => toDraftRelayfilePath({ id: "  " }));
 });
 
+test("a slash in a draft stem or account stays inside one path segment", () => {
+  // A value that expanded into two segments would shift the id the parser reads
+  // off the end of the path, so a write could address a different draft.
+  const draftWithSlash = toDraftRelayfilePath({
+    account: "me@example.com",
+    id: "q3/budget reply",
+  });
+  assert.equal(
+    draftWithSlash,
+    "/gmail/me@example.com/drafts/q3%2Fbudget%20reply.json",
+  );
+  const parsedDraft = parseRelayfilePath(draftWithSlash);
+  assert.equal(parsedDraft.resource, "drafts");
+  assert.equal(parsedDraft.id, "q3/budget reply");
+  assert.equal(resolveWritebackRequest(draftWithSlash, DRAFT_BODY).operation, "create");
+
+  const accountWithSlash = toDraftRelayfilePath({
+    account: "tenant/me@example.com",
+    id: "r1234567890",
+  });
+  assert.equal(
+    accountWithSlash,
+    "/gmail/tenant%2Fme@example.com/drafts/r1234567890.json",
+  );
+  // Still classified as a draft, not misrouted to the object resource.
+  assert.equal(parseRelayfilePath(accountWithSlash).resource, "drafts");
+});
+
 test("the drafts idPattern matches Gmail draft ids and rejects prose filenames", () => {
   const drafts = resources.find((resource) => resource.name === "drafts");
   assert.ok(drafts);

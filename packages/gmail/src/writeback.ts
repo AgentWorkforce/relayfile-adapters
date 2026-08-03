@@ -47,10 +47,15 @@ type GmailWritebackResource = 'drafts' | 'threads' | 'watches';
  * `scripts/writeback-discovery-data.mjs`, so the resolver and the published
  * discovery docs cannot drift apart.
  *
- * Threads and watches keep the legacy reserved-prefix heuristic: gmail is not
- * in the file-native migration table, and changing their create/update split
- * would alter behavior this change has no reason to touch. Migrating them is a
- * separate change.
+ * Threads and watches keep the legacy reserved-prefix heuristic: only drafts
+ * are file-native so far (see the Gmail row in
+ * `docs/migration/file-native-writeback.md`), and changing their create/update
+ * split would alter behavior this change has no reason to touch. Migrating them
+ * is a separate change.
+ *
+ * Inference is a default, not the only route: a caller that already knows which
+ * it wants passes `operation` to `resolveWritebackRequest` explicitly, which
+ * bypasses this entirely.
  */
 function isCanonicalId(resource: GmailWritebackResource, id: string | null): boolean {
   if (id === null) return false;
