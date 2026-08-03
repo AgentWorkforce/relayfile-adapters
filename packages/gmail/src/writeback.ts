@@ -1,4 +1,5 @@
 import { parseRelayfilePath } from './path-mapper.js';
+import { providerQueries } from './queries.js';
 import type { JsonObject, JsonValue, ProviderWritebackRequest, WritebackOperation } from './types.js';
 
 const READ_ONLY_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'url', '_webhook', '_connection', 'fingerprint', 'etag', 'eTag']);
@@ -21,13 +22,13 @@ export function resolveWritebackRequest(path: string, content: string, operation
   const draftLike = parsedPath.id === null || /^(draft|create|new|upload|tmp|temp)(?:[._-]|$)/i.test(parsedPath.id);
   const canonical = !draftLike && parsedPath.id !== null && /^[A-Za-z0-9_-]+$/.test(parsedPath.id);
   const resolvedOperation: WritebackOperation = operation ?? (content.trim().length === 0 ? 'delete' : canonical ? 'update' : 'create');
-  const resource = parsedPath.resource === 'lifecycle' ? "watches" : "threads";
-  const endpoint = resource === "watches" ? "/gmail/v1/users/{account}/watch" : "/gmail/v1/users/{account}/messages/{messageId}/modify";
+  const resource = resolveResource(parsedPath.resource);
+  const endpoint = endpointFor(resource, resolvedOperation);
 
   return {
     action: "gmail" + '.' + resource + '.' + resolvedOperation,
     operation: resolvedOperation,
-    method: methodFor(resolvedOperation),
+    method: methodFor(resource, resolvedOperation),
     endpoint,
     resource,
     resourceId: parsedPath.id,
@@ -35,9 +36,29 @@ export function resolveWritebackRequest(path: string, content: string, operation
   };
 }
 
-function methodFor(operation: WritebackOperation): 'DELETE' | 'PATCH' | 'POST' | 'PUT' {
+type GmailWritebackResource = 'drafts' | 'threads' | 'watches';
+
+function resolveResource(parsed: 'object' | 'drafts' | 'lifecycle' | 'unknown'): GmailWritebackResource {
+  if (parsed === 'lifecycle') return 'watches';
+  if (parsed === 'drafts') return 'drafts';
+  return 'threads';
+}
+
+function endpointFor(resource: GmailWritebackResource, operation: WritebackOperation): string {
+  if (resource === 'watches') return providerQueries.actions.lifecycleWrite;
+  if (resource === 'drafts') {
+    // drafts.create posts to the collection; update/delete address the draft id.
+    return operation === 'create'
+      ? providerQueries.actions.draftCreate
+      : providerQueries.actions.draftWrite;
+  }
+  return providerQueries.actions.objectWrite;
+}
+
+function methodFor(resource: GmailWritebackResource, operation: WritebackOperation): 'DELETE' | 'PATCH' | 'POST' | 'PUT' {
   if (operation === 'delete') return 'DELETE';
-  if (operation === 'update') return 'PATCH';
+  // Gmail's drafts.update is a PUT that replaces the draft; messages.modify is a PATCH.
+  if (operation === 'update') return resource === 'drafts' ? 'PUT' : 'PATCH';
   return 'POST';
 }
 

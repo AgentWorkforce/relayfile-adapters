@@ -3,6 +3,9 @@ import { GMAIL_PATH_ROOT, GMAIL_PATH_ROOTS } from "./identity.js";
 export const RELAYFILE_ROOT = GMAIL_PATH_ROOT;
 export const OBJECT_RESOURCE_PATH = `${RELAYFILE_ROOT}/{account}/threads`;
 export const LIFECYCLE_RESOURCE_PATH = `${RELAYFILE_ROOT}/watches`;
+export const DRAFTS_RESOURCE_PATH = `${RELAYFILE_ROOT}/drafts`;
+
+const DRAFTS_SEGMENT = 'drafts';
 
 export interface ObjectPathInput {
   accountId?: string | number;
@@ -44,7 +47,7 @@ export function toLifecycleRelayfilePath(id: string | number): string {
   return LIFECYCLE_RESOURCE_PATH + '/' + encodePathSegment(id) + '.json';
 }
 
-export function parseRelayfilePath(path: string): { resource: 'object' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
+export function parseRelayfilePath(path: string): { resource: 'object' | 'drafts' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
   const normalized = path.startsWith('/') ? path : '/' + path;
   const segments = normalized.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment.replace(/\.json$/, '')));
   const lifecycleSuffix = LIFECYCLE_RESOURCE_PATH.slice(RELAYFILE_ROOT.length);
@@ -55,10 +58,26 @@ export function parseRelayfilePath(path: string): { resource: 'object' | 'lifecy
   ) {
     return { resource: 'lifecycle', id: segments.at(-1) ?? null, segments };
   }
-  if (GMAIL_PATH_ROOTS.some((root) => matchesPathPrefix(segments, root))) {
+  if (matchedRoot(segments) !== null && isDraftsPath(segments)) {
+    return { resource: 'drafts', id: segments.at(-1) ?? null, segments };
+  }
+  if (matchedRoot(segments) !== null) {
     return { resource: 'object', id: segments.at(-1) ?? null, segments };
   }
   return { resource: 'unknown', id: null, segments };
+}
+
+function matchedRoot(segments: readonly string[]): string | null {
+  return GMAIL_PATH_ROOTS.find((root) => matchesPathPrefix(segments, root)) ?? null;
+}
+
+/**
+ * Drafts are addressed both with and without an account segment:
+ * `/gmail/drafts/<id>.json` (the writeback-discovery form) and
+ * `/gmail/<account>/drafts/<id>.json` (the mounted form).
+ */
+function isDraftsPath(segments: readonly string[]): boolean {
+  return segments[1] === DRAFTS_SEGMENT || segments[2] === DRAFTS_SEGMENT;
 }
 
 function matchesPathPrefix(segments: readonly string[], pathPrefix: string): boolean {

@@ -17,5 +17,7 @@ export const providerQueries = {
   actions: {
     objectWrite: "/gmail/v1/users/{account}/messages/{messageId}/modify",
     lifecycleWrite: "/gmail/v1/users/{account}/watch",
+    draftCreate: "/gmail/v1/users/{account}/drafts",
+    draftWrite: "/gmail/v1/users/{account}/drafts/{draftId}",
   },
 } as const;
