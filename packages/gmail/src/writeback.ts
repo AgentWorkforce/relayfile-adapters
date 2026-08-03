@@ -1,5 +1,6 @@
 import { parseRelayfilePath } from './path-mapper.js';
 import { providerQueries } from './queries.js';
+import { resources } from './resources.js';
 import type { JsonObject, JsonValue, ProviderWritebackRequest, WritebackOperation } from './types.js';
 
 const READ_ONLY_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'url', '_webhook', '_connection', 'fingerprint', 'etag', 'eTag']);
@@ -19,10 +20,9 @@ export function resolveWritebackRequest(path: string, content: string, operation
   const parsedPath = parseRelayfilePath(path);
   const payload = content.trim().length > 0 ? parseJsonObject(content) : {};
   rejectReadOnlyFields(payload);
-  const draftLike = parsedPath.id === null || /^(draft|create|new|upload|tmp|temp)(?:[._-]|$)/i.test(parsedPath.id);
-  const canonical = !draftLike && parsedPath.id !== null && /^[A-Za-z0-9_-]+$/.test(parsedPath.id);
-  const resolvedOperation: WritebackOperation = operation ?? (content.trim().length === 0 ? 'delete' : canonical ? 'update' : 'create');
   const resource = resolveResource(parsedPath.resource);
+  const canonical = isCanonicalId(resource, parsedPath.id);
+  const resolvedOperation: WritebackOperation = operation ?? (content.trim().length === 0 ? 'delete' : canonical ? 'update' : 'create');
   const endpoint = endpointFor(resource, resolvedOperation);
 
   return {
@@ -37,6 +37,30 @@ export function resolveWritebackRequest(path: string, content: string, operation
 }
 
 type GmailWritebackResource = 'drafts' | 'threads' | 'watches';
+
+/**
+ * Drafts follow the file-native writeback contract: a filename matching the
+ * resource's declared canonical `idPattern` edits that draft, and any other
+ * filename creates a new one. `new.json` carries no special privilege (see
+ * `docs/migration/file-native-writeback.md`). `resources.ts` is the single
+ * source of truth for the pattern — it is generated from
+ * `scripts/writeback-discovery-data.mjs`, so the resolver and the published
+ * discovery docs cannot drift apart.
+ *
+ * Threads and watches keep the legacy reserved-prefix heuristic: gmail is not
+ * in the file-native migration table, and changing their create/update split
+ * would alter behavior this change has no reason to touch. Migrating them is a
+ * separate change.
+ */
+function isCanonicalId(resource: GmailWritebackResource, id: string | null): boolean {
+  if (id === null) return false;
+  if (resource === 'drafts') {
+    const config = resources.find((candidate) => candidate.name === 'drafts');
+    return config ? config.idPattern.test(id) : false;
+  }
+  const reservedPrefix = /^(draft|create|new|upload|tmp|temp)(?:[._-]|$)/i.test(id);
+  return !reservedPrefix && /^[A-Za-z0-9_-]+$/.test(id);
+}
 
 function resolveResource(parsed: 'object' | 'drafts' | 'lifecycle' | 'unknown'): GmailWritebackResource {
   if (parsed === 'lifecycle') return 'watches';

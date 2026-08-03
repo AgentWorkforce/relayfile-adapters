@@ -47,6 +47,42 @@ export function toLifecycleRelayfilePath(id: string | number): string {
   return LIFECYCLE_RESOURCE_PATH + '/' + encodePathSegment(id) + '.json';
 }
 
+export interface DraftPathInput {
+  /** Draft id for a canonical edit, or the create-draft filename stem. */
+  readonly id: string | number;
+  /** Mounted drafts live under an account segment; the collection form omits it. */
+  readonly account?: string | number;
+}
+
+/**
+ * Compose a Gmail draft path. Both accepted shapes are produced here so callers
+ * never concatenate them by hand:
+ *
+ * - `toDraftRelayfilePath({ id })` → `/gmail/drafts/<id>.json`
+ * - `toDraftRelayfilePath({ account, id })` → `/gmail/<account>/drafts/<id>.json`
+ *
+ * A stem matching the drafts `idPattern` edits that draft; any other stem is a
+ * create draft (see `docs/migration/file-native-writeback.md`).
+ */
+export function toDraftRelayfilePath(input: DraftPathInput): string {
+  const stem = String(input.id).trim();
+  if (!stem) throw new Error('Gmail draft path requires an id');
+  const prefix =
+    input.account === undefined
+      ? DRAFTS_RESOURCE_PATH
+      : `${RELAYFILE_ROOT}/${encodeAccountSegment(input.account)}/${DRAFTS_SEGMENT}`;
+  return prefix + '/' + encodePathSegment(stem) + '.json';
+}
+
+/**
+ * Account segments are email addresses and materialize with a literal `@`
+ * (`/gmail/me@example.com/threads/...`). Percent-encoding it would compose a
+ * path that never matches a mounted file, so `@` is preserved here.
+ */
+function encodeAccountSegment(value: string | number): string {
+  return encodePathSegment(value).replace(/%40/gi, '@');
+}
+
 export function parseRelayfilePath(path: string): { resource: 'object' | 'drafts' | 'lifecycle' | 'unknown'; id: string | null; segments: string[] } {
   const normalized = path.startsWith('/') ? path : '/' + path;
   const segments = normalized.split('/').filter(Boolean).map((segment) => decodeURIComponent(segment.replace(/\.json$/, '')));

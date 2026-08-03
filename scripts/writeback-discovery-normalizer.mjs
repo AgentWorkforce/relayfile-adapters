@@ -381,6 +381,18 @@ function idPatternFor(adapterSlug, resourcePath) {
   if (adapterSlug === 'google-calendar') {
     return pattern('^[a-v0-9]{5,1024}$');
   }
+  if (adapterSlug === 'gmail') {
+    if (resourcePath.endsWith('/drafts')) {
+      // Gmail draft ids are an `r` followed by digits, optionally hyphenated
+      // (e.g. `r-4692061400304996596`, `r1234567890`). Keeping the canonical
+      // pattern this narrow is what makes every human-chosen filename a create
+      // draft, per the file-native writeback contract — the permissive default
+      // would classify `ask-storebrand.json` as canonical and issue a draft
+      // update for an id that does not exist.
+      return pattern('^r-?\\d+$');
+    }
+    return pattern('^[A-Za-z0-9_.:-]+$');
+  }
   return pattern('^[A-Za-z0-9_.:-]+$');
 }
 

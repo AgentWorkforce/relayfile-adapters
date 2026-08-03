@@ -20,7 +20,7 @@ export const resources = [
     name: "drafts",
     path: "/gmail/drafts",
     pathPattern: /^\/gmail\/drafts(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    idPattern: /^r-?\d+$/,
     schema: "discovery/gmail/drafts/.schema.json",
     createExample: "discovery/gmail/drafts/.create.example.json",
   },
