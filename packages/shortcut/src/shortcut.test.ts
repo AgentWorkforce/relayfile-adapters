@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import { describe, it } from "node:test";
 
 import { emitShortcutAuxiliaryFiles } from "./emit-auxiliary-files.js";
 import { digest } from "./digest.js";
 import { computeShortcutPath, shortcutByIdAliasPath, shortcutRootIndexPath } from "./path-mapper.js";
-import { normalizeShortcutWebhook, verifyShortcutWebhookSignature } from "./webhook-normalizer.js";
+import { normalizeShortcutWebhook } from "./webhook-normalizer.js";
 
 function client() {
   const files = new Map<string, string>();
@@ -21,7 +20,7 @@ function client() {
 }
 
 describe("Shortcut adapter", () => {
-  it("normalizes every action in a bundled webhook and verifies the provider signature", () => {
+  it("normalizes every action in a bundled webhook", () => {
     const body = JSON.stringify({
       id: "event-1",
       actions: [
@@ -29,11 +28,8 @@ describe("Shortcut adapter", () => {
         { id: 16, entity_type: "epic", action: "delete" },
       ],
     });
-    const signature = createHmac("sha256", "secret").update(body).digest("hex");
-    const normalized = normalizeShortcutWebhook(JSON.parse(body), { "Payload-Signature": signature }, { connectionId: "conn" });
+    const normalized = normalizeShortcutWebhook(JSON.parse(body), {}, { connectionId: "conn" });
     assert.deepEqual(normalized.actions.map((action) => action.eventType), ["story.update", "epic.delete"]);
-    assert.equal(verifyShortcutWebhookSignature(body, signature, "secret"), true);
-    assert.equal(verifyShortcutWebhookSignature(body, signature, "wrong"), false);
   });
 
   it("emits canonical records, indexes, and by-id aliases while preserving terminal fields", async () => {

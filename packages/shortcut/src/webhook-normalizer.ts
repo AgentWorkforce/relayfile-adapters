@@ -1,8 +1,6 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import type { ShortcutWebhookAction } from "./types.js";
 
 export const SHORTCUT_PROVIDER = "shortcut";
-export const SHORTCUT_SIGNATURE_HEADER = "payload-signature";
 
 export interface ShortcutWebhookHeaders {
   [key: string]: string | number | boolean | readonly string[] | null | undefined;
@@ -66,19 +64,6 @@ export function normalizeShortcutWebhook(
     ...(options.connectionId ? { connectionId: options.connectionId } : {}),
     ...(options.deliveryId ? { deliveryId: options.deliveryId } : {}),
   };
-}
-
-export function verifyShortcutWebhookSignature(
-  rawBody: string | Uint8Array,
-  signature: string | null | undefined,
-  secret: string,
-): boolean {
-  if (!signature || !secret) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const received = signature.trim().toLowerCase();
-  const expectedBytes = Buffer.from(expected, "utf8");
-  const receivedBytes = Buffer.from(received, "utf8");
-  return expectedBytes.length === receivedBytes.length && timingSafeEqual(expectedBytes, receivedBytes);
 }
 
 function readActions(payload: Record<string, unknown>): ShortcutWebhookAction[] {
