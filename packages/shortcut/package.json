@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-shortcut",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shortcut adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -32,7 +32,10 @@
       "default": "./dist/inbound.js"
     }
   },
-  "files": ["dist", "discovery"],
+  "files": [
+    "dist",
+    "discovery"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
@@ -40,7 +43,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.14"
+    "@relayfile/adapter-core": "^0.5.15"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
@@ -50,9 +53,13 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
-  "engines": { "node": ">=18.18" },
+  "engines": {
+    "node": ">=18.18"
+  },
   "license": "Apache-2.0",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
