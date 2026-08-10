@@ -23,6 +23,9 @@ export const calendlyClient = (opts?: RelayClientOptions): ProviderClient<'calen
 export const clickupClient = (opts?: RelayClientOptions): ProviderClient<'clickup'> =>
   providerClient('clickup', opts);
 
+export const cloudflareClient = (opts?: RelayClientOptions): ProviderClient<'cloudflare'> =>
+  providerClient('cloudflare', opts);
+
 export const confluenceClient = (opts?: RelayClientOptions): ProviderClient<'confluence'> =>
   providerClient('confluence', opts);
 
