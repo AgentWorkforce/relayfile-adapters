@@ -14,14 +14,32 @@ import type { ShortcutPathObjectType, ShortcutRecord } from "./types.js";
 
 export interface EmitShortcutAuxiliaryFilesInput {
   workspaceId: string;
+  categories?: readonly ShortcutRecord[];
+  customFields?: readonly ShortcutRecord[];
+  groups?: readonly ShortcutRecord[];
+  iterations?: readonly ShortcutRecord[];
+  labels?: readonly ShortcutRecord[];
+  members?: readonly ShortcutRecord[];
+  milestones?: readonly ShortcutRecord[];
+  projects?: readonly ShortcutRecord[];
   stories?: readonly ShortcutRecord[];
   epics?: readonly ShortcutRecord[];
+  workflows?: readonly ShortcutRecord[];
   connectionId?: string;
 }
 
 const BUCKETS: Array<[ShortcutPathObjectType, keyof EmitShortcutAuxiliaryFilesInput]> = [
-  ["story", "stories"],
+  ["category", "categories"],
+  ["custom-field", "customFields"],
   ["epic", "epics"],
+  ["group", "groups"],
+  ["iteration", "iterations"],
+  ["label", "labels"],
+  ["member", "members"],
+  ["milestone", "milestones"],
+  ["project", "projects"],
+  ["story", "stories"],
+  ["workflow", "workflows"],
 ];
 
 export async function emitShortcutAuxiliaryFiles(

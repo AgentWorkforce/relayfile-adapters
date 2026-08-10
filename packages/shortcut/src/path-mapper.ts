@@ -1,13 +1,31 @@
 import { SHORTCUT_OBJECT_TYPES, SHORTCUT_PATH_ROOT, type ShortcutPathObjectType } from "./types.js";
 
 const COLLECTIONS: Record<ShortcutPathObjectType, string> = {
-  story: "stories",
+  category: "categories",
+  "custom-field": "custom-fields",
   epic: "epics",
+  group: "groups",
+  iteration: "iterations",
+  label: "labels",
+  member: "members",
+  milestone: "milestones",
+  project: "projects",
+  story: "stories",
+  workflow: "workflows",
 };
 
 const NANGO_MODEL_MAP: Record<string, ShortcutPathObjectType> = {
-  Story: "story",
+  Category: "category",
+  CustomField: "custom-field",
   Epic: "epic",
+  Group: "group",
+  Iteration: "iteration",
+  Label: "label",
+  Member: "member",
+  Milestone: "milestone",
+  Project: "project",
+  Story: "story",
+  Workflow: "workflow",
 };
 
 function required(value: string | number, label: string): string {
@@ -23,10 +41,29 @@ export function encodeShortcutPathSegment(value: string | number): string {
 export function normalizeShortcutObjectType(value: string): ShortcutPathObjectType {
   const normalized = value.trim().toLowerCase().replace(/[_-]/g, "");
   const aliases: Record<string, ShortcutPathObjectType> = {
-    story: "story",
-    stories: "story",
+    category: "category",
+    categories: "category",
+    customfield: "custom-field",
+    customfields: "custom-field",
+    "custom-field": "custom-field",
     epic: "epic",
     epics: "epic",
+    group: "group",
+    groups: "group",
+    iteration: "iteration",
+    iterations: "iteration",
+    label: "label",
+    labels: "label",
+    member: "member",
+    members: "member",
+    milestone: "milestone",
+    milestones: "milestone",
+    project: "project",
+    projects: "project",
+    story: "story",
+    stories: "story",
+    workflow: "workflow",
+    workflows: "workflow",
   };
   const result = aliases[normalized];
   if (!result) throw new Error(`Unsupported Shortcut object type: ${value}`);

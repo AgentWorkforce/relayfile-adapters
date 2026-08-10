@@ -4,14 +4,22 @@ Shortcut records are stored under /shortcut. Canonical records use the stable Sh
 
 ## Tree
 
-- /shortcut/stories/<id>.json — story records
+- /shortcut/categories/<id>.json — category records
+- /shortcut/custom-fields/<id>.json — custom-field records
 - /shortcut/epics/<id>.json — epic records
+- /shortcut/groups/<id>.json — group records
+- /shortcut/iterations/<id>.json — iteration records
+- /shortcut/labels/<id>.json — label records
+- /shortcut/members/<id>.json — member records
+- /shortcut/milestones/<id>.json — milestone records
+- /shortcut/projects/<id>.json — project records
+- /shortcut/stories/<id>.json — story records
+- /shortcut/workflows/<id>.json — workflow records
 - Each collection has _index.json and by-id/<id>.json aliases.
 
 Writable discovery contracts:
 
-- discovery/shortcut/stories/.schema.json and .create.example.json
-- discovery/shortcut/epics/.schema.json and .create.example.json
+- discovery/shortcut/<resource>/.schema.json and .create.example.json for each writable collection
 
 Terminal lifecycle fields such as archived, completed, completed_at, epic_state_id, and workflow_state_id remain on canonical records. Only an explicit Shortcut delete action removes a record.
 `;
