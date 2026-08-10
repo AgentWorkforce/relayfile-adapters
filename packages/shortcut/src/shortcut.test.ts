@@ -85,6 +85,9 @@ describe("Shortcut adapter", () => {
   });
 
   it("emits every writable resource with canonical records, indexes, and by-id aliases", async () => {
+    for (const resource of resources) {
+      assert.equal(resource.pathPattern.test(`${resource.path}/_index.json`), false, `${resource.name} index must not be writable`);
+    }
     const relay = client();
     const result = await emitShortcutAuxiliaryFiles(relay, {
       workspaceId: "workspace",

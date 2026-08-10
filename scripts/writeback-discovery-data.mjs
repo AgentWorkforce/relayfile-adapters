@@ -528,7 +528,7 @@ export const adapters = [
       endpoint('/shortcut/categories', 'Create Shortcut category', 'Creates a Shortcut category.', ['name'], { name: str('Category name.') }, { name: 'Product' }),
       endpoint('/shortcut/custom-fields', 'Update Shortcut custom field', 'Updates or deletes an existing Shortcut custom field. Shortcut does not expose a REST create endpoint for custom fields.', [], {
         name: str('Custom field name.'),
-        field_type: { ...str('Custom field type.'), readOnly: true },
+        field_type: { ...en(['text', 'textarea', 'date', 'url', 'single_select', 'multi_select', 'person', 'file', 'number'], 'Custom field type.'), readOnly: true },
         values: arr(obj('Custom field enum value.', {
           id: str('Existing enum value id.'),
           value: str('Enum value text.'),

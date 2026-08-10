@@ -248,6 +248,9 @@ function resourceNameFor(adapterSlug, resourcePath) {
 }
 
 function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'shortcut') {
+    return `^${escapeRegex(resourcePath)}(?:/(?!_index\\.json$)[^/]+(?:\\.json)?)?$`;
+  }
   if (adapterSlug === 'dropbox') {
     if (resourcePath === '/dropbox/files' || resourcePath === '/dropbox/folders') {
       return `^${escapeRegex(resourcePath)}/(?!_index\\.json$)(?!by-(?:id|path)/)[^/]+(?:\\.json)?$`;

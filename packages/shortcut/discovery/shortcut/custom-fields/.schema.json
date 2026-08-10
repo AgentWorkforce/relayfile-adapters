@@ -74,7 +74,17 @@
       "description": "Custom field name."
     },
     "field_type": {
-      "type": "string",
+      "enum": [
+        "text",
+        "textarea",
+        "date",
+        "url",
+        "single_select",
+        "multi_select",
+        "person",
+        "file",
+        "number"
+      ],
       "description": "Custom field type.",
       "readOnly": true
     },
