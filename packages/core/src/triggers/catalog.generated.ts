@@ -495,6 +495,14 @@ export const KNOWN_TRIGGER_CATALOG = {
     "product.paid",
     "product.update"
   ],
+  "shortcut": [
+    "epic.create",
+    "epic.delete",
+    "epic.update",
+    "story.create",
+    "story.delete",
+    "story.update"
+  ],
   "slack": [
     "channel.archived",
     "channel.created",

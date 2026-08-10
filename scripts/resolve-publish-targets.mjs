@@ -26,7 +26,7 @@ const GROUPS = {
   calendar: ['google-calendar'],
   devtools: ['github', 'gitlab'],
   crm: ['hubspot', 'salesforce', 'pipedrive'],
-  pm: ['asana', 'clickup', 'jira', 'linear', 'notion'],
+  pm: ['asana', 'clickup', 'jira', 'linear', 'notion', 'shortcut'],
   support: ['intercom', 'zendesk'],
   analytics: ['mixpanel', 'segment'],
   email: ['mailgun', 'sendgrid'],

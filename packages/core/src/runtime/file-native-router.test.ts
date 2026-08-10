@@ -63,6 +63,24 @@ const resources: readonly AdapterResourceConfig[] = [
 
 const issueId = "11111111-1111-1111-1111-111111111111";
 
+const shortcutUpdateOnlyResource: AdapterResourceConfig = {
+  name: "custom-fields",
+  path: "/shortcut/custom-fields",
+  pathPattern: /^\/shortcut\/custom-fields(?:\/[^/]+(?:\.json)?)?$/,
+  idPattern: /^\d+$/,
+  schema: "discovery/shortcut/custom-fields/.schema.json",
+  operations: ["update", "delete"],
+};
+
+const shortcutReadOnlyResource: AdapterResourceConfig = {
+  name: "members",
+  path: "/shortcut/members",
+  pathPattern: /^\/shortcut\/members(?:\/[^/]+(?:\.json)?)?$/,
+  idPattern: /^\d+$/,
+  schema: "discovery/shortcut/members/.schema.json",
+  operations: [],
+};
+
 test("classifyWrite maps canonical ids to patch and drafts to create", () => {
   const patch = classifyWrite(`/linear/issues/${issueId}.json`, resources);
   assert.equal(patch?.kind, "patch");
@@ -75,6 +93,14 @@ test("classifyWrite maps canonical ids to patch and drafts to create", () => {
   assert.equal(create?.canonical, false);
   assert.equal(create?.id, "draft-title");
   assert.equal(classifyWrite("/linear/issues", resources), null);
+});
+
+test("classifyWrite honors resource operation capabilities", () => {
+  assert.equal(classifyWrite("/shortcut/custom-fields/123.json", [shortcutUpdateOnlyResource])?.kind, "patch");
+  assert.equal(classifyWrite("/shortcut/custom-fields/draft.json", [shortcutUpdateOnlyResource]), null);
+  assert.equal(classifyWrite("/shortcut/custom-fields/123.json", [shortcutUpdateOnlyResource], { fsEvent: "delete" })?.kind, "delete");
+  assert.equal(classifyWrite("/shortcut/members/123.json", [shortcutReadOnlyResource]), null);
+  assert.equal(classifyWrite("/shortcut/members/123.json", [shortcutReadOnlyResource], { fsEvent: "delete" }), null);
 });
 
 test("classifyWrite maps canonical delete events to delete", () => {
@@ -155,6 +181,27 @@ test("validatePayload enforces create required fields", () => {
   assert.deepEqual(validatePayload({ priority: 2 }, schema, "patch"), {
     ok: true,
   });
+});
+
+test("validatePayload enforces exactly-one object-level constraints", () => {
+  const schema: JsonSchema = {
+    type: "object",
+    required: ["name"],
+    properties: {
+      name: { type: "string" },
+      workflow_state_id: { type: "integer" },
+      project_id: { type: "integer" },
+    },
+    oneOf: [
+      { required: ["workflow_state_id"] },
+      { required: ["project_id"] },
+    ],
+    additionalProperties: false,
+  };
+  assert.equal(validatePayload({ name: "Story", workflow_state_id: 1 }, schema, "create").ok, true);
+  assert.equal(validatePayload({ name: "Story", project_id: 2 }, schema, "create").ok, true);
+  assert.equal(validatePayload({ name: "Story" }, schema, "create").ok, false);
+  assert.equal(validatePayload({ name: "Story", workflow_state_id: 1, project_id: 2 }, schema, "create").ok, false);
 });
 
 test("validatePayload enforces additionalProperties false", () => {

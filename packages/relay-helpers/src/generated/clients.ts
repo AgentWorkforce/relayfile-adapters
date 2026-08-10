@@ -98,6 +98,9 @@ export const sendgridClient = (opts?: RelayClientOptions): ProviderClient<'sendg
 export const sharepointClient = (opts?: RelayClientOptions): ProviderClient<'sharepoint'> =>
   providerClient('sharepoint', opts);
 
+export const shortcutClient = (opts?: RelayClientOptions): ProviderClient<'shortcut'> =>
+  providerClient('shortcut', opts);
+
 export const teamsClient = (opts?: RelayClientOptions): ProviderClient<'teams'> =>
   providerClient('teams', opts);
 

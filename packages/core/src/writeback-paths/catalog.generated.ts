@@ -861,6 +861,74 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "shortcut": {
+    "categories": [
+      {
+        "path": "/shortcut/categories",
+        "params": []
+      }
+    ],
+    "custom-fields": [
+      {
+        "path": "/shortcut/custom-fields",
+        "params": []
+      }
+    ],
+    "epics": [
+      {
+        "path": "/shortcut/epics",
+        "params": []
+      }
+    ],
+    "groups": [
+      {
+        "path": "/shortcut/groups",
+        "params": []
+      }
+    ],
+    "iterations": [
+      {
+        "path": "/shortcut/iterations",
+        "params": []
+      }
+    ],
+    "labels": [
+      {
+        "path": "/shortcut/labels",
+        "params": []
+      }
+    ],
+    "members": [
+      {
+        "path": "/shortcut/members",
+        "params": []
+      }
+    ],
+    "milestones": [
+      {
+        "path": "/shortcut/milestones",
+        "params": []
+      }
+    ],
+    "projects": [
+      {
+        "path": "/shortcut/projects",
+        "params": []
+      }
+    ],
+    "stories": [
+      {
+        "path": "/shortcut/stories",
+        "params": []
+      }
+    ],
+    "workflows": [
+      {
+        "path": "/shortcut/workflows",
+        "params": []
+      }
+    ]
+  },
   "slack": {
     "direct-messages": [
       {
