@@ -83,6 +83,7 @@
         "@relayfile/adapter-sendgrid#build",
         "@relayfile/adapter-shopify#build",
         "@relayfile/adapter-slack#build",
+        "@relayfile/adapter-shortcut#build",
         "@relayfile/adapter-stripe#build",
         "@relayfile/adapter-teams#build",
         "@relayfile/adapter-telegram#build",
