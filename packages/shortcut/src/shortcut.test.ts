@@ -194,6 +194,12 @@ describe("Shortcut adapter", () => {
       workspaceId: "workspace",
       stories: [{ id: 40, _deleted: true }],
     });
+    assert.ok(uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 41)));
+    assert.ok(uniqueRelay.files.has(shortcutByStateAliasPath("story", 500000011, 41)));
+    assert.ok(uniqueRelay.files.has(shortcutByAssigneeAliasPath("story", "member-4", 41)));
+    assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 41, true)));
+    assert.ok(!uniqueRelay.files.has(shortcutByStateAliasPath("story", 500000011, 41, true)));
+    assert.ok(!uniqueRelay.files.has(shortcutByAssigneeAliasPath("story", "member-4", 41, true)));
     assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40)));
     assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40, true)));
   });

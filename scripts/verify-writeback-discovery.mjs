@@ -44,10 +44,8 @@ for (const adapter of adapters) {
     const hasSchema = await assertFile(schemaFile, schemaPath);
     const hasExample = endpoint.example !== undefined;
     const exampleFile = join(root, 'packages', adapter.slug, 'discovery', examplePath.slice(1));
-    if (hasExample) {
-      await assertFile(exampleFile, examplePath);
-    }
-    if (!hasSchema || (hasExample && !(await fileExists(exampleFile)))) {
+    const hasExampleFile = hasExample ? await assertFile(exampleFile, examplePath) : true;
+    if (!hasSchema || !hasExampleFile) {
       continue;
     }
 

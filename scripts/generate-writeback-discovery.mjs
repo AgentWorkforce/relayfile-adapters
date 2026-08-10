@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +28,8 @@ for (const adapter of normalizedAdapters) {
         join(root, 'packages', adapter.slug, 'discovery', resource.examplePath.slice(1)),
         `${JSON.stringify(endpoint.example, null, 2)}\n`,
       );
+    } else {
+      await removeDiscoveryFile(join(root, 'packages', adapter.slug, 'discovery', `${resource.resourcePath}/.create.example.json`.replace(/^\//, '')));
     }
   }
 }
@@ -35,6 +37,14 @@ for (const adapter of normalizedAdapters) {
 async function writeDiscoveryFile(path, content) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content);
+}
+
+async function removeDiscoveryFile(path) {
+  try {
+    await unlink(path);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
 }
 
 function renderAdapterReadme(adapter) {

@@ -99,9 +99,19 @@ export async function emitShortcutAuxiliaryFiles(
     });
     const priorReader = new PriorAliasReader(client, input.workspaceId);
     const persistedRows = await readIndexRows(client, input.workspaceId, shortcutIndexPath(objectType));
+    const previousCollidingAliases = findCollidingAliases(objectType, [], persistedRows);
     const collidingAliases = findCollidingAliases(objectType, records, persistedRows);
+    const recordsToRebalance = await readRecordsToRebalance(
+      client,
+      input.workspaceId,
+      objectType,
+      records,
+      persistedRows,
+      previousCollidingAliases,
+      collidingAliases,
+    );
 
-    const fanOut = await runEmitBatch(client, input.workspaceId, records, async (record) => {
+    const fanOut = await runEmitBatch(client, input.workspaceId, [...records, ...recordsToRebalance], async (record) => {
       const id = readRecordId(record);
       if (!id) throw new Error(`Shortcut ${objectType} record is missing a valid id`);
 
@@ -259,6 +269,41 @@ async function readIndexRows(
   } catch {
     return [];
   }
+}
+
+async function readRecordsToRebalance(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  objectType: ShortcutPathObjectType,
+  incomingRecords: readonly ShortcutRecord[],
+  persistedRows: readonly ShortcutIndexRow[],
+  previousCollidingAliases: ReadonlySet<string>,
+  currentCollidingAliases: ReadonlySet<string>,
+): Promise<ShortcutRecord[]> {
+  if (!client.readFile || previousCollidingAliases.size === 0) return [];
+
+  const incomingIds = new Set(incomingRecords.map(readRecordId).filter((id): id is string => Boolean(id)));
+  const survivors = persistedRows.filter((row) => {
+    if (incomingIds.has(row.id)) return false;
+    const keys = row.aliasKeys ?? (row.title ? [`${objectType}:title:${slugifyAlias(row.title)}`] : []);
+    return keys.some((key) => previousCollidingAliases.has(key) && !currentCollidingAliases.has(key));
+  });
+  const records: ShortcutRecord[] = [];
+
+  for (const row of survivors) {
+    try {
+      const result = await client.readFile({ workspaceId, path: shortcutByIdAliasPath(objectType, row.id) });
+      if (!result?.content) continue;
+      const parsed: unknown = JSON.parse(result.content);
+      if (isRecord(parsed) && readRecordId(parsed as ShortcutRecord) === row.id) {
+        records.push(parsed as ShortcutRecord);
+      }
+    } catch {
+      // A missing survivor cannot be safely re-emitted; the normal batch remains best-effort.
+    }
+  }
+
+  return records;
 }
 
 function readState(record: ShortcutRecord, objectType: ShortcutPathObjectType): string | undefined {
