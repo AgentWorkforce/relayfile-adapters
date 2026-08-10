@@ -34,6 +34,7 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
     slug: adapter.slug,
     title: adapter.title,
     overview: adapter.overview,
+    ...(adapter.mountLabel ? { mountLabel: adapter.mountLabel } : {}),
     readPaths: adapter.readPaths.map(([path, description]) => [path, description]),
     ...(layoutManifest ? { layoutManifest } : {}),
     endpoints,
@@ -97,11 +98,14 @@ export function normalizeWritebackEndpointResource(adapterSlug, endpoint, layout
     name: resourceNameFor(adapterSlug, resourcePath),
     resourcePath,
     schemaPath: `${resourcePath}/.schema.json`,
-    examplePath: `${resourcePath}/.create.example.json`,
+    ...(endpoint.createSupported === false || endpoint.example === undefined
+      ? {}
+      : { examplePath: `${resourcePath}/.create.example.json` }),
     description: endpoint.description,
     pathPatternSource: pathPatternSourceFor(adapterSlug, resourcePath),
     pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapterSlug, resourcePath)),
     ...idPatternFor(adapterSlug, resourcePath),
+    ...(Array.isArray(endpoint.operations) ? { operations: [...endpoint.operations] } : {}),
     ...(layoutMatch
       ? {
           layoutResource: layoutMatch.resource,

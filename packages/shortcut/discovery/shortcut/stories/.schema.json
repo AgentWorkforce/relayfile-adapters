@@ -5,6 +5,18 @@
   "required": [
     "name"
   ],
+  "oneOf": [
+    {
+      "required": [
+        "workflow_state_id"
+      ]
+    },
+    {
+      "required": [
+        "project_id"
+      ]
+    }
+  ],
   "properties": {
     "id": {
       "type": "string",
@@ -82,6 +94,14 @@
     "priority": {
       "type": "integer",
       "description": "Shortcut story priority."
+    },
+    "workflow_state_id": {
+      "type": "integer",
+      "description": "Workflow state id."
+    },
+    "project_id": {
+      "type": "integer",
+      "description": "Project id."
     }
   },
   "additionalProperties": false,

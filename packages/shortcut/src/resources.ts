@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -22,7 +25,7 @@ export const resources = [
     pathPattern: /^\/shortcut\/custom-fields(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^(?!_index$)(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}|[A-Za-z0-9_.~-]+__(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}))$/i,
     schema: "discovery/shortcut/custom-fields/.schema.json",
-    createExample: "discovery/shortcut/custom-fields/.create.example.json",
+    operations: ["update","delete"],
   },
   {
     name: "epics",
@@ -62,7 +65,7 @@ export const resources = [
     pathPattern: /^\/shortcut\/members(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^(?!_index$)(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}|[A-Za-z0-9_.~-]+__(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}))$/i,
     schema: "discovery/shortcut/members/.schema.json",
-    createExample: "discovery/shortcut/members/.create.example.json",
+    operations: [],
   },
   {
     name: "milestones",

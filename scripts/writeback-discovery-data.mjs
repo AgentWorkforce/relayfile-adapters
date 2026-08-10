@@ -510,6 +510,7 @@ export const adapters = [
     title: 'Shortcut adapter',
     overview:
       'The Shortcut adapter exposes categories, custom fields, epics, groups, iterations, labels, members, milestones, projects, stories, and workflows under `/shortcut`, with file-native discovery contracts for the corresponding Nango actions and canonical sync records.',
+    mountLabel: 'Canonical mounts:',
     readPaths: [
       ['/shortcut/categories/<id>.json', 'Category records.'],
       ['/shortcut/custom-fields/<id>.json', 'Custom field records.'],
@@ -524,17 +525,29 @@ export const adapters = [
       ['/shortcut/workflows/<id>.json', 'Workflow records.'],
     ],
     endpoints: [
-      endpoint('/shortcut/categories/new.json', 'Create Shortcut category', 'Creates a Shortcut category.', ['name'], { name: str('Category name.') }, { name: 'Product' }),
-      endpoint('/shortcut/custom-fields/new.json', 'Create Shortcut custom field', 'Creates a Shortcut custom field.', ['name'], { name: str('Custom field name.'), field_type: str('Custom field type.'), values: arr(str('Allowed custom field value.'), 'Allowed values for an enumerated field.') }, { name: 'Customer tier', field_type: 'enum', values: ['free', 'paid'] }),
-      endpoint('/shortcut/epics/new.json', 'Create Shortcut epic', 'Creates a Shortcut epic.', ['name'], { name: str('Epic name.'), description: str('Epic description.'), group_id: str('Shortcut group id.') }, { name: 'Q4 onboarding' }),
-      endpoint('/shortcut/groups/new.json', 'Create Shortcut group', 'Creates a Shortcut group.', ['name'], { name: str('Group name.'), description: str('Group description.') }, { name: 'Product engineering' }),
-      endpoint('/shortcut/iterations/new.json', 'Create Shortcut iteration', 'Creates a Shortcut iteration.', ['name'], { name: str('Iteration name.'), start_date: str('Iteration start date.', 'date'), end_date: str('Iteration end date.', 'date') }, { name: 'Iteration 1', start_date: '2026-01-01', end_date: '2026-01-14' }),
-      endpoint('/shortcut/labels/new.json', 'Create Shortcut label', 'Creates a Shortcut label.', ['name'], { name: str('Label name.'), color: str('Label color.') }, { name: 'Bug', color: '#d73a4a' }),
-      endpoint('/shortcut/members/new.json', 'Create Shortcut member', 'Creates a Shortcut member record contract for discovery.', ['name'], { name: str('Member display name.'), email: str('Member email address.', 'email') }, { name: 'Ada Lovelace', email: 'ada@example.com' }),
-      endpoint('/shortcut/milestones/new.json', 'Create Shortcut milestone', 'Creates a Shortcut milestone.', ['name'], { name: str('Milestone name.'), description: str('Milestone description.'), deadline: str('Milestone deadline.', 'date') }, { name: 'Public beta', deadline: '2026-03-31' }),
-      endpoint('/shortcut/projects/new.json', 'Create Shortcut project', 'Creates a Shortcut project.', ['name'], { name: str('Project name.'), description: str('Project description.') }, { name: 'Mobile refresh' }),
-      endpoint('/shortcut/stories/new.json', 'Create Shortcut story', 'Creates a Shortcut story.', ['name'], { name: str('Story title.'), description: str('Story description.'), priority: int('Shortcut story priority.') }, { name: 'Replace example story title', description: 'Optional markdown body.', priority: 3 }),
-      endpoint('/shortcut/workflows/new.json', 'Create Shortcut workflow', 'Creates a Shortcut workflow record contract for discovery.', ['name'], { name: str('Workflow name.'), description: str('Workflow description.') }, { name: 'Engineering workflow' }),
+      endpoint('/shortcut/categories', 'Create Shortcut category', 'Creates a Shortcut category.', ['name'], { name: str('Category name.') }, { name: 'Product' }),
+      endpoint('/shortcut/custom-fields', 'Update Shortcut custom field', 'Updates or deletes an existing Shortcut custom field. Shortcut does not expose a REST create endpoint for custom fields.', [], {
+        name: str('Custom field name.'),
+        field_type: { ...str('Custom field type.'), readOnly: true },
+        values: arr(obj('Custom field enum value.', {
+          id: str('Existing enum value id.'),
+          value: str('Enum value text.'),
+          color_key: str('Shortcut color key.'),
+          enabled: bool('Whether the enum value is enabled.'),
+        }), 'Optional enum value updates. Omit a value to delete it.'),
+        description: str('Custom field description.'),
+        enabled: bool('Whether the custom field is enabled.'),
+        icon_set_identifier: str('Shortcut icon set identifier.'),
+      }, undefined, { operations: ['update', 'delete'], createSupported: false }),
+      endpoint('/shortcut/epics', 'Create Shortcut epic', 'Creates a Shortcut epic.', ['name'], { name: str('Epic name.'), description: str('Epic description.'), group_id: str('Shortcut group id.') }, { name: 'Q4 onboarding' }),
+      endpoint('/shortcut/groups', 'Create Shortcut group', 'Creates a Shortcut group.', ['mention_name', 'name'], { mention_name: str('Group mention name.'), name: str('Group name.'), description: str('Group description.') }, { mention_name: 'product-eng', name: 'Product engineering' }),
+      endpoint('/shortcut/iterations', 'Create Shortcut iteration', 'Creates a Shortcut iteration.', ['name', 'start_date', 'end_date'], { name: str('Iteration name.'), start_date: str('Iteration start date.', 'date'), end_date: str('Iteration end date.', 'date') }, { name: 'Iteration 1', start_date: '2026-01-01', end_date: '2026-01-14' }),
+      endpoint('/shortcut/labels', 'Create Shortcut label', 'Creates a Shortcut label.', ['name'], { name: str('Label name.'), color: str('Label color.') }, { name: 'Bug', color: '#d73a4a' }),
+      endpoint('/shortcut/members', 'Read Shortcut member', 'Reads Shortcut members. The REST API does not expose a member create operation.', [], { name: str('Member display name.'), email: str('Member email address.', 'email') }, undefined, { operations: [], createSupported: false }),
+      endpoint('/shortcut/milestones', 'Create Shortcut milestone', 'Creates a Shortcut milestone.', ['name'], { name: str('Milestone name.'), description: str('Milestone description.'), state: str('Milestone state.'), started_at_override: str('Milestone start override.', 'date-time'), completed_at_override: str('Milestone completion override.', 'date-time'), categories: arr(str('Category id.'), 'Category ids associated with the milestone.') }, { name: 'Public beta', state: 'Unstarted' }),
+      endpoint('/shortcut/projects', 'Create Shortcut project', 'Creates a Shortcut project.', ['name', 'team_id'], { name: str('Project name.'), team_id: int('Shortcut team id.'), description: str('Project description.') }, { name: 'Mobile refresh', team_id: 123 }),
+      endpoint('/shortcut/stories', 'Create Shortcut story', 'Creates a Shortcut story. Supply exactly one of `workflow_state_id` or `project_id`.', ['name'], { name: str('Story title.'), description: str('Story description.'), priority: int('Shortcut story priority.'), workflow_state_id: int('Workflow state id.'), project_id: int('Project id.') }, { name: 'Replace example story title', description: 'Optional markdown body.', priority: 3, workflow_state_id: 500000001 }, { oneOf: [{ required: ['workflow_state_id'] }, { required: ['project_id'] }] }),
+      endpoint('/shortcut/workflows', 'Create Shortcut workflow', 'Creates a Shortcut workflow record contract for discovery.', ['name'], { name: str('Workflow name.'), description: str('Workflow description.') }, { name: 'Engineering workflow' }),
     ],
   },
   {
@@ -758,17 +771,20 @@ export const adapters = [
 ];
 
 function endpoint(path, title, description, required, properties, example, schemaExtra = {}) {
+  const { operations, createSupported, ...schemaOverrides } = schemaExtra;
   return {
     path,
     schemaPath: path.replace(/new\.json$/, 'new.schema.json'),
-    examplePath: path.replace(/new\.json$/, 'new.example.json'),
+    ...(createSupported === false || example === undefined ? { createSupported: false } : {}),
+    ...(operations ? { operations } : {}),
+    ...(example === undefined ? {} : { examplePath: path.replace(/new\.json$/, 'new.example.json') }),
     description,
     schema: {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       title,
       type: 'object',
       required,
-      ...schemaExtra,
+      ...schemaOverrides,
       properties,
       additionalProperties: false,
     },

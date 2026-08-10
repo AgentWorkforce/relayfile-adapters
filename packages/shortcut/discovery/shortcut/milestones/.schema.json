@@ -79,10 +79,27 @@
       "type": "string",
       "description": "Milestone description."
     },
-    "deadline": {
+    "state": {
       "type": "string",
-      "format": "date",
-      "description": "Milestone deadline."
+      "description": "Milestone state."
+    },
+    "started_at_override": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Milestone start override."
+    },
+    "completed_at_override": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Milestone completion override."
+    },
+    "categories": {
+      "type": "array",
+      "description": "Category ids associated with the milestone.",
+      "items": {
+        "type": "string",
+        "description": "Category id."
+      }
     }
   },
   "additionalProperties": false,

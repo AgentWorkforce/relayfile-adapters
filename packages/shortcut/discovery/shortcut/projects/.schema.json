@@ -3,7 +3,8 @@
   "title": "Shortcut project",
   "type": "object",
   "required": [
-    "name"
+    "name",
+    "team_id"
   ],
   "properties": {
     "id": {
@@ -74,6 +75,10 @@
     "name": {
       "type": "string",
       "description": "Project name."
+    },
+    "team_id": {
+      "type": "integer",
+      "description": "Shortcut team id."
     },
     "description": {
       "type": "string",

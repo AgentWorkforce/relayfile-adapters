@@ -1,5 +1,6 @@
 {
   "name": "Replace example story title",
   "description": "Optional markdown body.",
-  "priority": 3
+  "priority": 3,
+  "workflow_state_id": 500000001
 }

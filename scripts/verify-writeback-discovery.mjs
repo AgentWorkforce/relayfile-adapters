@@ -41,21 +41,24 @@ for (const adapter of adapters) {
     }
 
     const schemaFile = join(root, 'packages', adapter.slug, 'discovery', schemaPath.slice(1));
-    const exampleFile = join(root, 'packages', adapter.slug, 'discovery', examplePath.slice(1));
     const hasSchema = await assertFile(schemaFile, schemaPath);
-    const hasExample = await assertFile(exampleFile, examplePath);
-    if (!hasSchema || !hasExample) {
+    const hasExample = endpoint.example !== undefined;
+    const exampleFile = join(root, 'packages', adapter.slug, 'discovery', examplePath.slice(1));
+    if (hasExample) {
+      await assertFile(exampleFile, examplePath);
+    }
+    if (!hasSchema || (hasExample && !(await fileExists(exampleFile)))) {
       continue;
     }
 
     const schema = await readJson(schemaFile, schemaPath);
-    const example = await readJson(exampleFile, examplePath);
-    if (!schema || !example) {
+    const example = hasExample ? await readJson(exampleFile, examplePath) : undefined;
+    if (!schema || (hasExample && !example)) {
       continue;
     }
 
     validateSchema(adapter.slug, schemaPath, schema);
-    validateExample(adapter.slug, examplePath, schema, example);
+    if (hasExample) validateExample(adapter.slug, examplePath, schema, example);
 
     if (!adapterMd.includes(`\`${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
       failures.push(`${adapter.slug}: .adapter.md must list ${schemaPath} plus Operations and ID Patterns sections`);

@@ -3,6 +3,7 @@
   "title": "Shortcut group",
   "type": "object",
   "required": [
+    "mention_name",
     "name"
   ],
   "properties": {
@@ -70,6 +71,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "mention_name": {
+      "type": "string",
+      "description": "Group mention name."
     },
     "name": {
       "type": "string",

@@ -1,10 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Shortcut custom field",
+  "title": "Update Shortcut custom field",
   "type": "object",
-  "required": [
-    "name"
-  ],
+  "required": [],
   "properties": {
     "id": {
       "type": "string",
@@ -77,15 +75,47 @@
     },
     "field_type": {
       "type": "string",
-      "description": "Custom field type."
+      "description": "Custom field type.",
+      "readOnly": true
     },
     "values": {
       "type": "array",
-      "description": "Allowed values for an enumerated field.",
+      "description": "Optional enum value updates. Omit a value to delete it.",
       "items": {
-        "type": "string",
-        "description": "Allowed custom field value."
+        "type": "object",
+        "description": "Custom field enum value.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing enum value id."
+          },
+          "value": {
+            "type": "string",
+            "description": "Enum value text."
+          },
+          "color_key": {
+            "type": "string",
+            "description": "Shortcut color key."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the enum value is enabled."
+          }
+        },
+        "additionalProperties": true
       }
+    },
+    "description": {
+      "type": "string",
+      "description": "Custom field description."
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the custom field is enabled."
+    },
+    "icon_set_identifier": {
+      "type": "string",
+      "description": "Shortcut icon set identifier."
     }
   },
   "additionalProperties": false,

@@ -63,9 +63,13 @@ describe("Shortcut adapter", () => {
       const canonical = computeShortcutRecordPath(objectType, { id, name: "Roadmap / Q3" });
       const byId = shortcutByIdAliasPath(objectType, id);
       const byTitle = shortcutByTitleAliasPath(objectType, "Roadmap / Q3", id);
+      const byState = shortcutByStateAliasPath(objectType, "In Progress", id);
+      const byAssignee = shortcutByAssigneeAliasPath(objectType, "member-1", id);
       assert.deepEqual(parseShortcutPath(canonical), { objectType, id, alias: "canonical" });
       assert.deepEqual(parseShortcutPath(byId), { objectType, id, alias: "by-id" });
       assert.deepEqual(parseShortcutPath(byTitle), { objectType, id, alias: "by-title" });
+      assert.deepEqual(parseShortcutPath(byState), { objectType, id, alias: "by-state" });
+      assert.deepEqual(parseShortcutPath(byAssignee), { objectType, id, alias: "by-assignee" });
     }
     assert.throws(() => computeShortcutPath("story", "_index"));
     assert.throws(() => shortcutByIdAliasPath("story", "_index"));
@@ -153,6 +157,16 @@ describe("Shortcut adapter", () => {
     const firstIndex = JSON.parse(relay.files.get(shortcutIndexPath("story")) ?? "[]") as Array<{ id: string }>;
     assert.deepEqual(firstIndex.map((row) => row.id), ["36", "35"]);
     assert.ok(relay.files.has(shortcutByAssigneeAliasPath("story", "member-1", 35, true)));
+    assert.ok(relay.files.has(shortcutByTitleAliasPath("story", "Roadmap / Q3", 35, true)));
+    assert.ok(relay.files.has(shortcutByStateAliasPath("story", 500000009, 35, true)));
+    assert.ok(relay.files.has(shortcutByTitleAliasPath("story", "Roadmap Q3", 36, true)));
+    assert.ok(relay.files.has(shortcutByStateAliasPath("story", 500000009, 36, true)));
+    const stableAlias = shortcutByTitleAliasPath("story", "Roadmap / Q3", 35, true);
+    await emitShortcutAuxiliaryFiles(relay, {
+      workspaceId: "workspace",
+      stories: [{ id: 35, name: "Roadmap / Q3", workflow_state_id: 500000009, owner_ids: ["member-1"], updated_at: "2026-08-02T12:00:00.000Z" }],
+    });
+    assert.ok(relay.files.has(stableAlias), "collision suffix changed during partial re-emission");
     await emitShortcutAuxiliaryFiles(relay, {
       workspaceId: "workspace",
       stories: [{ id: 35, name: "Renamed", workflow_state_id: 500000010, owner_ids: ["member-2"], updated_at: "2026-08-03T00:00:00.000Z" }],
@@ -161,6 +175,24 @@ describe("Shortcut adapter", () => {
     assert.deepEqual(secondIndex.map((row) => row.id), ["35", "36"]);
     assert.ok(!relay.files.has(shortcutByTitleAliasPath("story", "Roadmap / Q3", 35, true)));
     assert.ok(relay.files.has(shortcutByAssigneeAliasPath("story", "member-2", 35)));
+
+    const uniqueRelay = client();
+    await emitShortcutAuxiliaryFiles(uniqueRelay, {
+      workspaceId: "workspace",
+      stories: [{ id: 40, name: "Unique", workflow_state_id: 500000011, owner_ids: ["member-4"] }],
+    });
+    await emitShortcutAuxiliaryFiles(uniqueRelay, {
+      workspaceId: "workspace",
+      stories: [{ id: 41, name: "Unique", workflow_state_id: 500000011, owner_ids: ["member-4"] }, { id: 40, name: "Unique", workflow_state_id: 500000011, owner_ids: ["member-4"] }],
+    });
+    assert.ok(uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40, true)));
+    assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40)));
+    await emitShortcutAuxiliaryFiles(uniqueRelay, {
+      workspaceId: "workspace",
+      stories: [{ id: 40, _deleted: true }],
+    });
+    assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40)));
+    assert.ok(!uniqueRelay.files.has(shortcutByTitleAliasPath("story", "Unique", 40, true)));
   });
 
   it("reports delete failures when the client cannot delete files", async () => {
@@ -201,6 +233,13 @@ describe("Shortcut adapter", () => {
             canonicalPath: "/shortcut/stories/36.json",
             content: { completed: true },
           },
+          {
+            id: "story-37",
+            timestamp: "2026-08-10T12:03:00.000Z",
+            action: "update",
+            canonicalPath: "/shortcut/stories/37.json",
+            content: { state: "canceled" },
+          },
         ];
       },
     });
@@ -209,6 +248,7 @@ describe("Shortcut adapter", () => {
       "35 was completed",
       "16 was archived",
       "36 was completed",
+      "37 was canceled",
     ]);
   });
 });

@@ -2,7 +2,6 @@ import {
   EMIT_AUXILIARY_JSON_CONTENT_TYPE,
   IndexFileReconciler,
   PriorAliasReader,
-  aliasCollisionSuffix,
   runEmitBatch,
   slugifyAlias,
   type AuxiliaryEmitterClient,
@@ -46,6 +45,7 @@ interface ShortcutIndexRow {
   title: string;
   updated: string;
   canonicalPath: string;
+  aliasKeys?: readonly string[];
 }
 
 type BucketKey = keyof EmitShortcutAuxiliaryFilesInput;
@@ -98,7 +98,8 @@ export async function emitShortcutAuxiliaryFiles(
       }),
     });
     const priorReader = new PriorAliasReader(client, input.workspaceId);
-    const collidingAliases = findCollidingAliases(objectType, records);
+    const persistedRows = await readIndexRows(client, input.workspaceId, shortcutIndexPath(objectType));
+    const collidingAliases = findCollidingAliases(objectType, records, persistedRows);
 
     const fanOut = await runEmitBatch(client, input.workspaceId, records, async (record) => {
       const id = readRecordId(record);
@@ -158,6 +159,7 @@ function indexRow(objectType: ShortcutPathObjectType, record: ShortcutRecord, id
     title: readString(record, "name", "title", "description") ?? id,
     updated: readString(record, "updated_at", "updatedAt") ?? "",
     canonicalPath: computeShortcutRecordPath(objectType, record),
+    aliasKeys: aliasKeysFor(objectType, record),
   };
 }
 
@@ -170,44 +172,56 @@ function aliasPathsFor(
   const paths = [shortcutByIdAliasPath(objectType, id)];
   if (objectType !== "story" && objectType !== "epic") return paths;
 
+  const addAlias = (
+    kind: string,
+    value: string,
+    build: (colliding: boolean) => string,
+  ) => {
+    const base = build(false);
+    const collision = build(true);
+    if (collisionState === true) {
+      paths.push(base, collision);
+    } else {
+      paths.push(isColliding(collisionState, objectType, kind, value) ? collision : base);
+    }
+  };
+
   const title = readString(record, "name", "title");
-  if (title) paths.push(shortcutByTitleAliasPath(objectType, title, id, isColliding(collisionState, objectType, "title", title)));
+  if (title) addAlias("title", title, (colliding) => shortcutByTitleAliasPath(objectType, title, id, colliding));
 
   const state = readState(record, objectType);
-  if (state) paths.push(shortcutByStateAliasPath(objectType, state, id, isColliding(collisionState, objectType, "state", state)));
+  if (state) addAlias("state", state, (colliding) => shortcutByStateAliasPath(objectType, state, id, colliding));
 
   for (const assigneeId of readAssigneeIds(record)) {
-    paths.push(shortcutByAssigneeAliasPath(objectType, assigneeId, id, isColliding(collisionState, objectType, "assignee", assigneeId)));
+    addAlias("assignee", assigneeId, (colliding) => shortcutByAssigneeAliasPath(objectType, assigneeId, id, colliding));
   }
 
   const creatorId = readString(record, "requested_by_id", "creator_id", "creatorId");
-  if (creatorId) paths.push(shortcutByCreatorAliasPath(objectType, creatorId, id, isColliding(collisionState, objectType, "creator", creatorId)));
+  if (creatorId) addAlias("creator", creatorId, (colliding) => shortcutByCreatorAliasPath(objectType, creatorId, id, colliding));
 
   const priority = readString(record, "priority", "priority_id", "priorityId");
-  if (priority) paths.push(shortcutByPriorityAliasPath(objectType, priority, id, isColliding(collisionState, objectType, "priority", priority)));
+  if (priority) addAlias("priority", priority, (colliding) => shortcutByPriorityAliasPath(objectType, priority, id, colliding));
 
-  if (collisionState === true) {
-    return paths.flatMap((path) => [path, collisionVariant(path, id)]);
-  }
   return paths;
 }
 
-function findCollidingAliases(objectType: ShortcutPathObjectType, records: readonly ShortcutRecord[]): ReadonlySet<string> {
+function findCollidingAliases(
+  objectType: ShortcutPathObjectType,
+  records: readonly ShortcutRecord[],
+  persistedRows: readonly ShortcutIndexRow[],
+): ReadonlySet<string> {
   const counts = new Map<string, number>();
-  for (const record of records) {
-    const id = readRecordId(record);
-    if (!id || record._deleted === true || (objectType !== "story" && objectType !== "epic")) continue;
-    const values: Array<[string, string | undefined]> = [
-      ["title", readString(record, "name", "title")],
-      ["state", readState(record, objectType)],
-      ["creator", readString(record, "requested_by_id", "creator_id", "creatorId")],
-      ["priority", readString(record, "priority", "priority_id", "priorityId")],
-    ];
-    for (const [kind, value] of values) {
-      if (value) counts.set(`${objectType}:${kind}:${slugifyAlias(value)}`, (counts.get(`${objectType}:${kind}:${slugifyAlias(value)}`) ?? 0) + 1);
+  const incomingIds = new Set(records.map(readRecordId).filter((id): id is string => Boolean(id)));
+  for (const row of persistedRows) {
+    if (incomingIds.has(row.id)) continue;
+    for (const key of row.aliasKeys ?? (row.title ? [`${objectType}:title:${slugifyAlias(row.title)}`] : [])) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
-    for (const assigneeId of readAssigneeIds(record)) {
-      counts.set(`${objectType}:assignee:${slugifyAlias(assigneeId)}`, (counts.get(`${objectType}:assignee:${slugifyAlias(assigneeId)}`) ?? 0) + 1);
+  }
+  for (const record of records) {
+    if (record._deleted === true) continue;
+    for (const key of aliasKeysFor(objectType, record)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
   return new Set([...counts.entries()].filter(([, count]) => count > 1).map(([key]) => key));
@@ -217,8 +231,34 @@ function isColliding(state: boolean | ReadonlySet<string>, objectType: ShortcutP
   return state === true || (state instanceof Set && state.has(`${objectType}:${kind}:${slugifyAlias(value)}`));
 }
 
-function collisionVariant(path: string, id: string): string {
-  return path.replace(/__[^/]+\.json$/u, `-${aliasCollisionSuffix(id)}__${id}.json`);
+function aliasKeysFor(objectType: ShortcutPathObjectType, record: ShortcutRecord): string[] {
+  if (objectType !== "story" && objectType !== "epic") return [];
+  const keys: string[] = [];
+  const add = (kind: string, value: string | undefined) => {
+    if (value) keys.push(`${objectType}:${kind}:${slugifyAlias(value)}`);
+  };
+  add("title", readString(record, "name", "title"));
+  add("state", readState(record, objectType));
+  add("creator", readString(record, "requested_by_id", "creator_id", "creatorId"));
+  add("priority", readString(record, "priority", "priority_id", "priorityId"));
+  for (const assigneeId of readAssigneeIds(record)) add("assignee", assigneeId);
+  return keys;
+}
+
+async function readIndexRows(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<ShortcutIndexRow[]> {
+  if (!client.readFile) return [];
+  try {
+    const result = await client.readFile({ workspaceId, path });
+    if (!result?.content) return [];
+    const parsed: unknown = JSON.parse(result.content);
+    return Array.isArray(parsed) ? parsed.filter(isRecord) as unknown as ShortcutIndexRow[] : [];
+  } catch {
+    return [];
+  }
 }
 
 function readState(record: ShortcutRecord, objectType: ShortcutPathObjectType): string | undefined {

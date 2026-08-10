@@ -20,6 +20,7 @@ export const digest: DigestHandler = createDigestHandler({
     { verbs: "resolve|resolved", pastTense: "was resolved" },
     { verbs: "complete|completed|done", pastTense: "was completed" },
     { verbs: "archive|archived", pastTense: "was archived" },
+    { verbs: "cancel|canceled|cancelled", pastTense: "was canceled" },
     { verbs: "update|updated|change|changed|edit|edited", pastTense: "was updated" },
   ],
   alias: { mode: "any" },
@@ -34,8 +35,10 @@ function terminalStateVerb(event: DigestChangeEvent): string | null {
   const state = readLower(payload.state) ?? readLower(asRecord(payload.workflow_state)?.name) ?? readLower(asRecord(payload.epic_state)?.name);
   const archived = payload.archived === true;
   const completed = payload.completed === true || payload.completed_at != null || payload.completed_at_override != null;
+  const canceled = payload.canceled === true || payload.cancelled === true || payload.canceled_at != null || payload.cancelled_at != null;
 
   if (archived) return "was archived";
+  if (canceled || state === "canceled" || state === "cancelled") return "was canceled";
   if (completed || state === "completed" || state === "done") return "was completed";
   if (state === "closed") return "was closed";
   if (state === "resolved") return "was resolved";
