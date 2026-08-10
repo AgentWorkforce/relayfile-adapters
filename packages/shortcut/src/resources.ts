@@ -97,7 +97,7 @@ export const resources = [
     pathPattern: /^\/shortcut\/workflows(?:\/(?!_index\.json$)[^\/]+(?:\.json)?)?$/,
     idPattern: /^(?!_index$)(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}|[A-Za-z0-9_.~-]+__(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}))$/i,
     schema: "discovery/shortcut/workflows/.schema.json",
-    createExample: "discovery/shortcut/workflows/.create.example.json",
+    operations: [],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
