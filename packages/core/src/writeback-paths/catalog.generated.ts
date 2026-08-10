@@ -3,8 +3,9 @@
  *
  * Writeback path templates are emitted verbatim from each adapter's
  * `resources.ts` (`{ name, path }`) — the same source the writeback worker's
- * `classifyWrite` routes drafts against. A consumer resolves a concrete draft
- * path with `writebackPath(provider, resource, params)`.
+ * `classifyWrite` routes drafts against. Resources with `operations: []` are
+ * read-only and intentionally omitted. A consumer resolves a concrete draft path
+ * with `writebackPath(provider, resource, params)`.
  */
 
 export const WRITEBACK_PATH_CATALOG = {
@@ -898,12 +899,6 @@ export const WRITEBACK_PATH_CATALOG = {
         "params": []
       }
     ],
-    "members": [
-      {
-        "path": "/shortcut/members",
-        "params": []
-      }
-    ],
     "milestones": [
       {
         "path": "/shortcut/milestones",
@@ -919,12 +914,6 @@ export const WRITEBACK_PATH_CATALOG = {
     "stories": [
       {
         "path": "/shortcut/stories",
-        "params": []
-      }
-    ],
-    "workflows": [
-      {
-        "path": "/shortcut/workflows",
         "params": []
       }
     ]

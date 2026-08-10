@@ -36,7 +36,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | reddit | None | 0 | 2 | Inline JS schemas. |
 | s3 | None | 0 | 2 | Inline JS schemas. |
 | salesforce | None | 0 | 5 | Inline JS schemas. |
-| shortcut | None | 0 | 11 | Inline JS schemas for Shortcut categories, custom fields, epics, groups, iterations, labels, members, milestones, projects, stories, and workflows. |
+| shortcut | None | 0 | 9 | Inline JS schemas for Shortcut categories, custom fields, epics, groups, iterations, labels, milestones, projects, and stories; members and workflows are read-only and excluded from writeback. |
 | sharepoint | None | 0 | 2 | Inline JS schemas. |
 | slack | None | 0 | 4 | Inline JS schemas. |
 | teams | None | 0 | 3 | Inline JS schemas. |
