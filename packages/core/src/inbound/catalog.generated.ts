@@ -244,6 +244,38 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
   },
   {
     "schema": "relayfile.inbound-capability/1",
+    "id": "shortcut.nango",
+    "providerId": "shortcut",
+    "pathRoot": "/shortcut",
+    "providerConfigAliases": [
+      "shortcut",
+      "shortcut-relay"
+    ],
+    "source": "nango",
+    "eventKinds": [
+      "forward",
+      "sync",
+      "webhook"
+    ],
+    "logicalKey": {
+      "version": "1",
+      "strategies": [
+        "provider-delivery-id",
+        "nango-sync-page",
+        "semantic-payload"
+      ],
+      "providerDeliveryIdHeaders": [
+        "x-nango-delivery-id",
+        "x-nango-webhook-id",
+        "x-nango-id",
+        "webhook-id"
+      ],
+      "unknownEventFallback": "raw-body",
+      "semanticPayload": "canonical-json-v1"
+    }
+  },
+  {
+    "schema": "relayfile.inbound-capability/1",
     "id": "slack.nango",
     "providerId": "slack",
     "pathRoot": "/slack",
@@ -277,4 +309,4 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     }
   }
 ] as const;
-export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:edcb9170384faeebebe1a4c535552d6c6e2e96c69df68373d588322080fd96b0" as const;
+export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:4ff718ab3ab703411833b0a59c2ae21966b6d793f952974c8302dcea9ed7d680" as const;

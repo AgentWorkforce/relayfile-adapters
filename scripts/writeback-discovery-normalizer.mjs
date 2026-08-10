@@ -290,6 +290,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
 }
 
 function idPatternFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'shortcut') {
+    return pattern('^(?!_index$)(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}|[A-Za-z0-9_.~-]+__(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}))$', 'i');
+  }
   if (adapterSlug === 'linear') {
     if (resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
       return pattern('^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');

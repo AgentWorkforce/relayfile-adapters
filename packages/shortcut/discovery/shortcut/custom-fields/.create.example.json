@@ -1,0 +1,8 @@
+{
+  "name": "Customer tier",
+  "field_type": "enum",
+  "values": [
+    "free",
+    "paid"
+  ]
+}

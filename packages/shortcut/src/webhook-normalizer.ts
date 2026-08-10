@@ -2,6 +2,22 @@ import type { ShortcutWebhookAction } from "./types.js";
 
 export const SHORTCUT_PROVIDER = "shortcut";
 
+export const SHORTCUT_SUPPORTED_EVENTS = [
+  "story.create",
+  "story.update",
+  "story.delete",
+  "epic.create",
+  "epic.update",
+  "epic.delete",
+] as const;
+
+const NESTED_PARENT_TYPES: Readonly<Record<string, "story" | "epic">> = {
+  "story-comment": "story",
+  "story-link": "story",
+  "story-task": "story",
+  "epic-comment": "epic",
+};
+
 export interface ShortcutWebhookHeaders {
   [key: string]: string | number | boolean | readonly string[] | null | undefined;
 }
@@ -43,9 +59,10 @@ export function normalizeShortcutWebhook(
     if (!objectType || !verb || !objectId) {
       throw new Error("Shortcut webhook action must include entity_type, action, and id");
     }
+    const eventType = normalizeEventType(objectType, verb);
     return {
       provider: SHORTCUT_PROVIDER as typeof SHORTCUT_PROVIDER,
-      eventType: `${objectType}.${verb}`,
+      eventType,
       action: verb,
       objectType,
       objectId,
@@ -67,17 +84,38 @@ export function normalizeShortcutWebhook(
 }
 
 function readActions(payload: Record<string, unknown>): ShortcutWebhookAction[] {
-  if (Array.isArray(payload.actions)) {
-    return payload.actions.filter((value): value is ShortcutWebhookAction => {
-      const record = asRecord(value);
-      return Boolean(record && (typeof record.id === "string" || typeof record.id === "number") && typeof record.entity_type === "string" && typeof record.action === "string");
-    });
+  const values = Array.isArray(payload.actions)
+    ? payload.actions
+    : payload.action === undefined
+      ? []
+      : [payload.action];
+  return values.map((value) => {
+    const record = asRecord(value);
+    if (!record || !isWebhookAction(record)) {
+      throw new Error("Shortcut webhook action must include id, entity_type, and action");
+    }
+    return record as ShortcutWebhookAction;
+  });
+}
+
+function normalizeEventType(objectType: string, verb: string): string {
+  const direct = `${objectType}.${verb}`;
+  if ((SHORTCUT_SUPPORTED_EVENTS as readonly string[]).includes(direct)) return direct;
+  const parentType = NESTED_PARENT_TYPES[objectType];
+  if (parentType && ["create", "update", "delete"].includes(verb)) {
+    return `${parentType}.update`;
   }
-  const single = asRecord(payload.action);
-  if (single && (typeof single.id === "string" || typeof single.id === "number")) {
-    return [single as ShortcutWebhookAction];
-  }
-  return [];
+  throw new Error(`Unsupported Shortcut webhook event: ${direct}`);
+}
+
+function isWebhookAction(value: Record<string, unknown>): boolean {
+  return (
+    (typeof value.id === "string" || typeof value.id === "number") &&
+    typeof value.entity_type === "string" &&
+    value.entity_type.trim().length > 0 &&
+    typeof value.action === "string" &&
+    value.action.trim().length > 0
+  );
 }
 
 function normalizeHeaders(headers: ShortcutWebhookHeaders): Record<string, string> {

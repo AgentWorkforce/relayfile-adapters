@@ -506,6 +506,38 @@ export const adapters = [
     ],
   },
   {
+    slug: 'shortcut',
+    title: 'Shortcut adapter',
+    overview:
+      'The Shortcut adapter exposes categories, custom fields, epics, groups, iterations, labels, members, milestones, projects, stories, and workflows under `/shortcut`, with file-native discovery contracts for the corresponding Nango actions and canonical sync records.',
+    readPaths: [
+      ['/shortcut/categories/<id>.json', 'Category records.'],
+      ['/shortcut/custom-fields/<id>.json', 'Custom field records.'],
+      ['/shortcut/epics/<id>.json', 'Epic records.'],
+      ['/shortcut/groups/<id>.json', 'Group records.'],
+      ['/shortcut/iterations/<id>.json', 'Iteration records.'],
+      ['/shortcut/labels/<id>.json', 'Label records.'],
+      ['/shortcut/members/<id>.json', 'Member records.'],
+      ['/shortcut/milestones/<id>.json', 'Milestone records.'],
+      ['/shortcut/projects/<id>.json', 'Project records.'],
+      ['/shortcut/stories/<id>.json', 'Story records.'],
+      ['/shortcut/workflows/<id>.json', 'Workflow records.'],
+    ],
+    endpoints: [
+      endpoint('/shortcut/categories/new.json', 'Create Shortcut category', 'Creates a Shortcut category.', ['name'], { name: str('Category name.') }, { name: 'Product' }),
+      endpoint('/shortcut/custom-fields/new.json', 'Create Shortcut custom field', 'Creates a Shortcut custom field.', ['name'], { name: str('Custom field name.'), field_type: str('Custom field type.'), values: arr(str('Allowed custom field value.'), 'Allowed values for an enumerated field.') }, { name: 'Customer tier', field_type: 'enum', values: ['free', 'paid'] }),
+      endpoint('/shortcut/epics/new.json', 'Create Shortcut epic', 'Creates a Shortcut epic.', ['name'], { name: str('Epic name.'), description: str('Epic description.'), group_id: str('Shortcut group id.') }, { name: 'Q4 onboarding' }),
+      endpoint('/shortcut/groups/new.json', 'Create Shortcut group', 'Creates a Shortcut group.', ['name'], { name: str('Group name.'), description: str('Group description.') }, { name: 'Product engineering' }),
+      endpoint('/shortcut/iterations/new.json', 'Create Shortcut iteration', 'Creates a Shortcut iteration.', ['name'], { name: str('Iteration name.'), start_date: str('Iteration start date.', 'date'), end_date: str('Iteration end date.', 'date') }, { name: 'Iteration 1', start_date: '2026-01-01', end_date: '2026-01-14' }),
+      endpoint('/shortcut/labels/new.json', 'Create Shortcut label', 'Creates a Shortcut label.', ['name'], { name: str('Label name.'), color: str('Label color.') }, { name: 'Bug', color: '#d73a4a' }),
+      endpoint('/shortcut/members/new.json', 'Create Shortcut member', 'Creates a Shortcut member record contract for discovery.', ['name'], { name: str('Member display name.'), email: str('Member email address.', 'email') }, { name: 'Ada Lovelace', email: 'ada@example.com' }),
+      endpoint('/shortcut/milestones/new.json', 'Create Shortcut milestone', 'Creates a Shortcut milestone.', ['name'], { name: str('Milestone name.'), description: str('Milestone description.'), deadline: str('Milestone deadline.', 'date') }, { name: 'Public beta', deadline: '2026-03-31' }),
+      endpoint('/shortcut/projects/new.json', 'Create Shortcut project', 'Creates a Shortcut project.', ['name'], { name: str('Project name.'), description: str('Project description.') }, { name: 'Mobile refresh' }),
+      endpoint('/shortcut/stories/new.json', 'Create Shortcut story', 'Creates a Shortcut story.', ['name'], { name: str('Story title.'), description: str('Story description.'), priority: int('Shortcut story priority.') }, { name: 'Replace example story title', description: 'Optional markdown body.', priority: 3 }),
+      endpoint('/shortcut/workflows/new.json', 'Create Shortcut workflow', 'Creates a Shortcut workflow record contract for discovery.', ['name'], { name: str('Workflow name.'), description: str('Workflow description.') }, { name: 'Engineering workflow' }),
+    ],
+  },
+  {
     slug: 'slack',
     title: 'Slack adapter',
     overview:

@@ -122,113 +122,6 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
-  "cloudflare": {
-    "d1-databases": [
-      {
-        "path": "/cloudflare/d1/databases/{databaseId}.json",
-        "params": [
-          "databaseId"
-        ]
-      }
-    ],
-    "dns-records": [
-      {
-        "path": "/cloudflare/zones/{zoneId}/dns-records/{recordId}.json",
-        "params": [
-          "zoneId",
-          "recordId"
-        ]
-      }
-    ],
-    "kv-namespaces": [
-      {
-        "path": "/cloudflare/kv/namespaces/{namespaceId}.json",
-        "params": [
-          "namespaceId"
-        ]
-      }
-    ],
-    "notification-events": [
-      {
-        "path": "/cloudflare/notifications/events/{eventId}.json",
-        "params": [
-          "eventId"
-        ]
-      }
-    ],
-    "notification-policies": [
-      {
-        "path": "/cloudflare/notifications/policies/{policyId}.json",
-        "params": [
-          "policyId"
-        ]
-      }
-    ],
-    "notification-webhooks": [
-      {
-        "path": "/cloudflare/notifications/webhooks/{webhookId}.json",
-        "params": [
-          "webhookId"
-        ]
-      }
-    ],
-    "pages-projects": [
-      {
-        "path": "/cloudflare/pages/projects/{projectName}.json",
-        "params": [
-          "projectName"
-        ]
-      }
-    ],
-    "queues": [
-      {
-        "path": "/cloudflare/queues/{queueId}.json",
-        "params": [
-          "queueId"
-        ]
-      }
-    ],
-    "r2-buckets": [
-      {
-        "path": "/cloudflare/r2/buckets/{bucketName}.json",
-        "params": [
-          "bucketName"
-        ]
-      }
-    ],
-    "tunnels": [
-      {
-        "path": "/cloudflare/tunnels/{tunnelId}.json",
-        "params": [
-          "tunnelId"
-        ]
-      }
-    ],
-    "worker-usage": [
-      {
-        "path": "/cloudflare/analytics/workers/scripts/{scriptName}.json",
-        "params": [
-          "scriptName"
-        ]
-      }
-    ],
-    "workers-scripts": [
-      {
-        "path": "/cloudflare/workers/scripts/{scriptName}.json",
-        "params": [
-          "scriptName"
-        ]
-      }
-    ],
-    "zones": [
-      {
-        "path": "/cloudflare/zones/{zoneId}.json",
-        "params": [
-          "zoneId"
-        ]
-      }
-    ]
-  },
   "confluence": {
     "pages": [
       {
@@ -861,6 +754,74 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "shortcut": {
+    "categories": [
+      {
+        "path": "/shortcut/categories",
+        "params": []
+      }
+    ],
+    "custom-fields": [
+      {
+        "path": "/shortcut/custom-fields",
+        "params": []
+      }
+    ],
+    "epics": [
+      {
+        "path": "/shortcut/epics",
+        "params": []
+      }
+    ],
+    "groups": [
+      {
+        "path": "/shortcut/groups",
+        "params": []
+      }
+    ],
+    "iterations": [
+      {
+        "path": "/shortcut/iterations",
+        "params": []
+      }
+    ],
+    "labels": [
+      {
+        "path": "/shortcut/labels",
+        "params": []
+      }
+    ],
+    "members": [
+      {
+        "path": "/shortcut/members",
+        "params": []
+      }
+    ],
+    "milestones": [
+      {
+        "path": "/shortcut/milestones",
+        "params": []
+      }
+    ],
+    "projects": [
+      {
+        "path": "/shortcut/projects",
+        "params": []
+      }
+    ],
+    "stories": [
+      {
+        "path": "/shortcut/stories",
+        "params": []
+      }
+    ],
+    "workflows": [
+      {
+        "path": "/shortcut/workflows",
+        "params": []
+      }
+    ]
+  },
   "slack": {
     "direct-messages": [
       {
@@ -1006,6 +967,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "packageName": "@relayfile/adapter-airtable",
     "packagePath": "packages/airtable",
     "provider": "airtable",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-cloudflare",
+    "packagePath": "packages/cloudflare",
+    "provider": "cloudflare",
     "reason": "No resources.ts with writeback path templates"
   },
   {

@@ -250,6 +250,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {
+    "packageName": "@relayfile/adapter-shortcut",
+    "packagePath": "packages/shortcut",
+    "provider": "shortcut",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
     "packageName": "@relayfile/adapter-slack",
     "packagePath": "packages/slack",
     "provider": "slack",
