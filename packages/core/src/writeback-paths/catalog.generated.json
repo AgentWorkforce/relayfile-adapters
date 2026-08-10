@@ -889,12 +889,6 @@
         "params": []
       }
     ],
-    "members": [
-      {
-        "path": "/shortcut/members",
-        "params": []
-      }
-    ],
     "milestones": [
       {
         "path": "/shortcut/milestones",
@@ -910,12 +904,6 @@
     "stories": [
       {
         "path": "/shortcut/stories",
-        "params": []
-      }
-    ],
-    "workflows": [
-      {
-        "path": "/shortcut/workflows",
         "params": []
       }
     ]

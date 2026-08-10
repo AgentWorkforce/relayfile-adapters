@@ -1,10 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Shortcut workflow",
+  "title": "Read Shortcut workflow",
   "type": "object",
-  "required": [
-    "name"
-  ],
+  "required": [],
   "properties": {
     "id": {
       "type": "string",
