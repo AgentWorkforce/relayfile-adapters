@@ -35,6 +35,11 @@
       "types": "./dist/inbound.d.ts",
       "import": "./dist/inbound.js",
       "default": "./dist/inbound.js"
+    },
+    "./google-mail-relayfile-contract": {
+      "types": "./dist/google-mail-relayfile-contract.d.ts",
+      "import": "./dist/google-mail-relayfile-contract.js",
+      "default": "./dist/google-mail-relayfile-contract.js"
     }
   },
   "files": [

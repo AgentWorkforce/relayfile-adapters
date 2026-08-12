@@ -20,7 +20,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | gcp | None | 0 | 0 | Read-only observer adapter for Cloud Run services, Cloud Monitoring alert policies, and Cloud Billing current state; no writeback endpoints. |
 | gcs | None | 0 | 2 | Inline JS schemas. |
 | gitlab | None | 0 | 2 | Inline JS schemas. |
-| gmail | None | 0 | 3 | Inline JS schemas. |
+| gmail | None | 0 | 3 | Three legacy discovery schemas remain inline. The additive `/gmail` control contract owns Cloud's separate bounded 13-action Gmail surface; it is not a discovery schema or a provider executor. |
 | google-calendar | None | 0 | 1 | Inline JS schemas. |
 | google-drive | None | 0 | 2 | Inline JS schemas. |
 | granola | None | 0 | 2 | Inline JS schemas. |
