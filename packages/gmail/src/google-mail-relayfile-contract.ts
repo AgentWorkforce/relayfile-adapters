@@ -264,7 +264,10 @@ function isMutableUserLabelId(id: string): boolean {
   return /^Label_\d+$/u.test(id);
 }
 
-function isDraftLike(id: string): boolean {
+function isDraftLike(resource: GoogleMailRelayfileResource, id: string): boolean {
+  // Send-as creation uses a draft filename, but a canonical send-as id is an
+  // email address and may legitimately start with `new`, `draft`, or `temp`.
+  if (resource === 'send-as' && id.includes('@')) return false;
   return DRAFT_FILE_RE.test(id);
 }
 
@@ -288,8 +291,14 @@ function canonicalPath(resource: GoogleMailRelayfileResource, id: string): strin
 /** Parses one approved canonical resource path or a bounded by-id alias. */
 export function resolveGoogleMailRelayfileTarget(path: string): GoogleMailRelayfileTarget {
   const requestedPath = normalizePath(path);
-  const canonicalMatch = requestedPath.match(/^\/gmail\/(labels|filters|send-as|messages|threads)\/([^/]+)\.json$/u);
-  const aliasMatch = requestedPath.match(/^\/gmail\/(messages|threads)\/by-id\/([^/]+)\.json$/u);
+  const canonicalMatch = requestedPath.match(new RegExp(
+    `^${GOOGLE_MAIL_RELAYFILE_ROOT}/(labels|filters|send-as|messages|threads)/([^/]+)\\.json$`,
+    'u',
+  ));
+  const aliasMatch = requestedPath.match(new RegExp(
+    `^${GOOGLE_MAIL_RELAYFILE_ROOT}/(messages|threads)/by-id/([^/]+)\\.json$`,
+    'u',
+  ));
   const match = canonicalMatch ?? aliasMatch;
   if (!match?.[1] || !match[2] || !RESOURCES.has(match[1] as GoogleMailRelayfileResource)) {
     throw new Error('Google Mail Relayfile target is not a supported canonical resource or by-id alias');
@@ -303,7 +312,7 @@ export function resolveGoogleMailRelayfileTarget(path: string): GoogleMailRelayf
   }
   const kind: GoogleMailRelayfileTargetKind = aliasMatch
     ? 'by-id-alias'
-    : isDraftLike(resourceId) ? 'draft' : 'canonical';
+    : isDraftLike(resource, resourceId) ? 'draft' : 'canonical';
   return {
     requestedPath,
     canonicalPath: kind === 'draft' ? null : canonicalPath(resource, resourceId),

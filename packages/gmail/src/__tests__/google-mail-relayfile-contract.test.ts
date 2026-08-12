@@ -46,6 +46,16 @@ test('Google Mail Relayfile targets preserve a requested by-id alias and resolve
     resolveGoogleMailRelayfileTarget('/gmail/send-as/alias+agent@example.com.json').canonicalPath,
     '/gmail/send-as/alias+agent@example.com.json',
   );
+  const draftLikeSendAs = resolveGoogleMailRelayfileTarget('/gmail/send-as/new-hire@example.com.json');
+  assert.equal(draftLikeSendAs.kind, 'canonical');
+  assert.equal(
+    normalizeGoogleMailRelayfileWriteback({
+      path: draftLikeSendAs.requestedPath,
+      operation: 'upsert',
+      content: JSON.stringify({ sendAsEmail: 'new-hire@example.com', signature: 'Welcome aboard' }),
+    }).action,
+    'update_send_as',
+  );
   assert.throws(
     () => resolveGoogleMailRelayfileTarget('/gmail/messages/%31.json'),
     /absolute unencoded path/u,
@@ -243,6 +253,10 @@ test('Google Mail Relayfile resolves every reviewed action to its exact Gmail re
       endpoint: '/gmail/v1/users/me/threads/19fb85341fbd9682',
     },
   ] as const;
+  assert.deepEqual(
+    [...new Set(cases.map(({ action }) => action))].sort(),
+    GOOGLE_MAIL_RELAYFILE_ACTIONS.map(({ action }) => action).slice().sort(),
+  );
   const settingsActions: ReadonlySet<string> = new Set([
     'create_label', 'update_label', 'delete_label',
     'create_filter', 'delete_filter',
@@ -364,6 +378,21 @@ test('Google Mail Relayfile rejects operator-only SMTP material and accepts only
   assert.equal(send.action, 'send_message');
   assert.equal(send.target.canonicalPath, null);
   assert.equal(send.reconciliation.targetId, '19fb85341fbd9682');
+
+  const paddedSend = normalizeGoogleMailRelayfileWriteback({
+    path: '/gmail/messages/draft-padded.json',
+    operation: 'upsert',
+    content: JSON.stringify({ raw: 'VGVzdA==' }),
+  });
+  assert.equal(paddedSend.body?.raw, 'VGVzdA==');
+  assert.throws(
+    () => normalizeGoogleMailRelayfileWriteback({
+      path: '/gmail/messages/draft-invalid-padding.json',
+      operation: 'upsert',
+      content: JSON.stringify({ raw: 'VGVzdA=' }),
+    }),
+    /base64url/u,
+  );
 });
 
 test('Google Mail Relayfile delete paths require resolved canonical resources', () => {
