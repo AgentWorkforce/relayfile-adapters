@@ -94,6 +94,7 @@ import {
 const GITHUB_PROVIDER_NAME = 'github' as const;
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 const NUMBERED_DELETE_RECOVERY_REPO_SCAN_LIMIT = 25;
+const ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY = 25;
 
 // ---------------------------------------------------------------------------
 // Public input types
@@ -328,6 +329,18 @@ export async function emitGitHubAuxiliaryFiles(
 
   // --- issues -------------------------------------------------------------
   if (issues.length > 0) {
+    // Rows written before labels joined the public issue-index contract remain
+    // in the read/merge/write baseline until that exact issue changes. Hydrate
+    // those legacy rows from their stable materialized by-id artifacts first;
+    // current-batch upserts below then win with the freshest record data.
+    await backfillLegacyIssueIndexLabels(
+      client,
+      workspaceId,
+      issues,
+      priorReader,
+      (owner, repo) => getIssueReconciler(owner, repo),
+    );
+
     const fan = await runEmitBatch(client, workspaceId, issues, async (record) => {
       if (isDeleteRecord(record)) {
         return planNumberedDelete(
@@ -428,6 +441,76 @@ async function writeRootIndex(
   } catch (error) {
     aggregate.errors.push({ path: file.path, error: stringifyError(error) });
   }
+}
+
+async function backfillLegacyIssueIndexLabels(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  issues: readonly (GitHubIssueEmitRecord | ScopedDeleteTombstone)[],
+  priorReader: PriorAliasReader,
+  getReconciler: (owner: string, repo: string) => IndexFileReconciler<GitHubRecordIndexRow>,
+): Promise<void> {
+  if (!priorReader.isAvailable()) {
+    return;
+  }
+
+  const reposByIndexPath = new Map<string, { owner: string; repo: string }>();
+  for (const issue of issues) {
+    const repoInfo = extractRepoInfo(issue);
+    if (!repoInfo) continue;
+    reposByIndexPath.set(githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo), repoInfo);
+  }
+
+  await Promise.all(
+    [...reposByIndexPath.entries()].map(async ([indexPath, repoInfo]) => {
+      const rows = await readJsonArray(client, workspaceId, indexPath);
+      const legacyRows = rows.filter((row) => !Array.isArray(row.labels));
+      if (legacyRows.length === 0) {
+        return;
+      }
+
+      const reconciler = getReconciler(repoInfo.owner, repoInfo.repo);
+      for (let offset = 0; offset < legacyRows.length; offset += ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY) {
+        const chunk = legacyRows.slice(offset, offset + ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY);
+        const hydrated = await Promise.all(
+          chunk.map(async (row): Promise<GitHubRecordIndexRow | null> => {
+            const number = readNumberLike(row.number) ?? readNumberLike(row.id);
+            if (number === null) {
+              return null;
+            }
+            const labels = await priorReader.read<string[]>(
+              githubByIdAliasPath(repoInfo.owner, repoInfo.repo, 'issues', number),
+              extractMaterializedIssueLabels,
+            );
+            if (labels === null) {
+              return null;
+            }
+            return {
+              ...(row as Partial<GitHubRecordIndexRow>),
+              id: readNonEmptyString(row.id) ?? number,
+              title: typeof row.title === 'string' ? row.title : number,
+              updated: typeof row.updated === 'string' ? row.updated : '',
+              number: Number(number),
+              state: typeof row.state === 'string' ? row.state : '',
+              labels,
+            };
+          }),
+        );
+        reconciler.upsert(...hydrated.filter((row): row is GitHubRecordIndexRow => row !== null));
+      }
+    }),
+  );
+}
+
+function extractMaterializedIssueLabels(parsed: Record<string, unknown>): string[] | null {
+  const payload = pickPayload(parsed);
+  // Only an explicit array proves the authoritative artifact is label-complete.
+  // Missing/malformed artifacts keep the legacy row unchanged so consumers can
+  // continue their fail-open fallback rather than silently filtering it out.
+  if (!payload || !Array.isArray(payload.labels)) {
+    return null;
+  }
+  return readGitHubLabelNames(payload);
 }
 
 function stringifyError(error: unknown): string {
