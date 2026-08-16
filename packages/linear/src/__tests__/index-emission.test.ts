@@ -75,6 +75,7 @@ describe('linear index emission', () => {
     const teamRows = [
       linearTeamIndexRow({
         id: 'team-2',
+        key: 'INFRA',
         name: 'Infrastructure',
         updatedAt: '2026-04-03T12:00:00.000Z',
       }),
@@ -101,6 +102,7 @@ describe('linear index emission', () => {
       linearLabelIndexRow({
         id: 'label-1',
         name: 'Bug',
+        team: { id: 'team-2' },
         updatedAt: '2026-04-03T13:30:00.000Z',
       }),
     ]);
@@ -172,14 +174,26 @@ describe('linear index emission', () => {
       { id: 'user-1', title: 'agent@example.com', updated: '2026-04-01T04:00:00.000Z' },
     ]);
     assert.deepEqual(JSON.parse(teamIndex.content), [
-      { id: 'team-2', title: 'Infrastructure', updated: '2026-04-03T12:00:00.000Z' },
-      { id: 'team-1', title: 'CORE', updated: '2026-04-01T05:00:00.000Z' },
+      {
+        id: 'team-2',
+        title: 'Infrastructure',
+        updated: '2026-04-03T12:00:00.000Z',
+        key: 'INFRA',
+        name: 'Infrastructure',
+      },
+      { id: 'team-1', title: 'CORE', updated: '2026-04-01T05:00:00.000Z', key: 'CORE', name: '' },
     ]);
     assert.deepEqual(JSON.parse(stateIndex.content), [
       { id: 'state-1', title: 'In Progress', updated: '2026-04-03T17:00:00.000Z' },
     ]);
     assert.deepEqual(JSON.parse(labelIndex.content), [
-      { id: 'label-1', title: 'Bug', updated: '2026-04-03T13:30:00.000Z' },
+      {
+        id: 'label-1',
+        title: 'Bug',
+        updated: '2026-04-03T13:30:00.000Z',
+        name: 'Bug',
+        teamId: 'team-2',
+      },
     ]);
 
     assert.equal(linearIssuePath('issue-1'), '/linear/issues/issue-1.json');

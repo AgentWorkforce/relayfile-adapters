@@ -111,6 +111,7 @@ export interface JsonSchema {
   readonly enum?: readonly unknown[];
   readonly items?: JsonSchema;
   readonly oneOf?: readonly JsonSchema[];
+  readonly anyOf?: readonly JsonSchema[];
 }
 
 export type WritebackValidationReason =
@@ -119,6 +120,7 @@ export type WritebackValidationReason =
   | "readOnly"
   | "type"
   | "enum"
+  | "anyOf"
   | "oneOf";
 
 export class ReadOnlyFieldError extends Error {
@@ -232,6 +234,20 @@ export function validatePayload(
           new WritebackValidationError({
             reason: "oneOf",
             message: "Payload must satisfy exactly one allowed schema shape",
+          }),
+        );
+      }
+    }
+
+    if (schema.anyOf) {
+      const matchesAnyBranch = schema.anyOf.some((branch) =>
+        (branch.required ?? []).every((field) => payload[field] !== undefined),
+      );
+      if (!matchesAnyBranch) {
+        errors.push(
+          new WritebackValidationError({
+            reason: "anyOf",
+            message: "Payload must satisfy at least one allowed schema shape",
           }),
         );
       }
@@ -783,6 +799,8 @@ function defaultValidationMessage(
       return `${label} is required`;
     case "type":
       return `${label} does not match the schema type`;
+    case "anyOf":
+      return `${label} must satisfy at least one allowed schema shape`;
     case "oneOf":
       return `${label} must satisfy exactly one allowed schema shape`;
   }

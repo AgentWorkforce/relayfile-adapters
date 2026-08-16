@@ -204,6 +204,35 @@ test("validatePayload enforces exactly-one object-level constraints", () => {
   assert.equal(validatePayload({ name: "Story", workflow_state_id: 1, project_id: 2 }, schema, "create").ok, false);
 });
 
+test("validatePayload enforces at-least-one object-level constraints", () => {
+  const schema: JsonSchema = {
+    type: "object",
+    required: ["title"],
+    properties: {
+      title: { type: "string" },
+      teamId: { type: "string" },
+      team: { type: "object" },
+    },
+    anyOf: [
+      { required: ["teamId"] },
+      { required: ["team"] },
+    ],
+    additionalProperties: false,
+  };
+  assert.equal(validatePayload({ title: "Issue", teamId: "team-1" }, schema, "create").ok, true);
+  assert.equal(validatePayload({ title: "Issue", team: { key: "AR" } }, schema, "create").ok, true);
+  assert.equal(
+    validatePayload({ title: "Issue", teamId: "team-1", team: { key: "AR" } }, schema, "create").ok,
+    true,
+  );
+
+  const missing = validatePayload({ title: "Issue" }, schema, "create");
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.equal(missing.errors[0]?.reason, "anyOf");
+  }
+});
+
 test("validatePayload enforces additionalProperties false", () => {
   const result = validatePayload(
     { title: "Issue", unexpected: true },
