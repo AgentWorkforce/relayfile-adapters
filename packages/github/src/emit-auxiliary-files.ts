@@ -461,45 +461,43 @@ async function backfillLegacyIssueIndexLabels(
     reposByIndexPath.set(githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo), repoInfo);
   }
 
-  await Promise.all(
-    [...reposByIndexPath.entries()].map(async ([indexPath, repoInfo]) => {
-      const rows = await readJsonArray(client, workspaceId, indexPath);
-      const legacyRows = rows.filter((row) => !Array.isArray(row.labels));
-      if (legacyRows.length === 0) {
-        return;
-      }
+  for (const [indexPath, repoInfo] of reposByIndexPath) {
+    const rows = await readJsonArray(client, workspaceId, indexPath);
+    const legacyRows = rows.filter((row) => !Array.isArray(row.labels));
+    if (legacyRows.length === 0) {
+      continue;
+    }
 
-      const reconciler = getReconciler(repoInfo.owner, repoInfo.repo);
-      for (let offset = 0; offset < legacyRows.length; offset += ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY) {
-        const chunk = legacyRows.slice(offset, offset + ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY);
-        const hydrated = await Promise.all(
-          chunk.map(async (row): Promise<GitHubRecordIndexRow | null> => {
-            const number = readNumberLike(row.number) ?? readNumberLike(row.id);
-            if (number === null) {
-              return null;
-            }
-            const labels = await priorReader.read<string[]>(
-              githubByIdAliasPath(repoInfo.owner, repoInfo.repo, 'issues', number),
-              extractMaterializedIssueLabels,
-            );
-            if (labels === null) {
-              return null;
-            }
-            return {
-              ...(row as Partial<GitHubRecordIndexRow>),
-              id: readNonEmptyString(row.id) ?? number,
-              title: typeof row.title === 'string' ? row.title : number,
-              updated: typeof row.updated === 'string' ? row.updated : '',
-              number: Number(number),
-              state: typeof row.state === 'string' ? row.state : '',
-              labels,
-            };
-          }),
-        );
-        reconciler.upsert(...hydrated.filter((row): row is GitHubRecordIndexRow => row !== null));
-      }
-    }),
-  );
+    const reconciler = getReconciler(repoInfo.owner, repoInfo.repo);
+    for (let offset = 0; offset < legacyRows.length; offset += ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY) {
+      const chunk = legacyRows.slice(offset, offset + ISSUE_INDEX_LABEL_BACKFILL_READ_CONCURRENCY);
+      const hydrated = await Promise.all(
+        chunk.map(async (row): Promise<GitHubRecordIndexRow | null> => {
+          const number = readNumberLike(row.number) ?? readNumberLike(row.id);
+          if (number === null) {
+            return null;
+          }
+          const labels = await priorReader.read<string[]>(
+            githubByIdAliasPath(repoInfo.owner, repoInfo.repo, 'issues', number),
+            extractMaterializedIssueLabels,
+          );
+          if (labels === null) {
+            return null;
+          }
+          return {
+            ...(row as Partial<GitHubRecordIndexRow>),
+            id: number,
+            title: typeof row.title === 'string' ? row.title : number,
+            updated: typeof row.updated === 'string' ? row.updated : '',
+            number: Number(number),
+            state: typeof row.state === 'string' ? row.state : '',
+            labels,
+          };
+        }),
+      );
+      reconciler.upsert(...hydrated.filter((row): row is GitHubRecordIndexRow => row !== null));
+    }
+  }
 }
 
 function extractMaterializedIssueLabels(parsed: Record<string, unknown>): string[] | null {
