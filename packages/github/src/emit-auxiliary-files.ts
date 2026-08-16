@@ -455,15 +455,54 @@ async function backfillLegacyIssueIndexLabels(
   }
 
   const reposByIndexPath = new Map<string, { owner: string; repo: string }>();
+  // Issue numbers a tombstone deletes in this same batch. `IndexFileReconciler`
+  // applies removes to the on-disk rows first and then merges every queued
+  // upsert back in, so an upsert always wins over a remove for the same id
+  // regardless of queueing order. Hydrating a tombstoned row here would
+  // therefore overwrite its own removal and resurrect a deleted issue —
+  // permanently, because the resurrected row now carries `labels` and is never
+  // treated as legacy again.
+  const deletedByIndexPath = new Map<string, Set<string>>();
+  // Tombstones may omit owner/repo; planNumberedDelete recovers the repo later,
+  // so we cannot bind those to an index path yet. Skip them in every repo — an
+  // over-skip only defers one row's backfill to the next emit, while an
+  // under-skip resurrects a deleted issue.
+  const deletedInUnknownRepo = new Set<string>();
   for (const issue of issues) {
     const repoInfo = extractRepoInfo(issue);
+    if (isDeleteRecord(issue)) {
+      const number = readNumberLike(issue.id);
+      if (number !== null) {
+        if (repoInfo) {
+          const indexPath = githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo);
+          let deleted = deletedByIndexPath.get(indexPath);
+          if (!deleted) {
+            deleted = new Set<string>();
+            deletedByIndexPath.set(indexPath, deleted);
+          }
+          deleted.add(number);
+        } else {
+          deletedInUnknownRepo.add(number);
+        }
+      }
+    }
     if (!repoInfo) continue;
+    // A tombstone still opts its repo into the sweep: the batch's other legacy
+    // rows are unaffected by the delete and should still converge.
     reposByIndexPath.set(githubRepoIssuesIndexPath(repoInfo.owner, repoInfo.repo), repoInfo);
   }
 
   for (const [indexPath, repoInfo] of reposByIndexPath) {
     const rows = await readJsonArray(client, workspaceId, indexPath);
-    const legacyRows = rows.filter((row) => !Array.isArray(row.labels));
+    const deletedNumbers = deletedByIndexPath.get(indexPath);
+    const legacyRows = rows.filter((row) => {
+      if (Array.isArray(row.labels)) return false;
+      const number = readNumberLike(row.number) ?? readNumberLike(row.id);
+      if (number !== null && (deletedNumbers?.has(number) || deletedInUnknownRepo.has(number))) {
+        return false;
+      }
+      return true;
+    });
     if (legacyRows.length === 0) {
       continue;
     }
@@ -506,6 +545,19 @@ function extractMaterializedIssueLabels(parsed: Record<string, unknown>): string
   // Missing/malformed artifacts keep the legacy row unchanged so consumers can
   // continue their fail-open fallback rather than silently filtering it out.
   if (!payload || !Array.isArray(payload.labels)) {
+    return null;
+  }
+  // The elements have to be readable too, not just the container.
+  // `readGitHubLabelNames` drops unreadable entries silently, and a partially
+  // dropped set is indistinguishable from a complete one to consumers that
+  // filter on it — so a single malformed entry could hide a `factory`-labelled
+  // issue for good, since the backfilled row is never treated as legacy again.
+  const everyLabelReadable = payload.labels.every(
+    (label) =>
+      readNonEmptyString(label) !== undefined
+      || readNonEmptyString(isRecord(label) ? label.name : undefined) !== undefined,
+  );
+  if (!everyLabelReadable) {
     return null;
   }
   return readGitHubLabelNames(payload);
