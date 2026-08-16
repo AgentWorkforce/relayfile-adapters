@@ -467,6 +467,72 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.deepEqual(rows[0]?.labels, []);
   });
 
+  it('backfills labels on legacy issue index rows from materialized by-id artifacts', async () => {
+    const indexPath = githubRepoIssuesIndexPath('acme', 'widgets');
+    const client = createClient({
+      initialFiles: {
+        [indexPath]: JSON.stringify([
+          {
+            id: '7',
+            title: 'Factory issue',
+            updated: '2026-05-12T00:00:00Z',
+            number: 7,
+            state: 'open',
+          },
+        ]),
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify({
+          provider: 'github',
+          objectType: 'issue',
+          objectId: '7',
+          payload: {
+            owner: 'acme',
+            repo: 'widgets',
+            number: 7,
+            title: 'Factory issue',
+            state: 'open',
+            labels: [{ name: 'factory' }, { name: 'bug' }],
+            updated_at: '2026-05-12T00:00:00Z',
+          },
+        }),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 8,
+          title: 'Support issue',
+          state: 'open',
+          labels: [{ name: 'support' }],
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const rows = JSON.parse(client.files.get(indexPath) ?? '[]') as Array<Record<string, unknown>>;
+    assert.deepEqual(rows, [
+      {
+        id: '8',
+        title: 'Support issue',
+        updated: '2026-05-13T00:00:00Z',
+        number: 8,
+        state: 'open',
+        labels: ['support'],
+      },
+      {
+        id: '7',
+        title: 'Factory issue',
+        updated: '2026-05-12T00:00:00Z',
+        number: 7,
+        state: 'open',
+        labels: ['factory', 'bug'],
+      },
+    ]);
+  });
+
   it('uses the newest lifecycle timestamp for PR by-edited aliases', async () => {
     const client = createClient();
 
