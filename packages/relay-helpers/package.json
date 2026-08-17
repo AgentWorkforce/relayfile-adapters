@@ -41,8 +41,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.17",
-    "@relayfile/adapter-linear": "^0.4.11",
+    "@relayfile/adapter-core": "^0.5.18",
+    "@relayfile/adapter-linear": "^0.4.12",
     "@relayfile/adapter-reddit": "^0.2.9"
   }
 }
