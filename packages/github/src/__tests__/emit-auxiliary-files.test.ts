@@ -467,6 +467,226 @@ describe('emitGitHubAuxiliaryFiles', () => {
     assert.deepEqual(rows[0]?.labels, []);
   });
 
+  it('backfills labels on legacy issue index rows from materialized by-id artifacts', async () => {
+    const indexPath = githubRepoIssuesIndexPath('acme', 'widgets');
+    const client = createClient({
+      initialFiles: {
+        [indexPath]: JSON.stringify([
+          {
+            id: '7',
+            title: 'Factory issue',
+            updated: '2026-05-12T00:00:00Z',
+            number: 7,
+            state: 'open',
+          },
+        ]),
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify({
+          provider: 'github',
+          objectType: 'issue',
+          objectId: '7',
+          payload: {
+            owner: 'acme',
+            repo: 'widgets',
+            number: 7,
+            title: 'Factory issue',
+            state: 'open',
+            labels: [{ name: 'factory' }, { name: 'bug' }],
+            updated_at: '2026-05-12T00:00:00Z',
+          },
+        }),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 8,
+          title: 'Support issue',
+          state: 'open',
+          labels: [{ name: 'support' }],
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const rows = JSON.parse(client.files.get(indexPath) ?? '[]') as Array<Record<string, unknown>>;
+    assert.deepEqual(rows, [
+      {
+        id: '8',
+        title: 'Support issue',
+        updated: '2026-05-13T00:00:00Z',
+        number: 8,
+        state: 'open',
+        labels: ['support'],
+      },
+      {
+        id: '7',
+        title: 'Factory issue',
+        updated: '2026-05-12T00:00:00Z',
+        number: 7,
+        state: 'open',
+        labels: ['factory', 'bug'],
+      },
+    ]);
+  });
+
+  // --- legacy label backfill vs. delete tombstones -------------------------
+  // `IndexFileReconciler.flush` applies removes to the on-disk rows first and
+  // then merges every queued upsert back in, so an upsert always beats a remove
+  // for the same id. The backfill must therefore never queue a row that a
+  // tombstone in the same batch is deleting — and must keep backfilling every
+  // row that no tombstone targets.
+
+  function legacyBackfillFixture(): CapturingClient {
+    return createClient({
+      initialFiles: {
+        [githubRepoIssuesIndexPath('acme', 'widgets')]: JSON.stringify([
+          // Legacy row: written before `labels` joined the index contract.
+          { id: '7', title: 'Factory issue', updated: '2026-05-12T00:00:00Z', number: 7, state: 'open' },
+          { id: '22', title: 'Kept issue', updated: '2026-05-10T00:00:00Z', number: 22, state: 'open', labels: [] },
+        ]),
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify({
+          provider: 'github',
+          objectType: 'issue',
+          objectId: '7',
+          payload: {
+            owner: 'acme',
+            repo: 'widgets',
+            number: 7,
+            title: 'Factory issue',
+            state: 'open',
+            labels: [{ name: 'factory' }, { name: 'bug' }],
+            updated_at: '2026-05-12T00:00:00Z',
+          },
+        }),
+      },
+    });
+  }
+
+  function issueIndexRows(client: CapturingClient): Array<Record<string, unknown>> {
+    const indexPath = githubRepoIssuesIndexPath('acme', 'widgets');
+    return JSON.parse(client.files.get(indexPath) ?? '[]') as Array<Record<string, unknown>>;
+  }
+
+  // MUST-FIRE: the tombstoned legacy row must not come back.
+  it('does not resurrect a legacy issue row that a delete tombstone removes in the same batch', async () => {
+    const client = legacyBackfillFixture();
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ owner: 'acme', repo: 'widgets', id: '7', _deleted: true }],
+    });
+
+    const rows = issueIndexRows(client);
+    assert.deepEqual(
+      rows.map((r) => r.id),
+      ['22'],
+      'tombstoned legacy issue 7 was re-added to the index by the backfill',
+    );
+  });
+
+  // MUST-NOT-FIRE (a): with no tombstone at all, the legacy row is still backfilled.
+  it('still backfills a legacy issue row when no delete tombstone targets it', async () => {
+    const client = legacyBackfillFixture();
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 8,
+          title: 'Support issue',
+          state: 'open',
+          labels: [{ name: 'support' }],
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const rows = issueIndexRows(client);
+    const legacy = rows.find((r) => r.id === '7');
+    assert.ok(legacy, 'legacy issue 7 must survive when nothing deletes it');
+    assert.deepEqual(legacy?.labels, ['factory', 'bug']);
+  });
+
+  // MUST-NOT-FIRE (b): the skip is scoped to the tombstoned id, not "any batch
+  // containing a tombstone". A tombstone for a different issue must not disable
+  // the backfill for row 7.
+  it('backfills untombstoned legacy rows even when the batch deletes a different issue', async () => {
+    const client = legacyBackfillFixture();
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [{ owner: 'acme', repo: 'widgets', id: '9', _deleted: true }],
+    });
+
+    const rows = issueIndexRows(client);
+    const legacy = rows.find((r) => r.id === '7');
+    assert.ok(legacy, 'legacy issue 7 must survive a tombstone aimed at issue 9');
+    assert.deepEqual(
+      legacy?.labels,
+      ['factory', 'bug'],
+      'backfill must stay scoped to the tombstoned id, not disable itself wholesale',
+    );
+  });
+
+  // A partially unreadable label array must fail open rather than backfill a
+  // silently truncated set as authoritative.
+  it('leaves a legacy row untouched when the by-id artifact has an unreadable label entry', async () => {
+    const indexPath = githubRepoIssuesIndexPath('acme', 'widgets');
+    const client = createClient({
+      initialFiles: {
+        [indexPath]: JSON.stringify([
+          { id: '7', title: 'Factory issue', updated: '2026-05-12T00:00:00Z', number: 7, state: 'open' },
+        ]),
+        [githubByIdAliasPath('acme', 'widgets', 'issues', 7)]: JSON.stringify({
+          provider: 'github',
+          objectType: 'issue',
+          objectId: '7',
+          payload: {
+            owner: 'acme',
+            repo: 'widgets',
+            number: 7,
+            title: 'Factory issue',
+            state: 'open',
+            // The `factory` entry is unreadable; keeping the readable remainder
+            // would drop it and hide the issue from label filters for good.
+            labels: [{ nmae: 'factory' }, { name: 'bug' }],
+            updated_at: '2026-05-12T00:00:00Z',
+          },
+        }),
+      },
+    });
+
+    await emitGitHubAuxiliaryFiles(client, {
+      workspaceId: 'ws-1',
+      issues: [
+        {
+          owner: 'acme',
+          repo: 'widgets',
+          number: 8,
+          title: 'Support issue',
+          state: 'open',
+          labels: [{ name: 'support' }],
+          updated_at: '2026-05-13T00:00:00Z',
+        },
+      ],
+    });
+
+    const rows = JSON.parse(client.files.get(indexPath) ?? '[]') as Array<Record<string, unknown>>;
+    const legacy = rows.find((r) => r.id === '7');
+    assert.ok(legacy, 'legacy row must be retained');
+    assert.equal(
+      Object.hasOwn(legacy!, 'labels'),
+      false,
+      'a truncated label set must not be backfilled as authoritative',
+    );
+  });
+
   it('uses the newest lifecycle timestamp for PR by-edited aliases', async () => {
     const client = createClient();
 
