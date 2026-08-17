@@ -31,6 +31,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-linear` issue creates now accept synced `team.id` and label ids directly, resolve `team.key`/`team.name` plus label names through mounted team/label indexes, and keep explicit `teamId`/`labelIds` authoritative; adapter-core now enforces the schema's at-least-one team reference.
 - `@relayfile/adapter-core` direct HTTP create-draft writes now reuse the mount daemon's content identity, so a later mount echo coalesces onto the original revision and writeback operation instead of making its receipt context unreadable.
 - `@relayfile/relay-helpers` GitHub and Linear create helpers now return a discriminated `confirmed`/`pending`/`dropped` result, preserve late-receipt writes as non-throwing `pending`, and never disguise a Relayfile draft path as a provider URL.
 - `@relayfile/relay-helpers` final-write policies now compose monotonically in shared async scopes: authored rebinding cannot relax an outer denial or replace its canonical preview transport, overlapping Runs can be isolated, and out-of-order cleanup cannot resurrect stale policy.

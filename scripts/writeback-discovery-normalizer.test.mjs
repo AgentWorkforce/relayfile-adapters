@@ -170,6 +170,30 @@ test('normalizes existing writeback discovery adapter endpoints without changing
   });
 });
 
+test('publishes Linear mounted-reference issue create fields', () => {
+  const linear = adapters.find((adapter) => adapter.slug === 'linear');
+  assert.ok(linear);
+
+  const normalized = normalizeWritebackDiscoveryAdapter(linear);
+  const issueEndpoint = normalized.endpoints.find(
+    (endpoint) => endpoint.path === '/linear/issues/new.json'
+  );
+
+  assert.ok(issueEndpoint);
+  assert.deepEqual(issueEndpoint.schema.required, ['title']);
+  assert.deepEqual(issueEndpoint.schema.anyOf, [
+    { required: ['teamId'] },
+    { required: ['team'] },
+  ]);
+  assert.equal(issueEndpoint.schema.properties.team.type, 'object');
+  assert.deepEqual(issueEndpoint.schema.properties.team.properties.key, {
+    type: 'string',
+    description: 'Linear team key, resolved through issue-create preflight.',
+  });
+  assert.equal(issueEndpoint.schema.properties.labels.type, 'array');
+  assert.equal(issueEndpoint.schema.properties.labels.items.oneOf[1].type, 'object');
+});
+
 test('normalizes Notion page meta writebacks as pages resources', () => {
   const notion = adapters.find((adapter) => adapter.slug === 'notion');
   assert.ok(notion);

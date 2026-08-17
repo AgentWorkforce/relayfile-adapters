@@ -27,7 +27,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | hubspot | None | 0 | 4 | Inline JS schemas. |
 | intercom | None | 0 | 3 | Inline JS schemas. |
 | jira | None | 0 | 4 | Inline JS schemas. |
-| linear | None | 0 | 7 | Inline JS schemas; issue/comment/label writes proxy Linear GraphQL, while project writes target companion `linear-relay` Nango actions. |
+| linear | None | 0 | 7 | Inline JS schemas; issue/comment/label writes proxy Linear GraphQL, issue create exposes mounted team/label reference preflight, and project writes target companion `linear-relay` Nango actions. |
 | notion | None | 0 | 9 | Inline JS schemas cover database page creates, page `meta.json` property updates, content replacement, and comments. |
 | onedrive | None | 0 | 2 | Inline JS schemas. |
 | pipedrive | None | 0 | 4 | Inline JS schemas. |

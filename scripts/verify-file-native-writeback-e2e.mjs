@@ -98,8 +98,12 @@ async function section1Discovery() {
     fail('discovery: read /linear/issues/.schema.json', e.message);
     return null;
   }
-  if (!Array.isArray(schema.required) || !schema.required.includes('teamId') || !schema.required.includes('title')) {
-    fail('discovery: schema.required', 'must include teamId and title');
+  if (!Array.isArray(schema.required) || !schema.required.includes('title')) {
+    fail('discovery: schema.required', 'must include title');
+    return null;
+  }
+  if (!Array.isArray(schema.anyOf) || !schema.anyOf.some((branch) => branch.required?.includes('teamId')) || !schema.anyOf.some((branch) => branch.required?.includes('team'))) {
+    fail('discovery: schema.anyOf', 'must require teamId or team');
     return null;
   }
   if (schema.additionalProperties !== false) {
@@ -110,7 +114,7 @@ async function section1Discovery() {
     fail('discovery: schema.properties.id.readOnly', 'id must be marked readOnly: true');
     return null;
   }
-  pass('discovery: read /linear/issues/.schema.json (required, additionalProperties, readOnly)');
+  pass('discovery: read /linear/issues/.schema.json (required, anyOf, additionalProperties, readOnly)');
 
   const examplePath = join(root, 'packages/linear/discovery/linear/issues/.create.example.json');
   let example;
@@ -234,12 +238,12 @@ async function section2Runtime(schema) {
   try {
     const r = core.validatePayload({ title: 'no team' }, schema, 'create');
     if (r.ok !== false) throw new Error('expected ok=false');
-    if (!r.errors?.some((e) => e.reason === 'required' && e.field === 'teamId')) {
-      throw new Error(`expected required/teamId error; got ${JSON.stringify(r.errors)}`);
+    if (!r.errors?.some((e) => e.reason === 'anyOf')) {
+      throw new Error(`expected anyOf error; got ${JSON.stringify(r.errors)}`);
     }
-    pass('validatePayload: missing required → reason=required field=teamId');
+    pass('validatePayload: missing team reference → reason=anyOf');
   } catch (e) {
-    fail('validatePayload: missing required → reason=required field=teamId', e.message);
+    fail('validatePayload: missing team reference → reason=anyOf', e.message);
   }
 
   try {
@@ -337,6 +341,29 @@ async function section3LinearAdapter() {
     pass('linear: CREATE via draft filename → issueCreate mutation with required fields');
   } catch (e) {
     fail('linear: CREATE via draft filename → issueCreate mutation with required fields', e.message);
+  }
+
+  // CREATE from a common mounted shape resolves team keys and label names.
+  try {
+    const req = w.resolveWritebackRequest(
+      '/linear/issues/factory-create-github.json',
+      JSON.stringify({
+        title: 'Factory mirror',
+        team: { key: 'AR' },
+        labels: [{ name: 'relayfile-adapters' }],
+      }),
+      {
+        teams: [{ id: 'team-ar', key: 'AR', name: 'Agent Relay' }],
+        labels: [{ id: 'label-adapters', name: 'relayfile-adapters', teamId: 'team-ar' }],
+      },
+    );
+    const input = req.body?.variables?.input;
+    if (input?.teamId !== 'team-ar' || input?.labelIds?.[0] !== 'label-adapters') {
+      throw new Error(`input=${JSON.stringify(input)}`);
+    }
+    pass('linear: CREATE mounted shape → resolved teamId and labelIds');
+  } catch (e) {
+    fail('linear: CREATE mounted shape → resolved teamId and labelIds', e.message);
   }
 
   // ReadOnlyFieldError on canonical patch with readOnly field.

@@ -320,8 +320,13 @@ export const adapters = [
       ['/linear/comments/<name>__<commentId>/meta.json', 'Comment records (directory records so per-comment children can nest without a file/dir collision).'],
     ],
     endpoints: [
-      endpoint('/linear/issues/new.json', 'Create Linear issue', 'Creates a Linear issue.', ['teamId', 'title'], {
+      endpoint('/linear/issues/new.json', 'Create Linear issue', 'Creates a Linear issue. Explicit `teamId` and `labelIds` are accepted directly; `team.key`/`team.name` and label names are resolved by the adapter\'s mounted-reference preflight helper.', ['title'], {
         teamId: str('Linear team UUID. List `/linear/teams/` to find available teams.', 'uuid'),
+        team: obj('Mounted/synced Linear team reference. Supply `id` directly, or resolve `key`/`name` against `/linear/teams/_index.json` with the issue-create preflight helper.', {
+          id: str('Linear team UUID.', 'uuid'),
+          key: str('Linear team key, resolved through issue-create preflight.'),
+          name: str('Linear team name, resolved through issue-create preflight.'),
+        }),
         title: str('Issue title.', undefined, { minLength: 1 }),
         description: str('Markdown issue body.'),
         priority: en([0, 1, 2, 3, 4], '0=No priority, 1=Urgent, 2=High, 3=Medium, 4=Low.'),
@@ -330,12 +335,26 @@ export const adapters = [
         projectId: str('Linear project UUID.', 'uuid'),
         cycleId: str('Linear cycle UUID.', 'uuid'),
         labelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs.'),
+        labels: arr({
+          oneOf: [
+            str('Linear label name, resolved through issue-create preflight.'),
+            obj('Mounted/synced Linear label reference. Supply `id` directly, or resolve `name` against `/linear/labels/_index.json` with the issue-create preflight helper.', {
+              id: str('Linear label UUID.', 'uuid'),
+              name: str('Linear label name, resolved through issue-create preflight.'),
+            }),
+          ],
+        }, 'Mounted/synced label references. Explicit `labelIds` are authoritative when both fields are present.'),
         addedLabelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs to add without replacing the full label set. Do not combine with `labelIds`.'),
         removedLabelIds: arr(str('Linear label UUID.', 'uuid'), 'Linear label UUIDs to remove without replacing the full label set. Do not combine with `labelIds`.'),
         dueDate: str('Due date in YYYY-MM-DD form.', 'date'),
         estimate: num('Linear estimate value.'),
         parentId: str('Parent issue UUID.', 'uuid'),
-      }, { teamId: '00000000-0000-0000-0000-000000000000', title: 'Replace example title', description: 'Optional markdown body.', priority: 0 }),
+      }, { teamId: '00000000-0000-0000-0000-000000000000', title: 'Replace example title', description: 'Optional markdown body.', priority: 0 }, {
+        anyOf: [
+          { required: ['teamId'] },
+          { required: ['team'] },
+        ],
+      }),
       endpoint('/linear/issues/{issueId}/comments/new.json', 'Create Linear issue comment', 'Creates a comment on a Linear issue.', ['body'], {
         body: str('Comment body.', undefined, { minLength: 1 }),
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),

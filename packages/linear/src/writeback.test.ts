@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ReadOnlyFieldError, resolveDeleteRequest, resolveWritebackRequest } from './writeback.js';
+import {
+  ReadOnlyFieldError,
+  resolveDeleteRequest,
+  resolveIssueCreateReferences,
+  resolveWritebackRequest,
+} from './writeback.js';
 
 const PAGE_UUID = '2fd6800c-1c90-80ea-9ec8-fe4a0daa66b8';
 const PAGE_HEX = PAGE_UUID.replace(/-/g, '');
@@ -151,6 +156,140 @@ describe('linear writeback', () => {
       assert.throws(
         () => resolveWritebackRequest('/linear/issues/audit-log-export.json', JSON.stringify({ title: 'x' })),
         /requires a `teamId`/,
+      );
+    });
+
+    it('resolves mounted team keys and label names for issue create', () => {
+      const req = resolveWritebackRequest(
+        '/linear/issues/factory-create-github-14jnkm8.json',
+        JSON.stringify({
+          title: '[factory] GitHub: export shared mount-path parser for issues and PRs',
+          stateId: 'state-1',
+          labels: [{ name: 'relayfile-adapters' }],
+          team: { key: 'AR' },
+          source: {
+            provider: 'github',
+            owner: 'AgentWorkforce',
+            repo: 'relayfile-adapters',
+            number: 224,
+          },
+        }),
+        {
+          teams: [
+            {
+              id: 'team-ar',
+              title: 'Agent Relay',
+              updated: '2026-08-16T00:00:00.000Z',
+              key: 'AR',
+              name: 'Agent Relay',
+            },
+          ],
+          labels: [
+            {
+              id: 'label-relayfile-adapters',
+              title: 'relayfile-adapters',
+              updated: '2026-08-16T00:00:00.000Z',
+              name: 'relayfile-adapters',
+              teamId: 'team-ar',
+            },
+          ],
+        },
+      );
+
+      assert.strictEqual(req.action, 'create_issue');
+      assert.deepStrictEqual((req.body.variables as { input: Record<string, unknown> }).input, {
+        teamId: 'team-ar',
+        title: '[factory] GitHub: export shared mount-path parser for issues and PRs',
+        stateId: 'state-1',
+        labelIds: ['label-relayfile-adapters'],
+      });
+    });
+
+    it('accepts mounted records and direct ids in synced issue shapes', () => {
+      const direct = resolveWritebackRequest(
+        '/linear/issues/copied-synced-shape.json',
+        JSON.stringify({
+          title: 'Copied synced shape',
+          team: { id: 'team-ar', key: 'AR', name: 'Agent Relay' },
+          labels: {
+            nodes: [
+              { id: 'label-a', name: 'relayfile-adapters' },
+              { id: 'label-b', name: 'factory' },
+            ],
+          },
+        }),
+      );
+
+      assert.deepStrictEqual((direct.body.variables as { input: Record<string, unknown> }).input, {
+        teamId: 'team-ar',
+        title: 'Copied synced shape',
+        labelIds: ['label-a', 'label-b'],
+      });
+    });
+
+    it('prefers a team-scoped label over a workspace label with the same name', () => {
+      const references = resolveIssueCreateReferences(
+        {
+          title: 'Scoped label',
+          team: { name: 'Agent Relay' },
+          labels: ['Bug'],
+        },
+        {
+          teams: [{ id: 'team-ar', key: 'AR', name: 'Agent Relay' }],
+          labels: [
+            { id: 'label-workspace-bug', name: 'Bug', teamId: '' },
+            { id: 'label-team-bug', name: 'bug', team: { id: 'team-ar' } },
+          ],
+        },
+      );
+
+      assert.deepStrictEqual(references, {
+        teamId: 'team-ar',
+        labelIds: ['label-team-bug'],
+      });
+    });
+
+    it('keeps explicit teamId and labelIds authoritative', () => {
+      const req = resolveWritebackRequest(
+        '/linear/issues/deterministic-create.json',
+        JSON.stringify({
+          title: 'Deterministic create',
+          teamId: 'team-explicit',
+          team: { key: 'AR' },
+          labelIds: ['label-explicit'],
+          labels: [{ name: 'relayfile-adapters' }],
+        }),
+      );
+
+      assert.deepStrictEqual((req.body.variables as { input: Record<string, unknown> }).input, {
+        teamId: 'team-explicit',
+        title: 'Deterministic create',
+        labelIds: ['label-explicit'],
+      });
+    });
+
+    it('reports unresolved and ambiguous mounted references', () => {
+      assert.throws(
+        () =>
+          resolveWritebackRequest(
+            '/linear/issues/no-catalog.json',
+            JSON.stringify({ title: 'No catalog', team: { key: 'AR' } }),
+          ),
+        /requires a `teamId` or a reference catalog.*team\.key/i,
+      );
+
+      assert.throws(
+        () =>
+          resolveIssueCreateReferences(
+            { title: 'Ambiguous', team: { name: 'Platform' } },
+            {
+              teams: [
+                { id: 'team-a', name: 'Platform' },
+                { id: 'team-b', title: 'Platform' },
+              ],
+            },
+          ),
+        /team name "Platform" is ambiguous.*teamId/i,
       );
     });
   });
