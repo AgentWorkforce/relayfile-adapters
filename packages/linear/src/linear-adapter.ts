@@ -16,6 +16,7 @@ import {
   linearByNameAliasPath,
   linearByTitleAliasPath,
   linearCyclePath,
+  linearIssueByProjectPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearLabelByTeamPath,
@@ -324,6 +325,42 @@ export class LinearAdapter extends IntegrationAdapter {
           result.filesDeleted += previousCounts.filesDeleted;
         }
         result.paths.push(previousAliasPath);
+      }
+
+      const previousProjectAliasPath = resolvePreviousIssueProjectAliasPath(eventForWrite.payload);
+      const projectAliasPath = resolveIssueProjectAliasPath(eventForWrite.payload);
+      if (previousProjectAliasPath && previousProjectAliasPath !== projectAliasPath) {
+        if (this.client.deleteFile) {
+          await this.client.deleteFile({ workspaceId, path: previousProjectAliasPath });
+          result.filesDeleted += 1;
+        } else {
+          const previousDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: previousProjectAliasPath,
+            content: this.renderContent(workspaceId, eventForWrite, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const previousCounts = inferWriteCounts(eventForWrite, previousDeleteResult, true);
+          result.filesWritten += previousCounts.filesWritten;
+          result.filesUpdated += previousCounts.filesUpdated;
+          result.filesDeleted += previousCounts.filesDeleted;
+        }
+        result.paths.push(previousProjectAliasPath);
+      }
+
+      if (projectAliasPath) {
+        const projectAliasWriteResult = await this.client.writeFile({
+          workspaceId,
+          path: projectAliasPath,
+          content,
+          contentType: JSON_CONTENT_TYPE,
+          semantics,
+        });
+        const projectAliasCounts = inferWriteCounts(eventForWrite, projectAliasWriteResult, false);
+        result.filesWritten += projectAliasCounts.filesWritten;
+        result.filesUpdated += projectAliasCounts.filesUpdated;
+        result.paths.push(projectAliasPath);
       }
 
       if (!aliasPath) {
@@ -1394,6 +1431,38 @@ function resolvePreviousIssueStateAliasPath(payload: Record<string, unknown>): s
   return linearIssueByStatePath(stateName, identifier);
 }
 
+function resolveIssueProjectAliasPath(payload: Record<string, unknown>): string | undefined {
+  const projectId = readIssueProjectId(payload);
+  const identifier = asString(payload.identifier);
+  if (!projectId || !identifier) {
+    return undefined;
+  }
+  return linearIssueByProjectPath(projectId, identifier);
+}
+
+function resolvePreviousIssueProjectAliasPath(payload: Record<string, unknown>): string | undefined {
+  const previousData = getRecord(getRecord(payload._webhook)?.previousData);
+  if (!previousData) {
+    return undefined;
+  }
+
+  const projectId = readIssueProjectId(previousData);
+  const identifier = asString(previousData.identifier) ?? asString(payload.identifier);
+  if (!projectId || !identifier) {
+    return undefined;
+  }
+  return linearIssueByProjectPath(projectId, identifier);
+}
+
+function readIssueProjectId(payload: Record<string, unknown>): string | undefined {
+  const project = getRecord(payload.project);
+  return (
+    asString(project?.id) ??
+    asString(payload.projectId) ??
+    asString(payload.project_id)
+  );
+}
+
 function inferIssueStateAliasErrorPath(event: NormalizedWebhook): string {
   const identifier = asString(event.payload.identifier);
   if (identifier) {
@@ -1660,6 +1729,8 @@ async function resolveRemoveAliasPaths(
     return uniqueStrings([
       resolveIssueStateAliasPath(event.payload),
       resolvePreviousIssueStateAliasPath(event.payload),
+      resolveIssueProjectAliasPath(event.payload),
+      resolvePreviousIssueProjectAliasPath(event.payload),
     ]);
   }
   if (normalizedType !== 'label') {

@@ -7,6 +7,7 @@ import {
   linearIssueByAssigneePath,
   linearIssueByCreatorPath,
   linearIssueByPriorityPath,
+  linearIssueByProjectPath,
   linearIssueByStatePath,
   linearIssuePath,
   slugifyStateName,
@@ -131,6 +132,46 @@ test('Linear issue ingest writes canonical and by-state files with identical byt
   assert.ok(result.paths.includes(aliasPath));
   assert.deepStrictEqual(result.errors, []);
   assert.ok(result.filesWritten >= 2);
+});
+
+test('Linear issue ingest writes and reconciles by-project aliases', async () => {
+  const client = new RecordingClient();
+  const adapter = createAdapter(client);
+  const firstPath = linearIssueByProjectPath('project-alpha', 'ENG-123');
+  const secondPath = linearIssueByProjectPath('project-beta', 'ENG-123');
+
+  await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({ project: { id: 'project-alpha', name: 'Alpha' } }),
+  });
+  assert.ok(client.files.has(firstPath));
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.update',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({
+      project: { id: 'project-beta', name: 'Beta' },
+      _webhook: {
+        action: 'update',
+        previousData: {
+          identifier: 'ENG-123',
+          project: { id: 'project-alpha', name: 'Alpha' },
+          state_name: 'Todo',
+        },
+      },
+    }),
+  });
+
+  assert.strictEqual(client.files.has(firstPath), false);
+  assert.ok(client.files.has(secondPath));
+  assert.ok(client.deletes.includes(firstPath));
+  assert.ok(result.paths.includes(firstPath));
+  assert.ok(result.paths.includes(secondPath));
 });
 
 test('slugifyStateName keeps canonical Linear state directories stable', () => {

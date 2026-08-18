@@ -13,6 +13,7 @@ import {
   linearCommentPath,
   linearCommentReadCandidatePaths,
   linearIssueByEditedPath,
+  linearIssueByProjectPath,
   linearLabelByTeamPath,
   linearLabelPath,
   linearLabelsIndexPath,
@@ -124,6 +125,10 @@ describe('linear path-mapper', () => {
       assert.equal(
         linearIssueByEditedPath('2026-05-12', 'issue-123'),
         '/linear/issues/by-edited/2026-05-12/issue-123.json',
+      );
+      assert.equal(
+        linearIssueByProjectPath('project/123', 'AGE-8'),
+        '/linear/issues/by-project/project%2F123/AGE-8.json',
       );
       assert.equal(
         computeLinearPath('LinearProject', 'project-123'),

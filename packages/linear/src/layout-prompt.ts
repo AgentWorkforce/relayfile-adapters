@@ -10,7 +10,7 @@ Always run \`ls\` before constructing a path. PR 0 standardizes human-readable l
 \`/linear/labels/<uuid>.json\` is the canonical label record.
 \`/linear/projects/<uuid>/meta.json\` is the canonical project record. The legacy flat \`/linear/projects/<uuid>.json\` path is not written by current mirrors.
 
-Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\`, and \`/linear/issues/by-edited/YYYY-MM-DD/<issue-uuid>.json\` are additional lookups. The edited-date bucket is formatted as \`YYYY-MM-DD\` and uses the first available timestamp in this order: \`updatedAt\`, \`updated_at\`, \`completedAt\`, \`canceledAt\`, \`createdAt\`, then \`created_at\`.
+Issue lookups: \`/linear/issues/by-uuid/<uuid>.json\` is the stable anchor (always emitted, keyed on the Linear UUID). \`/linear/issues/by-id/<TEAM-123>.json\` is the human-readable lookup keyed on the Linear identifier (only emitted when the issue has one). \`/linear/issues/by-title/<slug>.json\`, \`/linear/issues/by-state/<state>/<TEAM-123>.json\`, \`/linear/issues/by-project/<project-uuid>/<TEAM-123>.json\`, \`/linear/issues/by-assignee/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-creator/<user-id>/<TEAM-123>.json\`, \`/linear/issues/by-priority/<priority>/<TEAM-123>.json\`, and \`/linear/issues/by-edited/YYYY-MM-DD/<issue-uuid>.json\` are additional lookups. The edited-date bucket is formatted as \`YYYY-MM-DD\` and uses the first available timestamp in this order: \`updatedAt\`, \`updated_at\`, \`completedAt\`, \`canceledAt\`, \`createdAt\`, then \`created_at\`.
 
 Project lookups: \`/linear/projects/by-id/<uuid>.json\` is the stable project id lookup, \`/linear/projects/by-name/<slug>.json\` resolves a project by name, \`/linear/projects/by-state/<backlog|planned|started|paused|completed|canceled>/<uuid>.json\` groups by Linear project state, and \`/linear/projects/by-team/<team-uuid>/<project-uuid>.json\` is emitted once per team on multi-team projects.
 
@@ -57,6 +57,7 @@ ls /linear/issues
 jq '.[0]' /linear/issues/_index.json
 jq '.[] | {identifier, state, title}' /linear/issues/_index.json
 ls /linear/issues/by-assignee
+ls /linear/issues/by-project/<project-uuid>
 ls /linear/issues/by-priority
 ls /linear/issues/by-edited/2026-05-12
 jq '.identifier' /linear/issues/by-edited/2026-05-12/11111111-1111-1111-1111-111111111111.json

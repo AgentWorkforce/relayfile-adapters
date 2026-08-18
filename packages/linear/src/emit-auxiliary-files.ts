@@ -16,7 +16,8 @@
  *     `TEAM-123` identifier when present (human-readable lookup), a by-title
  *     alias when the title slugs to non-empty, and grouped issue-tracking
  *     aliases for state, assignee, creator, and priority when the required
- *     grouping field and `identifier` are present. Index row carries
+ *     grouping field and `identifier` are present, including a by-project
+ *     alias keyed on the stable Linear project id. Index row carries
  *     `{ id, title, updated, identifier, state }`.
  *
  *   * **comment** — canonical `/linear/comments/<slug>__<id>/meta.json` (a
@@ -90,6 +91,7 @@ import {
   linearIssueByCreatorPath,
   linearIssueByEditedPath,
   linearIssueByPriorityPath,
+  linearIssueByProjectPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
@@ -342,13 +344,14 @@ async function planIssueWrite(
   const identifier = readNonEmptyString(issue.identifier);
   const title = readNonEmptyString(issue.title);
   const stateName = readIssueStateName(issue);
+  const projectId = readIssueProjectId(issue);
   const assigneeId = readIssueAssigneeId(issue);
   const creatorId = readIssueCreatorId(issue);
   const priority = issue.priority ?? undefined;
   const editedDate = editedDateSegment(readIssueEditedAt(issue));
 
   const content = renderContent('issue', issue, connectionId, false);
-  const newPaths = issuePathsFor({ id, identifier, title, stateName, assigneeId, creatorId, priority, editedDate });
+  const newPaths = issuePathsFor({ id, identifier, title, stateName, projectId, assigneeId, creatorId, priority, editedDate });
 
   // Reconciliation: the by-uuid alias is the stable anchor — it's always
   // emitted (keyed on the UUID, which is always present) so a prior write
@@ -374,6 +377,7 @@ async function planIssueWrite(
           identifier: prior.identifier,
           title: prior.title,
           stateName: prior.stateName,
+          projectId: prior.projectId,
           assigneeId: prior.assigneeId,
           creatorId: prior.creatorId,
           priority: prior.priority,
@@ -418,6 +422,7 @@ async function planIssueDelete(
     identifier: prior?.identifier,
     title: prior?.title,
     stateName: prior?.stateName,
+    projectId: prior?.projectId,
     assigneeId: prior?.assigneeId,
     creatorId: prior?.creatorId,
     priority: prior?.priority,
@@ -432,6 +437,7 @@ interface PriorIssueState {
   identifier?: string | undefined;
   title?: string | undefined;
   stateName?: string | undefined;
+  projectId?: string | undefined;
   assigneeId?: string | undefined;
   creatorId?: string | undefined;
   priority?: number | string | undefined;
@@ -445,6 +451,7 @@ function extractPriorIssueState(parsed: Record<string, unknown>): PriorIssueStat
     identifier: readNonEmptyString(payload.identifier),
     title: readNonEmptyString(payload.title),
     stateName: readPriorStateName(payload),
+    projectId: readPriorProjectId(payload),
     assigneeId: readPriorUserId(payload.assignee) ?? readNonEmptyString(payload.assignee_id),
     creatorId: readPriorUserId(payload.creator) ?? readNonEmptyString(payload.creator_id),
     priority: readPriority(payload.priority),
@@ -466,12 +473,13 @@ function issuePathsFor(args: {
   identifier?: string | undefined;
   title?: string | undefined;
   stateName?: string | undefined;
+  projectId?: string | undefined;
   assigneeId?: string | undefined;
   creatorId?: string | undefined;
   priority?: number | string | undefined;
   editedDate?: string | undefined;
 }): string[] {
-  const { id, identifier, title, stateName, assigneeId, creatorId, priority, editedDate } = args;
+  const { id, identifier, title, stateName, projectId, assigneeId, creatorId, priority, editedDate } = args;
   const humanReadable = identifier ?? title;
   const paths: string[] = [];
   // Canonical path.
@@ -497,6 +505,9 @@ function issuePathsFor(args: {
   if (stateName && identifier) {
     paths.push(linearIssueByStatePath(stateName, identifier));
   }
+  if (projectId && identifier) {
+    paths.push(linearIssueByProjectPath(projectId, identifier));
+  }
   if (assigneeId && identifier) {
     paths.push(linearIssueByAssigneePath(assigneeId, identifier));
   }
@@ -514,6 +525,24 @@ function issuePathsFor(args: {
 
 function readIssueStateName(issue: LinearIssue): string | undefined {
   return readNonEmptyString(issue.state?.name);
+}
+
+function readIssueProjectId(issue: LinearIssue): string | undefined {
+  const record = issue as unknown as Record<string, unknown>;
+  return (
+    readNonEmptyString(issue.project?.id) ??
+    readNonEmptyString(record.projectId) ??
+    readNonEmptyString(record.project_id)
+  );
+}
+
+function readPriorProjectId(payload: Record<string, unknown>): string | undefined {
+  const project = isRecord(payload.project) ? payload.project : undefined;
+  return (
+    readNonEmptyString(project?.id) ??
+    readNonEmptyString(payload.projectId) ??
+    readNonEmptyString(payload.project_id)
+  );
 }
 
 function readIssueAssigneeId(issue: LinearIssue): string | undefined {
