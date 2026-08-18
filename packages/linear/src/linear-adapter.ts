@@ -1581,6 +1581,15 @@ async function writeLinearAliases(
   const previousContent = await readLinearFile(client, byIdAliasPath, workspaceId);
   await writeLinearIndex(client, workspaceId, scope, { objectType: normalizedType });
   await writeLinearFile(client, workspaceId, byIdAliasPath, content, semantics);
+  if (normalizedType === 'issue') {
+    await writeLinearFile(
+      client,
+      workspaceId,
+      linearByUuidAliasPath(scope, event.objectId),
+      content,
+      semantics,
+    );
+  }
 
   let writtenAliasPath: string | undefined;
   if (title) {

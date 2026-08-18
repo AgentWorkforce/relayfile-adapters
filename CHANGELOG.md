@@ -9,7 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
-- `@relayfile/adapter-linear` now materializes `/linear/issues/by-project/<project-id>/<identifier>.json` aliases so project-scoped consumers can avoid mounting the full issue tree.
+- `@relayfile/adapter-linear` now materializes `/linear/issues/by-project/<project-id>/<identifier>.json` aliases so project-scoped consumers can avoid mounting the full issue tree. The path mapper and generated `LAYOUT.md` contract expose the new lookup; existing mounts must resync to materialize and discover it.
 - `@relayfile/adapter-granola` now publishes Granola's current `note.generated`, `note.edited`, and `note.access_granted` webhook events in the known-trigger catalog, replacing the stale `recording.created` label so autocomplete and lint match upstream webhook semantics.
 - `@relayfile/adapter-posthog` now provides read-only project-scoped materialization with canonical slug-and-ID paths, stable indexes and aliases, alert webhook normalization, digest visibility, and generated trigger and scope-key catalogs.
 - `@relayfile/adapter-core/inbound` now publishes a version-hashed, provider-owned Nango/Hookdeck capability catalog, deterministic cross-runtime `logicalEventKey`, and exact golden vectors; incomplete Nango sync-page identities are rejected, and GitLab Hookdeck prefers `x-gitlab-event-uuid` before falling back to the Hookdeck delivery id.

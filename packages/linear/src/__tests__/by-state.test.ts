@@ -202,13 +202,8 @@ test('Linear issue remove recovers a by-project alias from the stable UUID ancho
     payload: createIssuePayload({ project: { id: 'project-alpha', name: 'Alpha' } }),
   });
   assert.ok(client.files.has(projectPath));
-  const projectFile = client.files.get(projectPath);
-  assert.ok(projectFile);
-  // Production sync materialization supplies this stable UUID anchor. Seed
-  // the same bytes here so the webhook tombstone path can recover sparse
-  // deletion context exactly as it does against a synced mirror.
-  await client.writeFile({ ...projectFile, path: uuidPath });
   assert.ok(client.files.has(uuidPath));
+  assert.equal(client.files.get(uuidPath)?.content, client.files.get(projectPath)?.content);
 
   const result = await adapter.ingestWebhook('workspace-1', {
     provider: 'linear',
