@@ -15,6 +15,7 @@ import {
   linearByIdAliasPath,
   linearByNameAliasPath,
   linearByTitleAliasPath,
+  linearByUuidAliasPath,
   linearCyclePath,
   linearIssueByProjectPath,
   linearIssueByStatePath,
@@ -1726,12 +1727,31 @@ async function resolveRemoveAliasPaths(
 ): Promise<string[]> {
   const normalizedType = normalizeLinearObjectType(event.objectType);
   if (normalizedType === 'issue') {
-    return uniqueStrings([
+    const paths = [
       resolveIssueStateAliasPath(event.payload),
       resolvePreviousIssueStateAliasPath(event.payload),
       resolveIssueProjectAliasPath(event.payload),
       resolvePreviousIssueProjectAliasPath(event.payload),
-    ]);
+    ];
+    const priorContent = await readLinearFile(
+      client,
+      linearByUuidAliasPath(`${LINEAR_PATH_ROOT}/issues`, event.objectId),
+      workspaceId,
+    );
+    if (priorContent) {
+      const identifier =
+        asString(event.payload.identifier)
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'identifier');
+      const projectId =
+        readIssueProjectId(event.payload)
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'project', 'id')
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'projectId')
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'project_id');
+      if (identifier && projectId) {
+        paths.push(linearIssueByProjectPath(projectId, identifier));
+      }
+    }
+    return uniqueStrings(paths);
   }
   if (normalizedType !== 'label') {
     return [];

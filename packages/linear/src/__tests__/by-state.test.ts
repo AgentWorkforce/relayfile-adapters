@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   LINEAR_CANONICAL_STATES,
   LinearAdapter,
+  linearByUuidAliasPath,
   linearIssueByAssigneePath,
   linearIssueByCreatorPath,
   linearIssueByPriorityPath,
@@ -48,6 +49,19 @@ class TombstoneOnlyClient implements RelayFileClientLike {
     this.writes.push(input);
     this.files.set(input.path, input);
     return existed ? { updated: true } : { created: true };
+  }
+}
+
+class ReadableRecordingClient extends RecordingClient {
+  async readFile(
+    inputOrWorkspaceId: { path: string; workspaceId: string } | string,
+    maybePath?: string,
+  ): Promise<{ content: string } | undefined> {
+    const path = typeof inputOrWorkspaceId === 'string'
+      ? maybePath ?? inputOrWorkspaceId
+      : inputOrWorkspaceId.path;
+    const file = this.files.get(path);
+    return file ? { content: file.content } : undefined;
   }
 }
 
@@ -172,6 +186,44 @@ test('Linear issue ingest writes and reconciles by-project aliases', async () =>
   assert.ok(client.deletes.includes(firstPath));
   assert.ok(result.paths.includes(firstPath));
   assert.ok(result.paths.includes(secondPath));
+});
+
+test('Linear issue remove recovers a by-project alias from the stable UUID anchor', async () => {
+  const client = new ReadableRecordingClient();
+  const adapter = createAdapter(client);
+  const projectPath = linearIssueByProjectPath('project-alpha', 'ENG-123');
+  const uuidPath = linearByUuidAliasPath('/linear/issues', 'issue_123');
+
+  await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({ project: { id: 'project-alpha', name: 'Alpha' } }),
+  });
+  assert.ok(client.files.has(projectPath));
+  const projectFile = client.files.get(projectPath);
+  assert.ok(projectFile);
+  // Production sync materialization supplies this stable UUID anchor. Seed
+  // the same bytes here so the webhook tombstone path can recover sparse
+  // deletion context exactly as it does against a synced mirror.
+  await client.writeFile({ ...projectFile, path: uuidPath });
+  assert.ok(client.files.has(uuidPath));
+
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.remove',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: {
+      id: 'issue_123',
+      _webhook: { action: 'remove' },
+    },
+  });
+
+  assert.equal(client.files.has(projectPath), false);
+  assert.ok(client.deletes.includes(projectPath));
+  assert.ok(result.paths.includes(projectPath));
 });
 
 test('slugifyStateName keeps canonical Linear state directories stable', () => {
