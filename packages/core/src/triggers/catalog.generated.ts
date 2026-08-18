@@ -216,7 +216,9 @@ export const KNOWN_TRIGGER_CATALOG = {
   ],
   "granola": [
     "file.created",
-    "recording.created"
+    "note.access_granted",
+    "note.edited",
+    "note.generated"
   ],
   "hubspot": [
     "company.associationChange",
