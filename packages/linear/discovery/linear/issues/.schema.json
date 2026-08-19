@@ -3,14 +3,45 @@
   "title": "Linear issue",
   "type": "object",
   "required": [
-    "teamId",
     "title"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "teamId"
+      ]
+    },
+    {
+      "required": [
+        "team"
+      ]
+    }
   ],
   "properties": {
     "teamId": {
       "type": "string",
       "format": "uuid",
       "description": "Linear team UUID. List `/linear/teams/` to find available teams."
+    },
+    "team": {
+      "type": "object",
+      "description": "Mounted/synced Linear team reference. Supply `id` directly, or resolve `key`/`name` against `/linear/teams/_index.json` with the issue-create preflight helper.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Linear team UUID."
+        },
+        "key": {
+          "type": "string",
+          "description": "Linear team key, resolved through issue-create preflight."
+        },
+        "name": {
+          "type": "string",
+          "description": "Linear team name, resolved through issue-create preflight."
+        }
+      },
+      "additionalProperties": true
     },
     "title": {
       "type": "string",
@@ -58,6 +89,34 @@
         "type": "string",
         "format": "uuid",
         "description": "Linear label UUID."
+      }
+    },
+    "labels": {
+      "type": "array",
+      "description": "Mounted/synced label references. Explicit `labelIds` are authoritative when both fields are present.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Linear label name, resolved through issue-create preflight."
+          },
+          {
+            "type": "object",
+            "description": "Mounted/synced Linear label reference. Supply `id` directly, or resolve `name` against `/linear/labels/_index.json` with the issue-create preflight helper.",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Linear label UUID."
+              },
+              "name": {
+                "type": "string",
+                "description": "Linear label name, resolved through issue-create preflight."
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
       }
     },
     "addedLabelIds": {

@@ -25,6 +25,7 @@
     "tests/atomic-index/**/*.test.ts",
     "tests/emit-auxiliary/**/*.test.ts",
     "tests/triggers/**/*.test.ts",
+    "tests/inbound/**/*.test.ts",
     "tests/scope-keys/**/*.test.ts",
     "tests/writeback-paths/**/*.test.ts",
     "tests/vfs-client/**/*.test.ts"

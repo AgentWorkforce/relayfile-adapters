@@ -5,6 +5,21 @@ import type { JsonValue, LinearAgentActivity, LinearAgentActivityType, LinearWri
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
 
 /**
+ * Mounted Linear records used to resolve human-readable issue-create
+ * references. Both canonical synced envelopes and the enriched team/label
+ * `_index.json` rows are accepted.
+ */
+export interface LinearIssueCreateReferenceCatalog {
+  readonly teams: readonly unknown[];
+  readonly labels?: readonly unknown[];
+}
+
+export interface LinearIssueCreateResolvedReferences {
+  readonly teamId: string;
+  readonly labelIds?: string[];
+}
+
+/**
  * Resolve a relayfile writeback into a Linear mutation or action request.
  *
  * Supported routes (today):
@@ -22,7 +37,11 @@ export { ReadOnlyFieldError } from '@relayfile/adapter-core';
  * still have `<slug>--<32-hex>`. We reverse the suffix to recover the
  * canonical UUID Linear's API requires.
  */
-export function resolveWritebackRequest(path: string, content: string): LinearWritebackRequest {
+export function resolveWritebackRequest(
+  path: string,
+  content: string,
+  referenceCatalog?: LinearIssueCreateReferenceCatalog,
+): LinearWritebackRequest {
   const route = classifyWrite(path, resources);
 
   // Comment on an existing issue.
@@ -45,7 +64,7 @@ export function resolveWritebackRequest(path: string, content: string): LinearWr
   // Create a brand-new issue from any non-canonical filename.
   const issueFileMatch = path.match(/^\/linear\/issues\/([^/]+)\.json$/);
   if (issueFileMatch?.[1] && route?.resource.name === 'issues' && route.kind === 'create') {
-    return buildIssueCreate(content);
+    return buildIssueCreate(content, referenceCatalog);
   }
 
   // Update an existing issue's metadata.
@@ -341,20 +360,24 @@ function readAgentActivityType(payload: Record<string, unknown>): LinearAgentAct
 /**
  * Build an `issueCreate` mutation request for the writeback engine.
  *
- * Requires `teamId` and `title` in the payload. All other Linear
- * `IssueCreateInput` fields are optional and forwarded if present.
+ * Requires `title` plus an explicit `teamId`/`team.id`, or a mounted-reference
+ * catalog that can resolve `team.key`/`team.name`. Explicit `labelIds` are
+ * authoritative; otherwise synced `labels` entries can provide ids or names.
+ * All other Linear `IssueCreateInput` fields are optional and forwarded if
+ * present.
  */
-function buildIssueCreate(content: string): LinearWritebackRequest {
+function buildIssueCreate(
+  content: string,
+  referenceCatalog?: LinearIssueCreateReferenceCatalog,
+): LinearWritebackRequest {
   const payload = parseJsonObject(content);
   rejectReadOnlyFields(payload);
-  const teamId = readString(payload, 'teamId');
-  if (!teamId) {
-    throw new Error('issues/<draft>.json writeback requires a `teamId`');
-  }
   const title = readString(payload, 'title');
   if (!title) {
     throw new Error('issues/<draft>.json writeback requires a `title`');
   }
+
+  const { teamId, labelIds } = resolveIssueCreateReferences(payload, referenceCatalog);
 
   const input: Record<string, unknown> = { teamId, title };
   const description = readString(payload, 'description');
@@ -369,8 +392,7 @@ function buildIssueCreate(content: string): LinearWritebackRequest {
   if (projectId) input.projectId = projectId;
   const cycleId = readString(payload, 'cycleId');
   if (cycleId) input.cycleId = cycleId;
-  const labelIds = readStringArray(payload, 'labelIds');
-  if (labelIds) input.labelIds = labelIds;
+  if (labelIds !== undefined) input.labelIds = labelIds;
   const dueDate = readString(payload, 'dueDate');
   if (dueDate) input.dueDate = dueDate;
   const estimate = readNumber(payload, 'estimate');
@@ -384,6 +406,204 @@ function buildIssueCreate(content: string): LinearWritebackRequest {
     endpoint: '/graphql',
     body: { query: ISSUE_CREATE_MUTATION, variables: { input } },
   };
+}
+
+/**
+ * Resolve a common mounted/synced Linear issue-create shape into the IDs
+ * required by Linear's GraphQL `IssueCreateInput`.
+ *
+ * The catalog can be populated directly from `/linear/teams/_index.json` and
+ * `/linear/labels/_index.json`, or from canonical synced record envelopes.
+ * Explicit `teamId`, `team.id`, and `labelIds` never require a catalog.
+ */
+export function resolveIssueCreateReferences(
+  payloadOrContent: Record<string, unknown> | string,
+  referenceCatalog?: LinearIssueCreateReferenceCatalog,
+): LinearIssueCreateResolvedReferences {
+  const payload = typeof payloadOrContent === 'string'
+    ? parseJsonObject(payloadOrContent)
+    : payloadOrContent;
+  const teamId = resolveIssueCreateTeamId(payload, referenceCatalog);
+  const labelIds = resolveIssueCreateLabelIds(payload, teamId, referenceCatalog);
+  return {
+    teamId,
+    ...(labelIds !== undefined ? { labelIds } : {}),
+  };
+}
+
+function resolveIssueCreateTeamId(
+  payload: Record<string, unknown>,
+  referenceCatalog: LinearIssueCreateReferenceCatalog | undefined,
+): string {
+  const explicitTeamId = readString(payload, 'teamId');
+  if (explicitTeamId) return explicitTeamId;
+
+  const team = isRecord(payload.team) ? payload.team : undefined;
+  const syncedTeamId = team ? readString(team, 'id') : undefined;
+  if (syncedTeamId) return syncedTeamId;
+
+  const teamKey = normalizeReferenceValue(team ? readString(team, 'key') : undefined);
+  const teamName = normalizeReferenceValue(team ? readString(team, 'name') : undefined);
+  if (!teamKey && !teamName) {
+    throw new Error('issues/<draft>.json writeback requires a `teamId`');
+  }
+  if (!referenceCatalog) {
+    const reference = teamKey ? '`team.key`' : '`team.name`';
+    throw new Error(
+      `issues/<draft>.json writeback requires a \`teamId\` or a reference catalog to resolve ${reference}`,
+    );
+  }
+
+  const selector: { field: 'key' | 'name'; value: string } = teamKey
+    ? { field: 'key', value: teamKey }
+    : { field: 'name', value: teamName! };
+  const matches = referenceCatalog.teams
+    .map(normalizeCatalogRecord)
+    .filter((record): record is Record<string, unknown> => record !== undefined)
+    .filter((record) => referenceValuesEqual(readCatalogString(record, selector.field), selector.value))
+    .map((record) => readCatalogId(record))
+    .filter((id): id is string => id !== undefined);
+  const uniqueMatches = [...new Set(matches)];
+  if (uniqueMatches.length === 0) {
+    throw new Error(
+      `Linear issue create team ${selector.field} "${selector.value}" did not match a mounted team; provide \`teamId\``,
+    );
+  }
+  if (uniqueMatches.length > 1) {
+    throw new Error(
+      `Linear issue create team ${selector.field} "${selector.value}" is ambiguous; provide \`teamId\``,
+    );
+  }
+  return uniqueMatches[0]!;
+}
+
+function resolveIssueCreateLabelIds(
+  payload: Record<string, unknown>,
+  teamId: string,
+  referenceCatalog: LinearIssueCreateReferenceCatalog | undefined,
+): string[] | undefined {
+  // An explicit replacement set is authoritative even when a copied synced
+  // shape also retains a `labels` relation.
+  if (Object.hasOwn(payload, 'labelIds')) {
+    return uniqueStrings(readStringArray(payload, 'labelIds') ?? []);
+  }
+
+  const references = readIssueCreateLabelReferences(payload);
+  if (references === undefined) return undefined;
+
+  const labelIds: string[] = [];
+  for (const reference of references) {
+    if (reference.id) {
+      labelIds.push(reference.id);
+      continue;
+    }
+    if (!reference.name) continue;
+    if (!referenceCatalog?.labels) {
+      throw new Error(
+        `Linear issue create label name "${reference.name}" requires a reference catalog or explicit \`labelIds\``,
+      );
+    }
+    labelIds.push(resolveMountedLabelId(reference.name, teamId, referenceCatalog.labels));
+  }
+  return uniqueStrings(labelIds);
+}
+
+function readIssueCreateLabelReferences(
+  payload: Record<string, unknown>,
+): Array<{ id?: string; name?: string }> | undefined {
+  const labelsValue = payload.labels;
+  const entries = Array.isArray(labelsValue)
+    ? labelsValue
+    : isRecord(labelsValue) && Array.isArray(labelsValue.nodes)
+      ? labelsValue.nodes
+      : undefined;
+  if (!entries) return undefined;
+
+  return entries
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const name = normalizeReferenceValue(entry);
+        return name ? { name } : undefined;
+      }
+      if (!isRecord(entry)) return undefined;
+      const id = normalizeReferenceValue(readString(entry, 'id'));
+      const name = normalizeReferenceValue(readString(entry, 'name'));
+      return id || name ? { ...(id ? { id } : {}), ...(name ? { name } : {}) } : undefined;
+    })
+    .filter((entry): entry is { id?: string; name?: string } => entry !== undefined);
+}
+
+function resolveMountedLabelId(name: string, teamId: string, records: readonly unknown[]): string {
+  const candidates = records
+    .map(normalizeCatalogRecord)
+    .filter((record): record is Record<string, unknown> => record !== undefined)
+    .filter((record) => referenceValuesEqual(readCatalogString(record, 'name'), name))
+    .map((record) => ({
+      id: readCatalogId(record),
+      teamId: readCatalogTeamId(record),
+    }))
+    .filter((candidate): candidate is { id: string; teamId: string | undefined } => candidate.id !== undefined);
+
+  const teamMatches = uniqueStrings(
+    candidates.filter((candidate) => candidate.teamId === teamId).map((candidate) => candidate.id),
+  );
+  if (teamMatches.length === 1) return teamMatches[0]!;
+  if (teamMatches.length > 1) {
+    throw new Error(
+      `Linear issue create label name "${name}" is ambiguous for team "${teamId}"; provide \`labelIds\``,
+    );
+  }
+
+  const workspaceMatches = uniqueStrings(
+    candidates.filter((candidate) => !candidate.teamId).map((candidate) => candidate.id),
+  );
+  if (workspaceMatches.length === 1) return workspaceMatches[0]!;
+  if (workspaceMatches.length > 1) {
+    throw new Error(
+      `Linear issue create workspace label name "${name}" is ambiguous; provide \`labelIds\``,
+    );
+  }
+
+  throw new Error(
+    `Linear issue create label name "${name}" did not match a mounted label available to team "${teamId}"; provide \`labelIds\``,
+  );
+}
+
+function normalizeCatalogRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const payload = isRecord(value.payload) ? value.payload : undefined;
+  return payload ? { ...value, ...payload } : value;
+}
+
+function readCatalogId(record: Record<string, unknown>): string | undefined {
+  return normalizeReferenceValue(readString(record, 'id') ?? readString(record, 'objectId'));
+}
+
+function readCatalogString(record: Record<string, unknown>, field: 'key' | 'name'): string | undefined {
+  const fallback = field === 'name' ? readString(record, 'title') : undefined;
+  return normalizeReferenceValue(readString(record, field) ?? fallback);
+}
+
+function readCatalogTeamId(record: Record<string, unknown>): string | undefined {
+  const team = isRecord(record.team) ? record.team : undefined;
+  return normalizeReferenceValue(
+    readString(record, 'teamId') ??
+      readString(record, 'team_id') ??
+      (team ? readString(team, 'id') : undefined),
+  );
+}
+
+function normalizeReferenceValue(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function referenceValuesEqual(left: string | undefined, right: string): boolean {
+  return left?.toLocaleLowerCase('en-US') === right.toLocaleLowerCase('en-US');
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 /**

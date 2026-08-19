@@ -31,6 +31,7 @@ import type { MappingSpec } from "./spec/types.js";
 import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
 import { writeScopeKeyCatalog } from "./scope-keys/catalog-generator.js";
 import { writeWritebackPathCatalog } from "./writeback-paths/catalog-generator.js";
+import { writeInboundCapabilityCatalog } from "./inbound/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;
@@ -66,6 +67,9 @@ async function main(argv: string[]): Promise<void> {
       return;
     case "writeback-paths":
       await handleWritebackPaths(args);
+      return;
+    case "inbound":
+      await handleInbound(args);
       return;
     case "help":
     case undefined:
@@ -424,6 +428,8 @@ Commands:
   scope-keys check [--repo-root <path>]
   writeback-paths generate [--repo-root <path>]
   writeback-paths check [--repo-root <path>]
+  inbound generate [--repo-root <path>]
+  inbound check [--repo-root <path>]
 `);
 }
 
@@ -523,6 +529,59 @@ function printWritebackPathsHelp(): void {
 Commands:
   writeback-paths generate [--repo-root <path>]
   writeback-paths check [--repo-root <path>]
+`);
+}
+
+async function handleInbound(args: string[]): Promise<void> {
+  const [subcommand, ...rest] = args;
+  const flags = parseFlags(rest);
+  const repoRoot = readOptionalString(flags["repo-root"]);
+
+  switch (subcommand) {
+    case "generate": {
+      const generation = await writeInboundCapabilityCatalog({ repoRoot });
+      process.stdout.write(
+        `${JSON.stringify(renderInboundSummary("generate", generation), null, 2)}\n`,
+      );
+      return;
+    }
+    case "check": {
+      const generation = await writeInboundCapabilityCatalog({
+        check: true,
+        repoRoot,
+      });
+      process.stdout.write(
+        `${JSON.stringify(renderInboundSummary("check", generation), null, 2)}\n`,
+      );
+      return;
+    }
+    case "help":
+    case undefined:
+      printInboundHelp();
+      return;
+    default:
+      throw new Error(`Unknown inbound command "${subcommand}"`);
+  }
+}
+
+function renderInboundSummary(
+  command: "check" | "generate",
+  generation: Awaited<ReturnType<typeof writeInboundCapabilityCatalog>>,
+): Record<string, unknown> {
+  return {
+    command: `inbound ${command}`,
+    capabilities: generation.catalog.length,
+    catalogVersion: generation.catalogVersion,
+    providers: generation.sources.map(({ providerId }) => providerId),
+  };
+}
+
+function printInboundHelp(): void {
+  process.stdout.write(`adapter-core inbound
+
+Commands:
+  inbound generate [--repo-root <path>]
+  inbound check [--repo-root <path>]
 `);
 }
 

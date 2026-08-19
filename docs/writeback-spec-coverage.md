@@ -20,14 +20,14 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | gcp | None | 0 | 0 | Read-only observer adapter for Cloud Run services, Cloud Monitoring alert policies, and Cloud Billing current state; no writeback endpoints. |
 | gcs | None | 0 | 2 | Inline JS schemas. |
 | gitlab | None | 0 | 2 | Inline JS schemas. |
-| gmail | None | 0 | 3 | Inline JS schemas. |
+| gmail | None | 0 | 3 | Three legacy discovery schemas remain inline. The additive `/gmail` control contract owns Cloud's separate bounded 13-action Gmail surface; it is not a discovery schema or a provider executor. |
 | google-calendar | None | 0 | 1 | Inline JS schemas. |
 | google-drive | None | 0 | 2 | Inline JS schemas. |
 | granola | None | 0 | 2 | Inline JS schemas. |
 | hubspot | None | 0 | 4 | Inline JS schemas. |
 | intercom | None | 0 | 3 | Inline JS schemas. |
 | jira | None | 0 | 4 | Inline JS schemas. |
-| linear | None | 0 | 7 | Inline JS schemas; issue/comment/label writes proxy Linear GraphQL, while project writes target companion `linear-relay` Nango actions. |
+| linear | None | 0 | 7 | Inline JS schemas; issue/comment/label writes proxy Linear GraphQL, issue create exposes mounted team/label reference preflight, and project writes target companion `linear-relay` Nango actions. |
 | notion | None | 0 | 9 | Inline JS schemas cover database page creates, page `meta.json` property updates, content replacement, and comments. |
 | onedrive | None | 0 | 2 | Inline JS schemas. |
 | pipedrive | None | 0 | 4 | Inline JS schemas. |
@@ -36,6 +36,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | reddit | None | 0 | 2 | Inline JS schemas. |
 | s3 | None | 0 | 2 | Inline JS schemas. |
 | salesforce | None | 0 | 5 | Inline JS schemas. |
+| shortcut | None | 0 | 9 | Inline JS schemas for Shortcut categories, custom fields, epics, groups, iterations, labels, milestones, projects, and stories; members and workflows are read-only and excluded from writeback. |
 | sharepoint | None | 0 | 2 | Inline JS schemas. |
 | slack | None | 0 | 4 | Inline JS schemas. |
 | teams | None | 0 | 3 | Inline JS schemas. |

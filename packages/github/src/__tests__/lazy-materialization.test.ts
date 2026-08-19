@@ -10,6 +10,7 @@ interface RecordingProviderOptions {
   delayMs?: number;
   issues?: Partial<Record<RepoName, ReturnType<typeof createIssue>[]>>;
   pulls?: Partial<Record<RepoName, ReturnType<typeof createPull>[]>>;
+  commits?: Partial<Record<RepoName, ReturnType<typeof createCommit>[]>>;
   repos?: RepoName[];
 }
 
@@ -69,6 +70,12 @@ class RecordingProvider {
 
     if (request.endpoint === '/repos/octocat/repo-b/pulls') {
       return this.json(this.options.pulls?.['repo-b'] ?? defaultPulls('repo-b')) as ProxyResponse<T>;
+    }
+
+    const commitsMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/commits/);
+    if (commitsMatch) {
+      const repo = commitsMatch[1] as RepoName;
+      return this.json(this.options.commits?.[repo] ?? defaultCommits(repo)) as ProxyResponse<T>;
     }
 
     const pullFilesMatch = request.endpoint.match(/^\/repos\/octocat\/(repo-a|repo-b)\/pulls\/(\d+)\/files$/);
@@ -262,6 +269,47 @@ function createPull(
   };
 }
 
+function defaultCommits(repo: RepoName): ReturnType<typeof createCommit>[] {
+  return repo === 'repo-a'
+    ? [createCommit('repo-a', 'aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111', 'initial commit')]
+    : [];
+}
+
+function createCommit(
+  _repo: RepoName,
+  sha: string,
+  message: string,
+  options: { authorLogin?: string; committedAt?: string } = {},
+) {
+  return {
+    sha,
+    commit: {
+      message,
+      author: {
+        name: options.authorLogin ?? 'octocat',
+        email: 'octocat@github.com',
+        date: options.committedAt ?? '2026-05-01T00:00:00Z',
+      },
+      committer: {
+        name: 'octocat',
+        email: 'octocat@github.com',
+        date: options.committedAt ?? '2026-05-01T00:00:00Z',
+      },
+    },
+    author: {
+      login: options.authorLogin ?? 'octocat',
+      id: 1,
+      type: 'User',
+    },
+    committer: {
+      login: options.authorLogin ?? 'octocat',
+      id: 1,
+      type: 'User',
+    },
+    parents: [],
+  };
+}
+
 function createAdapter(provider: RecordingProvider, config: Partial<GitHubAdapterConfig> = {}) {
   return new GitHubAdapter(provider as never, {
     owner: 'octocat',
@@ -278,7 +326,7 @@ async function maybeDelay(delayMs: number | undefined): Promise<void> {
 }
 
 describe('GitHub lazy materialization', () => {
-  it('lazy defaults to false and initial sync writes full repo subtrees', async () => {
+  it('lazy defaults to false but repository commit history remains opt-in', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider);
 
@@ -287,6 +335,16 @@ describe('GitHub lazy materialization', () => {
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/issues/_index.json'));
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/pulls/_index.json'));
+    assert.strictEqual(
+      provider.writes.has('/github/repos/octocat/repo-a/commits/_index.json'),
+      false,
+    );
+    assert.strictEqual(
+      provider.requests.some((request) =>
+        /^\/repos\/octocat\/[^/]+\/commits(?:\?|$)/.test(request.endpoint),
+      ),
+      false,
+    );
   });
 
   it('lazy true initial sync writes only the repos index plus root marker', async () => {
@@ -564,7 +622,7 @@ describe('GitHub lazy materialization', () => {
     assert.strictEqual(provider.countRequests('/repos/octocat/repo-a/pulls'), 1);
   });
 
-  it('materializeRepo writes repo meta plus empty issue and pull indexes for repos with no synced content', async () => {
+  it('materializeRepo writes repo meta plus issue and pull indexes without opt-in commits', async () => {
     const provider = new RecordingProvider();
     const adapter = createAdapter(provider, { lazy: true });
 
@@ -584,6 +642,7 @@ describe('GitHub lazy materialization', () => {
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/pulls/_index.json')),
       { pulls: [] },
     );
+    assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-b/commits/_index.json'), false);
   });
 
   it('webhook reconciliation in a never-materialized lazy repo writes repo meta.json', async () => {
@@ -615,6 +674,39 @@ describe('GitHub lazy materialization', () => {
       materialization: {
         default: 'lazy',
         webhookWritesForLazyRepos: false,
+      },
+    });
+
+    await adapter.sync('workspace-1');
+    const result = await adapter.ingestWebhook('workspace-1', {
+      provider: 'github',
+      connectionId: 'conn-lazy',
+      eventType: 'issues.labeled',
+      objectType: 'issue',
+      objectId: '10',
+      payload: {
+        action: 'labeled',
+        issue: createIssue('repo-a', 10, 'repo-a issue', { labels: ['factory'] }),
+        repository: createRepository('repo-a'),
+        label: { name: 'factory' },
+      },
+    });
+
+    assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-a/meta.json'), false);
+    assert.deepStrictEqual(result.paths, ['/github/repos/octocat/repo-a/issues/10__repo-a-issue/meta.json']);
+  });
+
+  it('does not let an implicit commit default enable webhook writes for an effectively lazy repo', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, {
+      materialization: {
+        default: 'eager',
+        webhookWritesForLazyRepos: false,
+        rules: [{
+          repos: ['octocat/repo-a'],
+          issues: 'lazy',
+          pulls: 'lazy',
+        }],
       },
     });
 

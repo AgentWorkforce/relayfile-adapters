@@ -11,6 +11,7 @@ import {
 import type { IngestResult, VfsLike } from './files/content-fetcher.js';
 import {
   buildRepoIndexFile,
+  type GitHubCommitIndexRow,
   type GitHubRecordIndexRow,
   type GitHubRepoIndexRow,
   parseIndexRows,
@@ -53,6 +54,24 @@ export async function atomicUpsertRecordIndex(
     vfs,
     path,
     (content) => parseIndexRows<GitHubRecordIndexRow>(content),
+    merge,
+    serialize,
+    options,
+  );
+}
+
+/** CAS upsert for a per-repo `commits/_index.json`. */
+export async function atomicUpsertCommitIndex(
+  vfs: VfsLike,
+  path: string,
+  merge: (rows: GitHubCommitIndexRow[]) => GitHubCommitIndexRow[],
+  serialize: (rows: GitHubCommitIndexRow[]) => string,
+  options?: AtomicUpsertOptions,
+): Promise<IngestResult> {
+  return runAtomicIndexWrite(
+    vfs,
+    path,
+    (content) => parseIndexRows<GitHubCommitIndexRow>(content),
     merge,
     serialize,
     options,

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,16 +23,28 @@ for (const adapter of normalizedAdapters) {
       join(root, 'packages', adapter.slug, 'discovery', resource.schemaPath.slice(1)),
       `${JSON.stringify(fullRecordSchema(endpoint.schema), null, 2)}\n`,
     );
-    await writeDiscoveryFile(
-      join(root, 'packages', adapter.slug, 'discovery', resource.examplePath.slice(1)),
-      `${JSON.stringify(endpoint.example, null, 2)}\n`,
-    );
+    if (resource.examplePath && endpoint.example !== undefined) {
+      await writeDiscoveryFile(
+        join(root, 'packages', adapter.slug, 'discovery', resource.examplePath.slice(1)),
+        `${JSON.stringify(endpoint.example, null, 2)}\n`,
+      );
+    } else {
+      await removeDiscoveryFile(join(root, 'packages', adapter.slug, 'discovery', `${resource.resourcePath}/.create.example.json`.replace(/^\//, '')));
+    }
   }
 }
 
 async function writeDiscoveryFile(path, content) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, content);
+}
+
+async function removeDiscoveryFile(path) {
+  try {
+    await unlink(path);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
 }
 
 function renderAdapterReadme(adapter) {
@@ -42,14 +54,14 @@ function renderAdapterReadme(adapter) {
     '',
     adapter.overview,
     '',
-    'Read-only mounts:',
+    adapter.mountLabel ?? 'Read-only mounts:',
     ...adapter.readPaths.map(([path, description]) => `- \`${path}\` - ${description}`),
     '',
     'Resources:',
     '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | \`${resource.examplePath}\` | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | ${resource.examplePath ? `\`${resource.examplePath}\`` : '—'} | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
     '',
     '## Operations',
     '',
@@ -57,7 +69,7 @@ function renderAdapterReadme(adapter) {
     '|---|---|',
     '| Read | `cat <canonical-resource-path>` after listing the resource directory or following an alias when one is available. Use the resource table and ID patterns below to determine whether a resource uses a bare id, an adapter-specific slug/id filename, or an exact sidecar path such as `content.md`. |',
     '| Edit | Write the resource update payload to the canonical resource path. For JSON resources, included mutable fields PATCH; fields marked `readOnly` in `.schema.json` are rejected. |',
-    '| Create | Write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at its canonical resource path and rewrites the draft as `{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }`. |',
+    '| Create | For resources with a create example, write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at its canonical resource path and rewrites the draft as `{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }`. |',
     '| Ignore | Editor scratch files named `partial.json`, `.tmp.json`, `.partial.json`, `*.tmp.json`, or `*.partial.json` are ignored and never treated as create drafts. |',
     '| Delete | `rm <canonical-resource-path>` for canonical records. |',
     '',
@@ -68,7 +80,7 @@ function renderAdapterReadme(adapter) {
     '',
     ...adapter.endpoints.flatMap((endpoint) => renderEndpointContract(endpoint)),
     '## Create Examples',
-    'Read the resource `.schema.json` first, then use the sibling `.create.example.json` as a minimal create document. The example intentionally omits read-only fields.',
+    'Read the resource `.schema.json` first, then use the sibling `.create.example.json` as a minimal create document when the resource advertises one. The example intentionally omits read-only fields.',
     '',
   ];
 
@@ -80,12 +92,14 @@ function renderEndpointContract(endpoint) {
   const required = new Set(endpoint.schema.required ?? []);
   const fieldNames = Object.keys(endpoint.schema.properties ?? {});
   const optional = fieldNames.filter((fieldName) => !required.has(fieldName));
+  const operations = endpoint.operations ?? ['create', 'update', 'delete'];
   const lines = [
     `### ${endpoint.schema.title}`,
     '',
     `Resource: \`${resourceWritePath(resource)}\``,
     `Schema: \`${resource.schemaPath}\``,
-    `Create example: \`${resource.examplePath}\``,
+    `Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`,
+    ...(resource.examplePath ? [`Create example: \`${resource.examplePath}\``] : ['Create example: none; use the provider UI or another supported operation.']),
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
     `Optional fields: ${optional.length > 0 ? optional.map((fieldName) => `\`${fieldName}\``).join(', ') : 'none'}.`,
     ...renderValidationNotes(endpoint.schema),
@@ -110,7 +124,9 @@ function renderIdPattern(resource) {
   if (writePath === resource.resourcePath) {
     return `- \`${writePath}\`: exact file path.`;
   }
-  return `- \`${writePath}\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`;
+  return resource.operations && !resource.operations.includes('create')
+    ? `- \`${writePath}\`: \`${resource.idPatternSource}\`. Non-canonical filenames are not writeback routes for this resource.`
+    : `- \`${writePath}\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`;
 }
 
 function resourceIdPatternCell(resource) {
@@ -209,8 +225,11 @@ function renderResourcesTs(adapter) {
     '  readonly pathPattern: RegExp;',
     '  readonly idPattern: RegExp;',
     '  readonly schema: string;',
-    '  readonly createExample: string;',
+    '  readonly createExample?: string;',
+    '  readonly operations?: readonly AdapterResourceOperation[];',
     '}',
+    '',
+    'export type AdapterResourceOperation = "create" | "update" | "delete";',
     '',
     'export const resources = [',
     ...resources.map((resource) => [
@@ -220,7 +239,8 @@ function renderResourcesTs(adapter) {
       `    pathPattern: ${resource.pathPatternLiteral},`,
       `    idPattern: ${resource.idPatternLiteral},`,
       `    schema: ${JSON.stringify(`discovery${resource.schemaPath}`)},`,
-      `    createExample: ${JSON.stringify(`discovery${resource.examplePath}`)},`,
+      ...(resource.examplePath ? [`    createExample: ${JSON.stringify(`discovery${resource.examplePath}`)},`] : []),
+      ...(resource.operations ? [`    operations: ${JSON.stringify(resource.operations)},`] : []),
       '  },',
     ].join('\n')),
     '] as const satisfies readonly AdapterResourceConfig[];',

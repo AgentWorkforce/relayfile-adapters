@@ -15,6 +15,8 @@ describe('github layout prompt', () => {
     assert.match(file.content, /__/u);
     assert.match(file.content, /_index\.json/u);
     assert.match(file.content, /by-edited\/YYYY-MM-DD/u);
+    assert.match(file.content, /"merged": true/u);
+    assert.match(file.content, /select\(\.mergedAt != null\)/u);
     assert.match(file.content, /discovery\/github\/repos\/\{owner\}\/\{repo\}\/issues\/\.schema\.json/u);
     assert.match(file.content, /discovery\/github\/repos\/\{owner\}\/\{repo\}\/issues\/\.create\.example\.json/u);
     assert.match(file.content, /discovery\/github\/repos\/\{owner\}\/\{repo\}\/pulls\/\{pullNumber\}\/reviews\/\.schema\.json/u);

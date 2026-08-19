@@ -58,6 +58,9 @@ function createAdapterMocks() {
     ingestCheckRun: mock.method(adapter, 'ingestCheckRun', async () =>
       createResult('/github/repos/acme/widgets/pulls/7/checks/4.json'),
     ),
+    ingestCommitStatus: mock.method(adapter, 'ingestCommitStatus', async () =>
+      createResult('/github/repos/acme/widgets/pulls/7/meta.json'),
+    ),
     ingestDeploymentStatus: mock.method(adapter, 'ingestDeploymentStatus', async () =>
       createResult('/github/repos/acme/widgets/deployments/11/statuses/12.json'),
     ),
@@ -271,7 +274,7 @@ describe('WebhookRouter', () => {
     assert.strictEqual(router.isSupported('deployment_status.created'), true);
   });
 
-  it('getSupportedEvents lists all 20 events', () => {
+  it('getSupportedEvents lists all 21 events', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.deepStrictEqual(router.getSupportedEvents(), [
@@ -294,8 +297,9 @@ describe('WebhookRouter', () => {
       'issues.reopened',
       'issues.closed',
       'check_run.completed',
+      'status',
       'deployment_status.created',
     ]);
-    assert.strictEqual(router.getSupportedEvents().length, 20);
+    assert.strictEqual(router.getSupportedEvents().length, 21);
   });
 });

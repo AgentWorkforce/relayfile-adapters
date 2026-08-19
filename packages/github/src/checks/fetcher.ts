@@ -27,6 +27,7 @@ export async function fetchCheckRuns(
   repo: string,
   sha: string,
   connectionId?: string,
+  headers?: Record<string, string>,
 ): Promise<CheckRunListResponse> {
   const resolvedConnectionId = await resolveConnectionId(provider, connectionId);
   const allCheckRuns: JsonObject[] = [];
@@ -39,7 +40,10 @@ export async function fetchCheckRuns(
       baseUrl: GITHUB_API_BASE_URL,
       endpoint: `/repos/${owner}/${repo}/commits/${sha}/check-runs`,
       connectionId: resolvedConnectionId,
-      headers: GITHUB_API_HEADERS,
+      headers: {
+        ...GITHUB_API_HEADERS,
+        ...headers,
+      },
       query: {
         page: String(page),
         per_page: String(CHECK_RUNS_PER_PAGE),

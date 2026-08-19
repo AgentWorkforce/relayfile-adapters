@@ -289,6 +289,16 @@
     ]
   },
   "github": {
+    "close-pull-request": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber"
+        ]
+      }
+    ],
     "issue-comments": [
       {
         "path": "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
@@ -315,6 +325,24 @@
           "owner",
           "repo",
           "pullNumber"
+        ]
+      }
+    ],
+    "pull-requests": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pull-requests",
+        "params": [
+          "owner",
+          "repo"
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "path": "/github/repos/{owner}/{repo}/refs",
+        "params": [
+          "owner",
+          "repo"
         ]
       }
     ],
@@ -820,6 +848,62 @@
     "subscriptions": [
       {
         "path": "/sharepoint/subscriptions",
+        "params": []
+      }
+    ]
+  },
+  "shortcut": {
+    "categories": [
+      {
+        "path": "/shortcut/categories",
+        "params": []
+      }
+    ],
+    "custom-fields": [
+      {
+        "path": "/shortcut/custom-fields",
+        "params": []
+      }
+    ],
+    "epics": [
+      {
+        "path": "/shortcut/epics",
+        "params": []
+      }
+    ],
+    "groups": [
+      {
+        "path": "/shortcut/groups",
+        "params": []
+      }
+    ],
+    "iterations": [
+      {
+        "path": "/shortcut/iterations",
+        "params": []
+      }
+    ],
+    "labels": [
+      {
+        "path": "/shortcut/labels",
+        "params": []
+      }
+    ],
+    "milestones": [
+      {
+        "path": "/shortcut/milestones",
+        "params": []
+      }
+    ],
+    "projects": [
+      {
+        "path": "/shortcut/projects",
+        "params": []
+      }
+    ],
+    "stories": [
+      {
+        "path": "/shortcut/stories",
         "params": []
       }
     ]

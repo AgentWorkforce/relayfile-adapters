@@ -1,6 +1,11 @@
-import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
+import { encodeSegment } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
-import { created } from './receipt.js';
+import { created, type CreatedResult } from './receipt.js';
+import {
+  createRelayTransportResolver,
+  type RelayClientOptions,
+} from './transport.js';
+import { executeRelayWrite } from './write-authorizer.js';
 
 export interface GithubTarget {
   owner: string;
@@ -10,7 +15,7 @@ export interface GithubTarget {
 
 export interface GithubClient extends ProviderClient<'github'> {
   /** Comment on an issue or pull request. */
-  comment(target: GithubTarget, body: string): Promise<{ id: string; url: string }>;
+  comment(target: GithubTarget, body: string): Promise<CreatedResult>;
   /** Create an issue. */
   createIssue(args: {
     owner: string;
@@ -18,7 +23,35 @@ export interface GithubClient extends ProviderClient<'github'> {
     title: string;
     body: string;
     labels?: string[];
-  }): Promise<{ id: string; url: string }>;
+  }): Promise<CreatedResult>;
+  /** Create a pull request from a branch already present on GitHub. */
+  createPullRequest(args: {
+    owner: string;
+    repo: string;
+    title: string;
+    head: string;
+    base: string;
+    body?: string;
+    draft?: boolean;
+    author?: 'app' | 'user';
+  }): Promise<CreatedResult>;
+  /** Create a Git ref through a non-canonical draft. */
+  pushRef(args: {
+    owner: string;
+    repo: string;
+    ref: string;
+    sha: string;
+  }): Promise<void>;
+  /** Update a Git ref through its deterministic canonical resource path. */
+  updateRef(args: {
+    owner: string;
+    repo: string;
+    ref: string;
+    sha: string;
+    force?: boolean;
+  }): Promise<void>;
+  /** Close a pull request without merging it. */
+  closePullRequest(target: GithubTarget): Promise<void>;
   /**
    * Merge a pull request. (Named `mergePullRequest`, not `merge`, because
    * `merge` is the catalog resource key exposed as `.merge`.)
@@ -47,12 +80,13 @@ export interface GithubClient extends ProviderClient<'github'> {
  * Ergonomic GitHub client over the writeback-path catalog, plus the uniform
  * resource-keyed access (`.issues`, `.["issue-comments"]`, `.merge`, `.reviews`).
  */
-export function githubClient(opts: IntegrationClientOptions = {}): GithubClient {
+export function githubClient(opts: RelayClientOptions = {}): GithubClient {
   const base = providerClient('github', opts);
+  const resolveTransport = createRelayTransportResolver(opts);
   return Object.assign(base, {
     async comment(target: GithubTarget, body: string) {
       return created(
-        await base['issue-comments'].write(
+        base['issue-comments'].write(
           { owner: target.owner, repo: target.repo, issueNumber: target.number },
           { body }
         )
@@ -60,10 +94,82 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
     },
     async createIssue(args: { owner: string; repo: string; title: string; body: string; labels?: string[] }) {
       return created(
-        await base.issues.write(
+        base.issues.write(
           { owner: args.owner, repo: args.repo },
           { title: args.title, body: args.body, ...(args.labels ? { labels: args.labels } : {}) }
         )
+      );
+    },
+    async createPullRequest(args: {
+      owner: string;
+      repo: string;
+      title: string;
+      head: string;
+      base: string;
+      body?: string;
+      draft?: boolean;
+      author?: 'app' | 'user';
+    }) {
+      return created(
+        base['pull-requests'].write(
+          { owner: args.owner, repo: args.repo },
+          {
+            title: args.title,
+            head: args.head,
+            base: args.base,
+            ...(args.body !== undefined ? { body: args.body } : {}),
+            ...(args.draft !== undefined ? { draft: args.draft } : {}),
+            ...(args.author !== undefined ? { author: args.author } : {})
+          }
+        )
+      );
+    },
+    async pushRef(args: {
+      owner: string;
+      repo: string;
+      ref: string;
+      sha: string;
+    }) {
+      await base.refs.write(
+        { owner: args.owner, repo: args.repo },
+        {
+          ref: args.ref,
+          sha: args.sha
+        }
+      );
+    },
+    async updateRef(args: {
+      owner: string;
+      repo: string;
+      ref: string;
+      sha: string;
+      force?: boolean;
+    }) {
+      const normalizedRef = normalizeGitHubRef(args.ref);
+      const collectionPath = base.refs.path({ owner: args.owner, repo: args.repo });
+      const path = `${collectionPath}/${encodeSegment(normalizedRef)}.json`;
+      const body = {
+        ref: normalizedRef,
+        sha: args.sha,
+        ...(args.force !== undefined ? { force: args.force } : {})
+      };
+      const transport = resolveTransport();
+      await executeRelayWrite(
+        transport,
+        {
+          provider: 'github',
+          resource: 'refs',
+          parameters: { owner: args.owner, repo: args.repo, ref: normalizedRef },
+          path,
+          body,
+        },
+        { options: opts, integration: 'github', operation: 'write.refs', path, data: body },
+      );
+    },
+    async closePullRequest(target: GithubTarget) {
+      await base['close-pull-request'].write(
+        { owner: target.owner, repo: target.repo, pullNumber: target.number },
+        {}
       );
     },
     async mergePullRequest(args: {
@@ -110,4 +216,13 @@ export function githubClient(opts: IntegrationClientOptions = {}): GithubClient 
       );
     }
   }) as GithubClient;
+}
+
+function normalizeGitHubRef(ref: string): string {
+  const trimmed = ref.trim();
+  const normalized = trimmed.startsWith('refs/') ? trimmed : `refs/heads/${trimmed}`;
+  if (!/^refs\/[^/]+\/[^/].*$/u.test(normalized) || normalized.includes('//')) {
+    throw new Error('GitHub ref must name a non-empty ref such as refs/heads/main');
+  }
+  return normalized;
 }

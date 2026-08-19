@@ -1,0 +1,307 @@
+{
+  "schema": "relayfile.inbound-capability-catalog/1",
+  "catalogVersion": "sha256:4ff718ab3ab703411833b0a59c2ae21966b6d793f952974c8302dcea9ed7d680",
+  "capabilities": [
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "github.nango",
+      "providerId": "github",
+      "pathRoot": "/github",
+      "providerConfigAliases": [
+        "github",
+        "github-app",
+        "github-app-oauth",
+        "github-relay",
+        "github-sage"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "gitlab.hookdeck",
+      "providerId": "gitlab",
+      "pathRoot": "/gitlab",
+      "providerConfigAliases": [
+        "gitlab",
+        "gitlab-relay"
+      ],
+      "source": "hookdeck",
+      "eventKinds": [
+        "webhook"
+      ],
+      "detection": {
+        "headerAny": [
+          "x-gitlab-event",
+          "x-gitlab-event-uuid",
+          "x-gitlab-token"
+        ]
+      },
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "hookdeck-delivery-id",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-gitlab-event-uuid"
+        ],
+        "hookdeckDeliveryIdHeaders": [
+          "x-hookdeck-eventid"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "gitlab.nango",
+      "providerId": "gitlab",
+      "pathRoot": "/gitlab",
+      "providerConfigAliases": [
+        "gitlab",
+        "gitlab-relay"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "gmail.nango",
+      "providerId": "gmail",
+      "pathRoot": "/gmail",
+      "providerConfigAliases": [
+        "gmail",
+        "google-mail",
+        "google-mail-relay"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "hubspot.nango",
+      "providerId": "hubspot",
+      "pathRoot": "/hubspot",
+      "providerConfigAliases": [
+        "hubspot",
+        "hubspot-relay"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "linear.nango",
+      "providerId": "linear",
+      "pathRoot": "/linear",
+      "providerConfigAliases": [
+        "linear",
+        "linear-relay",
+        "linear-sage"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "notion.nango",
+      "providerId": "notion",
+      "pathRoot": "/notion",
+      "providerConfigAliases": [
+        "notion",
+        "notion-relay",
+        "notion-sage"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "shortcut.nango",
+      "providerId": "shortcut",
+      "pathRoot": "/shortcut",
+      "providerConfigAliases": [
+        "shortcut",
+        "shortcut-relay"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "slack.nango",
+      "providerId": "slack",
+      "pathRoot": "/slack",
+      "providerConfigAliases": [
+        "slack",
+        "slack-relay",
+        "slack-sage",
+        "slack-sage-preview"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    }
+  ]
+}

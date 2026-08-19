@@ -26,7 +26,21 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 { "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "identifier": "<TEAM-123>", "state": "<state name>" }
 \`\`\`
 
-\`/linear/comments/_index.json\`, \`/linear/labels/_index.json\`, \`/linear/users/_index.json\`, \`/linear/teams/_index.json\`, \`/linear/projects/_index.json\`, \`/linear/states/_index.json\`, \`/linear/cycles/_index.json\`, \`/linear/milestones/_index.json\`, and \`/linear/roadmaps/_index.json\` use:
+\`/linear/teams/_index.json\` rows add the stable lookup fields needed by issue-create preflight:
+
+\`\`\`json
+{ "id": "<team uuid>", "title": "<team name>", "updated": "<iso8601>", "key": "<TEAM>", "name": "<team name>" }
+\`\`\`
+
+\`/linear/labels/_index.json\` rows add label name and scope (an empty \`teamId\` means workspace-scoped):
+
+\`\`\`json
+{ "id": "<label uuid>", "title": "<label name>", "updated": "<iso8601>", "name": "<label name>", "teamId": "<team uuid or empty>" }
+\`\`\`
+
+Pass those parsed index arrays as the optional third argument to \`resolveWritebackRequest\`, or call \`resolveIssueCreateReferences\` directly, when a create draft uses \`team: { key|name }\` or label names. Explicit \`teamId\` and \`labelIds\` remain authoritative and need no catalog.
+
+\`/linear/comments/_index.json\`, \`/linear/users/_index.json\`, \`/linear/projects/_index.json\`, \`/linear/states/_index.json\`, \`/linear/cycles/_index.json\`, \`/linear/milestones/_index.json\`, and \`/linear/roadmaps/_index.json\` use:
 
 \`\`\`json
 { "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>" }

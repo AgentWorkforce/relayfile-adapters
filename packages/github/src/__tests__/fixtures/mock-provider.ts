@@ -95,6 +95,13 @@ export function createMockProvider(): MockConnectionProvider {
         }) as ProxyResponse<T>;
       }
 
+      if (
+        request.endpoint ===
+        `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/commits/${mockRepoContext.headSha}/status`
+      ) {
+        return jsonResponse({ state: 'success', statuses: [] }) as ProxyResponse<T>;
+      }
+
       if (request.endpoint === `/repos/${mockRepoContext.owner}/${mockRepoContext.repo}/pulls/42`) {
         if (request.headers?.Accept === 'application/vnd.github.diff') {
           return {

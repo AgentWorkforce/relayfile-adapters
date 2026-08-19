@@ -11,3 +11,6 @@ export * from './writeback.js';
 export * from './delta-fetcher.js';
 export * from './metadata.js';
 export * from './subscriptions.js';
+export * from './identity.js';
+export * from './inbound.js';
+export * from './google-mail-relayfile-contract.js';

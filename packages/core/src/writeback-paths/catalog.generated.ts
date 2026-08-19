@@ -3,8 +3,9 @@
  *
  * Writeback path templates are emitted verbatim from each adapter's
  * `resources.ts` (`{ name, path }`) — the same source the writeback worker's
- * `classifyWrite` routes drafts against. A consumer resolves a concrete draft
- * path with `writebackPath(provider, resource, params)`.
+ * `classifyWrite` routes drafts against. Resources with `operations: []` are
+ * read-only and intentionally omitted. A consumer resolves a concrete draft path
+ * with `writebackPath(provider, resource, params)`.
  */
 
 export const WRITEBACK_PATH_CATALOG = {
@@ -298,6 +299,16 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "github": {
+    "close-pull-request": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json",
+        "params": [
+          "owner",
+          "repo",
+          "pullNumber"
+        ]
+      }
+    ],
     "issue-comments": [
       {
         "path": "/github/repos/{owner}/{repo}/issues/{issueNumber}/comments",
@@ -324,6 +335,24 @@ export const WRITEBACK_PATH_CATALOG = {
           "owner",
           "repo",
           "pullNumber"
+        ]
+      }
+    ],
+    "pull-requests": [
+      {
+        "path": "/github/repos/{owner}/{repo}/pull-requests",
+        "params": [
+          "owner",
+          "repo"
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "path": "/github/repos/{owner}/{repo}/refs",
+        "params": [
+          "owner",
+          "repo"
         ]
       }
     ],
@@ -833,6 +862,62 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "shortcut": {
+    "categories": [
+      {
+        "path": "/shortcut/categories",
+        "params": []
+      }
+    ],
+    "custom-fields": [
+      {
+        "path": "/shortcut/custom-fields",
+        "params": []
+      }
+    ],
+    "epics": [
+      {
+        "path": "/shortcut/epics",
+        "params": []
+      }
+    ],
+    "groups": [
+      {
+        "path": "/shortcut/groups",
+        "params": []
+      }
+    ],
+    "iterations": [
+      {
+        "path": "/shortcut/iterations",
+        "params": []
+      }
+    ],
+    "labels": [
+      {
+        "path": "/shortcut/labels",
+        "params": []
+      }
+    ],
+    "milestones": [
+      {
+        "path": "/shortcut/milestones",
+        "params": []
+      }
+    ],
+    "projects": [
+      {
+        "path": "/shortcut/projects",
+        "params": []
+      }
+    ],
+    "stories": [
+      {
+        "path": "/shortcut/stories",
+        "params": []
+      }
+    ]
+  },
   "slack": {
     "direct-messages": [
       {
@@ -1002,6 +1087,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "packageName": "@relayfile/adapter-neon",
     "packagePath": "packages/neon",
     "provider": "neon",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-posthog",
+    "packagePath": "packages/posthog",
+    "provider": "posthog",
     "reason": "No resources.ts with writeback path templates"
   },
   {

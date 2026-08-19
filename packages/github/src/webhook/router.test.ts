@@ -84,6 +84,11 @@ class RecordingAdapter extends GitHubAdapter {
     return createResult('/github/repos/acme/widgets/pulls/7/checks/4.json');
   }
 
+  override async ingestCommitStatus(_payload: Record<string, unknown>): Promise<IngestResult> {
+    this.calls.push('ingestCommitStatus');
+    return createResult('/github/repos/acme/widgets/pulls/7/meta.json');
+  }
+
   override async ingestDeploymentStatus(payload: Record<string, unknown>): Promise<IngestResult> {
     this.calls.push(`ingestDeploymentStatus:${String(payload.action ?? '')}`);
     return createResult('/github/repos/acme/widgets/deployments/11/statuses/12.json');
@@ -322,7 +327,7 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
   const router = new WebhookRouter(new RecordingAdapter());
   const events = router.getSupportedEvents();
 
-  assert.equal(events.length, 20);
+  assert.equal(events.length, 21);
   assert.deepEqual(events, [
     'pull_request.opened',
     'pull_request.synchronize',
@@ -343,6 +348,7 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
     'issues.reopened',
     'issues.closed',
     'check_run.completed',
+    'status',
     'deployment_status.created',
   ]);
 });

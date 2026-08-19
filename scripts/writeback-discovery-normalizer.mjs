@@ -34,6 +34,7 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
     slug: adapter.slug,
     title: adapter.title,
     overview: adapter.overview,
+    ...(adapter.mountLabel ? { mountLabel: adapter.mountLabel } : {}),
     readPaths: adapter.readPaths.map(([path, description]) => [path, description]),
     ...(layoutManifest ? { layoutManifest } : {}),
     endpoints,
@@ -97,11 +98,14 @@ export function normalizeWritebackEndpointResource(adapterSlug, endpoint, layout
     name: resourceNameFor(adapterSlug, resourcePath),
     resourcePath,
     schemaPath: `${resourcePath}/.schema.json`,
-    examplePath: `${resourcePath}/.create.example.json`,
+    ...(endpoint.createSupported === false || endpoint.example === undefined
+      ? {}
+      : { examplePath: `${resourcePath}/.create.example.json` }),
     description: endpoint.description,
     pathPatternSource: pathPatternSourceFor(adapterSlug, resourcePath),
     pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapterSlug, resourcePath)),
     ...idPatternFor(adapterSlug, resourcePath),
+    ...(Array.isArray(endpoint.operations) ? { operations: [...endpoint.operations] } : {}),
     ...(layoutMatch
       ? {
           layoutResource: layoutMatch.resource,
@@ -244,6 +248,9 @@ function resourceNameFor(adapterSlug, resourcePath) {
 }
 
 function pathPatternSourceFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'shortcut') {
+    return `^${escapeRegex(resourcePath)}(?:/(?!_index\\.json$)[^/]+(?:\\.json)?)?$`;
+  }
   if (adapterSlug === 'dropbox') {
     if (resourcePath === '/dropbox/files' || resourcePath === '/dropbox/folders') {
       return `^${escapeRegex(resourcePath)}/(?!_index\\.json$)(?!by-(?:id|path)/)[^/]+(?:\\.json)?$`;
@@ -290,6 +297,9 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
 }
 
 function idPatternFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'shortcut') {
+    return pattern('^(?!_index$)(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}|[A-Za-z0-9_.~-]+__(?:[0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32}))$', 'i');
+  }
   if (adapterSlug === 'linear') {
     if (resourcePath.includes('/agent-sessions/') && resourcePath.endsWith('/activities')) {
       return pattern('^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$', 'i');
@@ -380,6 +390,18 @@ function idPatternFor(adapterSlug, resourcePath) {
   }
   if (adapterSlug === 'google-calendar') {
     return pattern('^[a-v0-9]{5,1024}$');
+  }
+  if (adapterSlug === 'gmail') {
+    if (resourcePath.endsWith('/drafts')) {
+      // Gmail draft ids are an `r` followed by digits, optionally hyphenated
+      // (e.g. `r-4692061400304996596`, `r1234567890`). Keeping the canonical
+      // pattern this narrow is what makes every human-chosen filename a create
+      // draft, per the file-native writeback contract — the permissive default
+      // would classify `ask-storebrand.json` as canonical and issue a draft
+      // update for an id that does not exist.
+      return pattern('^r-?\\d+$');
+    }
+    return pattern('^[A-Za-z0-9_.:-]+$');
   }
   return pattern('^[A-Za-z0-9_.:-]+$');
 }

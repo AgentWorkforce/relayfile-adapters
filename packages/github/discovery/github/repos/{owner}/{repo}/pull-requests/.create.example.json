@@ -1,0 +1,6 @@
+{
+  "title": "Implement workspace GitHub writeback",
+  "head": "factory/issue-52",
+  "base": "main",
+  "body": "Created through the authenticated workspace connection."
+}

@@ -3,8 +3,6 @@ import {
   encodeSegment,
   listJsonFiles,
   readJsonFile,
-  writeJsonFile,
-  type IntegrationClientOptions,
   type WritebackResult
 } from '@relayfile/adapter-core/vfs-client';
 import {
@@ -13,6 +11,11 @@ import {
   type WritebackProvider,
   type WritebackResource
 } from '@relayfile/adapter-core/writeback-paths';
+import {
+  createRelayTransportResolver,
+  type RelayClientOptions,
+} from './transport.js';
+import { executeRelayWrite } from './write-authorizer.js';
 
 export type RelayParams = Record<string, string | number>;
 
@@ -53,8 +56,9 @@ function isItemPath(path: string): boolean {
  */
 export function relayClient<P extends WritebackProvider>(
   provider: P,
-  opts: IntegrationClientOptions = {}
+  opts: RelayClientOptions = {}
 ): RelayClient<P> {
+  const resolveTransport = createRelayTransportResolver(opts);
   const knownResources = (): string => Object.keys(WRITEBACK_PATH_CATALOG[provider] ?? {}).join(', ');
   return {
     provider,
@@ -63,8 +67,26 @@ export function relayClient<P extends WritebackProvider>(
     },
     async write(resource, params, body) {
       const base = writebackPath(provider, resource, params);
+      const transport = resolveTransport();
+      const request = {
+        provider,
+        resource: String(resource),
+        parameters: { ...params },
+        path: base,
+        body,
+      };
       const target = isItemPath(base) ? base : `${base}/${draftFile(String(resource))}`;
-      return writeJsonFile(opts, provider, `write.${String(resource)}`, target, body);
+      return executeRelayWrite(
+        transport,
+        request,
+        {
+          options: opts,
+          integration: provider,
+          operation: `write.${String(resource)}`,
+          path: target,
+          data: body,
+        },
+      );
     },
     async read<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T> {
       // `async` so a validation/path error rejects the promise rather than
@@ -76,6 +98,15 @@ export function relayClient<P extends WritebackProvider>(
           `read("${String(resource)}") resolves to collection "${path}"; read a specific item path or use list(). Known resources for ${provider}: ${knownResources()}`
         );
       }
+      const transport = resolveTransport();
+      if (transport) {
+        return transport.read<T>({
+          provider,
+          resource: String(resource),
+          parameters: { ...params },
+          path,
+        });
+      }
       return readJsonFile<T>(opts, provider, `read.${String(resource)}`, path);
     },
     async list<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T[]> {
@@ -85,6 +116,15 @@ export function relayClient<P extends WritebackProvider>(
           `list("${String(resource)}") resolves to item "${path}"; use read() instead. Known resources for ${provider}: ${knownResources()}`
         );
       }
+      const transport = resolveTransport();
+      if (transport) {
+        return transport.list<T>({
+          provider,
+          resource: String(resource),
+          parameters: { ...params },
+          path,
+        });
+      }
       const files = await listJsonFiles<T>(opts, provider, `list.${String(resource)}`, path);
       return files.map((file) => file.value);
     }
@@ -92,4 +132,4 @@ export function relayClient<P extends WritebackProvider>(
 }
 
 /** Re-exported so callers can build item-read paths (`${collection}/${id}.json`). */
-export { encodeSegment, type IntegrationClientOptions, type WritebackResult };
+export { encodeSegment, type RelayClientOptions, type WritebackResult };

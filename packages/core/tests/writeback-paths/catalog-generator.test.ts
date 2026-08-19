@@ -37,6 +37,8 @@ test("linear/github/slack writeback templates match the canonical mount paths", 
   assert.equal(WRITEBACK_PATH_CATALOG.slack.messages[0].path, "/slack/channels/{channelId}/messages");
   assert.equal(WRITEBACK_PATH_CATALOG.telegram.messages[0].path, "/telegram/chats/{chatId}/messages");
   assert.equal(WRITEBACK_PATH_CATALOG.telegram.reactions[0].path, "/telegram/chats/{chatId}/messages/{messageId}/reactions");
+  assert.equal(Object.hasOwn(WRITEBACK_PATH_CATALOG.shortcut, "members"), false);
+  assert.equal(Object.hasOwn(WRITEBACK_PATH_CATALOG.shortcut, "workflows"), false);
 });
 
 test("a resource name with multiple mount paths keeps every distinct template", () => {

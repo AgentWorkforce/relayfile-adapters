@@ -27,6 +27,9 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
     "organizationId",
     "projectId"
   ],
+  "posthog": [
+    "project_id"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"
@@ -244,6 +247,12 @@ export const ADAPTERS_WITHOUT_KNOWN_SCOPE_KEYS = [
     "packageName": "@relayfile/adapter-shopify",
     "packagePath": "packages/shopify",
     "provider": "shopify",
+    "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
+  },
+  {
+    "packageName": "@relayfile/adapter-shortcut",
+    "packagePath": "packages/shortcut",
+    "provider": "shortcut",
     "reason": "No supportedScopeKeys() implementation and no mapping.yaml scopeKeys block"
   },
   {

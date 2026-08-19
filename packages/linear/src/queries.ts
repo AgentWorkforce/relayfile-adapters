@@ -517,6 +517,16 @@ export interface LinearIssueIndexRow extends LinearBaseIndexRow {
   state: string;
 }
 
+export interface LinearTeamIndexRow extends LinearBaseIndexRow {
+  key: string;
+  name: string;
+}
+
+export interface LinearLabelIndexRow extends LinearBaseIndexRow {
+  name: string;
+  teamId: string;
+}
+
 export interface LinearGraphqlResponse<T> {
   data?: T;
   errors?: Array<{ message?: string; path?: string[] }>;
@@ -602,11 +612,13 @@ export function linearUserIndexRow(user: LinearUser): LinearBaseIndexRow {
   };
 }
 
-export function linearTeamIndexRow(team: LinearTeam): LinearBaseIndexRow {
+export function linearTeamIndexRow(team: LinearTeam): LinearTeamIndexRow {
   return {
     id: team.id,
     title: normalizeIndexTitle(team.name) || normalizeIndexTitle(team.key),
     updated: normalizeUpdated(team.updatedAt, team.updated_at, team.createdAt, team.created_at),
+    key: normalizeIndexTitle(team.key),
+    name: normalizeIndexTitle(team.name),
   };
 }
 
@@ -618,11 +630,13 @@ export function linearProjectIndexRow(project: LinearProject): LinearBaseIndexRo
   };
 }
 
-export function linearLabelIndexRow(label: LinearLabel): LinearBaseIndexRow {
+export function linearLabelIndexRow(label: LinearLabel): LinearLabelIndexRow {
   return {
     id: label.id,
     title: normalizeIndexTitle(label.name),
     updated: normalizeUpdated(label.updatedAt, label.updated_at, label.createdAt, label.created_at),
+    name: normalizeIndexTitle(label.name),
+    teamId: normalizeIndexTitle(label.team?.id) || normalizeIndexTitle(label.team_id),
   };
 }
 

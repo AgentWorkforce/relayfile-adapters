@@ -1,14 +1,17 @@
 import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from './config.js';
+import { fetchRepoCommits } from './commits/fetcher.js';
 import type { VfsLike } from './files/content-fetcher.js';
+import { buildGitHubCommitIndexRow, buildRepoCommitsIndexFile } from './index-emitter.js';
 import { ingestIssue } from './issues/issue-mapper.js';
 import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
 import {
+  DEFAULT_REPO_MATERIALIZATION,
   resolveRepoMaterialization,
   type ResolvedRepoMaterialization,
   type ResolvedResourceMaterialization,
 } from './materialization-policy.js';
-import { githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
+import { githubCommitPath, githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
 import { ingestPullRequest } from './pr/diff-writer.js';
 import type {
   GitHubAdapterConfig,
@@ -61,11 +64,6 @@ const JSON_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
 } as const;
-const FULL_REPO_MATERIALIZATION: ResolvedRepoMaterialization = {
-  issues: { mode: 'eager' },
-  pulls: { mode: 'eager' },
-};
-
 export async function syncGitHubWorkspace(
   workspaceId: string,
   provider: GitHubRequestProvider,
@@ -86,7 +84,7 @@ export async function syncGitHubWorkspace(
 
   for (const repo of repos) {
     const plan = resolveRepoMaterialization(config, repo.owner, repo.repo, options);
-    if (plan.issues.mode !== 'eager' && plan.pulls.mode !== 'eager') {
+    if (plan.issues.mode !== 'eager' && plan.pulls.mode !== 'eager' && plan.commits.mode !== 'eager') {
       continue;
     }
 
@@ -100,6 +98,9 @@ export async function syncGitHubWorkspace(
     if (plan.pulls.mode === 'eager') {
       syncedObjectTypes.add('pull_request');
     }
+    if (plan.commits.mode === 'eager') {
+      syncedObjectTypes.add('commit');
+    }
   }
 
   return toSyncResult(tracked, options.cursor, Array.from(syncedObjectTypes));
@@ -112,16 +113,20 @@ export async function materializeRepo(
   owner: string,
   repo: string,
   inFlight: Map<string, Promise<MaterializeResult>> = new Map(),
-  plan: ResolvedRepoMaterialization = FULL_REPO_MATERIALIZATION,
+  plan?: ResolvedRepoMaterialization,
 ): Promise<MaterializeResult> {
   void workspaceId;
-  const key = `${owner}/${repo}:${JSON.stringify(plan)}`.toLowerCase();
+  const effectivePlan = plan ?? {
+    ...DEFAULT_REPO_MATERIALIZATION,
+    commits: resolveRepoMaterialization(config, owner, repo).commits,
+  };
+  const key = `${owner}/${repo}:${JSON.stringify(effectivePlan)}`.toLowerCase();
   const existing = inFlight.get(key);
   if (existing) {
     return existing;
   }
 
-  const task = materializeRepoInternal(provider, config, owner, repo, plan).finally(() => {
+  const task = materializeRepoInternal(provider, config, owner, repo, effectivePlan).finally(() => {
     inFlight.delete(key);
   });
   inFlight.set(key, task);
@@ -182,6 +187,26 @@ async function materializeRepoInternal(
     );
     for (const pull of pulls) {
       mergeIntoTracked(tracked, await ingestPullRequest(provider, owner, repo, pull.number, vfs));
+    }
+  }
+
+  if (plan.commits.mode === 'eager') {
+    const commits = await fetchRepoCommitList(provider, config, owner, repo, plan.commits);
+    const commitIndex = buildRepoCommitsIndexFile(
+      owner,
+      repo,
+      commits.map((commit) => buildGitHubCommitIndexRow(owner, repo, commit)),
+    );
+    mergeIntoTracked(
+      tracked,
+      await writeTextFile(vfs, commitIndex.path, commitIndex.content),
+    );
+    for (const commit of commits) {
+      const commitPath = githubCommitPath(owner, repo, commit.sha);
+      mergeIntoTracked(
+        tracked,
+        await writeJsonFile(vfs, commitPath, commit.record),
+      );
     }
   }
 
@@ -310,6 +335,52 @@ async function fetchRepoPullRequests(
 
     page += 1;
   }
+}
+
+interface RepoCommitListItem {
+  sha: string;
+  message: string;
+  authorLogin: string;
+  committedAt: string;
+  record: JsonObject;
+}
+
+async function fetchRepoCommitList(
+  provider: GitHubRequestProvider,
+  config: GitHubAdapterConfig,
+  owner: string,
+  repo: string,
+  materialization: ResolvedResourceMaterialization,
+): Promise<RepoCommitListItem[]> {
+  const commits = await fetchRepoCommits(provider, owner, repo, {
+    baseUrl: config.baseUrl || GITHUB_API_BASE_URL,
+    connectionId: await resolveConnectionId(provider, config.connectionId),
+    providerConfigKey: config.providerConfigKey,
+    maxCommits: config.maxCommits,
+    since: materialization.since,
+  });
+
+  return commits
+    .map(toRepoCommitListItem)
+    .filter((commit) => commit.sha.length > 0);
+}
+
+function toRepoCommitListItem(value: JsonObject): RepoCommitListItem {
+  const sha = (readString(value, 'sha') ?? '').trim();
+  const commitData = readObject(value, 'commit');
+  const message = readString(commitData, 'message') ?? '';
+  const authorData = readObject(value, 'author');
+  const commitAuthorData = readObject(commitData, 'author');
+  const authorLogin = readString(authorData, 'login') ?? '';
+  const committedAt = readString(commitData ? readObject(commitData, 'committer') : undefined, 'date') ?? readString(commitAuthorData, 'date') ?? '';
+
+  return {
+    sha,
+    message: message.split('\n')[0] ?? message, // first line only for index
+    authorLogin,
+    committedAt,
+    record: value,
+  };
 }
 
 async function proxyOperation(

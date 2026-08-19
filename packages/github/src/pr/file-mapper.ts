@@ -38,11 +38,12 @@ export async function mapPRFiles(
   repo: string,
   number: number,
   title?: string,
+  explicitConnectionId?: string,
 ): Promise<PullRequestFileMapping[]> {
   const trimmedOwner = requireNonEmpty(owner, 'owner');
   const trimmedRepo = requireNonEmpty(repo, 'repo');
   const prNumber = requirePositiveInteger(number, 'number');
-  const connectionId = await resolveConnectionId(provider);
+  const connectionId = await resolveConnectionId(provider, explicitConnectionId);
 
   const files: PullRequestFileMapping[] = [];
   let page = 1;
@@ -112,7 +113,13 @@ function buildHeaders(): Record<string, string> {
   };
 }
 
-async function resolveConnectionId(provider: GitHubRequestProvider): Promise<string> {
+async function resolveConnectionId(
+  provider: GitHubRequestProvider,
+  explicitConnectionId?: string,
+): Promise<string> {
+  if (explicitConnectionId?.trim()) {
+    return explicitConnectionId.trim();
+  }
   const connectionAwareProvider = provider as ConnectionAwareProvider;
   const candidateConnectionId =
     connectionAwareProvider.connectionId?.trim() ??

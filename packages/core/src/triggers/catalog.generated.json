@@ -139,7 +139,8 @@
     "pull_request_review.submitted",
     "pull_request_review_comment.created",
     "pull_request_review_thread.resolved",
-    "push"
+    "push",
+    "status"
   ],
   "gitlab": [
     "build.canceled",
@@ -207,7 +208,9 @@
   ],
   "granola": [
     "file.created",
-    "recording.created"
+    "note.access_granted",
+    "note.edited",
+    "note.generated"
   ],
   "hubspot": [
     "company.associationChange",
@@ -379,6 +382,10 @@
     "file.deleted",
     "file.updated"
   ],
+  "posthog": [
+    "posthog.alert.resolved",
+    "posthog.alert.triggered"
+  ],
   "recall": [
     "file.created",
     "recording.created",
@@ -481,6 +488,14 @@
     "product.fulfill",
     "product.paid",
     "product.update"
+  ],
+  "shortcut": [
+    "epic.create",
+    "epic.delete",
+    "epic.update",
+    "story.create",
+    "story.delete",
+    "story.update"
   ],
   "slack": [
     "channel.archived",

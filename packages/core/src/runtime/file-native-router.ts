@@ -15,7 +15,7 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
   readonly operations?: readonly AdapterResourceOperation[];
 }
 
@@ -110,6 +110,8 @@ export interface JsonSchema {
   readonly readOnly?: boolean;
   readonly enum?: readonly unknown[];
   readonly items?: JsonSchema;
+  readonly oneOf?: readonly JsonSchema[];
+  readonly anyOf?: readonly JsonSchema[];
 }
 
 export type WritebackValidationReason =
@@ -117,7 +119,9 @@ export type WritebackValidationReason =
   | "additionalProperties"
   | "readOnly"
   | "type"
-  | "enum";
+  | "enum"
+  | "anyOf"
+  | "oneOf";
 
 export class ReadOnlyFieldError extends Error {
   readonly field: string;
@@ -160,7 +164,7 @@ export function classifyWrite(
 
     const canonical = testResourceId(resource.idPattern, id);
     if (event === "delete") {
-      if (!canonical) {
+      if (!canonical || (resource.operations && !resource.operations.includes("delete"))) {
         continue;
       }
       return {
@@ -175,8 +179,14 @@ export function classifyWrite(
       continue;
     }
 
+    const kind = canonical ? "patch" : "create";
+    const operation = kind === "patch" ? "update" : "create";
+    if (resource.operations && !resource.operations.includes(operation)) {
+      continue;
+    }
+
     return {
-      kind: canonical ? "patch" : "create",
+      kind,
       resource,
       id,
       canonical,
@@ -211,6 +221,34 @@ export function validatePayload(
             reason: "required",
             message: `Missing required field "${field}"`,
           })
+        );
+      }
+    }
+
+    if (schema.oneOf) {
+      const matchingBranches = schema.oneOf.filter((branch) =>
+        (branch.required ?? []).every((field) => payload[field] !== undefined),
+      ).length;
+      if (matchingBranches !== 1) {
+        errors.push(
+          new WritebackValidationError({
+            reason: "oneOf",
+            message: "Payload must satisfy exactly one allowed schema shape",
+          }),
+        );
+      }
+    }
+
+    if (schema.anyOf) {
+      const matchesAnyBranch = schema.anyOf.some((branch) =>
+        (branch.required ?? []).every((field) => payload[field] !== undefined),
+      );
+      if (!matchesAnyBranch) {
+        errors.push(
+          new WritebackValidationError({
+            reason: "anyOf",
+            message: "Payload must satisfy at least one allowed schema shape",
+          }),
         );
       }
     }
@@ -761,6 +799,10 @@ function defaultValidationMessage(
       return `${label} is required`;
     case "type":
       return `${label} does not match the schema type`;
+    case "anyOf":
+      return `${label} must satisfy at least one allowed schema shape`;
+    case "oneOf":
+      return `${label} must satisfy exactly one allowed schema shape`;
   }
 }
 

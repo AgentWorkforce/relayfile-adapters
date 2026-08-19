@@ -40,7 +40,11 @@ test('gmail integration maps raw provider payload through the storage bridge', a
   assert.equal(event.sizeBytes, null);
   assert.equal(event.fingerprint, 'hist-20');
   assert.equal((deliveries[0] as { delivery_id: string }).delivery_id, 'gmail:me@example.com:hist-20:thread-1');
-  assert.equal(adapter.resolveWriteback('/gmail/me@example.com/drafts/draft-subject.json', JSON.stringify({"message":{"raw":"RnJvbTogbWVAZXhhbXBsZS5jb20K"}})).operation, 'create');
+  const draftWriteback = adapter.resolveWriteback('/gmail/me@example.com/drafts/draft-subject.json', JSON.stringify({"message":{"raw":"RnJvbTogbWVAZXhhbXBsZS5jb20K"}}));
+  assert.equal(draftWriteback.operation, 'create');
+  assert.equal(draftWriteback.action, 'gmail.drafts.create');
+  assert.equal(draftWriteback.method, 'POST');
+  assert.equal(draftWriteback.endpoint, '/gmail/v1/users/{account}/drafts');
   const nango = adapter.mapNangoSyncRecord({ id: 'thread-1', model: 'Thread', name: 'example', updatedAt: '2026-05-09T00:00:00.000Z' });
   assert.equal(nango.source, 'gmail');
 });

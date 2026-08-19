@@ -23,6 +23,12 @@ export function normalizeSubreddit(value: string): string {
   return trimmed;
 }
 
+// Keeps `<slug>__<postId>.json` comfortably under the 255-byte NAME_MAX most
+// filesystems enforce -- long Reddit titles (and the mount sync's own
+// `.tmp-<random>` suffix on top) can otherwise blow past that limit and fail
+// every sync cycle for the post.
+const SLUG_MAX_LENGTH = 80;
+
 function slugify(value: string): string {
   const ascii = value
     .normalize('NFKD')
@@ -31,7 +37,9 @@ function slugify(value: string): string {
   const slug = ascii
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|-+$/g, '')
+    .slice(0, SLUG_MAX_LENGTH)
+    .replace(/-+$/g, '');
   return slug || 'post';
 }
 

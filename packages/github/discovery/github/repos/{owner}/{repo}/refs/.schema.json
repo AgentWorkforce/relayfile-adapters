@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Push GitHub ref",
+  "type": "object",
+  "required": ["ref", "sha"],
+  "properties": {
+    "ref": { "type": "string", "description": "Full ref or branch name." },
+    "sha": { "type": "string", "description": "Git object SHA already present in the repository." },
+    "force": { "type": "boolean", "description": "Allow a non-fast-forward update." }
+  },
+  "additionalProperties": false
+}

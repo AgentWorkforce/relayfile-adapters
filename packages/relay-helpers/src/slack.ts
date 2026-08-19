@@ -1,5 +1,5 @@
-import type { IntegrationClientOptions } from '@relayfile/adapter-core/vfs-client';
 import { providerClient, type ProviderClient } from './provider-client.js';
+import type { RelayClientOptions } from './transport.js';
 import { withProcessWritebackIdempotency } from './writeback-idempotency.js';
 
 export { createWritebackIdempotency } from './writeback-idempotency.js';
@@ -64,7 +64,7 @@ export interface SlackClient extends ProviderClient<'slack'> {
  * Ergonomic Slack client over the writeback-path catalog, plus the uniform
  * resource-keyed access (`.messages`, `.["direct-messages"]`, `.replies`, `.reactions`).
  */
-export function slackClient(opts: IntegrationClientOptions = {}): SlackClient {
+export function slackClient(opts: RelayClientOptions = {}): SlackClient {
   const base = providerClient('slack', opts);
   return Object.assign(base, {
     async post(channel: string, text: string, opts: { replyTo?: string } = {}) {
@@ -83,7 +83,12 @@ export function slackClient(opts: IntegrationClientOptions = {}): SlackClient {
       return { user, ts: slackReceiptTs(result.receipt) };
     },
     async reply(channel: string, threadTs: string, text: string) {
-      const result = await base.replies.write({ channelId: channel, messageTs: tsParam(threadTs) }, withIdempotency({ text }));
+      const result = await base.replies.write(
+        { channelId: channel, messageTs: tsParam(threadTs) },
+        // Mirror the path parameter so preview records expose the resolved thread explicitly.
+        // The live Slack resolver treats the identical body value as an idempotent override.
+        withIdempotency({ text, thread_ts: threadTs })
+      );
       return { channel, ts: slackReceiptTs(result.receipt) };
     },
     async react(channel: string, messageTs: string, emoji: string) {

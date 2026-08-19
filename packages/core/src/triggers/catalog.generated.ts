@@ -147,7 +147,8 @@ export const KNOWN_TRIGGER_CATALOG = {
     "pull_request_review.submitted",
     "pull_request_review_comment.created",
     "pull_request_review_thread.resolved",
-    "push"
+    "push",
+    "status"
   ],
   "gitlab": [
     "build.canceled",
@@ -215,7 +216,9 @@ export const KNOWN_TRIGGER_CATALOG = {
   ],
   "granola": [
     "file.created",
-    "recording.created"
+    "note.access_granted",
+    "note.edited",
+    "note.generated"
   ],
   "hubspot": [
     "company.associationChange",
@@ -387,6 +390,10 @@ export const KNOWN_TRIGGER_CATALOG = {
     "file.deleted",
     "file.updated"
   ],
+  "posthog": [
+    "posthog.alert.resolved",
+    "posthog.alert.triggered"
+  ],
   "recall": [
     "file.created",
     "recording.created",
@@ -489,6 +496,14 @@ export const KNOWN_TRIGGER_CATALOG = {
     "product.fulfill",
     "product.paid",
     "product.update"
+  ],
+  "shortcut": [
+    "epic.create",
+    "epic.delete",
+    "epic.update",
+    "story.create",
+    "story.delete",
+    "story.update"
   ],
   "slack": [
     "channel.archived",

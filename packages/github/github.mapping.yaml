@@ -44,6 +44,8 @@ webhooks:
       - deployment_status.environment
   push:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
+  status:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/gate-status/{{sha}}.json
   issues:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
   pull_request.edited:
@@ -93,6 +95,18 @@ resources:
     path: /github/repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/files/{{filename}}
     iterate: true
 writebacks:
+  create_pull_request:
+    match: /github/repos/*/*/pull-requests/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls
+  update_ref:
+    match: /github/repos/*/*/refs/refs%2F*%2F*.json
+    endpoint: PATCH /repos/{owner}/{repo}/git/refs/{namespace}/{ref}
+  create_ref:
+    match: /github/repos/*/*/refs/*.json
+    endpoint: POST /repos/{owner}/{repo}/git/refs
+  close_pull_request:
+    match: /github/repos/*/*/pulls/*/close.json
+    endpoint: PATCH /repos/{owner}/{repo}/pulls/{pull_number}
   review:
     match: /github/repos/*/*/pulls/*/reviews/*.json
     endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews

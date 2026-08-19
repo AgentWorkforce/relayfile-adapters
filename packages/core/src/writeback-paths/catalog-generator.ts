@@ -61,6 +61,7 @@ interface AdapterPackage {
 interface AdapterResource {
   name: string;
   path: string;
+  operations?: readonly string[];
 }
 
 const GENERATED_HEADER = `/**
@@ -68,8 +69,9 @@ const GENERATED_HEADER = `/**
  *
  * Writeback path templates are emitted verbatim from each adapter's
  * \`resources.ts\` (\`{ name, path }\`) — the same source the writeback worker's
- * \`classifyWrite\` routes drafts against. A consumer resolves a concrete draft
- * path with \`writebackPath(provider, resource, params)\`.
+ * \`classifyWrite\` routes drafts against. Resources with \`operations: []\` are
+ * read-only and intentionally omitted. A consumer resolves a concrete draft path
+ * with \`writebackPath(provider, resource, params)\`.
  */
 `;
 
@@ -238,8 +240,14 @@ function normalizeResources(value: unknown): AdapterResource[] {
   const out: AdapterResource[] = [];
   for (const entry of value) {
     if (!isRecord(entry)) continue;
-    const { name, path } = entry;
-    if (typeof name === "string" && name.length > 0 && typeof path === "string" && path.length > 0) {
+    const { name, path, operations } = entry;
+    if (
+      typeof name === "string" &&
+      name.length > 0 &&
+      typeof path === "string" &&
+      path.length > 0 &&
+      !(Array.isArray(operations) && operations.length === 0)
+    ) {
       out.push({ name, path });
     }
   }
@@ -255,10 +263,11 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
   }
   // Match `name: "x"` immediately followed by `path: "/y"` within each
   // resource literal. `name` always precedes `path` in the generated file.
-  const pattern = /name:\s*["']([^"']+)["']\s*,\s*path:\s*["']([^"']+)["']/gu;
+  const pattern = /\{\s*name:\s*["']([^"']+)["']\s*,\s*path:\s*["']([^"']+)["'](?<tail>[\s\S]*?)\n\s*\},/gu;
   const out: AdapterResource[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(contents)) !== null) {
+    if (/operations:\s*\[\s*\]/u.test(match.groups?.tail ?? "")) continue;
     out.push({ name: match[1], path: match[2] });
   }
   return out;
