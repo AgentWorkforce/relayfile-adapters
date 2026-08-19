@@ -15,13 +15,13 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   // so consumers that inspect only the manifest root can discover all
   // lookup keys. `by-name` belongs here because `linear/teams`,
   // `linear/labels`, and `linear/projects` expose it.
-  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-name', 'by-priority', 'by-title', 'by-state', 'by-team', 'by-uuid'],
+  aliasSegments: ['by-assignee', 'by-creator', 'by-edited', 'by-id', 'by-name', 'by-priority', 'by-project', 'by-title', 'by-state', 'by-team', 'by-uuid'],
   resources: [
     {
       path: 'linear/issues',
       title: 'Issues',
       materialization: 'eager',
-      aliasSegments: ['by-uuid', 'by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority', 'by-edited'],
+      aliasSegments: ['by-uuid', 'by-id', 'by-title', 'by-state', 'by-project', 'by-assignee', 'by-creator', 'by-priority', 'by-edited'],
       writebackResources: [
         { path: 'linear/issues', schemaId: 'linear/issue' },
         { path: 'linear/issues/comments', schemaId: 'linear/comment' },

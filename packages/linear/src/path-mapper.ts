@@ -234,6 +234,10 @@ export function linearIssueByStatePath(stateName: string, identifier: string): s
   return `${LINEAR_PATH_ROOT}/issues/by-state/${slugifyStateName(stateName)}/${encodeLinearPathSegment(identifier)}.json`;
 }
 
+export function linearIssueByProjectPath(projectId: string, identifier: string): string {
+  return `${LINEAR_PATH_ROOT}/issues/by-project/${encodeLinearPathSegment(projectId)}/${encodeLinearPathSegment(identifier)}.json`;
+}
+
 export function linearIssueByAssigneePath(assigneeId: string, identifier: string): string {
   return `${LINEAR_PATH_ROOT}/issues/by-assignee/${encodeLinearPathSegment(assigneeId)}/${encodeLinearPathSegment(identifier)}.json`;
 }

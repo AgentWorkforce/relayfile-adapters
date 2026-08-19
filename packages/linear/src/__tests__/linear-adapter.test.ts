@@ -519,6 +519,7 @@ test('ingestWebhook writes identifier-aware issue and comment filenames at runti
       '/linear/issues/AGE-8__issue_123.json',
       '/linear/issues/_index.json',
       '/linear/issues/by-id/AGE-8.json',
+      '/linear/issues/by-uuid/issue_123.json',
       '/linear/issues/by-title/ship-mixed-case-path-handling-before-friday.json',
       '/linear/LAYOUT.md',
       '/linear/comments/AGE-8__comment_123/meta.json',

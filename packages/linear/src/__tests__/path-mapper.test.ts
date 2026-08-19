@@ -13,6 +13,7 @@ import {
   linearCommentPath,
   linearCommentReadCandidatePaths,
   linearIssueByEditedPath,
+  linearIssueByProjectPath,
   linearLabelByTeamPath,
   linearLabelPath,
   linearLabelsIndexPath,
@@ -124,6 +125,25 @@ describe('linear path-mapper', () => {
       assert.equal(
         linearIssueByEditedPath('2026-05-12', 'issue-123'),
         '/linear/issues/by-edited/2026-05-12/issue-123.json',
+      );
+      const projectAliasPath = linearIssueByProjectPath('project/123', 'AGE/8');
+      assert.equal(
+        projectAliasPath,
+        '/linear/issues/by-project/project%2F123/AGE%2F8.json',
+      );
+      const projectAliasMatch = projectAliasPath.match(
+        /^\/linear\/issues\/by-project\/([^/]+)\/([^/]+)\.json$/u,
+      );
+      assert.ok(projectAliasMatch);
+      assert.equal(decodeURIComponent(projectAliasMatch[1]!), 'project/123');
+      assert.equal(decodeURIComponent(projectAliasMatch[2]!), 'AGE/8');
+      assert.notEqual(
+        linearIssueByProjectPath('project/123', 'AGE/8'),
+        linearIssueByProjectPath('project/456', 'AGE/8'),
+      );
+      assert.notEqual(
+        linearIssueByProjectPath('project/123', 'AGE/8'),
+        linearIssueByProjectPath('project/123', 'AGE/9'),
       );
       assert.equal(
         computeLinearPath('LinearProject', 'project-123'),

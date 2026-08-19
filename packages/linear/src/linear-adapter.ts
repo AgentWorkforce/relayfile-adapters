@@ -15,7 +15,9 @@ import {
   linearByIdAliasPath,
   linearByNameAliasPath,
   linearByTitleAliasPath,
+  linearByUuidAliasPath,
   linearCyclePath,
+  linearIssueByProjectPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearLabelByTeamPath,
@@ -324,6 +326,42 @@ export class LinearAdapter extends IntegrationAdapter {
           result.filesDeleted += previousCounts.filesDeleted;
         }
         result.paths.push(previousAliasPath);
+      }
+
+      const previousProjectAliasPath = resolvePreviousIssueProjectAliasPath(eventForWrite.payload);
+      const projectAliasPath = resolveIssueProjectAliasPath(eventForWrite.payload);
+      if (previousProjectAliasPath && previousProjectAliasPath !== projectAliasPath) {
+        if (this.client.deleteFile) {
+          await this.client.deleteFile({ workspaceId, path: previousProjectAliasPath });
+          result.filesDeleted += 1;
+        } else {
+          const previousDeleteResult = await this.client.writeFile({
+            workspaceId,
+            path: previousProjectAliasPath,
+            content: this.renderContent(workspaceId, eventForWrite, true),
+            contentType: JSON_CONTENT_TYPE,
+            semantics,
+          });
+          const previousCounts = inferWriteCounts(eventForWrite, previousDeleteResult, true);
+          result.filesWritten += previousCounts.filesWritten;
+          result.filesUpdated += previousCounts.filesUpdated;
+          result.filesDeleted += previousCounts.filesDeleted;
+        }
+        result.paths.push(previousProjectAliasPath);
+      }
+
+      if (projectAliasPath) {
+        const projectAliasWriteResult = await this.client.writeFile({
+          workspaceId,
+          path: projectAliasPath,
+          content,
+          contentType: JSON_CONTENT_TYPE,
+          semantics,
+        });
+        const projectAliasCounts = inferWriteCounts(eventForWrite, projectAliasWriteResult, false);
+        result.filesWritten += projectAliasCounts.filesWritten;
+        result.filesUpdated += projectAliasCounts.filesUpdated;
+        result.paths.push(projectAliasPath);
       }
 
       if (!aliasPath) {
@@ -1394,6 +1432,55 @@ function resolvePreviousIssueStateAliasPath(payload: Record<string, unknown>): s
   return linearIssueByStatePath(stateName, identifier);
 }
 
+function resolveIssueProjectAliasPath(payload: Record<string, unknown>): string | undefined {
+  const projectId = readIssueProjectId(payload);
+  const identifier = asString(payload.identifier);
+  if (!projectId || !identifier) {
+    return undefined;
+  }
+  return linearIssueByProjectPath(projectId, identifier);
+}
+
+function resolvePreviousIssueProjectAliasPath(payload: Record<string, unknown>): string | undefined {
+  const previousData = getRecord(getRecord(payload._webhook)?.previousData);
+  if (!previousData) {
+    return undefined;
+  }
+
+  // Linear's `previousData` carries only the fields that actually changed. An
+  // issue that transfers teams keeps its project but gets a new identifier, so
+  // `previousData` holds the old identifier and omits the project entirely.
+  // Reading the project from `previousData` alone would yield `undefined` and
+  // orphan `/by-project/<project>/<old-identifier>.json`. When the project key
+  // is absent the project did not change, so fall back to the current payload,
+  // mirroring the identifier fallback below.
+  //
+  // The key-presence check matters: a project key that is present but empty
+  // means the issue had NO project before, so no prior alias was ever written
+  // and synthesizing one here would delete a path that never existed.
+  const projectId = hasProjectKey(previousData)
+    ? readIssueProjectId(previousData)
+    : readIssueProjectId(payload);
+  const identifier = asString(previousData.identifier) ?? asString(payload.identifier);
+  if (!projectId || !identifier) {
+    return undefined;
+  }
+  return linearIssueByProjectPath(projectId, identifier);
+}
+
+function hasProjectKey(payload: Record<string, unknown>): boolean {
+  return 'project' in payload || 'projectId' in payload || 'project_id' in payload;
+}
+
+function readIssueProjectId(payload: Record<string, unknown>): string | undefined {
+  const project = getRecord(payload.project);
+  return (
+    asString(project?.id) ??
+    asString(payload.projectId) ??
+    asString(payload.project_id)
+  );
+}
+
 function inferIssueStateAliasErrorPath(event: NormalizedWebhook): string {
   const identifier = asString(event.payload.identifier);
   if (identifier) {
@@ -1511,6 +1598,15 @@ async function writeLinearAliases(
   const previousContent = await readLinearFile(client, byIdAliasPath, workspaceId);
   await writeLinearIndex(client, workspaceId, scope, { objectType: normalizedType });
   await writeLinearFile(client, workspaceId, byIdAliasPath, content, semantics);
+  if (normalizedType === 'issue') {
+    await writeLinearFile(
+      client,
+      workspaceId,
+      linearByUuidAliasPath(scope, event.objectId),
+      content,
+      semantics,
+    );
+  }
 
   let writtenAliasPath: string | undefined;
   if (title) {
@@ -1657,10 +1753,31 @@ async function resolveRemoveAliasPaths(
 ): Promise<string[]> {
   const normalizedType = normalizeLinearObjectType(event.objectType);
   if (normalizedType === 'issue') {
-    return uniqueStrings([
+    const paths = [
       resolveIssueStateAliasPath(event.payload),
       resolvePreviousIssueStateAliasPath(event.payload),
-    ]);
+      resolveIssueProjectAliasPath(event.payload),
+      resolvePreviousIssueProjectAliasPath(event.payload),
+    ];
+    const priorContent = await readLinearFile(
+      client,
+      linearByUuidAliasPath(`${LINEAR_PATH_ROOT}/issues`, event.objectId),
+      workspaceId,
+    );
+    if (priorContent) {
+      const identifier =
+        asString(event.payload.identifier)
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'identifier');
+      const projectId =
+        readIssueProjectId(event.payload)
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'project', 'id')
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'projectId')
+        ?? readAliasKeyFromContent(priorContent, 'payload', 'project_id');
+      if (identifier && projectId) {
+        paths.push(linearIssueByProjectPath(projectId, identifier));
+      }
+    }
+    return uniqueStrings(paths);
   }
   if (normalizedType !== 'label') {
     return [];

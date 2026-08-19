@@ -24,6 +24,7 @@ import {
   linearIssueByCreatorPath,
   linearIssueByEditedPath,
   linearIssueByPriorityPath,
+  linearIssueByProjectPath,
   linearIssueByStatePath,
   linearIssuePath,
   linearIssuesIndexPath,
@@ -399,6 +400,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       identifier: 'AGE-8',
       title: 'Release Plan',
       state: { id: 'state-1', name: 'In Progress' },
+      project: { id: 'project-1', name: 'Factory' },
       assignee: { id: 'user-assignee', name: 'Alice' },
       creator: { id: 'user-creator', name: 'Casey' },
       priority: 2,
@@ -415,8 +417,8 @@ describe('emitLinearAuxiliaryFiles', () => {
       issues: [issue],
     });
 
-    // Issue emits 9 files (canonical + by-uuid + by-id + by-title + category aliases + by-edited) + 1 issues index + 1 root index.
-    assert.equal(result.written, 11);
+    // Issue emits 10 files (canonical + by-uuid + by-id + by-title + category aliases + by-edited) + 1 issues index + 1 root index.
+    assert.equal(result.written, 12);
     assert.deepEqual(result.errors, []);
 
     const expectedPaths = [
@@ -425,6 +427,7 @@ describe('emitLinearAuxiliaryFiles', () => {
       linearByIdAliasPath(ISSUES_SCOPE, 'AGE-8'),
       linearByTitleAliasPath(ISSUES_SCOPE, 'Release Plan', 'issue-123'),
       linearIssueByStatePath('In Progress', 'AGE-8'),
+      linearIssueByProjectPath('project-1', 'AGE-8'),
       linearIssueByAssigneePath('user-assignee', 'AGE-8'),
       linearIssueByCreatorPath('user-creator', 'AGE-8'),
       linearIssueByPriorityPath(2, 'AGE-8'),
