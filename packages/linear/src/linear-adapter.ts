@@ -1447,12 +1447,29 @@ function resolvePreviousIssueProjectAliasPath(payload: Record<string, unknown>):
     return undefined;
   }
 
-  const projectId = readIssueProjectId(previousData);
+  // Linear's `previousData` carries only the fields that actually changed. An
+  // issue that transfers teams keeps its project but gets a new identifier, so
+  // `previousData` holds the old identifier and omits the project entirely.
+  // Reading the project from `previousData` alone would yield `undefined` and
+  // orphan `/by-project/<project>/<old-identifier>.json`. When the project key
+  // is absent the project did not change, so fall back to the current payload,
+  // mirroring the identifier fallback below.
+  //
+  // The key-presence check matters: a project key that is present but empty
+  // means the issue had NO project before, so no prior alias was ever written
+  // and synthesizing one here would delete a path that never existed.
+  const projectId = hasProjectKey(previousData)
+    ? readIssueProjectId(previousData)
+    : readIssueProjectId(payload);
   const identifier = asString(previousData.identifier) ?? asString(payload.identifier);
   if (!projectId || !identifier) {
     return undefined;
   }
   return linearIssueByProjectPath(projectId, identifier);
+}
+
+function hasProjectKey(payload: Record<string, unknown>): boolean {
+  return 'project' in payload || 'projectId' in payload || 'project_id' in payload;
 }
 
 function readIssueProjectId(payload: Record<string, unknown>): string | undefined {

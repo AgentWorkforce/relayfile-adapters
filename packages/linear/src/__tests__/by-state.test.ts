@@ -188,6 +188,76 @@ test('Linear issue ingest writes and reconciles by-project aliases', async () =>
   assert.ok(result.paths.includes(secondPath));
 });
 
+test('Linear issue identifier transfer reconciles the by-project alias when the project is unchanged', async () => {
+  const client = new RecordingClient();
+  const adapter = createAdapter(client);
+  const oldPath = linearIssueByProjectPath('project-alpha', 'ENG-123');
+  const newPath = linearIssueByProjectPath('project-alpha', 'PROD-45');
+
+  await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.create',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({ project: { id: 'project-alpha', name: 'Alpha' } }),
+  });
+  assert.ok(client.files.has(oldPath));
+
+  // An issue transferred between teams keeps its project but gets a new
+  // identifier, so Linear's `previousData` carries the old identifier and
+  // omits the unchanged project entirely.
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.update',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({
+      identifier: 'PROD-45',
+      project: { id: 'project-alpha', name: 'Alpha' },
+      _webhook: {
+        action: 'update',
+        previousData: { identifier: 'ENG-123' },
+      },
+    }),
+  });
+
+  assert.strictEqual(client.files.has(oldPath), false);
+  assert.ok(client.deletes.includes(oldPath));
+  assert.ok(client.files.has(newPath));
+  assert.ok(result.paths.includes(oldPath));
+  assert.ok(result.paths.includes(newPath));
+});
+
+test('Linear issue gaining a project does not delete a by-project alias that never existed', async () => {
+  const client = new RecordingClient();
+  const adapter = createAdapter(client);
+
+  // `previousData` carries `project: null` — the issue genuinely had no
+  // project before, so there is no prior alias to reconcile. The current
+  // project must not be used to synthesize a phantom prior path.
+  const result = await adapter.ingestWebhook('workspace-1', {
+    provider: 'linear',
+    eventType: 'issue.update',
+    objectType: 'issue',
+    objectId: 'issue_123',
+    payload: createIssuePayload({
+      identifier: 'PROD-45',
+      project: { id: 'project-alpha', name: 'Alpha' },
+      _webhook: {
+        action: 'update',
+        previousData: { identifier: 'ENG-123', project: null },
+      },
+    }),
+  });
+
+  assert.deepStrictEqual(
+    client.deletes.filter((path) => path.startsWith('/linear/issues/by-project/')),
+    [],
+  );
+  assert.ok(client.files.has(linearIssueByProjectPath('project-alpha', 'PROD-45')));
+  assert.ok(result.paths.includes(linearIssueByProjectPath('project-alpha', 'PROD-45')));
+});
+
 test('Linear issue remove recovers a by-project alias from the stable UUID anchor', async () => {
   const client = new ReadableRecordingClient();
   const adapter = createAdapter(client);
