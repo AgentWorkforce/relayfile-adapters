@@ -14,6 +14,8 @@ import {
   type GitHubCommitIndexRow,
   type GitHubRecordIndexRow,
   type GitHubRepoIndexRow,
+  normalizeRecordIndexRows,
+  normalizeRepoIndexRows,
   parseIndexRows,
 } from './index-emitter.js';
 import { githubReposIndexPath } from './path-mapper.js';
@@ -53,7 +55,7 @@ export async function atomicUpsertRecordIndex(
   return runAtomicIndexWrite(
     vfs,
     path,
-    (content) => parseIndexRows<GitHubRecordIndexRow>(content),
+    (content) => normalizeRecordIndexRows(parseIndexRows<unknown>(content, { path })),
     merge,
     serialize,
     options,
@@ -71,7 +73,7 @@ export async function atomicUpsertCommitIndex(
   return runAtomicIndexWrite(
     vfs,
     path,
-    (content) => parseIndexRows<GitHubCommitIndexRow>(content),
+    (content) => parseIndexRows<GitHubCommitIndexRow>(content, { path }),
     merge,
     serialize,
     options,
@@ -90,7 +92,7 @@ export async function atomicUpsertRepoIndex(
   return runAtomicIndexWrite(
     vfs,
     path,
-    (content) => parseIndexRows<GitHubRepoIndexRow>(content),
+    (content) => normalizeRepoIndexRows(parseIndexRows<unknown>(content, { path })),
     merge,
     (rows) => buildRepoIndexFile(rows).content,
     options,

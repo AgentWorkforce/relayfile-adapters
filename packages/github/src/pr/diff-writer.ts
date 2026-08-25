@@ -194,6 +194,9 @@ export async function ingestPullRequest(
           updated,
           number: parsedPullRequest.number,
           state: parsedPullRequest.state || '',
+          // Branch name inline so a consumer can answer "which PR implements
+          // this issue?" from the index alone (issue #271).
+          ...(parsedPullRequest.head?.ref ? { headRef: parsedPullRequest.head.ref } : {}),
           ...pullRequestMergeIndexFields(parsedPullRequest.mergedAt),
         }),
       (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,

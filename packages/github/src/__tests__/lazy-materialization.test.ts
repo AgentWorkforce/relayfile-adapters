@@ -568,9 +568,12 @@ describe('GitHub lazy materialization', () => {
 
     await adapter.sync('workspace-1');
 
+    // The documented shape is a bare top-level array, not `{ repos: [...] }`
+    // (issue #271) — the eager writer and the incremental index emitter used to
+    // fight over this file with two different shapes.
     assert.deepStrictEqual(
       JSON.parse(await provider.readFile('/github/repos/_index.json')),
-      { repos: [] },
+      [],
     );
   });
 
@@ -581,27 +584,84 @@ describe('GitHub lazy materialization', () => {
     await adapter.sync('workspace-1');
     await adapter.materializeRepo('workspace-1', 'octocat', 'repo-a');
 
-    // PR 1's index emitter overwrites the lazy `{repos: [...]}` payload with
-    // a flat array of `{ id, title, updated }` rows after materialize completes.
-    // This is a known shape conflict tracked alongside the wider alias/index
-    // unification work; here we just verify some entry for repo-a survived
-    // the reconciliation and that the canonical metadata file was written.
-    const raw = await provider.readFile('/github/repos/_index.json');
-    const parsed = JSON.parse(raw) as unknown;
-    const rows = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as { repos?: unknown }).repos)
-        ? ((parsed as { repos: unknown[] }).repos)
-        : [];
+    // The eager writer and the incremental index emitter now agree on the
+    // documented top-level array, so the root index no longer flips shape
+    // mid-sync (issue #271).
+    const parsed = JSON.parse(await provider.readFile('/github/repos/_index.json')) as unknown;
+    assert.ok(Array.isArray(parsed), 'the root index must be a top-level array');
     assert.ok(
-      rows.some((entry) => {
-        if (!entry || typeof entry !== 'object') return false;
-        const record = entry as Record<string, unknown>;
-        return record.id === 'octocat/repo-a' || (record.owner === 'octocat' && record.repo === 'repo-a');
-      }),
+      (parsed as Array<Record<string, unknown>>).some((row) => row.id === 'octocat/repo-a'),
       'expected repo-a to be present in the root index after materialize',
     );
     assert.ok(provider.writes.has('/github/repos/octocat/repo-a/meta.json'));
+  });
+
+  it('eager materialization writes record indexes as top-level arrays carrying headRef on pull rows only', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider);
+
+    await adapter.sync('workspace-1');
+
+    const pulls = JSON.parse(
+      await provider.readFile('/github/repos/octocat/repo-a/pulls/_index.json'),
+    ) as unknown;
+    const issues = JSON.parse(
+      await provider.readFile('/github/repos/octocat/repo-a/issues/_index.json'),
+    ) as unknown;
+
+    assert.ok(Array.isArray(pulls), 'pulls/_index.json must be a top-level array');
+    assert.ok(Array.isArray(issues), 'issues/_index.json must be a top-level array');
+
+    const pullRow = (pulls as Array<Record<string, unknown>>).find((row) => row.number === 42);
+    assert.ok(pullRow, 'expected the eager pull row to survive the per-record ingest');
+    assert.strictEqual(
+      pullRow.headRef,
+      'feature',
+      'GitHub returns head.ref on every list-pulls row; it must reach the index',
+    );
+
+    for (const row of issues as Array<Record<string, unknown>>) {
+      assert.strictEqual(
+        'headRef' in row,
+        false,
+        'an issue has no head ref, so issue rows must omit the field entirely',
+      );
+    }
+  });
+
+  it('reads an already-ingested legacy `{ pulls: [...] }` index and rewrites it as an array', async () => {
+    const provider = new RecordingProvider();
+    const adapter = createAdapter(provider, { lazy: true });
+    await adapter.sync('workspace-1');
+
+    // Simulate a mount ingested by an adapter older than issue #271.
+    provider.writes.set(
+      '/github/repos/octocat/repo-a/pulls/_index.json',
+      JSON.stringify({
+        pulls: [{ number: 9001, title: 'legacy pull', state: 'open', url: 'https://example.test/9001' }],
+      }),
+    );
+
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map((arg) => String(arg)).join(' '));
+    };
+    try {
+      await adapter.materializeRepo('workspace-1', 'octocat', 'repo-a');
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    const parsed = JSON.parse(
+      await provider.readFile('/github/repos/octocat/repo-a/pulls/_index.json'),
+    ) as unknown;
+    assert.ok(Array.isArray(parsed), 'the rewritten index must be a top-level array');
+
+    assert.ok(
+      warnings.some((warning) => /index shape mismatch/.test(warning) && /legacy/.test(warning)),
+      `expected a loud shape-mismatch warning, got ${JSON.stringify(warnings)}`,
+    );
   });
 
   it('parallel materializeRepo calls share one in-flight fetch and return the same repo paths', async () => {
@@ -634,13 +694,17 @@ describe('GitHub lazy materialization', () => {
       '/github/repos/octocat/repo-b/meta.json',
       '/github/repos/octocat/repo-b/pulls/_index.json',
     ]);
+    // A repo with zero eager records is the one case where the legacy
+    // `{ issues: [] }` / `{ pulls: [] }` wrapper used to survive on disk: with
+    // no records there is no per-record ingest to overwrite it. It is now the
+    // documented empty array (issue #271).
     assert.deepStrictEqual(
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/issues/_index.json')),
-      { issues: [] },
+      [],
     );
     assert.deepStrictEqual(
       JSON.parse(await provider.readFile('/github/repos/octocat/repo-b/pulls/_index.json')),
-      { pulls: [] },
+      [],
     );
     assert.strictEqual(provider.writes.has('/github/repos/octocat/repo-b/commits/_index.json'), false);
   });

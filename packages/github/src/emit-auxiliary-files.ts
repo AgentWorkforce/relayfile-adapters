@@ -127,6 +127,9 @@ export interface GitHubPullRequestEmitRecord extends GitHubRepoContext {
   updatedAt?: string;
   closed_at?: string | null;
   merged_at?: string | null;
+  /** Source branch. `head.ref` on REST/webhook payloads; `headRef` when already normalized. */
+  head?: unknown;
+  headRef?: string;
 }
 
 export interface GitHubIssueEmitRecord extends GitHubRepoContext {
@@ -918,9 +921,37 @@ function buildRecordIndexRow(
     ...withOptionalString('creatorKey', readGitHubCreatorKey(record)),
     ...withOptionalString('priority', readPriority(record)),
     ...(objectType === 'pull_request'
-      ? pullRequestMergeIndexFields(readNonEmptyString(record.merged_at))
+      ? {
+          // Branch name inline so a consumer can answer "which PR implements
+          // this issue?" from the index alone (issue #271). Issue rows have no
+          // head ref, so this is emitted only for pull requests.
+          ...withOptionalHeadRef(readGitHubHeadRef(record)),
+          ...pullRequestMergeIndexFields(readNonEmptyString(record.merged_at)),
+        }
       : {}),
   };
+}
+
+function withOptionalHeadRef(value: string | undefined): Partial<GitHubRecordIndexRow> {
+  return value ? { headRef: value } : {};
+}
+
+/**
+ * Read the pull request's source branch name. Webhook and REST payloads spell
+ * it `head.ref`; already-normalized records may carry a flat `headRef`.
+ */
+function readGitHubHeadRef(record: Record<string, unknown>): string | undefined {
+  const flat = readNonEmptyString(record.headRef) ?? readNonEmptyString(record.head_ref);
+  if (flat) {
+    return flat;
+  }
+
+  const head = record.head;
+  if (head && typeof head === 'object' && !Array.isArray(head)) {
+    return readNonEmptyString((head as Record<string, unknown>).ref);
+  }
+
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,14 @@ export interface GitHubRecordIndexRow extends GitHubRepoIndexRow {
   // omitted for issues and for unmerged PRs. Additive — older readers ignore it.
   merged?: boolean;
   mergedAt?: string;
+  // Source branch name (pull requests only). GitHub returns `head.ref` on every
+  // row of `GET /repos/{owner}/{repo}/pulls`, and branch name is the primary
+  // signal consumers use to answer "which PR implements this issue?". Carrying
+  // it inline lets a consumer resolve that from the index alone instead of
+  // opening every pull record. Absent on issue rows, and absent on pull rows
+  // written before this field existed. Additive — older readers ignore it.
+  // See issue #271.
+  headRef?: string;
 }
 
 export interface GitHubCommitIndexRow extends GitHubRepoIndexRow {
@@ -148,14 +156,15 @@ export function buildRepoCommitsIndexFile(
 export async function readRepoIndexRows(
   vfs: VfsLike,
 ): Promise<GitHubRepoIndexRow[]> {
-  return parseIndexRows<GitHubRepoIndexRow>(await readVfsText(vfs, githubReposIndexPath()));
+  const path = githubReposIndexPath();
+  return normalizeRepoIndexRows(parseIndexRows<unknown>(await readVfsText(vfs, path), { path }));
 }
 
 export async function readRecordIndexRows(
   vfs: VfsLike,
   path: string,
 ): Promise<GitHubRecordIndexRow[]> {
-  return parseIndexRows<GitHubRecordIndexRow>(await readVfsText(vfs, path));
+  return normalizeRecordIndexRows(parseIndexRows<unknown>(await readVfsText(vfs, path), { path }));
 }
 
 export function upsertRepoIndexRow(
@@ -180,20 +189,26 @@ export function upsertCommitIndexRow(
 }
 
 function compareRepoRows(left: GitHubRepoIndexRow, right: GitHubRepoIndexRow): number {
-  if (left.updated !== right.updated) {
-    return right.updated.localeCompare(left.updated);
+  // `?? ''` guards rows recovered from an older on-disk index, which may be
+  // missing `updated`/`id` entirely. Sorting must never throw on ingest.
+  const leftUpdated = left.updated ?? '';
+  const rightUpdated = right.updated ?? '';
+  if (leftUpdated !== rightUpdated) {
+    return rightUpdated.localeCompare(leftUpdated);
   }
-  return left.id.localeCompare(right.id);
+  return (left.id ?? '').localeCompare(right.id ?? '');
 }
 
 function compareRecordRows(left: GitHubRecordIndexRow, right: GitHubRecordIndexRow): number {
-  if (left.updated !== right.updated) {
-    return right.updated.localeCompare(left.updated);
+  const leftUpdated = left.updated ?? '';
+  const rightUpdated = right.updated ?? '';
+  if (leftUpdated !== rightUpdated) {
+    return rightUpdated.localeCompare(leftUpdated);
   }
   if (left.number !== right.number) {
-    return left.number - right.number;
+    return (left.number ?? 0) - (right.number ?? 0);
   }
-  return left.id.localeCompare(right.id);
+  return (left.id ?? '').localeCompare(right.id ?? '');
 }
 
 async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefined> {
@@ -217,17 +232,184 @@ async function readVfsText(vfs: VfsLike, path: string): Promise<string | undefin
   return undefined;
 }
 
-export function parseIndexRows<T>(content: string | undefined): T[] {
+/**
+ * Keys a pre-array writer used to wrap its rows under. The eager backfill in
+ * `lazy.ts` wrote `{ "repos": [...] }`, `{ "issues": [...] }`, and
+ * `{ "pulls": [...] }` before this adapter converged on the documented
+ * top-level array (issue #271); an already-ingested mount can still hold one.
+ */
+const LEGACY_INDEX_WRAPPER_KEYS = ['repos', 'issues', 'pulls', 'commits'] as const;
+
+export interface ParseIndexRowsOptions {
+  /**
+   * Mount path of the index being parsed. Used only to make a shape-mismatch
+   * warning actionable — every index file is named `_index.json`, so the
+   * warning is useless without the enclosing path.
+   */
+  path?: string;
+}
+
+/**
+ * Parse an index file into rows.
+ *
+ * The documented, canonical shape is a bare top-level array (see
+ * `GITHUB_LAYOUT_PROMPT`). A legacy `{ "<kind>": [...] }` wrapper is still
+ * accepted so a mount ingested by an older adapter keeps working across the
+ * upgrade; the next write rewrites it as an array.
+ *
+ * Every unrecognised shape is warned about before falling back to `[]`. The
+ * fallback is deliberate — a malformed index must never abort an ingest — but
+ * it used to be *silent*, which is how a permanent shape divergence survived
+ * in production unnoticed (issue #271). Behaviour is unchanged; only the
+ * visibility is new.
+ */
+export function parseIndexRows<T>(
+  content: string | undefined,
+  options: ParseIndexRowsOptions = {},
+): T[] {
   if (!content) {
     return [];
   }
 
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(content) as unknown;
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
+    parsed = JSON.parse(content) as unknown;
+  } catch (error) {
+    warnIndexShapeMismatch(
+      options.path,
+      `is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+    );
     return [];
   }
+
+  if (Array.isArray(parsed)) {
+    return parsed as T[];
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const record = parsed as Record<string, unknown>;
+
+    for (const key of LEGACY_INDEX_WRAPPER_KEYS) {
+      const rows = record[key];
+      if (Array.isArray(rows)) {
+        warnIndexShapeMismatch(
+          options.path,
+          `uses the legacy \`{ "${key}": [...] }\` wrapper instead of the documented top-level array; ` +
+            'the rows were recovered and the next write rewrites the file as an array',
+        );
+        return rows as T[];
+      }
+    }
+
+    if (Array.isArray(record.rows)) {
+      warnIndexShapeMismatch(
+        options.path,
+        'holds an alias directory manifest (`{ "rows": [{ "title", "file" }] }`), not record rows — ' +
+          'the alias namespace `/github/repos/<owner>__<repo>/<kind>/_index.json` and the canonical ' +
+          'record index share the `_index.json` filename (issue #271)',
+      );
+      return [];
+    }
+  }
+
+  warnIndexShapeMismatch(
+    options.path,
+    'is neither the documented top-level array nor a recognised legacy wrapper; treating it as empty',
+  );
+  return [];
+}
+
+function warnIndexShapeMismatch(path: string | undefined, detail: string): void {
+  console.warn(`GitHub index shape mismatch: ${path ?? '<unknown index path>'} ${detail}.`);
+}
+
+/**
+ * Coerce rows recovered from an older on-disk index into valid
+ * {@link GitHubRecordIndexRow}s. Legacy `{ "pulls": [...] }` rows carried
+ * `{ number, title, state, url }` — no `id` and no `updated` — which the row
+ * comparators and the `id`-keyed upsert both assume are present. Rows without
+ * a usable number are dropped rather than written back malformed.
+ */
+export function normalizeRecordIndexRows(rows: readonly unknown[]): GitHubRecordIndexRow[] {
+  const normalized: GitHubRecordIndexRow[] = [];
+
+  for (const candidate of rows) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      continue;
+    }
+
+    const row = candidate as Record<string, unknown>;
+    const number = readFiniteNumber(row.number) ?? readFiniteNumber(row.id);
+    const id = readNonEmptyText(row.id) ?? (number === undefined ? undefined : String(number));
+    if (id === undefined || number === undefined) {
+      continue;
+    }
+
+    normalized.push({
+      ...(row as Partial<GitHubRecordIndexRow>),
+      id,
+      number,
+      title: readNonEmptyText(row.title) ?? '',
+      state: readNonEmptyText(row.state) ?? '',
+      updated:
+        readNonEmptyText(row.updated) ??
+        readNonEmptyText(row.updated_at) ??
+        readNonEmptyText(row.updatedAt) ??
+        '',
+    });
+  }
+
+  return normalized;
+}
+
+/**
+ * Coerce rows recovered from an older `/github/repos/_index.json` into valid
+ * {@link GitHubRepoIndexRow}s. The legacy eager writer stored
+ * `{ owner, repo, url }` rows with no `id`, `title`, or `updated`.
+ */
+export function normalizeRepoIndexRows(rows: readonly unknown[]): GitHubRepoIndexRow[] {
+  const normalized: GitHubRepoIndexRow[] = [];
+
+  for (const candidate of rows) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      continue;
+    }
+
+    const row = candidate as Record<string, unknown>;
+    const owner = readNonEmptyText(row.owner);
+    const repo = readNonEmptyText(row.repo);
+    const id = readNonEmptyText(row.id) ?? (owner && repo ? `${owner}/${repo}` : undefined);
+    if (id === undefined) {
+      continue;
+    }
+
+    normalized.push({
+      ...(row as Partial<GitHubRepoIndexRow>),
+      id,
+      title: readNonEmptyText(row.title) ?? id,
+      updated:
+        readNonEmptyText(row.updated) ??
+        readNonEmptyText(row.updated_at) ??
+        readNonEmptyText(row.pushed_at) ??
+        '',
+    });
+  }
+
+  return normalized;
+}
+
+function readNonEmptyText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function readFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return undefined;
 }
 
 function upsertIndexRow<T extends { id: string }>(rows: T[], row: T): T[] {

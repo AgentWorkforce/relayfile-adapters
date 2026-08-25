@@ -216,6 +216,9 @@ export async function bulkIngestPR(
             updated,
             number: metadata.number,
             state: metadata.state || '',
+            // Branch name inline so a consumer can answer "which PR implements
+            // this issue?" from the index alone (issue #271).
+            ...(metadata.head?.ref ? { headRef: metadata.head.ref } : {}),
             ...pullRequestMergeIndexFields(metadata.mergedAt),
           }),
         (rows) => buildRepoPullsIndexFile(trimmedOwner, trimmedRepo, rows).content,
@@ -844,6 +847,26 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * A row of the **alias directory manifest**, not of a record index.
+ *
+ * `writeGitHubIndex` writes `/github/repos/<owner>__<repo>/pulls/_index.json`
+ * — the flat alias namespace — listing which alias subdirectories exist
+ * (`by-id/`, `by-title/`). It contains zero pull requests.
+ *
+ * The canonical record index is a different file at a different path:
+ * `/github/repos/<owner>/<repo>/pulls/_index.json`, a top-level array of
+ * `GitHubRecordIndexRow`. The two share the `_index.json` filename, which has
+ * misled consumers into reading one and expecting the other (issue #271).
+ *
+ * Renaming this file to something honest (`_aliases.json`) is the cleaner fix,
+ * but it is a published mount-layout change with its own blast radius and is
+ * left for a maintainer decision. Until then the collision is documented here,
+ * in `GITHUB_LAYOUT_PROMPT`, and warned about at read time on both sides:
+ * `parseIndexRows` warns when a record index turns out to be a manifest, and
+ * `parseGitHubIndexRows` below warns when a manifest turns out to be a record
+ * index.
+ */
 interface GitHubIndexRow {
   file: string;
   title: string;
@@ -898,19 +921,28 @@ async function writeBulkPullRequestAliases(
   );
 }
 
+/** Write the alias directory manifest. See {@link GitHubIndexRow}. */
 async function writeGitHubIndex(vfs: VfsLike, scope: string): Promise<void> {
   const indexPath = `${scope}/_index.json`;
-  const rows = mergeGitHubIndexRows(await readVfsContent(vfs, indexPath), [
-    { title: 'by-id', file: 'by-id/' },
-    { title: 'by-title', file: 'by-title/' },
-  ]);
+  const rows = mergeGitHubIndexRows(
+    await readVfsContent(vfs, indexPath),
+    [
+      { title: 'by-id', file: 'by-id/' },
+      { title: 'by-title', file: 'by-title/' },
+    ],
+    indexPath,
+  );
   await runVfsWrite(vfs, indexPath, `${JSON.stringify({ rows }, null, 2)}\n`);
 }
 
-function mergeGitHubIndexRows(existingContent: string | undefined, requiredRows: GitHubIndexRow[]): GitHubIndexRow[] {
+function mergeGitHubIndexRows(
+  existingContent: string | undefined,
+  requiredRows: GitHubIndexRow[],
+  indexPath?: string,
+): GitHubIndexRow[] {
   const rows = new Map<string, GitHubIndexRow>();
 
-  for (const row of parseGitHubIndexRows(existingContent)) {
+  for (const row of parseGitHubIndexRows(existingContent, indexPath)) {
     rows.set(row.file, row);
   }
 
@@ -921,19 +953,58 @@ function mergeGitHubIndexRows(existingContent: string | undefined, requiredRows:
   return [...rows.values()].sort((left, right) => left.file.localeCompare(right.file));
 }
 
-function parseGitHubIndexRows(existingContent: string | undefined): GitHubIndexRow[] {
+function parseGitHubIndexRows(
+  existingContent: string | undefined,
+  indexPath?: string,
+): GitHubIndexRow[] {
   if (!existingContent) {
     return [];
   }
 
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(existingContent) as { rows?: Array<Partial<GitHubIndexRow>> };
-    return Array.isArray(parsed.rows)
-      ? parsed.rows.filter((row): row is GitHubIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string')
-      : [];
-  } catch {
+    parsed = JSON.parse(existingContent) as unknown;
+  } catch (error) {
+    warnAliasManifestShape(
+      indexPath,
+      `is not valid JSON (${error instanceof Error ? error.message : String(error)})`,
+    );
     return [];
   }
+
+  if (Array.isArray(parsed)) {
+    // A top-level array is the canonical *record* index shape. Seeing it here
+    // means a record index was written into the alias namespace, or that these
+    // two `_index.json` meanings have collided (issue #271). Rebuilding the
+    // manifest would destroy the record rows, so warn and keep the behaviour
+    // unchanged — the required manifest rows are re-added by the caller.
+    warnAliasManifestShape(
+      indexPath,
+      'is a top-level array (the canonical record-index shape), not an alias directory manifest',
+    );
+    return [];
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const rows = (parsed as { rows?: unknown }).rows;
+    if (Array.isArray(rows)) {
+      return (rows as Array<Partial<GitHubIndexRow>>).filter(
+        (row): row is GitHubIndexRow => typeof row?.file === 'string' && typeof row?.title === 'string',
+      );
+    }
+  }
+
+  warnAliasManifestShape(
+    indexPath,
+    'is neither `{ "rows": [{ "title", "file" }] }` nor a recognised shape; treating it as empty',
+  );
+  return [];
+}
+
+function warnAliasManifestShape(indexPath: string | undefined, detail: string): void {
+  console.warn(
+    `GitHub alias manifest shape mismatch: ${indexPath ?? '<unknown alias index path>'} ${detail}.`,
+  );
 }
 
 async function resolveAliasPath(

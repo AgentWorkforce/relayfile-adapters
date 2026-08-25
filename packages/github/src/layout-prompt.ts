@@ -24,13 +24,27 @@ Writable resources advertise sibling schemas and create examples at \`discovery/
 { "id": "<owner/repo>", "title": "<owner/repo>", "updated": "<iso8601>" }
 \`\`\`
 
+Every index file in the canonical tree is a **bare top-level JSON array** of row objects — never an object wrapper. A reader should treat a non-array \`_index.json\` in the canonical tree as a stale mount written by an older adapter.
+
 \`issues/_index.json\` and \`pulls/_index.json\` rows use:
 
 \`\`\`json
-{ "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "number": 42, "state": "open", "labels": ["factory"] }
+{ "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "number": 42, "state": "open", "labels": ["factory"], "headRef": "feature/AR-448-thing" }
 \`\`\`
 
 \`labels\` carries the issue's label names inline so you can filter on the index without opening every \`meta.json\` (e.g. \`jq '.[] | select(.labels | index("factory"))'\`). It is present on issue rows; pull rows may omit it. Merged pull rows additionally carry \`"merged": true\` and \`"mergedAt": "<iso8601>"\`; issues and unmerged pulls omit both fields.
+
+\`headRef\` is the pull request's source branch name (GitHub's \`head.ref\`), carried inline so a consumer can answer "which pull request implements this issue?" by branch name from the index alone, instead of opening every pull record. **It is present on pull rows and absent on issue rows**, since an issue has no head ref. It is also absent on pull rows written before this field existed, so match on it and fall back rather than assuming it is set.
+
+### The alias namespace also has an \`_index.json\`, and it means something else
+
+\`/github/repos/<owner>__<repo>/<issues|pulls>/_index.json\` is an **alias directory manifest**, not a record index. It lists which alias subdirectories exist and contains zero issues or pull requests:
+
+\`\`\`json
+{ "rows": [ { "title": "by-id", "file": "by-id/" }, { "title": "by-title", "file": "by-title/" } ] }
+\`\`\`
+
+Only the canonical \`/github/repos/<owner>/<repo>/...\` tree carries record indexes. Do not read the flat \`<owner>__<repo>\` alias \`_index.json\` expecting records.
 
 \`commits/_index.json\` is an array sorted by \`updated\` descending where each row uses:
 
@@ -51,6 +65,7 @@ ls /github/repos
 jq '.[0]' /github/repos/_index.json
 jq '.[] | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
 jq '.[] | select(.mergedAt != null) | {number, title, mergedAt}' /github/repos/octocat/hello-world/pulls/_index.json
+jq '.[] | select(.headRef == "feature/AR-448-thing") | {number, state, title}' /github/repos/octocat/hello-world/pulls/_index.json
 jq '.[] | select(.labels | index("factory"))' /github/repos/octocat/hello-world/issues/_index.json
 jq '.[].sha' /github/repos/octocat/hello-world/commits/_index.json
 jq '.[] | {sha, message, authorLogin, committedAt}' /github/repos/octocat/hello-world/commits/_index.json
