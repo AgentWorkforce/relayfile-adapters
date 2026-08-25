@@ -485,6 +485,9 @@ describe('pull request ingestion', () => {
         updated: mockPRPayload.updated_at,
         number: 42,
         state: mockPRPayload.state,
+        // Branch name carried inline so a consumer can resolve "which PR
+        // implements this issue?" from the index alone (issue #271).
+        headRef: mockPRPayload.head.ref,
       }],
     );
     assert.deepStrictEqual(JSON.parse(writes.get('/github/repos/octocat/hello-world/issues/_index.json') ?? '[]'), []);
@@ -614,6 +617,7 @@ describe('pull request ingestion', () => {
           updated: '2026-03-30T10:00:00Z',
           number: 43,
           state: mockPRPayload.state,
+          headRef: mockPRPayload.head.ref,
         },
         {
           id: '42',
@@ -621,6 +625,7 @@ describe('pull request ingestion', () => {
           updated: mockPRPayload.updated_at,
           number: 42,
           state: mockPRPayload.state,
+          headRef: mockPRPayload.head.ref,
         },
       ],
     );

@@ -494,6 +494,9 @@ describe('bulk ingest', () => {
         updated: mockPRPayload.updated_at,
         number: 42,
         state: 'closed',
+        // Branch name carried inline so a consumer can resolve "which PR
+        // implements this issue?" from the index alone (issue #271).
+        headRef: mockPRPayload.head.ref,
         merged: true,
         mergedAt: '2026-03-29T12:00:00Z',
       }],
@@ -624,6 +627,7 @@ describe('bulk ingest', () => {
           updated: '2026-04-04T10:00:00.000Z',
           number: 43,
           state: mockPRPayload.state,
+          headRef: mockPRPayload.head.ref,
         },
         {
           id: '42',
@@ -631,6 +635,7 @@ describe('bulk ingest', () => {
           updated: '2026-04-03T10:00:00.000Z',
           number: 42,
           state: mockPRPayload.state,
+          headRef: mockPRPayload.head.ref,
         },
       ],
     );

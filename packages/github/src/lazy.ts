@@ -2,7 +2,17 @@ import { withProxyRetry } from '@relayfile/adapter-core/http';
 import { GITHUB_API_BASE_URL } from './config.js';
 import { fetchRepoCommits } from './commits/fetcher.js';
 import type { VfsLike } from './files/content-fetcher.js';
-import { buildGitHubCommitIndexRow, buildRepoCommitsIndexFile } from './index-emitter.js';
+import {
+  buildGitHubCommitIndexRow,
+  buildRepoCommitsIndexFile,
+  buildRepoIndexFile,
+  buildRepoIssuesIndexFile,
+  buildRepoPullsIndexFile,
+  type GitHubRecordIndexRow,
+  type GitHubRepoIndexRow,
+  normalizeRepoIndexRows,
+  parseIndexRows,
+} from './index-emitter.js';
 import { ingestIssue } from './issues/issue-mapper.js';
 import { listIssues, listPullRequests, listRepos, getRepository, type GitHubOperation } from './operations.js';
 import {
@@ -11,7 +21,7 @@ import {
   type ResolvedRepoMaterialization,
   type ResolvedResourceMaterialization,
 } from './materialization-policy.js';
-import { githubCommitPath, githubRepositoryMetaPath, githubRepoPrefix } from './path-mapper.js';
+import { githubCommitPath, githubRepositoryMetaPath } from './path-mapper.js';
 import { ingestPullRequest } from './pr/diff-writer.js';
 import type {
   GitHubAdapterConfig,
@@ -30,6 +40,8 @@ interface RepoIndexEntry {
   owner: string;
   repo: string;
   url: string;
+  /** Provider update timestamp, carried so the repos index row can supply `updated`. */
+  updated: string;
 }
 
 interface RepoListItem {
@@ -39,6 +51,12 @@ interface RepoListItem {
   title: string | null;
   updated: string | null;
   url: string | null;
+  /**
+   * Source branch name. GitHub returns `head.ref` on every row of
+   * `GET /repos/{owner}/{repo}/pulls`; it is absent from the issues response,
+   * so this is optional on the shared shape. See issue #271.
+   */
+  headRef?: string;
 }
 
 interface ConnectionAwareProvider extends GitHubRequestProvider {
@@ -74,7 +92,7 @@ export async function syncGitHubWorkspace(
   const repos = await resolveRepos(provider, config);
   const vfs = requireVfsProvider(provider);
   const rootMarkerResult = await writeTextFile(vfs, ROOT_DIR_MARKER_PATH, '');
-  const rootIndexResult = await writeJsonFile(vfs, ROOT_INDEX_PATH, { repos });
+  const rootIndexResult = await writeRootIndex(vfs, repos);
   const tracked = mergeTrackedResults(rootMarkerResult, rootIndexResult);
   const syncedObjectTypes = new Set<string>(['repository']);
 
@@ -143,30 +161,27 @@ async function materializeRepoInternal(
   const vfs = requireVfsProvider(provider);
   const tracked = createTrackedResult(owner, repo);
   const indexedRepos = await readRepoIndex(vfs);
-  const repoPrefix = githubRepoPrefix(owner, repo);
   const repoMetadata = await fetchRepositoryMetadata(provider, config, owner, repo);
 
   if (!indexedRepos.some((entry) => sameRepo(entry, owner, repo))) {
     const nextRepos = [...indexedRepos, toRepoIndexEntry(repoMetadata, owner, repo)]
       .sort((left, right) => `${left.owner}/${left.repo}`.localeCompare(`${right.owner}/${right.repo}`));
-    mergeIntoTracked(tracked, await writeJsonFile(vfs, ROOT_INDEX_PATH, { repos: nextRepos }));
+    mergeIntoTracked(tracked, await writeRootIndex(vfs, nextRepos));
   }
 
   mergeIntoTracked(tracked, await writeJsonFile(vfs, githubRepositoryMetaPath(owner, repo), repoMetadata));
 
+  // Both eager index writes emit the documented top-level array via the shared
+  // index emitter. They used to write `{ "issues": [...] }` / `{ "pulls": [...] }`,
+  // which the per-record ingest below then silently discarded and rewrote as an
+  // array — so the wrapper only ever survived on disk for a repo with zero
+  // eager records, or inside the window between this write and the first
+  // ingest. Emitting the array here means the per-record CAS upserts merge into
+  // these rows instead of throwing them away. See issue #271.
   if (plan.issues.mode === 'eager') {
     const issues = await fetchRepoIssues(provider, config, owner, repo, plan.issues);
-    mergeIntoTracked(
-      tracked,
-      await writeJsonFile(vfs, `${repoPrefix}/issues/_index.json`, {
-        issues: issues.map((issue) => ({
-          number: issue.number,
-          title: issue.title,
-          state: issue.state,
-          url: issue.url,
-        })),
-      }),
-    );
+    const issuesIndex = buildRepoIssuesIndexFile(owner, repo, issues.map(toRecordIndexRow));
+    mergeIntoTracked(tracked, await writeTextFile(vfs, issuesIndex.path, issuesIndex.content));
     for (const issue of issues) {
       mergeIntoTracked(tracked, await ingestIssue(provider, owner, repo, issue.number, vfs));
     }
@@ -174,17 +189,8 @@ async function materializeRepoInternal(
 
   if (plan.pulls.mode === 'eager') {
     const pulls = await fetchRepoPullRequests(provider, config, owner, repo, plan.pulls);
-    mergeIntoTracked(
-      tracked,
-      await writeJsonFile(vfs, `${repoPrefix}/pulls/_index.json`, {
-        pulls: pulls.map((pull) => ({
-          number: pull.number,
-          title: pull.title,
-          state: pull.state,
-          url: pull.url,
-        })),
-      }),
-    );
+    const pullsIndex = buildRepoPullsIndexFile(owner, repo, pulls.map(toRecordIndexRow));
+    mergeIntoTracked(tracked, await writeTextFile(vfs, pullsIndex.path, pullsIndex.content));
     for (const pull of pulls) {
       mergeIntoTracked(tracked, await ingestPullRequest(provider, owner, repo, pull.number, vfs));
     }
@@ -522,29 +528,75 @@ function requireVfsProvider(provider: GitHubRequestProvider): LazyGitHubProvider
   return vfs;
 }
 
+/**
+ * Read `/github/repos/_index.json`.
+ *
+ * Accepts the documented top-level array of `{ id, title, updated }` rows and
+ * the legacy `{ "repos": [{ owner, repo, url }] }` wrapper this function used
+ * to write, so an already-ingested mount survives the upgrade in both
+ * directions. `parseIndexRows` warns when it recovers a legacy or unrecognised
+ * shape. See issue #271.
+ */
 async function readRepoIndex(vfs: VfsLike): Promise<RepoIndexEntry[]> {
-  const raw = await readTextFile(vfs, ROOT_INDEX_PATH);
-  if (!raw) {
-    return [];
-  }
+  const rows = normalizeRepoIndexRows(
+    parseIndexRows<unknown>(await readTextFile(vfs, ROOT_INDEX_PATH), { path: ROOT_INDEX_PATH }),
+  );
 
-  try {
-    const payload = JSON.parse(raw) as { repos?: unknown };
-    if (!Array.isArray(payload.repos)) {
+  return rows.flatMap((row) => {
+    const legacy = row as unknown as Record<string, unknown>;
+    const owner =
+      (typeof legacy.owner === 'string' && legacy.owner) || row.id.split('/', 2)[0];
+    const repo = (typeof legacy.repo === 'string' && legacy.repo) || row.id.split('/', 2)[1];
+    if (!owner || !repo) {
       return [];
     }
 
-    return payload.repos.flatMap((entry, index) => {
-      try {
-        const repo = expectObject(entry, `GitHub repos index[${index}]`);
-        return [toRepoIndexEntry(repo)];
-      } catch {
-        return [];
-      }
-    });
-  } catch {
-    return [];
-  }
+    return [
+      {
+        owner,
+        repo,
+        url:
+          typeof legacy.url === 'string' && legacy.url
+            ? legacy.url
+            : `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+        updated: row.updated,
+      },
+    ];
+  });
+}
+
+/**
+ * Write `/github/repos/_index.json` in the documented top-level array shape,
+ * the same shape `buildRepoIndexFile` emits from the incremental ingest paths.
+ * Before issue #271 this wrote `{ "repos": [{ owner, repo, url }] }`, which
+ * every subsequent record ingest discarded and rewrote as an array — the two
+ * writers fought over the same file on every sync.
+ */
+async function writeRootIndex(vfs: VfsLike, repos: RepoIndexEntry[]): Promise<TrackedWriteResult> {
+  const index = buildRepoIndexFile(repos.map(toRepoIndexRow));
+  return writeTextFile(vfs, index.path, index.content);
+}
+
+function toRepoIndexRow(entry: RepoIndexEntry): GitHubRepoIndexRow {
+  const id = `${entry.owner}/${entry.repo}`;
+  return { id, title: id, updated: entry.updated };
+}
+
+/**
+ * Project a listed issue or pull request onto the shared record index row.
+ * `headRef` is emitted only for pull requests, where GitHub supplies
+ * `head.ref`; issue rows omit it entirely.
+ */
+function toRecordIndexRow(item: RepoListItem): GitHubRecordIndexRow {
+  return {
+    id: String(item.number),
+    title: item.title ?? '',
+    updated: item.updated ?? '',
+    number: item.number,
+    state: item.state ?? '',
+    ...(item.labels.length > 0 ? { labels: item.labels } : {}),
+    ...(item.headRef ? { headRef: item.headRef } : {}),
+  };
 }
 
 async function readTextFile(vfs: VfsLike, path: string): Promise<string | undefined> {
@@ -621,6 +673,9 @@ async function runVfsWrite(vfs: VfsLike, path: string, content: string): Promise
 
 function toRepoListItem(value: JsonObject, context: string): RepoListItem {
   const number = readPositiveInteger(value, 'number', context);
+  // `head.ref` is present on every pull-request row and absent on issue rows,
+  // so it stays optional on the shared shape rather than becoming `null`.
+  const headRef = readString(readObject(value, 'head'), 'ref');
   return {
     labels: readLabelNames(value.labels),
     number,
@@ -628,6 +683,7 @@ function toRepoListItem(value: JsonObject, context: string): RepoListItem {
     state: readString(value, 'state'),
     updated: readString(value, 'updated_at'),
     url: readString(value, 'html_url') ?? readString(value, 'url'),
+    ...(headRef ? { headRef } : {}),
   };
 }
 
@@ -702,6 +758,11 @@ function toRepoIndexEntry(
       readString(value, 'html_url') ??
       readString(value, 'url') ??
       `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    updated:
+      readString(value, 'updated') ??
+      readString(value, 'updated_at') ??
+      readString(value, 'pushed_at') ??
+      '',
   };
 }
 
