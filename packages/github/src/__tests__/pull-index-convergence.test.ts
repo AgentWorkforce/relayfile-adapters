@@ -302,6 +302,33 @@ describe('convergeRepoPullIndex', () => {
     assert.equal(provider.writes.length, 0);
   });
 
+  it('rejects a write-only VFS before a request can overwrite an empty baseline', async () => {
+    const requests: ProxyRequest[] = [];
+    const writes: string[] = [];
+    const writeOnlyProvider = {
+      name: 'write-only-provider',
+      connectionId: 'conn-pull-index',
+      async proxy<T = unknown>(request: ProxyRequest): Promise<ProxyResponse<T>> {
+        requests.push(request);
+        return {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          data: [createPull(7)] as T,
+        };
+      },
+      writeFile(path: string): void {
+        writes.push(path);
+      },
+    };
+
+    await assert.rejects(
+      convergeRepoPullIndex('workspace-1', writeOnlyProvider, config(), OWNER, REPO),
+      /requires a provider that implements VFS reads/,
+    );
+    assert.equal(requests.length, 0);
+    assert.equal(writes.length, 0);
+  });
+
   it('rejects a malformed list row without head.ref before touching the index', async () => {
     const malformed = createPull(7) as ReturnType<typeof createPull> & { head?: unknown };
     delete malformed.head;

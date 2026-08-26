@@ -80,6 +80,7 @@ export async function convergeRepoPullIndex(
   options: ConvergeRepoPullIndexOptions = {},
 ): Promise<ConvergeRepoPullIndexResult> {
   void workspaceId;
+  const vfs = requireVfsProvider(provider);
   const page = parseCursor(options.cursor, owner, repo);
   const operation = listPullRequests({
     owner,
@@ -115,7 +116,7 @@ export async function convergeRepoPullIndex(
   );
 
   const writeResult = rows.length > 0
-    ? await reconcilePullIndexPage(requireVfsProvider(provider), owner, repo, rows)
+    ? await reconcilePullIndexPage(vfs, owner, repo, rows)
     : emptyIngestResult();
   const done = rows.length < PULL_INDEX_PAGE_SIZE;
 
@@ -275,6 +276,11 @@ function buildProviderHeaders(
 
 function requireVfsProvider(provider: GitHubRequestProvider): VfsLike {
   const vfs = provider as GitHubRequestProvider & VfsLike;
+  if (!vfs.readFile && !vfs.read && !vfs.get) {
+    throw new Error(
+      'GitHub pull-index convergence requires a provider that implements VFS reads.',
+    );
+  }
   if (!vfs.writeFile && !vfs.write && !vfs.put && !vfs.set && !vfs.upsert) {
     throw new Error('GitHub pull-index convergence requires a provider that implements VFS writes.');
   }
