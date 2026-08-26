@@ -36,6 +36,7 @@ describe('package barrel', () => {
       'buildRepoIndexFile',
       'buildRepoIssuesIndexFile',
       'buildRepoPullsIndexFile',
+      'convergeRepoPullIndex',
     ] as const;
 
     for (const name of expected) {

@@ -52,6 +52,7 @@ export * from './digest.js';
 export * from './index-emitter.js';
 export * from './layout.js';
 export * from './layout-prompt.js';
+export * from './pull-index-convergence.js';
 export * from './summary.js';
 export * from './thread.js';
 export * from './proactive/review-adapter.github.js';
