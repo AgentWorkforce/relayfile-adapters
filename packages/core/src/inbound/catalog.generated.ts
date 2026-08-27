@@ -244,6 +244,71 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
   },
   {
     "schema": "relayfile.inbound-capability/1",
+    "id": "ramp.hookdeck",
+    "providerId": "ramp",
+    "pathRoot": "/ramp",
+    "providerConfigAliases": [
+      "ramp",
+      "ramp-relay",
+      "ramp-sandbox-relay"
+    ],
+    "source": "hookdeck",
+    "eventKinds": [
+      "webhook"
+    ],
+    "detection": {
+      "headerAny": [
+        "x-ramp-signature"
+      ]
+    },
+    "logicalKey": {
+      "version": "1",
+      "strategies": [
+        "hookdeck-delivery-id",
+        "semantic-payload"
+      ],
+      "hookdeckDeliveryIdHeaders": [
+        "x-hookdeck-eventid"
+      ],
+      "unknownEventFallback": "raw-body",
+      "semanticPayload": "canonical-json-v1"
+    }
+  },
+  {
+    "schema": "relayfile.inbound-capability/1",
+    "id": "ramp.nango",
+    "providerId": "ramp",
+    "pathRoot": "/ramp",
+    "providerConfigAliases": [
+      "ramp",
+      "ramp-relay",
+      "ramp-sandbox-relay"
+    ],
+    "source": "nango",
+    "eventKinds": [
+      "forward",
+      "sync",
+      "webhook"
+    ],
+    "logicalKey": {
+      "version": "1",
+      "strategies": [
+        "provider-delivery-id",
+        "nango-sync-page",
+        "semantic-payload"
+      ],
+      "providerDeliveryIdHeaders": [
+        "x-nango-delivery-id",
+        "x-nango-webhook-id",
+        "x-nango-id",
+        "webhook-id"
+      ],
+      "unknownEventFallback": "raw-body",
+      "semanticPayload": "canonical-json-v1"
+    }
+  },
+  {
+    "schema": "relayfile.inbound-capability/1",
     "id": "shortcut.nango",
     "providerId": "shortcut",
     "pathRoot": "/shortcut",
@@ -309,4 +374,4 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     }
   }
 ] as const;
-export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:4ff718ab3ab703411833b0a59c2ae21966b6d793f952974c8302dcea9ed7d680" as const;
+export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:cb738d3754b9e68781d6ee3092345d3109afbfd889497f413640d2be1039ad10" as const;

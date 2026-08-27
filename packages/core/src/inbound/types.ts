@@ -123,7 +123,7 @@ export interface DefineHookdeckInboundCapabilityInput {
   readonly pathRoot: `/${string}`;
   readonly providerConfigAliases: readonly string[];
   readonly detectionHeaders: readonly string[];
-  readonly providerDeliveryIdHeaders: readonly string[];
+  readonly providerDeliveryIdHeaders?: readonly string[];
   readonly hookdeckDeliveryIdHeaders?: readonly string[];
   readonly eventKinds?: readonly string[];
 }
@@ -131,6 +131,10 @@ export interface DefineHookdeckInboundCapabilityInput {
 export function defineHookdeckInboundCapability(
   input: DefineHookdeckInboundCapabilityInput,
 ): InboundCapabilityDeclaration {
+  const providerDeliveryIdHeaders =
+    input.providerDeliveryIdHeaders?.length
+      ? input.providerDeliveryIdHeaders
+      : undefined;
   return {
     schema: INBOUND_CAPABILITY_SCHEMA,
     id: input.id,
@@ -142,12 +146,19 @@ export function defineHookdeckInboundCapability(
     detection: { headerAny: input.detectionHeaders },
     logicalKey: {
       version: "1",
-      strategies: [
-        "provider-delivery-id",
-        "hookdeck-delivery-id",
-        "semantic-payload",
-      ],
-      providerDeliveryIdHeaders: input.providerDeliveryIdHeaders,
+      strategies: providerDeliveryIdHeaders
+        ? [
+            "provider-delivery-id",
+            "hookdeck-delivery-id",
+            "semantic-payload",
+          ]
+        : [
+            "hookdeck-delivery-id",
+            "semantic-payload",
+          ],
+      ...(providerDeliveryIdHeaders
+        ? { providerDeliveryIdHeaders }
+        : {}),
       hookdeckDeliveryIdHeaders:
         input.hookdeckDeliveryIdHeaders ?? ["x-hookdeck-eventid"],
       unknownEventFallback: "raw-body",

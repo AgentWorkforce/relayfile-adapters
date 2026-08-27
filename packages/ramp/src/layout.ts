@@ -1,0 +1,96 @@
+import type { LayoutManifestProvider as CoreLayoutManifestProvider } from '@relayfile/adapter-core';
+
+export type {
+  LayoutManifest,
+  LayoutManifestProvider,
+  LayoutResourceManifest,
+  MaterializationMode,
+  WritebackResourceManifest,
+} from '@relayfile/adapter-core';
+
+export const layoutManifest: CoreLayoutManifestProvider = () => ({
+  provider: 'ramp',
+  filenameConvention: '<slug>__<id>.json for flat records and <id>__<slug>/meta.json for directory records',
+  aliasSegments: [
+    'by-email',
+    'by-id',
+    'by-invoice-number',
+    'by-merchant',
+    'by-name',
+    'by-number',
+    'by-purchase-order',
+    'by-receipt-status',
+    'by-reimbursement',
+    'by-renewal-status',
+    'by-state',
+    'by-status',
+    'by-transaction',
+    'by-user',
+    'by-vendor',
+  ],
+  resources: [
+    {
+      path: 'ramp/bills',
+      title: 'Bills',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-invoice-number', 'by-vendor', 'by-status'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/purchase-orders',
+      title: 'Purchase Orders',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-number', 'by-vendor', 'by-receipt-status'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/item-receipts',
+      title: 'Item Receipts',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-number', 'by-purchase-order'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/vendor-agreements',
+      title: 'Vendor Agreements',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-name', 'by-renewal-status'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/transactions',
+      title: 'Transactions',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-merchant', 'by-state'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/reimbursements',
+      title: 'Reimbursements',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-user', 'by-state'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/receipts',
+      title: 'Receipts',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-transaction', 'by-reimbursement'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/vendors',
+      title: 'Vendors',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-name'],
+      writebackResources: [],
+    },
+    {
+      path: 'ramp/dimensions/users',
+      title: 'Users',
+      materialization: 'eager',
+      aliasSegments: ['by-id', 'by-email'],
+      writebackResources: [],
+    },
+  ],
+});

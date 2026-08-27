@@ -30,6 +30,14 @@ export const KNOWN_SCOPE_KEY_CATALOG = {
   "posthog": [
     "project_id"
   ],
+  "ramp": [
+    "departmentId",
+    "entityId",
+    "locationId",
+    "since",
+    "userId",
+    "vendorId"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

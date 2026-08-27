@@ -35,7 +35,7 @@ test("generated inbound capability catalog is in sync with adapter declarations"
 
   assert.deepEqual(
     generation.sources.map((source) => source.providerId),
-    ["github", "gitlab", "gmail", "hubspot", "linear", "notion", "shortcut", "slack"],
+    ["github", "gitlab", "gmail", "hubspot", "linear", "notion", "ramp", "shortcut", "slack"],
   );
 });
 
