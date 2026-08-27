@@ -56,9 +56,17 @@ export function buildRampIndexFile(
   bucket: RampIndexBucket,
   rows: RampIndexRow[],
 ): RampIndexFile {
+  const validRows = rows.filter(isRampIndexRow);
   return {
     path: rampIndexPath(bucket),
     contentType: 'application/json; charset=utf-8',
-    content: `${JSON.stringify([...rows].sort(compareRampIndexRows))}\n`,
+    content: `${JSON.stringify(validRows.sort(compareRampIndexRows))}\n`,
   };
+}
+
+function isRampIndexRow(value: RampIndexRow | Record<string, unknown>): value is RampIndexRow {
+  return typeof value.id === 'string'
+    && typeof value.title === 'string'
+    && typeof value.updated === 'string'
+    && typeof value.canonicalPath === 'string';
 }

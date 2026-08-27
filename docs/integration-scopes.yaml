@@ -1805,6 +1805,7 @@ integrations:
       - vendors:write
       - accounting:write
       - comments:write
+      - applications:read
       - unified_requests:read
       - spend_requests:read
       - custom_records:read

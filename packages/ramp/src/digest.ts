@@ -6,7 +6,7 @@ import {
   type DigestHandler,
   type DigestSection,
   type DigestWindow,
-} from '@relayfile/adapter-core/digest';
+} from '@relayfile/adapter-core';
 
 export type {
   DigestBullet,

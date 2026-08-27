@@ -23,31 +23,24 @@ test('Ramp titles follow the resource-specific fallback chain', () => {
 });
 
 test('Ramp updated timestamps follow the resource-specific fallback chain', () => {
+  const cases = [
+    ['bills', { id: 'bill-1', paid_at: '2026-08-27T15:00:00.000Z', issued_at: '2026-08-27T14:00:00.000Z', created_at: '2026-08-27T13:00:00.000Z' }, '2026-08-27T15:00:00.000Z'],
+    ['purchase-orders', { id: 'po-1', archived_at: '2026-08-27T12:00:00.000Z', created_at: '2026-08-27T11:00:00.000Z' }, '2026-08-27T12:00:00.000Z'],
+    ['item-receipts', { id: 'ir-1', archived_at: '2026-08-27T12:00:00.000Z', received_at: '2026-08-27T11:00:00.000Z', created_at: '2026-08-27T10:00:00.000Z' }, '2026-08-27T12:00:00.000Z'],
+    ['vendor-agreements', { id: 'agreement-1', updated_at: '2026-08-27T12:00:00.000Z', created_at: '2026-08-27T11:00:00.000Z' }, '2026-08-27T12:00:00.000Z'],
+    ['transactions', { id: 'txn-1', settlement_date: '2026-08-27T15:00:00.000Z', user_transaction_time: '2026-08-27T14:00:00.000Z', created_at: '2026-08-27T13:00:00.000Z' }, '2026-08-27T15:00:00.000Z'],
+    ['reimbursements', { id: 'reim-1', submitted_at: '2026-08-27T14:00:00.000Z', created_at: '2026-08-27T13:00:00.000Z' }, '2026-08-27T14:00:00.000Z'],
+    ['vendors', { id: 'vendor-1', updated_at: null, created_at: '2026-08-27T13:00:00.000Z' }, '2026-08-27T13:00:00.000Z'],
+    ['receipts', { id: 'receipt-1', created_at: '2026-08-27T13:00:00.000Z' }, '2026-08-27T13:00:00.000Z'],
+  ] as const;
+
+  for (const [resource, record, expected] of cases) {
+    assert.equal(rampUpdated(resource, record), expected);
+  }
+
   assert.equal(
-    rampUpdated('bills', {
-      id: 'bill-1',
-      paid_at: '2026-08-27T15:00:00.000Z',
-      issued_at: '2026-08-27T14:00:00.000Z',
-      created_at: '2026-08-27T13:00:00.000Z',
-    }),
-    '2026-08-27T15:00:00.000Z',
-  );
-  assert.equal(
-    rampUpdated('transactions', {
-      id: 'txn-1',
-      settlement_date: '2026-08-27T15:00:00.000Z',
-      user_transaction_time: '2026-08-27T14:00:00.000Z',
-      created_at: '2026-08-27T13:00:00.000Z',
-    }),
-    '2026-08-27T15:00:00.000Z',
-  );
-  assert.equal(
-    rampUpdated('reimbursements', {
-      id: 'reim-1',
-      submitted_at: '2026-08-27T14:00:00.000Z',
-      created_at: '2026-08-27T13:00:00.000Z',
-    }),
-    '2026-08-27T14:00:00.000Z',
+    rampUpdated('vendors', { id: 'vendor-2', updated_at: null, created_at: null }),
+    '1970-01-01T00:00:00.000Z',
   );
 });
 
@@ -76,13 +69,13 @@ test('Ramp index rows keep canonical paths plus filterable business fields', () 
   });
 });
 
-test('Ramp index rows sort newest-first then by id', () => {
+test('Ramp index rows sort newest-first by instant then id', () => {
   const rows = [
-    { id: 'b', title: 'B', updated: '2026-08-27T10:00:00.000Z', canonicalPath: '/b' },
-    { id: 'a', title: 'A', updated: '2026-08-27T10:00:00.000Z', canonicalPath: '/a' },
+    { id: 'b', title: 'B', updated: '2026-08-27T10:00:00-05:00', canonicalPath: '/b' },
+    { id: 'a', title: 'A', updated: '2026-08-27T15:00:00.000Z', canonicalPath: '/a' },
     { id: 'c', title: 'C', updated: '2026-08-27T11:00:00.000Z', canonicalPath: '/c' },
   ];
 
   rows.sort(compareRampIndexRows);
-  assert.deepEqual(rows.map((row) => row.id), ['c', 'a', 'b']);
+  assert.deepEqual(rows.map((row) => row.id), ['a', 'b', 'c']);
 });

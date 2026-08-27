@@ -5,6 +5,7 @@ import {
 } from '@relayfile/adapter-core';
 
 import { buildRampIndexFile, buildRampRootIndexFile, type RampIndexBucket } from './index-emitter.js';
+import { rampLayoutPromptFile } from './layout-prompt.js';
 import { rampByIdAliasPath, rampIndexPath } from './path-mapper.js';
 import {
   buildRampAliasPointer,
@@ -23,8 +24,10 @@ import type {
   RampIndexRow,
   RampItemReceiptRecord,
   RampPurchaseOrderRecord,
+  RampRepaymentRecord,
   RampReceiptRecord,
   RampReimbursementRecord,
+  RampTransferRecord,
   RampTransactionRecord,
   RampVendorAgreementRecord,
   RampVendorRecord,
@@ -42,8 +45,8 @@ export interface EmitRampAuxiliaryFilesInput {
   reimbursements?: readonly (RampReimbursementRecord | RampDeleteRecord)[];
   receipts?: readonly (RampReceiptRecord | RampDeleteRecord)[];
   vendors?: readonly (RampVendorRecord | RampDeleteRecord)[];
-  transfers?: readonly (RampBaseRecord | RampDeleteRecord)[];
-  repayments?: readonly (RampBaseRecord | RampDeleteRecord)[];
+  transfers?: readonly (RampTransferRecord | RampDeleteRecord)[];
+  repayments?: readonly (RampRepaymentRecord | RampDeleteRecord)[];
   dimensionEntities?: readonly (RampDimensionRecord | RampDeleteRecord)[];
   dimensionUsers?: readonly (RampDimensionRecord | RampDeleteRecord)[];
   dimensionDepartments?: readonly (RampDimensionRecord | RampDeleteRecord)[];
@@ -60,30 +63,39 @@ export async function emitRampAuxiliaryFiles(
   input: EmitRampAuxiliaryFilesInput,
 ): Promise<EmitAuxiliaryFilesResult> {
   const aggregate: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
-  const rootIndex = buildRampRootIndexFile();
 
-  await safeWrite(client, input.workspaceId, rootIndex.path, rootIndex.content, aggregate);
+  await writeStaticFiles(client, input.workspaceId, aggregate);
 
-  await emitResource(client, input.workspaceId, aggregate, 'bills', input.bills ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'purchase-orders', input.purchaseOrders ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'item-receipts', input.itemReceipts ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'vendor-agreements', input.vendorAgreements ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'transactions', input.transactions ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'reimbursements', input.reimbursements ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'receipts', input.receipts ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'vendors', input.vendors ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'transfers', input.transfers ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'repayments', input.repayments ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/entities', input.dimensionEntities ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/users', input.dimensionUsers ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/departments', input.dimensionDepartments ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/locations', input.dimensionLocations ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/merchants', input.dimensionMerchants ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'dimensions/spend-programs', input.dimensionSpendPrograms ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'accounting/accounts', input.accountingAccounts ?? [], input.connectionId);
-  await emitResource(client, input.workspaceId, aggregate, 'accounting/fields', input.accountingFields ?? [], input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'bills', input.bills, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'purchase-orders', input.purchaseOrders, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'item-receipts', input.itemReceipts, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'vendor-agreements', input.vendorAgreements, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'transactions', input.transactions, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'reimbursements', input.reimbursements, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'receipts', input.receipts, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'vendors', input.vendors, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'transfers', input.transfers, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'repayments', input.repayments, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/entities', input.dimensionEntities, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/users', input.dimensionUsers, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/departments', input.dimensionDepartments, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/locations', input.dimensionLocations, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/merchants', input.dimensionMerchants, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'dimensions/spend-programs', input.dimensionSpendPrograms, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'accounting/accounts', input.accountingAccounts, input.connectionId);
+  await emitResource(client, input.workspaceId, aggregate, 'accounting/fields', input.accountingFields, input.connectionId);
 
   return aggregate;
+}
+
+async function writeStaticFiles(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  for (const file of [buildRampRootIndexFile(), rampLayoutPromptFile()]) {
+    await safeWrite(client, workspaceId, file.path, file.content, aggregate, file.contentType);
+  }
 }
 
 async function emitResource(
@@ -91,42 +103,54 @@ async function emitResource(
   workspaceId: string,
   aggregate: EmitAuxiliaryFilesResult,
   resource: RampCanonicalResource,
-  records: readonly (RampBaseRecord | RampDeleteRecord)[],
+  records: readonly (RampBaseRecord | RampDeleteRecord)[] | undefined,
   connectionId?: string,
 ): Promise<void> {
-  if (records.length === 0) {
+  if (records === undefined) {
     return;
   }
 
-  const currentRows = await readJsonArray<RampIndexRow>(client, workspaceId, rampIndexPath(resource));
-  const rowMap = new Map(currentRows.map((row) => [row.id, row]));
+  const indexPath = rampIndexPath(resource);
+  const currentRows = await readIndexRows(client, workspaceId, indexPath, aggregate);
+  const rowMap = new Map(currentRows.rows.map((row) => [row.id, row]));
 
   for (const record of records) {
     const id = readId(record.id);
     if (!id) continue;
 
-    const byIdPath = `${resource}/by-id`;
-    void byIdPath;
-    const previousPointer = await readPreviousPointer(client, workspaceId, resource, id);
+    const previousPointer = await readPreviousPointer(client, workspaceId, resource, id, aggregate);
 
     if (isDeleteRecord(record)) {
-      rowMap.delete(id);
-      if (previousPointer) {
-        for (const aliasPath of previousPointer.aliasPaths) {
-          await safeDelete(client, workspaceId, aliasPath, aggregate);
-        }
+      if (currentRows.available) {
+        rowMap.delete(id);
+      }
+
+      const deletePaths = new Set<string>([rampByIdAliasPath(resource, id)]);
+      if (previousPointer?.canonicalPath) {
+        deletePaths.add(previousPointer.canonicalPath);
+      }
+      for (const aliasPath of previousPointer?.aliasPaths ?? []) {
+        deletePaths.add(aliasPath);
+      }
+      for (const path of deletePaths) {
+        await safeDelete(client, workspaceId, path, aggregate);
       }
       continue;
     }
 
     const row = rampIndexRow(resource, record);
-    rowMap.set(row.id, row);
+    if (currentRows.available) {
+      rowMap.set(row.id, row);
+    }
     const aliasPaths = rampAliasPaths(resource, record, row);
     const pointer = buildRampAliasPointer(resource, record, row, aliasPaths, connectionId);
     const content = `${JSON.stringify(pointer, null, 2)}\n`;
     const nextAliasSet = new Set(aliasPaths);
 
     if (previousPointer) {
+      if (previousPointer.canonicalPath && previousPointer.canonicalPath !== row.canonicalPath) {
+        await safeDelete(client, workspaceId, previousPointer.canonicalPath, aggregate);
+      }
       for (const aliasPath of previousPointer.aliasPaths) {
         if (!nextAliasSet.has(aliasPath)) {
           await safeDelete(client, workspaceId, aliasPath, aggregate);
@@ -139,6 +163,14 @@ async function emitResource(
     }
   }
 
+  if (!currentRows.available) {
+    aggregate.errors.push({
+      path: indexPath,
+      error: 'Skipped Ramp index rewrite because the existing index could not be read safely',
+    });
+    return;
+  }
+
   const indexFile = buildRampIndexFile(resource as RampIndexBucket, [...rowMap.values()].sort(compareRampIndexRows));
   await safeWrite(client, workspaceId, indexFile.path, indexFile.content, aggregate);
 }
@@ -148,44 +180,69 @@ async function readPreviousPointer(
   workspaceId: string,
   resource: RampCanonicalResource,
   id: string,
-): Promise<{ aliasPaths: string[] } | null> {
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<{ aliasPaths: string[]; canonicalPath?: string } | null> {
   if (!client.readFile) {
     return null;
   }
-  const response = await client.readFile({
-    workspaceId,
-    path: rampByIdAliasPath(resource, id),
-  });
-  if (!response?.content) {
-    return null;
-  }
   try {
-    const parsed = JSON.parse(response.content) as { aliasPaths?: unknown };
-    return Array.isArray(parsed.aliasPaths)
-      ? { aliasPaths: parsed.aliasPaths.filter((entry): entry is string => typeof entry === 'string') }
-      : null;
-  } catch {
+    const response = await client.readFile({
+      workspaceId,
+      path: rampByIdAliasPath(resource, id),
+    });
+    if (!response?.content) {
+      return null;
+    }
+    const parsed = JSON.parse(response.content) as {
+      aliasPaths?: unknown;
+      canonicalPath?: unknown;
+    };
+    const aliasPaths = Array.isArray(parsed.aliasPaths)
+      ? parsed.aliasPaths.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+    const canonicalPath = typeof parsed.canonicalPath === 'string' && parsed.canonicalPath.length > 0
+      ? parsed.canonicalPath
+      : undefined;
+    if (aliasPaths.length === 0 && !canonicalPath) {
+      return null;
+    }
+    return { aliasPaths, ...(canonicalPath ? { canonicalPath } : {}) };
+  } catch (error) {
+    aggregate.errors.push({
+      path: rampByIdAliasPath(resource, id),
+      error: stringifyError(error),
+    });
     return null;
   }
 }
 
-async function readJsonArray<T>(
+async function readIndexRows(
   client: AuxiliaryEmitterClient,
   workspaceId: string,
   path: string,
-): Promise<T[]> {
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<{ rows: RampIndexRow[]; available: boolean }> {
   if (!client.readFile) {
-    return [];
+    aggregate.errors.push({ path, error: 'readFile not supported by client' });
+    return { rows: [], available: false };
   }
   try {
     const response = await client.readFile({ workspaceId, path });
     if (!response?.content) {
-      return [];
+      return { rows: [], available: true };
     }
     const parsed = JSON.parse(response.content) as unknown;
-    return Array.isArray(parsed) ? parsed as T[] : [];
-  } catch {
-    return [];
+    if (!Array.isArray(parsed)) {
+      aggregate.errors.push({ path, error: 'Ramp index content was not a JSON array' });
+      return { rows: [], available: false };
+    }
+    return {
+      rows: parsed.filter(isRampIndexRow),
+      available: true,
+    };
+  } catch (error) {
+    aggregate.errors.push({ path, error: stringifyError(error) });
+    return { rows: [], available: false };
   }
 }
 
@@ -195,13 +252,14 @@ async function safeWrite(
   path: string,
   content: string,
   aggregate: EmitAuxiliaryFilesResult,
+  contentType = JSON_CONTENT_TYPE,
 ): Promise<void> {
   try {
     await client.writeFile({
       workspaceId,
       path,
       content,
-      contentType: JSON_CONTENT_TYPE,
+      contentType,
     });
     aggregate.written += 1;
   } catch (error) {
@@ -216,6 +274,7 @@ async function safeDelete(
   aggregate: EmitAuxiliaryFilesResult,
 ): Promise<void> {
   if (!client.deleteFile) {
+    aggregate.errors.push({ path, error: 'deleteFile not supported by client' });
     return;
   }
   try {
@@ -236,6 +295,17 @@ function readId(value: unknown): string | undefined {
 
 function isDeleteRecord(record: RampBaseRecord | RampDeleteRecord): record is RampDeleteRecord {
   return '_deleted' in record && record._deleted === true;
+}
+
+function isRampIndexRow(value: unknown): value is RampIndexRow {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const row = value as Record<string, unknown>;
+  return typeof row.id === 'string'
+    && typeof row.title === 'string'
+    && typeof row.updated === 'string'
+    && typeof row.canonicalPath === 'string';
 }
 
 function stringifyError(error: unknown): string {

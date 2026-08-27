@@ -38,7 +38,14 @@ import type {
   RampVendorRecord,
 } from './types.js';
 
+const FALLBACK_UPDATED_AT = '1970-01-01T00:00:00.000Z';
+
 export function compareRampIndexRows(left: RampIndexRow, right: RampIndexRow): number {
+  const leftMs = parseUpdatedAt(left.updated);
+  const rightMs = parseUpdatedAt(right.updated);
+  if (leftMs !== rightMs) {
+    return rightMs - leftMs;
+  }
   if (left.updated !== right.updated) {
     return right.updated.localeCompare(left.updated);
   }
@@ -301,42 +308,42 @@ export function rampUpdated(resource: RampCanonicalResource, record: RampBaseRec
       return readString((record as RampBillRecord).paid_at)
         ?? readString((record as RampBillRecord).issued_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'purchase-orders':
       return readString((record as RampPurchaseOrderRecord).archived_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'item-receipts':
       return readString((record as RampItemReceiptRecord).archived_at)
         ?? readString((record as RampItemReceiptRecord).received_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'vendor-agreements':
       return readString(record.updated_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'transactions':
       return readString(record.updated_at)
         ?? readString((record as RampTransactionRecord).settlement_date)
         ?? readString((record as RampTransactionRecord).user_transaction_time)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'reimbursements':
       return readString(record.updated_at)
         ?? readString((record as RampReimbursementRecord).submitted_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'vendors':
       return readString(record.updated_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     case 'receipts':
       return readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
     default:
       return readString(record.updated_at)
         ?? readString(record.created_at)
-        ?? fallbackNow();
+        ?? fallbackUpdatedAt();
   }
 }
 
@@ -361,6 +368,11 @@ function readString(value: unknown): string | undefined {
   return undefined;
 }
 
-function fallbackNow(): string {
-  return new Date().toISOString();
+function fallbackUpdatedAt(): string {
+  return FALLBACK_UPDATED_AT;
+}
+
+function parseUpdatedAt(value: string): number {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

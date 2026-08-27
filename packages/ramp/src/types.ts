@@ -39,7 +39,6 @@ export const RAMP_CANONICAL_RESOURCES = [
 ] as const;
 
 export type RampDirectoryResource = (typeof RAMP_DIRECTORY_RESOURCES)[number];
-export type RampFlatResource = (typeof RAMP_FLAT_RESOURCES)[number];
 export type RampCanonicalResource = (typeof RAMP_CANONICAL_RESOURCES)[number];
 
 export interface RampBaseRecord {
@@ -47,12 +46,6 @@ export interface RampBaseRecord {
   created_at?: string | null;
   updated_at?: string | null;
   [key: string]: unknown;
-}
-
-export interface RampBusinessRecord extends RampBaseRecord {
-  business_id?: string | null;
-  legal_name?: string | null;
-  display_name?: string | null;
 }
 
 export interface RampBillRecord extends RampBaseRecord {

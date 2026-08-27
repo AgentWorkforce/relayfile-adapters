@@ -62,6 +62,10 @@ function encodeSegment(value: string, label = 'path segment'): string {
   return encodeURIComponent(trimmed);
 }
 
+function encodeCompositeIdSegment(value: string, label = 'id'): string {
+  return encodeSegment(value, label).replace(/_/gu, '%5F');
+}
+
 function folderAlias(value: string): string {
   const slug = slugifyAlias(value);
   return slug || 'untitled';
@@ -92,7 +96,7 @@ export function flatNameWithId(
   id: string,
   opts: NameWithIdOptions = {},
 ): string {
-  const normalizedId = encodeSegment(id, 'id');
+  const normalizedId = encodeCompositeIdSegment(id, 'id');
   const slug = humanReadable ? slugifyAlias(humanReadable) : '';
   if (!slug) {
     return normalizedId;
@@ -109,7 +113,7 @@ export function directoryRecordSegment(
   id: string,
   humanReadable?: string,
 ): string {
-  const normalizedId = encodeSegment(id, 'id');
+  const normalizedId = encodeCompositeIdSegment(id, 'id');
   const slug = humanReadable ? slugifyAlias(humanReadable) : '';
   return slug ? `${normalizedId}__${slug}` : normalizedId;
 }
@@ -395,10 +399,11 @@ export function parseRampCanonicalPath(path: string): ParsedRampCanonicalPath | 
   if (normalized === rampBusinessPath()) {
     return { kind: 'singleton', resource: 'business' };
   }
+  if (!normalized.startsWith(`${RAMP_PATH_ROOT}/`)) {
+    return undefined;
+  }
 
-  const withoutRoot = normalized.startsWith(`${RAMP_PATH_ROOT}/`)
-    ? normalized.slice(RAMP_PATH_ROOT.length + 1)
-    : normalized.slice(1);
+  const withoutRoot = normalized.slice(RAMP_PATH_ROOT.length + 1);
   const segments = withoutRoot.split('/').filter(Boolean);
   if (segments.length < 2) {
     return undefined;
@@ -421,6 +426,10 @@ export function parseRampCanonicalPath(path: string): ParsedRampCanonicalPath | 
           humanReadable: parsed.humanReadable,
         };
       }
+      return undefined;
+    }
+
+    if (rest.length === 1 && rest[0] === '_index.json') {
       return undefined;
     }
 

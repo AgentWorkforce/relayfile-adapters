@@ -16,6 +16,7 @@ import {
   rampBillByVendorAliasPath,
   rampByIdAliasPath,
   rampIndexPath,
+  rampLayoutPath,
   rampRootIndexPath,
 } from './path-mapper.js';
 
@@ -26,13 +27,21 @@ interface MemoryClient extends AuxiliaryEmitterClient {
   files: Map<string, string>;
 }
 
-function createClient(initialFiles: Record<string, string> = {}): MemoryClient {
+type ClientOptions = {
+  failingReads?: Set<string>;
+  withDelete?: boolean;
+};
+
+function createClient(
+  initialFiles: Record<string, string> = {},
+  options: ClientOptions = {},
+): MemoryClient {
   const files = new Map<string, string>(Object.entries(initialFiles));
   const writes: EmitWriteInput[] = [];
   const deletes: EmitDeleteInput[] = [];
   const reads: EmitReadInput[] = [];
 
-  return {
+  const client: MemoryClient = {
     writes,
     deletes,
     reads,
@@ -44,23 +53,31 @@ function createClient(initialFiles: Record<string, string> = {}): MemoryClient {
     },
     async readFile(input): Promise<EmitReadResult | null> {
       reads.push(input);
+      if (options.failingReads?.has(input.path)) {
+        throw new Error(`boom:${input.path}`);
+      }
       const content = files.get(input.path);
       return content === undefined ? null : { content };
     },
-    async deleteFile(input) {
+  };
+
+  if (options.withDelete !== false) {
+    client.deleteFile = async (input) => {
       deletes.push(input);
       files.delete(input.path);
-    },
-  };
+    };
+  }
+
+  return client;
 }
 
-test('emitRampAuxiliaryFiles always writes the root index', async () => {
+test('emitRampAuxiliaryFiles always writes the root index and layout guide', async () => {
   const client = createClient();
   const result = await emitRampAuxiliaryFiles(client, { workspaceId: 'ws_1' });
 
   assert.deepEqual(result.errors, []);
-  assert.equal(client.writes.length, 1);
-  assert.equal(client.writes[0]!.path, rampRootIndexPath());
+  assert.equal(client.files.has(rampRootIndexPath()), true);
+  assert.equal(client.files.has(rampLayoutPath()), true);
   assert.deepEqual(JSON.parse(client.files.get(rampRootIndexPath()) ?? '[]')[0], {
     id: 'business',
     title: 'Business',
@@ -72,13 +89,16 @@ test('emitRampAuxiliaryFiles materializes stable by-id aliases and reconciles st
   const oldInvoiceAlias = rampBillByInvoiceNumberAliasPath('INV-OLD', 'bill_1', 'INV-OLD');
   const oldStatusAlias = rampBillByStatusAliasPath('APPROVAL_PENDING', 'bill_1', 'INV-OLD');
   const oldVendorAlias = rampBillByVendorAliasPath('Old Vendor', 'bill_1', 'INV-OLD');
+  const oldCanonicalPath = '/ramp/bills/bill_1__inv-old/meta.json';
   const client = createClient({
     [oldPointerPath]: JSON.stringify({
+      canonicalPath: oldCanonicalPath,
       aliasPaths: [oldPointerPath, oldInvoiceAlias, oldStatusAlias, oldVendorAlias],
     }),
     [oldInvoiceAlias]: '{}',
     [oldStatusAlias]: '{}',
     [oldVendorAlias]: '{}',
+    [oldCanonicalPath]: '{}',
   });
 
   const result = await emitRampAuxiliaryFiles(client, {
@@ -98,6 +118,7 @@ test('emitRampAuxiliaryFiles materializes stable by-id aliases and reconciles st
   assert.ok(client.files.has(rampBillByInvoiceNumberAliasPath('INV-NEW', 'bill_1', 'INV-NEW')));
   assert.ok(client.files.has(rampBillByStatusAliasPath('PAID', 'bill_1', 'INV-NEW')));
   assert.ok(client.files.has(rampBillByVendorAliasPath('New Vendor', 'bill_1', 'INV-NEW')));
+  assert.ok(!client.files.has(oldCanonicalPath));
   assert.ok(!client.files.has(oldInvoiceAlias));
   assert.ok(!client.files.has(oldStatusAlias));
   assert.ok(!client.files.has(oldVendorAlias));
@@ -107,8 +128,57 @@ test('emitRampAuxiliaryFiles materializes stable by-id aliases and reconciles st
     id: 'bill_1',
     title: 'INV-NEW',
     updated: '2026-08-27T15:00:00.000Z',
-    canonicalPath: '/ramp/bills/bill_1__inv-new/meta.json',
+    canonicalPath: '/ramp/bills/bill%5F1__inv-new/meta.json',
     status: 'PAID',
     vendor_id: 'vendor_1',
   }]);
+});
+
+test('emitRampAuxiliaryFiles materializes empty indexes for explicitly synced empty resources', async () => {
+  const client = createClient();
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    receipts: [],
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(client.files.get(rampIndexPath('receipts')), '[]\n');
+  assert.equal(client.files.has(rampIndexPath('bills')), false);
+});
+
+test('emitRampAuxiliaryFiles skips index rewrites when it cannot read the prior index safely', async () => {
+  const indexPath = rampIndexPath('bills');
+  const client = createClient({}, { failingReads: new Set([indexPath]) });
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [{
+      id: 'bill_1',
+      invoice_number: 'INV-NEW',
+      vendor: { id: 'vendor_1', name: 'New Vendor' },
+      status: 'PAID',
+      paid_at: '2026-08-27T15:00:00.000Z',
+    }],
+  });
+
+  assert.equal(client.files.has(indexPath), false);
+  assert.ok(client.files.has(rampByIdAliasPath('bills', 'bill_1')));
+  assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp index rewrite/u.test(error.error)));
+});
+
+test('emitRampAuxiliaryFiles reports deleteFile gaps instead of silently skipping cleanup', async () => {
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const client = createClient({
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: '/ramp/bills/bill_1__inv-old/meta.json',
+      aliasPaths: [oldPointerPath],
+    }),
+  }, { withDelete: false });
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [{ id: 'bill_1', _deleted: true }],
+  });
+
+  assert.ok(result.errors.some((error) => /deleteFile not supported by client/u.test(error.error)));
 });

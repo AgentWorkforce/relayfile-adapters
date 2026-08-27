@@ -38,6 +38,10 @@ export interface RampWebhookSignatureValidationResult {
   receivedSignature?: string;
 }
 
+export interface NormalizeRampWebhookOptions {
+  webhookSecret?: string;
+}
+
 const CONNECTION_ID_HEADER_KEYS = [
   'x-relay-connection-id',
   'x-connection-id',
@@ -55,9 +59,17 @@ const PROVIDER_CONFIG_KEY_HEADER_KEYS = [
 export function normalizeRampWebhook(
   rawPayload: unknown,
   headers: RampWebhookHeaders = {},
+  options: NormalizeRampWebhookOptions = {},
 ): NormalizedRampWebhook {
-  const payload = parseRampWebhookPayload(rawPayload);
   const normalizedHeaders = normalizeHeaders(headers);
+  if (options.webhookSecret !== undefined) {
+    if (!isRawWebhookBody(rawPayload)) {
+      throw new Error('Ramp webhook signature validation requires the original raw request body.');
+    }
+    assertValidRampWebhookSignature(rawPayload, normalizedHeaders, options.webhookSecret);
+  }
+
+  const payload = parseRampWebhookPayload(rawPayload);
   const eventType = readNonEmptyString(payload.type) ?? readNonEmptyString(payload.event_type);
   if (!eventType) {
     throw new Error('Ramp webhook payload missing type');
@@ -230,8 +242,8 @@ function extractRampObjectId(
   if (eventType === 'webhooks.verification' || eventType === 'tests.test_event') {
     return (
       readNonEmptyString(payload.webhook_id) ??
-      eventId ??
-      readNonEmptyString(payload.challenge)
+      readNonEmptyString(payload.challenge) ??
+      eventId
     );
   }
 
@@ -239,9 +251,6 @@ function extractRampObjectId(
 }
 
 function decodeWebhookPayload(rawPayload: unknown): unknown {
-  if (isRecord(rawPayload)) {
-    return rawPayload;
-  }
   if (typeof rawPayload === 'string') {
     return JSON.parse(rawPayload) as unknown;
   }
@@ -250,6 +259,9 @@ function decodeWebhookPayload(rawPayload: unknown): unknown {
   }
   if (rawPayload instanceof ArrayBuffer) {
     return JSON.parse(Buffer.from(rawPayload).toString('utf8')) as unknown;
+  }
+  if (isRecord(rawPayload)) {
+    return rawPayload;
   }
   throw new Error('Ramp webhook payload must be JSON object, string, Uint8Array, or ArrayBuffer.');
 }
@@ -321,6 +333,12 @@ function readNonEmptyString(value: unknown): string | undefined {
     return String(value);
   }
   return undefined;
+}
+
+function isRawWebhookBody(value: unknown): value is string | Uint8Array | ArrayBuffer {
+  return typeof value === 'string'
+    || value instanceof Uint8Array
+    || value instanceof ArrayBuffer;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

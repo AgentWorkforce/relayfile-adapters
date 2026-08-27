@@ -13,10 +13,12 @@ Mount a Ramp business as a filesystem so a finance agent can `cat` a bill, a pur
 order, or a transaction — and, in phase 3, code a transaction or draft a bill by writing
 a file.
 
-**In scope** (the seven resources the design partner asked for, plus the dimension reads
-that make them legible): bills, item receipts, payments, purchase orders, reimbursements,
-transactions, vendor agreements, vendors, receipts, transfers, repayments, and the
-entity / user / department / location / merchant / GL-account dimension tables.
+**In scope** (the design-partner resources, plus the dimension reads that make them
+legible): bills, item receipts, purchase orders, reimbursements, transactions, vendor
+agreements, vendors, receipts, transfers, repayments, and the entity / user /
+department / location / merchant / spend-program / GL-account dimension tables. Payment
+data is surfaced inside the owning bill record; there is no standalone
+`/ramp/payments/` resource.
 
 **Out of scope**: cards, card vault, limits, funds, treasury balances, spend programs
 beyond a read-only dimension mount, `/developer/v1/statements` (see §3), incorporation,
@@ -58,14 +60,15 @@ Three traps that will otherwise cost an afternoon:
   Treat `/developer/v1/statements` as out of scope until that is resolved; do not build a
   statements resource that dies on a 403 for the first customer.
 
-Webhook management requires **no scope at all** — all six `/developer/v1/webhooks*`
-operations ship `security: []` in the OpenAPI.
+Webhook management requires **no specific OAuth scope**, but it still requires a valid
+OAuth access token. The `/developer/v1/webhooks*` operations currently ship an `oauth2`
+security requirement with an empty scope list in the OpenAPI.
 
 ## 4. VFS layout
 
 Root `/ramp`. One tree per business (a Nango connection == one Ramp business).
 
-```
+```text
 /ramp/LAYOUT.md
 /ramp/_index.json
 /ramp/business.json                                  # GET /business
@@ -304,7 +307,7 @@ Source these schemas from the Ramp OpenAPI via `contractEndpoint(...)` /
 
 ## 9. Files to create
 
-```
+```text
 packages/ramp/
   package.json               # no "private", version field present, do NOT bump versions in the feature PR
   tsconfig.json
