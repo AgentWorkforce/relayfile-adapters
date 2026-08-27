@@ -34,6 +34,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-github` pull-index convergence now fails closed when a page cannot be persisted and reports fetched versus persisted row counts separately, preventing exhausted CAS writes from appearing complete.
 - `@relayfile/adapter-linear` issue creates now accept synced `team.id` and label ids directly, resolve `team.key`/`team.name` plus label names through mounted team/label indexes, and keep explicit `teamId`/`labelIds` authoritative; adapter-core now enforces the schema's at-least-one team reference.
 - `@relayfile/adapter-github` now backfills label names into legacy issue `_index.json` rows from materialized issue artifacts, keeping label-filtered consumers on the index-only path.
 - `@relayfile/adapter-core` direct HTTP create-draft writes now reuse the mount daemon's content identity, so a later mount echo coalesces onto the original revision and writeback operation instead of making its receipt context unreadable.

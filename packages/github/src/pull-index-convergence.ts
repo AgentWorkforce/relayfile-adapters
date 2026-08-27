@@ -44,8 +44,10 @@ export interface ConvergeRepoPullIndexResult extends IngestResult {
   done: boolean;
   /** Page fetched by this invocation. Useful for progress logging. */
   page: number;
-  /** Pull rows fetched and reconciled by this invocation. */
+  /** Pull rows fetched from GitHub by this invocation. */
   pullRequestsScanned: number;
+  /** Pull rows durably reconciled into the index by this invocation. */
+  pullRequestsPersisted: number;
   /**
    * GitHub list operations issued by this invocation. This is always one.
    * The primitive deliberately leaves retries to its idempotent caller so a
@@ -54,6 +56,28 @@ export interface ConvergeRepoPullIndexResult extends IngestResult {
   githubRequests: 1;
   /** Present only while another page remains. Bound to the owner/repository. */
   cursor?: string;
+}
+
+export class PullIndexConvergenceError extends Error {
+  readonly page: number;
+  readonly path: string;
+  readonly pullRequestsScanned: number;
+  readonly writeErrors: IngestResult['errors'];
+
+  constructor(
+    path: string,
+    page: number,
+    pullRequestsScanned: number,
+    writeErrors: IngestResult['errors'],
+  ) {
+    const detail = writeErrors.map(({ error }) => error).join('; ') || 'index write did not complete';
+    super(`failed to persist pull-index page ${page} to ${path}: ${detail}`);
+    this.name = 'PullIndexConvergenceError';
+    this.path = path;
+    this.page = page;
+    this.pullRequestsScanned = pullRequestsScanned;
+    this.writeErrors = writeErrors;
+  }
 }
 
 /**
@@ -69,7 +93,9 @@ export interface ConvergeRepoPullIndexResult extends IngestResult {
  *
  * Page rows are merged into the current index instead of replacing it from an
  * empty baseline. That makes retries idempotent and lets CAS preserve rows or
- * richer fields written concurrently by webhook/direct ingestion.
+ * richer fields written concurrently by webhook/direct ingestion. A page whose
+ * CAS attempts are exhausted rejects without returning a cursor or `done`, so
+ * callers cannot advance past rows that were fetched but not persisted.
  */
 export async function convergeRepoPullIndex(
   workspaceId: string,
@@ -115,9 +141,25 @@ export async function convergeRepoPullIndex(
     ),
   );
 
+  const path = githubRepoPullsIndexPath(owner, repo);
   const writeResult = rows.length > 0
     ? await reconcilePullIndexPage(vfs, owner, repo, rows)
     : emptyIngestResult();
+  if (
+    rows.length > 0
+    && (
+      writeResult.errors.length > 0
+      || writeResult.filesWritten + writeResult.filesUpdated !== 1
+      || !writeResult.paths.includes(path)
+    )
+  ) {
+    throw new PullIndexConvergenceError(
+      path,
+      page,
+      rows.length,
+      writeResult.errors,
+    );
+  }
   const done = rows.length < PULL_INDEX_PAGE_SIZE;
 
   return {
@@ -125,6 +167,7 @@ export async function convergeRepoPullIndex(
     done,
     page,
     pullRequestsScanned: rows.length,
+    pullRequestsPersisted: rows.length,
     githubRequests: 1,
     ...(!done ? { cursor: formatCursor(owner, repo, page + 1) } : {}),
   };

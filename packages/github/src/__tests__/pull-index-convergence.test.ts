@@ -20,10 +20,12 @@ class PullIndexProvider {
   readonly name = 'pull-index-provider';
   readonly connectionId = 'conn-pull-index';
   readonly requests: ProxyRequest[] = [];
+  readonly writeAttempts: string[] = [];
   readonly writes: string[] = [];
   readonly files = new Map<string, StoredFile>();
   private revision = 0;
   private concurrentRow: Record<string, unknown> | undefined;
+  private staleReads: { path: string; remaining: number; value: StoredFile } | undefined;
 
   constructor(private readonly pulls: ReturnType<typeof createPull>[]) {}
 
@@ -43,6 +45,10 @@ class PullIndexProvider {
   }
 
   readFile(path: string): { content: string; revision: string } | undefined {
+    if (this.staleReads?.path === path && this.staleReads.remaining > 0) {
+      this.staleReads.remaining -= 1;
+      return { ...this.staleReads.value };
+    }
     const stored = this.files.get(path);
     return stored ? { ...stored } : undefined;
   }
@@ -52,6 +58,7 @@ class PullIndexProvider {
     content: string,
     options?: { baseRevision?: string },
   ): void {
+    this.writeAttempts.push(path);
     if (path === PULL_INDEX_PATH && this.concurrentRow) {
       const currentBeforePeer = this.files.get(path);
       const rows = currentBeforePeer
@@ -86,6 +93,22 @@ class PullIndexProvider {
 
   injectConcurrentRowOnNextWrite(row: Record<string, unknown>): void {
     this.concurrentRow = row;
+  }
+
+  advanceIndexWithStaleReads(row: Record<string, unknown>, staleReadCount: number): void {
+    const current = this.files.get(PULL_INDEX_PATH);
+    assert.ok(current, 'pull index must be seeded before simulating a stale read');
+    const rows = JSON.parse(current.content) as Array<Record<string, unknown>>;
+    this.staleReads = {
+      path: PULL_INDEX_PATH,
+      remaining: staleReadCount,
+      value: { ...current },
+    };
+    this.revision += 1;
+    this.files.set(PULL_INDEX_PATH, {
+      content: `${JSON.stringify([...rows, row])}\n`,
+      revision: `r${this.revision}`,
+    });
   }
 
   text(path: string): string {
@@ -164,6 +187,7 @@ describe('convergeRepoPullIndex', () => {
       done: true,
       page: 1,
       pullRequestsScanned: 2,
+      pullRequestsPersisted: 2,
       githubRequests: 1,
     });
 
@@ -191,6 +215,7 @@ describe('convergeRepoPullIndex', () => {
     assert.equal(first.done, false);
     assert.equal(first.page, 1);
     assert.equal(first.pullRequestsScanned, 100);
+    assert.equal(first.pullRequestsPersisted, 100);
     assert.ok(first.cursor);
     assert.equal(provider.requests.length, 1);
 
@@ -200,6 +225,7 @@ describe('convergeRepoPullIndex', () => {
     assert.equal(second.done, false);
     assert.equal(second.page, 2);
     assert.equal(second.pullRequestsScanned, 100);
+    assert.equal(second.pullRequestsPersisted, 100);
     assert.ok(second.cursor);
     assert.equal(provider.requests.length, 2);
 
@@ -209,10 +235,19 @@ describe('convergeRepoPullIndex', () => {
     assert.equal(third.done, true);
     assert.equal(third.page, 3);
     assert.equal(third.pullRequestsScanned, 38);
+    assert.equal(third.pullRequestsPersisted, 38);
     assert.equal(third.cursor, undefined);
     assert.equal(provider.requests.length, 3);
 
     const rows = JSON.parse(provider.text(PULL_INDEX_PATH)) as Array<Record<string, unknown>>;
+    const scanned = first.pullRequestsScanned
+      + second.pullRequestsScanned
+      + third.pullRequestsScanned;
+    const persisted = first.pullRequestsPersisted
+      + second.pullRequestsPersisted
+      + third.pullRequestsPersisted;
+    assert.equal(persisted, scanned, 'every scanned row must be reported persisted');
+    assert.equal(rows.length, persisted, 'persisted accounting must match the stored index');
     assert.equal(rows.length, 238);
     assert.ok(rows.every((row) => typeof row.headRef === 'string' && row.headRef.length > 0));
     assert.deepEqual(
@@ -280,6 +315,35 @@ describe('convergeRepoPullIndex', () => {
     assert.deepEqual(rows.map((row) => row.id), ['99', '7']);
     assert.equal(rows.find((row) => row.id === '99')?.headRef, 'feature/webhook');
     assert.equal(rows.find((row) => row.id === '7')?.headRef, 'feature/AR-7');
+  });
+
+  it('rejects the page when stale reads exhaust every CAS write attempt', async () => {
+    const provider = new PullIndexProvider([createPull(7, { headRef: 'feature/AR-7' })]);
+    provider.seed(PULL_INDEX_PATH, []);
+    provider.advanceIndexWithStaleReads({
+      id: '99',
+      title: 'Webhook-created pull',
+      updated: '2026-08-25T12:30:00Z',
+      number: 99,
+      state: 'open',
+      headRef: 'feature/webhook',
+    }, 3);
+
+    await assert.rejects(
+      convergeRepoPullIndex('workspace-1', provider, config(), OWNER, REPO),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.name, 'PullIndexConvergenceError');
+        assert.match(error.message, /failed to persist pull-index page 1/);
+        return true;
+      },
+    );
+
+    assert.equal(provider.requests.length, 1, 'CAS retries do not repeat the GitHub list call');
+    assert.equal(provider.writeAttempts.length, 3, 'every bounded CAS attempt must conflict');
+    assert.equal(provider.writes.length, 0, 'the fetched page never reached the index');
+    const rows = JSON.parse(provider.text(PULL_INDEX_PATH)) as Array<Record<string, unknown>>;
+    assert.deepEqual(rows.map((row) => row.id), ['99']);
   });
 
   it('rejects a cursor from another repository before spending a request', async () => {
