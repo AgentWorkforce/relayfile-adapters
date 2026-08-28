@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-ramp",
-  "version": "0.1.0",
+  "version": "0.5.24",
   "description": "Ramp adapter package for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -61,7 +61,7 @@
     "directory": "packages/ramp"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.22"
+    "@relayfile/adapter-core": "^0.5.24"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
