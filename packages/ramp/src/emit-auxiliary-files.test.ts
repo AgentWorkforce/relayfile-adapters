@@ -146,20 +146,22 @@ test('emitRampAuxiliaryFiles materializes empty indexes for explicitly synced em
   assert.equal(client.files.has(rampIndexPath('bills')), false);
 });
 
-test('emitRampAuxiliaryFiles skips index rewrites when it cannot read the prior index safely', async () => {
+test('emitRampAuxiliaryFiles skips index rewrites but still writes current aliases when it cannot read the prior index safely', async () => {
   const indexPath = rampIndexPath('bills');
   const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
   const oldInvoiceAlias = rampBillByInvoiceNumberAliasPath('INV-OLD', 'bill_1', 'INV-OLD');
   const oldCanonicalPath = '/ramp/bills/bill_1__inv-old/meta.json';
-  const oldPointerContent = JSON.stringify({
-    canonicalPath: oldCanonicalPath,
-    aliasPaths: [oldPointerPath, oldInvoiceAlias],
-  });
   const client = createClient({
-    [oldPointerPath]: oldPointerContent,
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: oldCanonicalPath,
+      aliasPaths: [oldPointerPath, oldInvoiceAlias],
+    }),
     [oldInvoiceAlias]: '{}',
     [oldCanonicalPath]: '{}',
   }, { failingReads: new Set([indexPath]) });
+  const newInvoiceAlias = rampBillByInvoiceNumberAliasPath('INV-NEW', 'bill_1', 'INV-NEW');
+  const newStatusAlias = rampBillByStatusAliasPath('PAID', 'bill_1', 'INV-NEW');
+  const newVendorAlias = rampBillByVendorAliasPath('New Vendor', 'bill_1', 'INV-NEW');
 
   const result = await emitRampAuxiliaryFiles(client, {
     workspaceId: 'ws_1',
@@ -173,11 +175,69 @@ test('emitRampAuxiliaryFiles skips index rewrites when it cannot read the prior 
   });
 
   assert.equal(client.files.has(indexPath), false);
-  assert.equal(client.files.get(oldPointerPath), oldPointerContent);
   assert.equal(client.files.has(oldInvoiceAlias), true);
   assert.equal(client.files.has(oldCanonicalPath), true);
+  assert.equal(client.files.has(newInvoiceAlias), true);
+  assert.equal(client.files.has(newStatusAlias), true);
+  assert.equal(client.files.has(newVendorAlias), true);
   assert.deepEqual(client.deletes, []);
-  assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp resource mutation/u.test(error.error)));
+
+  const pointer = JSON.parse(client.files.get(oldPointerPath) ?? '{}') as {
+    canonicalPath?: string;
+    aliasPaths?: string[];
+  };
+  assert.equal(pointer.canonicalPath, '/ramp/bills/bill%5F1__inv-new/meta.json');
+  assert.deepEqual(pointer.aliasPaths, [
+    oldPointerPath,
+    newInvoiceAlias,
+    newVendorAlias,
+    newStatusAlias,
+  ]);
+  assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp index reconciliation/u.test(error.error)));
+});
+
+test('emitRampAuxiliaryFiles ignores malformed canonical cleanup paths from persisted pointers', async () => {
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const malformedCanonicalPath = '/ramp/bills/bill%ZZ__inv-old/meta.json';
+  const client = createClient({
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: malformedCanonicalPath,
+      aliasPaths: [oldPointerPath],
+    }),
+    [malformedCanonicalPath]: '{}',
+  });
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [{ id: 'bill_1', _deleted: true }],
+  });
+
+  assert.equal(client.deletes.some((entry) => entry.path === malformedCanonicalPath), false);
+  assert.equal(client.files.has(malformedCanonicalPath), true);
+  assert.ok(result.errors.some((error) => /Skipped unsafe Ramp canonicalPath cleanup/u.test(error.error)));
+});
+
+test('emitRampAuxiliaryFiles ignores unsafe alias cleanup paths from persisted pointers', async () => {
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const oldCanonicalPath = '/ramp/bills/bill_1__inv-old/meta.json';
+  const unsafeAliasPath = rampBillByStatusAliasPath('PAID', 'bill_2', 'INV-2');
+  const client = createClient({
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: oldCanonicalPath,
+      aliasPaths: [oldPointerPath, unsafeAliasPath],
+    }),
+    [oldCanonicalPath]: '{}',
+    [unsafeAliasPath]: '{}',
+  });
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [{ id: 'bill_1', _deleted: true }],
+  });
+
+  assert.equal(client.deletes.some((entry) => entry.path === unsafeAliasPath), false);
+  assert.equal(client.files.has(unsafeAliasPath), true);
+  assert.ok(result.errors.some((error) => /Skipped unsafe Ramp aliasPath cleanup/u.test(error.error)));
 });
 
 test('emitRampAuxiliaryFiles ignores unsafe canonical cleanup paths from persisted pointers', async () => {
