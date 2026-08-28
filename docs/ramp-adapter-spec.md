@@ -61,8 +61,8 @@ Three traps that will otherwise cost an afternoon:
   statements resource that dies on a 403 for the first customer.
 
 Webhook management requires **no specific OAuth scope**, but it still requires a valid
-OAuth access token. The `/developer/v1/webhooks*` operations currently ship an `oauth2`
-security requirement with an empty scope list in the OpenAPI.
+OAuth access token. The `/developer/v1/webhooks*` operations currently ship
+`security: [{ oauth2: [] }]` in the OpenAPI.
 
 ## 4. VFS layout
 
@@ -334,6 +334,7 @@ npx adapter-core inbound generate
 node scripts/generate-writeback-discovery.mjs   # after updating scripts/writeback-discovery-data.mjs
 npm run gen -w @relayfile/relay-helpers          # new writeback provider ⇒ regenerate clients
 node scripts/resolve-publish-targets.mjs all     # confirm packages/ramp is discovered
+npm run test:digest-contracts                    # required after adapter/layout changes
 npx turbo build typecheck test                   # must pass before the PR
 ```
 

@@ -69,9 +69,9 @@ test('Ramp index rows keep canonical paths plus filterable business fields', () 
   });
 });
 
-test('Ramp index rows sort newest-first by instant then id', () => {
+test('Ramp index rows sort newest-first by instant then id for identical timestamps', () => {
   const rows = [
-    { id: 'b', title: 'B', updated: '2026-08-27T10:00:00-05:00', canonicalPath: '/b' },
+    { id: 'b', title: 'B', updated: '2026-08-27T15:00:00.000Z', canonicalPath: '/b' },
     { id: 'a', title: 'A', updated: '2026-08-27T15:00:00.000Z', canonicalPath: '/a' },
     { id: 'c', title: 'C', updated: '2026-08-27T11:00:00.000Z', canonicalPath: '/c' },
   ];

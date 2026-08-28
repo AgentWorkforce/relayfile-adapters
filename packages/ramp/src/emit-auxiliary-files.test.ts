@@ -148,7 +148,18 @@ test('emitRampAuxiliaryFiles materializes empty indexes for explicitly synced em
 
 test('emitRampAuxiliaryFiles skips index rewrites when it cannot read the prior index safely', async () => {
   const indexPath = rampIndexPath('bills');
-  const client = createClient({}, { failingReads: new Set([indexPath]) });
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const oldInvoiceAlias = rampBillByInvoiceNumberAliasPath('INV-OLD', 'bill_1', 'INV-OLD');
+  const oldCanonicalPath = '/ramp/bills/bill_1__inv-old/meta.json';
+  const oldPointerContent = JSON.stringify({
+    canonicalPath: oldCanonicalPath,
+    aliasPaths: [oldPointerPath, oldInvoiceAlias],
+  });
+  const client = createClient({
+    [oldPointerPath]: oldPointerContent,
+    [oldInvoiceAlias]: '{}',
+    [oldCanonicalPath]: '{}',
+  }, { failingReads: new Set([indexPath]) });
 
   const result = await emitRampAuxiliaryFiles(client, {
     workspaceId: 'ws_1',
@@ -162,8 +173,29 @@ test('emitRampAuxiliaryFiles skips index rewrites when it cannot read the prior 
   });
 
   assert.equal(client.files.has(indexPath), false);
-  assert.ok(client.files.has(rampByIdAliasPath('bills', 'bill_1')));
-  assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp index rewrite/u.test(error.error)));
+  assert.equal(client.files.get(oldPointerPath), oldPointerContent);
+  assert.equal(client.files.has(oldInvoiceAlias), true);
+  assert.equal(client.files.has(oldCanonicalPath), true);
+  assert.deepEqual(client.deletes, []);
+  assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp resource mutation/u.test(error.error)));
+});
+
+test('emitRampAuxiliaryFiles ignores unsafe canonical cleanup paths from persisted pointers', async () => {
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const client = createClient({
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: '/workspace/secrets.txt',
+      aliasPaths: [oldPointerPath],
+    }),
+  });
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [{ id: 'bill_1', _deleted: true }],
+  });
+
+  assert.equal(client.deletes.some((entry) => entry.path === '/workspace/secrets.txt'), false);
+  assert.ok(result.errors.some((error) => /Skipped unsafe Ramp canonicalPath cleanup/u.test(error.error)));
 });
 
 test('emitRampAuxiliaryFiles reports deleteFile gaps instead of silently skipping cleanup', async () => {

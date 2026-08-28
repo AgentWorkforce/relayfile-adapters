@@ -6,7 +6,7 @@ import {
 
 import { buildRampIndexFile, buildRampRootIndexFile, type RampIndexBucket } from './index-emitter.js';
 import { rampLayoutPromptFile } from './layout-prompt.js';
-import { rampByIdAliasPath, rampIndexPath } from './path-mapper.js';
+import { parseRampCanonicalPath, rampByIdAliasPath, rampIndexPath, rampResourceRoot } from './path-mapper.js';
 import {
   buildRampAliasPointer,
   compareRampIndexRows,
@@ -112,6 +112,13 @@ async function emitResource(
 
   const indexPath = rampIndexPath(resource);
   const currentRows = await readIndexRows(client, workspaceId, indexPath, aggregate);
+  if (!currentRows.available) {
+    aggregate.errors.push({
+      path: indexPath,
+      error: 'Skipped Ramp resource mutation because the existing index could not be read safely',
+    });
+    return;
+  }
   const rowMap = new Map(currentRows.rows.map((row) => [row.id, row]));
 
   for (const record of records) {
@@ -121,15 +128,14 @@ async function emitResource(
     const previousPointer = await readPreviousPointer(client, workspaceId, resource, id, aggregate);
 
     if (isDeleteRecord(record)) {
-      if (currentRows.available) {
-        rowMap.delete(id);
-      }
+      rowMap.delete(id);
 
       const deletePaths = new Set<string>([rampByIdAliasPath(resource, id)]);
-      if (previousPointer?.canonicalPath) {
-        deletePaths.add(previousPointer.canonicalPath);
+      const previousCanonicalPath = safePriorCanonicalPath(previousPointer?.canonicalPath, resource, id, aggregate);
+      if (previousCanonicalPath) {
+        deletePaths.add(previousCanonicalPath);
       }
-      for (const aliasPath of previousPointer?.aliasPaths ?? []) {
+      for (const aliasPath of safePriorAliasPaths(previousPointer?.aliasPaths ?? [], resource)) {
         deletePaths.add(aliasPath);
       }
       for (const path of deletePaths) {
@@ -139,19 +145,18 @@ async function emitResource(
     }
 
     const row = rampIndexRow(resource, record);
-    if (currentRows.available) {
-      rowMap.set(row.id, row);
-    }
+    rowMap.set(row.id, row);
     const aliasPaths = rampAliasPaths(resource, record, row);
     const pointer = buildRampAliasPointer(resource, record, row, aliasPaths, connectionId);
     const content = `${JSON.stringify(pointer, null, 2)}\n`;
     const nextAliasSet = new Set(aliasPaths);
 
     if (previousPointer) {
-      if (previousPointer.canonicalPath && previousPointer.canonicalPath !== row.canonicalPath) {
-        await safeDelete(client, workspaceId, previousPointer.canonicalPath, aggregate);
+      const previousCanonicalPath = safePriorCanonicalPath(previousPointer.canonicalPath, resource, id, aggregate);
+      if (previousCanonicalPath && previousCanonicalPath !== row.canonicalPath) {
+        await safeDelete(client, workspaceId, previousCanonicalPath, aggregate);
       }
-      for (const aliasPath of previousPointer.aliasPaths) {
+      for (const aliasPath of safePriorAliasPaths(previousPointer.aliasPaths, resource)) {
         if (!nextAliasSet.has(aliasPath)) {
           await safeDelete(client, workspaceId, aliasPath, aggregate);
         }
@@ -161,14 +166,6 @@ async function emitResource(
     for (const aliasPath of aliasPaths) {
       await safeWrite(client, workspaceId, aliasPath, content, aggregate);
     }
-  }
-
-  if (!currentRows.available) {
-    aggregate.errors.push({
-      path: indexPath,
-      error: 'Skipped Ramp index rewrite because the existing index could not be read safely',
-    });
-    return;
   }
 
   const indexFile = buildRampIndexFile(resource as RampIndexBucket, [...rowMap.values()].sort(compareRampIndexRows));
@@ -306,6 +303,31 @@ function isRampIndexRow(value: unknown): value is RampIndexRow {
     && typeof row.title === 'string'
     && typeof row.updated === 'string'
     && typeof row.canonicalPath === 'string';
+}
+
+function safePriorCanonicalPath(
+  path: string | undefined,
+  resource: RampCanonicalResource,
+  id: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+  const parsed = parseRampCanonicalPath(path);
+  if (parsed?.resource === resource && parsed.id === id) {
+    return path;
+  }
+  aggregate.errors.push({
+    path,
+    error: `Skipped unsafe Ramp canonicalPath cleanup for ${resource} ${id}`,
+  });
+  return undefined;
+}
+
+function safePriorAliasPaths(paths: readonly string[], resource: RampCanonicalResource): string[] {
+  const prefix = `${rampResourceRoot(resource)}/`;
+  return paths.filter((path) => path.startsWith(prefix) && path.endsWith('.json'));
 }
 
 function stringifyError(error: unknown): string {

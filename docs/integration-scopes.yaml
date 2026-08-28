@@ -1836,8 +1836,9 @@ integrations:
       (3) `statements:read` appears in the published OpenAPI and the picker but
       was reported unavailable on the Gil app registration, so it is excluded
       here and `/developer/v1/statements` is out of scope for the adapter.
-      Webhook management needs NO scope — all six `/developer/v1/webhooks*`
-      operations ship `security: []`; what they need is a public HTTPS endpoint
+      Webhook management needs no specific OAuth scope, but it still requires a
+      valid OAuth access token — all six `/developer/v1/webhooks*` operations
+      ship `security: [{ oauth2: [] }]`. They also need a public HTTPS endpoint
       that answers Ramp's verification challenge. Event payloads are thin
       (`{ id, type, created_at, business_id, object: { id } }`), so the read
       scope for a resource is what actually makes its events useful. Auth must
