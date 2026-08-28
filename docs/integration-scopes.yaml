@@ -1,6 +1,6 @@
 version: 1
 title: Relayfile integration scope catalog
-updated: "2026-05-17"
+updated: "2026-08-27"
 purpose: >
   Machine-readable scope inventory for Relayfile adapter evals and app
   registration. Entries start as pending unless scopes were already provided or
@@ -1764,3 +1764,89 @@ integrations:
     sources:
       - local-priority-doc
     notes: "No OAuth app scopes; eval should capture host/user/path permissions separately."
+
+  - slug: ramp
+    display_name: Ramp
+    category: finance
+    status: implemented
+    package: "@relayfile/adapter-ramp"
+    nango_slug: ramp
+    auth_model: oauth
+    scope_status: verified
+    required_scopes:
+      - openid
+      - offline_access
+      - bills:read
+      - item_receipts:read
+      - purchase_orders:read
+      - reimbursements:read
+      - transactions:read
+      - vendors:read
+      - receipts:read
+      - transfers:read
+      - repayments:read
+      - business:read
+      - entities:read
+      - users:read
+      - departments:read
+      - locations:read
+      - merchants:read
+      - accounting:read
+      - spend_programs:read
+    candidate_scopes:
+      - memos:read
+      - memos:write
+      - transactions:write
+      - bills:write
+      - purchase_orders:write
+      - item_receipts:write
+      - reimbursements:write
+      - receipts:write
+      - vendors:write
+      - accounting:write
+      - comments:write
+      - applications:read
+      - unified_requests:read
+      - spend_requests:read
+      - custom_records:read
+      - custom_forms:read
+      - audit_logs:read
+      - cards:read
+      - limits:read
+    sources:
+      - https://docs.ramp.com/openapi/developer-api.json
+      - https://docs.ramp.com/llms-guides/webhooks.txt
+      - https://docs.ramp.com/developer-api/v1/overview/scopes
+      - https://nango.dev/docs/integrations/all/ramp
+      - https://raw.githubusercontent.com/NangoHQ/nango/master/packages/providers/providers.yaml
+      - usegil-ramp-app-registration-screenshots-2026-08-27
+    notes: >-
+      Verified against Ramp's published OpenAPI (per-operation `security` blocks
+      name the exact scope for every endpoint) and the Gil app-registration scope
+      picker. Required scopes cover the seven resources Gil asked for — Bills,
+      Item Receipts, Payments, Purchase Orders, Reimbursements, Transactions,
+      Vendor Agreements — plus the dimension reads that make records legible
+      (entity/user/department/location/merchant/GL resolution); without those,
+      every synced record is opaque UUIDs. Three scope-name traps: (1) there is
+      no `payments:*` scope — Ramp's webhook guide states "Payments: No public
+      OAuth scope", and payment data is read through `bills:read` (incl.
+      `/bills/{id}/remittance-receipt`), `reimbursements:read`, `transfers:read`,
+      and `repayments:read`; (2) there is no `vendor_agreements:*` scope —
+      `/vendors/agreements/*` is gated by `vendors:read` / `vendors:write`;
+      (3) `statements:read` appears in the published OpenAPI and the picker but
+      was reported unavailable on the Gil app registration, so it is excluded
+      here and `/developer/v1/statements` is out of scope for the adapter.
+      Webhook management needs no specific OAuth scope, but it still requires a
+      valid OAuth access token — all six `/developer/v1/webhooks*` operations
+      ship `security: [{ oauth2: [] }]`. They also need a public HTTPS endpoint
+      that answers Ramp's verification challenge. Event payloads are thin
+      (`{ id, type, created_at, business_id, object: { id } }`), so the read
+      scope for a resource is what actually makes its events useful. Auth must
+      be `authorization_code` + `offline_access` for customer-connected
+      businesses under white-label OAuth; `client_credentials` only reaches the
+      app owner's own Ramp business. `candidate_scopes` are the phase-2
+      writeback set — `vendors:write` carries the largest blast radius
+      (`/vendors/{id}/update-bank-accounts`) and should stay behind human
+      approval. Deliberately excluded: `cards:read_vault` (exposes PANs),
+      `cards:write`, `embedded_cards:write`, `funds:write`, `limits:write`,
+      `users:write`, `x402*`, `sandbox:write`, `blank_canvas:write`.

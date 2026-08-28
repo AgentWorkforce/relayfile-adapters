@@ -22,6 +22,14 @@
   "posthog": [
     "project_id"
   ],
+  "ramp": [
+    "departmentId",
+    "entityId",
+    "locationId",
+    "since",
+    "userId",
+    "vendorId"
+  ],
   "salesforce": [
     "connectionId",
     "providerConfigKey"

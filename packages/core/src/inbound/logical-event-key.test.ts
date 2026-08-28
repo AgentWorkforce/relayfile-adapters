@@ -5,6 +5,7 @@ import {
   INBOUND_CAPABILITY_CATALOG,
   INBOUND_CAPABILITY_CATALOG_VERSION,
   INBOUND_LOGICAL_EVENT_GOLDEN_VECTORS,
+  defineHookdeckInboundCapability,
   logicalEventKey,
   resolveInboundCapability,
 } from "./index.js";
@@ -175,6 +176,45 @@ test("GitLab Hookdeck uses the provider event UUID before Hookdeck delivery fall
   const result = await logicalEventKey(input, capability);
   assert.equal(result.strategy, "provider-delivery-id");
   assert.equal(result.evidence.providerDeliveryId, "gitlab-event-123");
+});
+
+test("Hookdeck capabilities without provider delivery headers key on Hookdeck id before semantic fallback", async () => {
+  const capability = defineHookdeckInboundCapability({
+    id: "ramp.hookdeck",
+    providerId: "ramp",
+    pathRoot: "/ramp",
+    providerConfigAliases: ["ramp-relay"],
+    detectionHeaders: ["x-ramp-signature"],
+    hookdeckDeliveryIdHeaders: ["x-hookdeck-eventid"],
+  });
+
+  assert.deepEqual(capability.logicalKey.strategies, [
+    "hookdeck-delivery-id",
+    "semantic-payload",
+  ]);
+  assert.equal(capability.logicalKey.providerDeliveryIdHeaders, undefined);
+
+  const result = await logicalEventKey(
+    {
+      source: "hookdeck",
+      headers: {
+        "X-Ramp-Signature": "sha256=abc123",
+        "X-Hookdeck-EventID": "hookdeck-delivery-456",
+      },
+      payload: {
+        type: "bills.updated",
+        business_id: "business-1",
+        object: { id: "bill-1" },
+      },
+      rawBody: encoder.encode(
+        '{"type":"bills.updated","business_id":"business-1","object":{"id":"bill-1"}}',
+      ),
+    },
+    capability,
+  );
+
+  assert.equal(result.strategy, "hookdeck-delivery-id");
+  assert.equal(result.evidence.providerDeliveryId, "hookdeck-delivery-456");
 });
 
 test("known events use canonical semantic JSON before exact-body fallback", async () => {

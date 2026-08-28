@@ -78,6 +78,7 @@
         "@relayfile/adapter-pipedrive#build",
         "@relayfile/adapter-recall#build",
         "@relayfile/adapter-reddit#build",
+        "@relayfile/adapter-ramp#build",
         "@relayfile/adapter-salesforce#build",
         "@relayfile/adapter-segment#build",
         "@relayfile/adapter-sendgrid#build",

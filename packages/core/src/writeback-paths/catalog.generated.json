@@ -740,6 +740,158 @@
       }
     ]
   },
+  "ramp": {
+    "accounting-accounts": [
+      {
+        "path": "/ramp/accounting/accounts/{glAccountId}.json",
+        "params": [
+          "glAccountId"
+        ]
+      }
+    ],
+    "accounting-fields": [
+      {
+        "path": "/ramp/accounting/fields/{fieldId}.json",
+        "params": [
+          "fieldId"
+        ]
+      }
+    ],
+    "bills": [
+      {
+        "path": "/ramp/bills/{billId}/meta.json",
+        "params": [
+          "billId"
+        ]
+      }
+    ],
+    "business": [
+      {
+        "path": "/ramp/business.json",
+        "params": []
+      }
+    ],
+    "departments": [
+      {
+        "path": "/ramp/dimensions/departments/{departmentId}.json",
+        "params": [
+          "departmentId"
+        ]
+      }
+    ],
+    "entities": [
+      {
+        "path": "/ramp/dimensions/entities/{entityId}.json",
+        "params": [
+          "entityId"
+        ]
+      }
+    ],
+    "item-receipts": [
+      {
+        "path": "/ramp/item-receipts/{itemReceiptId}/meta.json",
+        "params": [
+          "itemReceiptId"
+        ]
+      }
+    ],
+    "locations": [
+      {
+        "path": "/ramp/dimensions/locations/{locationId}.json",
+        "params": [
+          "locationId"
+        ]
+      }
+    ],
+    "merchants": [
+      {
+        "path": "/ramp/dimensions/merchants/{merchantId}.json",
+        "params": [
+          "merchantId"
+        ]
+      }
+    ],
+    "purchase-orders": [
+      {
+        "path": "/ramp/purchase-orders/{purchaseOrderId}/meta.json",
+        "params": [
+          "purchaseOrderId"
+        ]
+      }
+    ],
+    "receipts": [
+      {
+        "path": "/ramp/receipts/{receiptId}.json",
+        "params": [
+          "receiptId"
+        ]
+      }
+    ],
+    "reimbursements": [
+      {
+        "path": "/ramp/reimbursements/{reimbursementId}.json",
+        "params": [
+          "reimbursementId"
+        ]
+      }
+    ],
+    "repayments": [
+      {
+        "path": "/ramp/repayments/{repaymentId}.json",
+        "params": [
+          "repaymentId"
+        ]
+      }
+    ],
+    "spend-programs": [
+      {
+        "path": "/ramp/dimensions/spend-programs/{spendProgramId}.json",
+        "params": [
+          "spendProgramId"
+        ]
+      }
+    ],
+    "transactions": [
+      {
+        "path": "/ramp/transactions/{transactionId}.json",
+        "params": [
+          "transactionId"
+        ]
+      }
+    ],
+    "transfers": [
+      {
+        "path": "/ramp/transfers/{transferId}.json",
+        "params": [
+          "transferId"
+        ]
+      }
+    ],
+    "users": [
+      {
+        "path": "/ramp/dimensions/users/{userId}.json",
+        "params": [
+          "userId"
+        ]
+      }
+    ],
+    "vendor-agreements": [
+      {
+        "path": "/ramp/vendor-agreements/{agreementId}/meta.json",
+        "params": [
+          "agreementId"
+        ]
+      }
+    ],
+    "vendors": [
+      {
+        "path": "/ramp/vendors/{vendorId}.json",
+        "params": [
+          "vendorId"
+        ]
+      }
+    ]
+  },
   "recall": {
     "recordings": [
       {
