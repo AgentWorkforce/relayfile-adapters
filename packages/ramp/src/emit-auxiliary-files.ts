@@ -221,7 +221,7 @@ async function readPreviousPointer(
   aggregate: EmitAuxiliaryFilesResult,
 ): Promise<PreviousPointerReadResult> {
   if (!client.readFile) {
-    return { available: false };
+    return { available: true, pointer: null };
   }
   try {
     const response = await client.readFile({

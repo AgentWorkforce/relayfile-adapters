@@ -30,6 +30,7 @@ interface MemoryClient extends AuxiliaryEmitterClient {
 type ClientOptions = {
   failingReads?: Set<string>;
   withDelete?: boolean;
+  withRead?: boolean;
 };
 
 function createClient(
@@ -51,15 +52,18 @@ function createClient(
       files.set(input.path, input.content);
       return { created: true };
     },
-    async readFile(input): Promise<EmitReadResult | null> {
+  };
+
+  if (options.withRead !== false) {
+    client.readFile = async (input): Promise<EmitReadResult | null> => {
       reads.push(input);
       if (options.failingReads?.has(input.path)) {
         throw new Error(`boom:${input.path}`);
       }
       const content = files.get(input.path);
       return content === undefined ? null : { content };
-    },
-  };
+    };
+  }
 
   if (options.withDelete !== false) {
     client.deleteFile = async (input) => {
@@ -244,6 +248,33 @@ test('emitRampAuxiliaryFiles cleans up deferred stale paths once index reads rec
   };
   assert.equal(pointer.cleanupPaths, undefined);
   assert.equal(client.files.has(indexPath), true);
+});
+
+test('emitRampAuxiliaryFiles still materializes aliases for write-only clients', async () => {
+  const client = createClient({}, { withRead: false });
+  const byIdPath = rampByIdAliasPath('bills', 'bill_1');
+  const invoiceAliasPath = rampBillByInvoiceNumberAliasPath('INV-NEW', 'bill_1', 'INV-NEW');
+  const statusAliasPath = rampBillByStatusAliasPath('PAID', 'bill_1', 'INV-NEW');
+  const vendorAliasPath = rampBillByVendorAliasPath('New Vendor', 'bill_1', 'INV-NEW');
+
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    connectionId: 'conn_1',
+    bills: [{
+      id: 'bill_1',
+      invoice_number: 'INV-NEW',
+      vendor: { id: 'vendor_1', name: 'New Vendor' },
+      status: 'PAID',
+      paid_at: '2026-08-27T15:00:00.000Z',
+    }],
+  });
+
+  assert.equal(client.files.has(byIdPath), true);
+  assert.equal(client.files.has(invoiceAliasPath), true);
+  assert.equal(client.files.has(statusAliasPath), true);
+  assert.equal(client.files.has(vendorAliasPath), true);
+  assert.equal(client.files.has(rampIndexPath('bills')), false);
+  assert.ok(result.errors.some((error) => error.path === rampIndexPath('bills') && /readFile not supported/u.test(error.error)));
 });
 
 test('emitRampAuxiliaryFiles skips record mutation when the prior by-id pointer cannot be read safely', async () => {
