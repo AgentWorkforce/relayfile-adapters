@@ -164,6 +164,7 @@ export interface RampAliasPointer {
   title: string;
   updated: string;
   aliasPaths: string[];
+  cleanupPaths?: string[];
   payload?: Record<string, unknown>;
   connectionId?: string;
 }

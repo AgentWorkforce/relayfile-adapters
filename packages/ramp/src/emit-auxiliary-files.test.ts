@@ -185,6 +185,7 @@ test('emitRampAuxiliaryFiles skips index rewrites but still writes current alias
   const pointer = JSON.parse(client.files.get(oldPointerPath) ?? '{}') as {
     canonicalPath?: string;
     aliasPaths?: string[];
+    cleanupPaths?: string[];
   };
   assert.equal(pointer.canonicalPath, '/ramp/bills/bill%5F1__inv-new/meta.json');
   assert.deepEqual(pointer.aliasPaths, [
@@ -193,7 +194,56 @@ test('emitRampAuxiliaryFiles skips index rewrites but still writes current alias
     newVendorAlias,
     newStatusAlias,
   ]);
+  assert.deepEqual(pointer.cleanupPaths, [
+    oldCanonicalPath,
+    oldInvoiceAlias,
+  ]);
   assert.ok(result.errors.some((error) => error.path === indexPath && /Skipped Ramp index reconciliation/u.test(error.error)));
+});
+
+test('emitRampAuxiliaryFiles cleans up deferred stale paths once index reads recover', async () => {
+  const indexPath = rampIndexPath('bills');
+  const failingReads = new Set([indexPath]);
+  const oldPointerPath = rampByIdAliasPath('bills', 'bill_1');
+  const oldInvoiceAlias = rampBillByInvoiceNumberAliasPath('INV-OLD', 'bill_1', 'INV-OLD');
+  const oldCanonicalPath = '/ramp/bills/bill_1__inv-old/meta.json';
+  const client = createClient({
+    [oldPointerPath]: JSON.stringify({
+      canonicalPath: oldCanonicalPath,
+      aliasPaths: [oldPointerPath, oldInvoiceAlias],
+    }),
+    [oldInvoiceAlias]: '{}',
+    [oldCanonicalPath]: '{}',
+  }, { failingReads });
+
+  const bill = {
+    id: 'bill_1',
+    invoice_number: 'INV-NEW',
+    vendor: { id: 'vendor_1', name: 'New Vendor' },
+    status: 'PAID',
+    paid_at: '2026-08-27T15:00:00.000Z',
+  };
+
+  await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [bill],
+  });
+
+  failingReads.delete(indexPath);
+  const result = await emitRampAuxiliaryFiles(client, {
+    workspaceId: 'ws_1',
+    bills: [bill],
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(client.files.has(oldInvoiceAlias), false);
+  assert.equal(client.files.has(oldCanonicalPath), false);
+
+  const pointer = JSON.parse(client.files.get(oldPointerPath) ?? '{}') as {
+    cleanupPaths?: string[];
+  };
+  assert.equal(pointer.cleanupPaths, undefined);
+  assert.equal(client.files.has(indexPath), true);
 });
 
 test('emitRampAuxiliaryFiles ignores malformed canonical cleanup paths from persisted pointers', async () => {

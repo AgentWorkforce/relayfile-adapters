@@ -58,6 +58,7 @@ export function buildRampAliasPointer(
   row: RampIndexRow,
   aliasPaths: readonly string[],
   connectionId?: string,
+  cleanupPaths?: readonly string[],
 ): RampAliasPointer {
   return {
     provider: 'ramp',
@@ -67,6 +68,7 @@ export function buildRampAliasPointer(
     title: row.title,
     updated: row.updated,
     aliasPaths: [...aliasPaths],
+    ...(cleanupPaths?.length ? { cleanupPaths: [...cleanupPaths] } : {}),
     payload: record,
     ...(connectionId ? { connectionId } : {}),
   };

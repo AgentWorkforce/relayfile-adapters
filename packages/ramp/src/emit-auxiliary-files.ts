@@ -131,9 +131,7 @@ async function emitResource(
     const id = readId(record.id);
     if (!id) continue;
 
-    const previousPointer = canReconcile
-      ? await readPreviousPointer(client, workspaceId, resource, id, aggregate)
-      : null;
+    const previousPointer = await readPreviousPointer(client, workspaceId, resource, id, aggregate);
 
     if (isDeleteRecord(record)) {
       if (!canReconcile) {
@@ -149,6 +147,9 @@ async function emitResource(
       for (const aliasPath of safePriorAliasPaths(previousPointer?.aliasPaths ?? [], resource, id, aggregate)) {
         deletePaths.add(aliasPath);
       }
+      for (const cleanupPath of safePriorCleanupPaths(previousPointer?.cleanupPaths ?? [], resource, id, aggregate)) {
+        deletePaths.add(cleanupPath);
+      }
       for (const path of deletePaths) {
         await safeDelete(client, workspaceId, path, aggregate);
       }
@@ -160,19 +161,31 @@ async function emitResource(
       rowMap.set(row.id, row);
     }
     const aliasPaths = rampAliasPaths(resource, record, row);
-    const pointer = buildRampAliasPointer(resource, record, row, aliasPaths, connectionId);
-    const content = `${JSON.stringify(pointer, null, 2)}\n`;
     const nextAliasSet = new Set(aliasPaths);
+    const cleanupPaths = canReconcile
+      ? undefined
+      : retainedCleanupPaths(previousPointer, resource, id, row.canonicalPath, nextAliasSet, aggregate);
+    const pointer = buildRampAliasPointer(resource, record, row, aliasPaths, connectionId, cleanupPaths);
+    const content = `${JSON.stringify(pointer, null, 2)}\n`;
 
     if (canReconcile && previousPointer) {
+      const stalePaths = new Set<string>();
       const previousCanonicalPath = safePriorCanonicalPath(previousPointer.canonicalPath, resource, id, aggregate);
       if (previousCanonicalPath && previousCanonicalPath !== row.canonicalPath) {
-        await safeDelete(client, workspaceId, previousCanonicalPath, aggregate);
+        stalePaths.add(previousCanonicalPath);
       }
       for (const aliasPath of safePriorAliasPaths(previousPointer.aliasPaths, resource, id, aggregate)) {
         if (!nextAliasSet.has(aliasPath)) {
-          await safeDelete(client, workspaceId, aliasPath, aggregate);
+          stalePaths.add(aliasPath);
         }
+      }
+      for (const cleanupPath of safePriorCleanupPaths(previousPointer.cleanupPaths ?? [], resource, id, aggregate)) {
+        if (cleanupPath !== row.canonicalPath && !nextAliasSet.has(cleanupPath)) {
+          stalePaths.add(cleanupPath);
+        }
+      }
+      for (const path of stalePaths) {
+        await safeDelete(client, workspaceId, path, aggregate);
       }
     }
 
@@ -193,7 +206,7 @@ async function readPreviousPointer(
   resource: RampCanonicalResource,
   id: string,
   aggregate: EmitAuxiliaryFilesResult,
-): Promise<{ aliasPaths: string[]; canonicalPath?: string } | null> {
+): Promise<{ aliasPaths: string[]; canonicalPath?: string; cleanupPaths?: string[] } | null> {
   if (!client.readFile) {
     return null;
   }
@@ -208,6 +221,7 @@ async function readPreviousPointer(
     const parsed = JSON.parse(response.content) as {
       aliasPaths?: unknown;
       canonicalPath?: unknown;
+      cleanupPaths?: unknown;
     };
     const aliasPaths = Array.isArray(parsed.aliasPaths)
       ? parsed.aliasPaths.filter((entry): entry is string => typeof entry === 'string')
@@ -215,10 +229,17 @@ async function readPreviousPointer(
     const canonicalPath = typeof parsed.canonicalPath === 'string' && parsed.canonicalPath.length > 0
       ? parsed.canonicalPath
       : undefined;
-    if (aliasPaths.length === 0 && !canonicalPath) {
+    const cleanupPaths = Array.isArray(parsed.cleanupPaths)
+      ? parsed.cleanupPaths.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+    if (aliasPaths.length === 0 && cleanupPaths.length === 0 && !canonicalPath) {
       return null;
     }
-    return { aliasPaths, ...(canonicalPath ? { canonicalPath } : {}) };
+    return {
+      aliasPaths,
+      ...(canonicalPath ? { canonicalPath } : {}),
+      ...(cleanupPaths.length > 0 ? { cleanupPaths } : {}),
+    };
   } catch (error) {
     aggregate.errors.push({
       path: rampByIdAliasPath(resource, id),
@@ -329,14 +350,9 @@ function safePriorCanonicalPath(
   if (!path) {
     return undefined;
   }
-  let parsed: ReturnType<typeof parseRampCanonicalPath>;
-  try {
-    parsed = parseRampCanonicalPath(path);
-  } catch {
-    parsed = undefined;
-  }
-  if (parsed?.resource === resource && parsed.id === id) {
-    return path;
+  const safePath = readSafePriorCanonicalPath(path, resource, id);
+  if (safePath) {
+    return safePath;
   }
   aggregate.errors.push({
     path,
@@ -351,44 +367,116 @@ function safePriorAliasPaths(
   id: string,
   aggregate: EmitAuxiliaryFilesResult,
 ): string[] {
-  const prefix = `${rampResourceRoot(resource)}/`;
   const safePaths: string[] = [];
   for (const path of paths) {
-    const relative = path.startsWith(prefix) ? path.slice(prefix.length) : '';
-    const segments = relative.split('/').filter(Boolean);
-    const leaf = segments.at(-1);
-    const isAliasPath = Boolean(
-      relative
-      && path.startsWith(prefix)
-      && segments.length >= 2
-      && segments[0]?.startsWith('by-')
-      && !segments.some((segment) => segment === '.' || segment === '..')
-      && leaf
-      && leaf !== '_index.json'
-      && leaf.endsWith('.json'),
-    );
-    if (!isAliasPath || !leaf) {
+    const safePath = readSafePriorAliasPath(path, resource, id);
+    if (!safePath) {
       aggregate.errors.push({
         path,
         error: `Skipped unsafe Ramp aliasPath cleanup for ${resource} ${id}`,
       });
       continue;
     }
-    try {
-      const parsed = parseFlatNameWithId(leaf);
-      if (parsed.id === id) {
-        safePaths.push(path);
-        continue;
-      }
-    } catch {
-      // Treat malformed persisted paths as unsafe and leave them in place.
-    }
-    aggregate.errors.push({
-      path,
-      error: `Skipped unsafe Ramp aliasPath cleanup for ${resource} ${id}`,
-    });
+    safePaths.push(safePath);
   }
   return safePaths;
+}
+
+function safePriorCleanupPaths(
+  paths: readonly string[],
+  resource: RampCanonicalResource,
+  id: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): string[] {
+  const safePaths: string[] = [];
+  for (const path of paths) {
+    const safePath = readSafePriorCanonicalPath(path, resource, id) ?? readSafePriorAliasPath(path, resource, id);
+    if (!safePath) {
+      aggregate.errors.push({
+        path,
+        error: `Skipped unsafe Ramp cleanupPath for ${resource} ${id}`,
+      });
+      continue;
+    }
+    safePaths.push(safePath);
+  }
+  return safePaths;
+}
+
+function retainedCleanupPaths(
+  previousPointer: { aliasPaths: string[]; canonicalPath?: string; cleanupPaths?: string[] } | null,
+  resource: RampCanonicalResource,
+  id: string,
+  canonicalPath: string,
+  nextAliasSet: ReadonlySet<string>,
+  aggregate: EmitAuxiliaryFilesResult,
+): string[] | undefined {
+  if (!previousPointer) {
+    return undefined;
+  }
+  const cleanupPaths = new Set<string>();
+  const previousCanonicalPath = safePriorCanonicalPath(previousPointer.canonicalPath, resource, id, aggregate);
+  if (previousCanonicalPath && previousCanonicalPath !== canonicalPath) {
+    cleanupPaths.add(previousCanonicalPath);
+  }
+  for (const aliasPath of safePriorAliasPaths(previousPointer.aliasPaths, resource, id, aggregate)) {
+    if (!nextAliasSet.has(aliasPath)) {
+      cleanupPaths.add(aliasPath);
+    }
+  }
+  for (const cleanupPath of safePriorCleanupPaths(previousPointer.cleanupPaths ?? [], resource, id, aggregate)) {
+    if (cleanupPath !== canonicalPath && !nextAliasSet.has(cleanupPath)) {
+      cleanupPaths.add(cleanupPath);
+    }
+  }
+  return cleanupPaths.size > 0 ? [...cleanupPaths] : undefined;
+}
+
+function readSafePriorCanonicalPath(
+  path: string | undefined,
+  resource: RampCanonicalResource,
+  id: string,
+): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+  let parsed: ReturnType<typeof parseRampCanonicalPath>;
+  try {
+    parsed = parseRampCanonicalPath(path);
+  } catch {
+    parsed = undefined;
+  }
+  return parsed?.resource === resource && parsed.id === id ? path : undefined;
+}
+
+function readSafePriorAliasPath(
+  path: string,
+  resource: RampCanonicalResource,
+  id: string,
+): string | undefined {
+  const prefix = `${rampResourceRoot(resource)}/`;
+  const relative = path.startsWith(prefix) ? path.slice(prefix.length) : '';
+  const segments = relative.split('/').filter(Boolean);
+  const leaf = segments.at(-1);
+  const isAliasPath = Boolean(
+    relative
+    && path.startsWith(prefix)
+    && segments.length >= 2
+    && segments[0]?.startsWith('by-')
+    && !segments.some((segment) => segment === '.' || segment === '..')
+    && leaf
+    && leaf !== '_index.json'
+    && leaf.endsWith('.json'),
+  );
+  if (!isAliasPath || !leaf) {
+    return undefined;
+  }
+  try {
+    const parsed = parseFlatNameWithId(leaf);
+    return parsed.id === id ? path : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function stringifyError(error: unknown): string {
