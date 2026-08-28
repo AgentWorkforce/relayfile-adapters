@@ -41,6 +41,11 @@ import type {
 
 const JSON_CONTENT_TYPE = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 
+type PreviousPointer = { aliasPaths: string[]; canonicalPath?: string; cleanupPaths?: string[] };
+type PreviousPointerReadResult =
+  | { available: true; pointer: PreviousPointer | null }
+  | { available: false };
+
 export interface EmitRampAuxiliaryFilesInput {
   workspaceId: string;
   bills?: readonly (RampBillRecord | RampDeleteRecord)[];
@@ -131,7 +136,15 @@ async function emitResource(
     const id = readId(record.id);
     if (!id) continue;
 
-    const previousPointer = await readPreviousPointer(client, workspaceId, resource, id, aggregate);
+    const previousPointerResult = await readPreviousPointer(client, workspaceId, resource, id, aggregate);
+    if (!previousPointerResult.available) {
+      aggregate.errors.push({
+        path: rampByIdAliasPath(resource, id),
+        error: `Skipped Ramp record mutation for ${resource} ${id} because the prior pointer could not be read safely`,
+      });
+      continue;
+    }
+    const previousPointer = previousPointerResult.pointer;
 
     if (isDeleteRecord(record)) {
       if (!canReconcile) {
@@ -206,9 +219,9 @@ async function readPreviousPointer(
   resource: RampCanonicalResource,
   id: string,
   aggregate: EmitAuxiliaryFilesResult,
-): Promise<{ aliasPaths: string[]; canonicalPath?: string; cleanupPaths?: string[] } | null> {
+): Promise<PreviousPointerReadResult> {
   if (!client.readFile) {
-    return null;
+    return { available: false };
   }
   try {
     const response = await client.readFile({
@@ -216,7 +229,7 @@ async function readPreviousPointer(
       path: rampByIdAliasPath(resource, id),
     });
     if (!response?.content) {
-      return null;
+      return { available: true, pointer: null };
     }
     const parsed = JSON.parse(response.content) as {
       aliasPaths?: unknown;
@@ -233,19 +246,22 @@ async function readPreviousPointer(
       ? parsed.cleanupPaths.filter((entry): entry is string => typeof entry === 'string')
       : [];
     if (aliasPaths.length === 0 && cleanupPaths.length === 0 && !canonicalPath) {
-      return null;
+      return { available: true, pointer: null };
     }
     return {
-      aliasPaths,
-      ...(canonicalPath ? { canonicalPath } : {}),
-      ...(cleanupPaths.length > 0 ? { cleanupPaths } : {}),
+      available: true,
+      pointer: {
+        aliasPaths,
+        ...(canonicalPath ? { canonicalPath } : {}),
+        ...(cleanupPaths.length > 0 ? { cleanupPaths } : {}),
+      },
     };
   } catch (error) {
     aggregate.errors.push({
       path: rampByIdAliasPath(resource, id),
       error: stringifyError(error),
     });
-    return null;
+    return { available: false };
   }
 }
 
@@ -404,7 +420,7 @@ function safePriorCleanupPaths(
 }
 
 function retainedCleanupPaths(
-  previousPointer: { aliasPaths: string[]; canonicalPath?: string; cleanupPaths?: string[] } | null,
+  previousPointer: PreviousPointer | null,
   resource: RampCanonicalResource,
   id: string,
   canonicalPath: string,
