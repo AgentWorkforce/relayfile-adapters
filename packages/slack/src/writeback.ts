@@ -1,4 +1,5 @@
 import { ReadOnlyFieldError, classifyWrite } from '@relayfile/adapter-core';
+import { slackChannelIdFromPathSegment } from './path-mapper.js';
 import { resources } from './resources.js';
 import type { SlackWritebackRequest } from './types.js';
 
@@ -142,20 +143,19 @@ export function resolveDeleteRequest(path: string): SlackWritebackRequest {
  *      payload to override.
  */
 function extractSlackChannel(segment: string): string {
-  const decoded = decodeURIComponent(segment);
+  // Forms 1-3 are the shared contract; `slackChannelIdFromPathSegment` is the
+  // single implementation so this resolver and downstream matchers cannot drift.
+  const channelId = slackChannelIdFromPathSegment(segment);
+  if (channelId) return channelId;
 
-  // v2 round-trip-safe form: <channelId>__<slug>
-  const idWithSlug = /^([CDG][A-Z0-9]{7,})__[A-Za-z0-9._+=@-]+/.exec(decoded);
-  if (idWithSlug?.[1]) return idWithSlug[1];
-
-  // Legacy round-trip-safe form: <slug>--<channelId>
-  const sluggedId = /--([CDG][A-Z0-9]{7,})$/.exec(decoded);
-  if (sluggedId?.[1]) return sluggedId[1];
-
-  // Bare canonical id
-  if (/^[CDG][A-Z0-9]{7,}$/.test(decoded)) return decoded;
-
-  // Bare slug — best-effort. Documented limitation: lossy for names with `_`.
+  // Bare slug — best-effort, and writeback-specific: only this caller can
+  // reasonably guess at `#name`. Documented limitation: lossy for names with `_`.
+  let decoded = segment;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    // fall back to the raw segment
+  }
   return decoded.startsWith('#') ? decoded : `#${decoded}`;
 }
 
