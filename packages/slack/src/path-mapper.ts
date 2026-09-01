@@ -127,6 +127,46 @@ function joinPath(...segments: string[]): string {
     .join('/');
 }
 
+/**
+ * Recover the canonical Slack channel id from a channel path segment, in every
+ * form this adapter has emitted. The inverse of {@link channelSegmentV2} and
+ * its predecessors, exported so consumers never re-implement the contract:
+ *
+ *   1. `<channelId>__<slug>` — current (v2)
+ *   2. `<slug>--<channelId>` — legacy, adapter-slack <= 0.2.2
+ *   3. `<channelId>`         — bare
+ *
+ * Returns `null` when no canonical id is recoverable (e.g. a name-only
+ * segment), so callers can decide whether a best-effort `#name` is acceptable
+ * rather than having that choice made for them.
+ *
+ * Both round-trip forms are keyed off the ID, never the slug: Slack channel
+ * names may contain underscores that slugification lossily replaces, so the id
+ * token is the only reliable part.
+ *
+ * Downstream matchers depend on this. When the segment shape moved to form 1,
+ * Cloud's watch matcher still assumed form 3 and every channel-scoped Slack
+ * trigger silently stopped firing for months.
+ */
+export function slackChannelIdFromPathSegment(segment: string): string | null {
+  let decoded = segment;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    // A malformed escape is not a reason to fail the lookup; fall back to raw.
+  }
+
+  const idWithSlug = /^([CDG][A-Z0-9]{7,})__/.exec(decoded);
+  if (idWithSlug?.[1]) return idWithSlug[1];
+
+  const slugWithId = /--([CDG][A-Z0-9]{7,})$/.exec(decoded);
+  if (slugWithId?.[1]) return slugWithId[1];
+
+  if (/^[CDG][A-Z0-9]{7,}$/.test(decoded)) return decoded;
+
+  return null;
+}
+
 export function sanitizeSlackPathSegment(value: string, fallback = 'unknown'): string {
   return normalizeSegment(value, fallback);
 }
