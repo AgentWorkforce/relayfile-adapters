@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-core/events` now provides versioned subscription and handler-event contracts with browser-safe validation against existing adapter event catalogs, preserving logical event identity separately from transport delivery IDs.
 - `@relayfile/adapter-github` now exports a cursor-resumable pull-index convergence primitive that backfills `headRef` with one GitHub list request per invocation and no per-record metadata, file, or diff fetches.
 - `@relayfile/adapter-linear` now materializes `/linear/issues/by-project/<project-id>/<identifier>.json` aliases so project-scoped consumers can avoid mounting the full issue tree. The path mapper and generated `LAYOUT.md` contract expose the new lookup; existing mounts must resync to materialize and discover it.
 - `@relayfile/adapter-ramp` now provides read-only Ramp finance materialization with canonical bill, purchase-order, item-receipt, vendor-agreement, transaction, reimbursement, receipt, vendor, transfer, repayment, dimension, and accounting paths; stable indexes and aliases; a generated `LAYOUT.md` contract; Hookdeck-aware inbound declarations; webhook normalization and signature verification; and digest-visible lifecycle classification. Existing consumers must resync to materialize and discover the new canonical paths and layout contract.

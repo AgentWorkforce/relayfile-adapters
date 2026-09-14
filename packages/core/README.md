@@ -74,6 +74,29 @@ const adapter = new SchemaAdapter({
 });
 ```
 
+## Event subscriptions
+
+`@relayfile/adapter-core/events` exports versioned subscription declarations and
+handler event envelopes with browser-safe validation:
+
+```ts
+import { defineEventSubscription } from '@relayfile/adapter-core/events';
+
+const source = defineEventSubscription({
+  provider: 'linear',
+  connectionId: 'conn_linear_team',
+  eventTypes: ['issue.create', 'issue.update'],
+  pathPrefixes: ['/linear/issues'],
+});
+```
+
+Event names come from the existing trigger catalog. `createAdapterEvent` and
+`parseAdapterEvent` preserve the upstream logical event ID and payload; parsing
+does not authenticate, match, or deduplicate. The host performs those checks
+before invoking a handler, so unmatched events create no run. The Cloud/Flows
+execution bridge is a separate consumer change. See the
+[contract and rollout](../../docs/event-subscriptions.md).
+
 ## What It Generates
 
 - `adapter.generated.ts`: static mapping logic for path resolution and writeback matching

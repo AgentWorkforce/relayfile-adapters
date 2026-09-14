@@ -44,6 +44,11 @@
       "import": "./dist/src/inbound/index.js",
       "default": "./dist/src/inbound/index.js"
     },
+    "./events": {
+      "types": "./dist/src/events/index.d.ts",
+      "import": "./dist/src/events/index.js",
+      "default": "./dist/src/events/index.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
