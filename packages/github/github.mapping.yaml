@@ -24,6 +24,13 @@ webhooks:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/comments/{{comment.id}}.json
   pull_request_review_thread.resolved:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/review-threads/{{thread.id}}.json
+  issue_comment:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - comment.id
   issue_comment.created:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
     extract:
@@ -31,6 +38,24 @@ webhooks:
       - issue.number
       - issue.title
       - comment.id
+  check_run:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/checks/{{check_run.id}}.json
+    extract:
+      - action
+      - check_run.id
+      - check_run.name
+      - check_run.status
+      - check_run.conclusion
+      - check_run.head_sha
+  check_run.completed:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/checks/{{check_run.id}}.json
+    extract:
+      - action
+      - check_run.id
+      - check_run.name
+      - check_run.status
+      - check_run.conclusion
+      - check_run.head_sha
   deployment_status.created:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/deployments/{{deployment.id}}/statuses/{{deployment_status.id}}.json
     extract:
