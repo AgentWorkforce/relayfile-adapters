@@ -1,0 +1,143 @@
+adapter:
+  name: github
+  version: "1.0.0"
+  baseUrl: https://api.github.com
+  source:
+    openapi: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml
+webhooks:
+  pull_request:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{number}}/meta.json
+    extract:
+      - action
+      - number
+      - pull_request.title
+      - pull_request.state
+  pull_request_review:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.submitted:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review.dismissed:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/reviews/{{review.id}}.json
+  pull_request_review_comment.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/comments/{{comment.id}}.json
+  pull_request_review_thread.resolved:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/review-threads/{{thread.id}}.json
+  issue_comment:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - comment.id
+  issue_comment.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - comment.id
+  check_run:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/checks/{{check_run.id}}.json
+    extract:
+      - action
+      - check_run.id
+      - check_run.name
+      - check_run.status
+      - check_run.conclusion
+      - check_run.head_sha
+  check_run.completed:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/checks/{{check_run.id}}.json
+    extract:
+      - action
+      - check_run.id
+      - check_run.name
+      - check_run.status
+      - check_run.conclusion
+      - check_run.head_sha
+  deployment_status.created:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/deployments/{{deployment.id}}/statuses/{{deployment_status.id}}.json
+    extract:
+      - action
+      - deployment.id
+      - deployment.ref
+      - deployment.sha
+      - deployment.environment
+      - deployment_status.id
+      - deployment_status.state
+      - deployment_status.environment
+  push:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
+  status:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/gate-status/{{sha}}.json
+  issues:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+  pull_request.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/meta.json
+    extract:
+      - action
+      - pull_request.number
+      - pull_request.title
+  pull_request.reopened:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/pulls/{{pull_request.number}}/meta.json
+    extract:
+      - action
+      - pull_request.number
+      - pull_request.title
+  issues.edited:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+  issues.labeled:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - label.name
+  issues.unlabeled:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+      - label.name
+  issues.reopened:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - issue.title
+resources:
+  pull_request:
+    endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}
+    path: /github/repos/{{owner}}/{{repo}}/pulls/{{number}}/meta.json
+  pull_request_files:
+    endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}/files
+    path: /github/repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/files/{{filename}}
+    iterate: true
+writebacks:
+  create_pull_request:
+    match: /github/repos/*/*/pull-requests/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls
+  update_ref:
+    match: /github/repos/*/*/refs/refs%2F*%2F*.json
+    endpoint: PATCH /repos/{owner}/{repo}/git/refs/{namespace}/{ref}
+  create_ref:
+    match: /github/repos/*/*/refs/*.json
+    endpoint: POST /repos/{owner}/{repo}/git/refs
+  close_pull_request:
+    match: /github/repos/*/*/pulls/*/close.json
+    endpoint: PATCH /repos/{owner}/{repo}/pulls/{pull_number}
+  review:
+    match: /github/repos/*/*/pulls/*/reviews/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+  merge:
+    match: /github/repos/*/*/pulls/*/merge.json
+    endpoint: PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge
+  comment:
+    match: /github/repos/*/*/pulls/*/comments/*.json
+    endpoint: POST /repos/{owner}/{repo}/pulls/{pull_number}/comments
