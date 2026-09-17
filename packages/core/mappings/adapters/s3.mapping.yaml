@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new object was created in the Amazon S3 bucket.
+  file.updated:
+    description: An existing object was updated in the Amazon S3 bucket.
+  file.deleted:
+    description: An object was deleted from the Amazon S3 bucket.

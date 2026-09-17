@@ -1,0 +1,12 @@
+adapter:
+  name: daytona
+  version: "1.0.0"
+  baseUrl: https://api.daytona.io
+webhooks:
+  sandbox.created: {}
+  sandbox.state.updated: {}
+  snapshot.created: {}
+  snapshot.state.updated: {}
+  snapshot.removed: {}
+  volume.created: {}
+  volume.state.updated: {}

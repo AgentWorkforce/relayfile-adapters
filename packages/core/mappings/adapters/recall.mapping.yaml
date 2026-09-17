@@ -1,0 +1,26 @@
+adapter:
+  name: recall
+  version: "1.0.0"
+  baseUrl: https://us-west-2.recall.ai
+webhooks:
+  recording.created:
+    path: /recall/recordings/{{id}}.json
+    extract:
+      - id
+      - title
+      - created_at
+      - updated_at
+      - status
+      - transcript_text
+  transcript.done:
+    path: /recall/recordings/{{recording_id}}.json
+    extract:
+      - recording_id
+      - transcript_text
+      - transcript
+  # Storage-bridge event: emitted when any pipeline (e.g. NB-Whisper) writes
+  # a recording directly to the recall VFS mount (/recall/recordings/<id>.json).
+  # This is NOT a Recall API webhook — it fires via the storage-change
+  # dispatcher the same way gmail/google-drive file.created events do.
+  file.created:
+    description: A recording was written to the recall VFS mount (storage-bridge path, e.g. from the NB-Whisper transcript pipeline).
