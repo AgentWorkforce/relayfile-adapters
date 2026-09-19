@@ -38,9 +38,25 @@ export interface ShortcutNormalizedWebhook {
   eventId?: string;
   changedAt?: string;
   actions: ShortcutNormalizedWebhookAction[];
+  /**
+   * Valid Shortcut actions that do not produce a Relayfile trigger. These are
+   * retained so callers can log an otherwise partial webhook delivery.
+   */
+  skippedEventTypes: string[];
   headers: Record<string, string>;
   connectionId?: string;
   deliveryId?: string;
+}
+
+/**
+ * Creates the error used when a Shortcut webhook contains actions but none
+ * match the events this adapter supports.
+ */
+export function unsupportedShortcutWebhookEventError(unsupportedEventTypes: readonly string[]): Error {
+  const [firstUnsupported] = unsupportedEventTypes;
+  return new Error(
+    `Unsupported Shortcut webhook event: ${firstUnsupported}; no supported actions; skipped event types: ${unsupportedEventTypes.join(", ")}`,
+  );
 }
 
 export function normalizeShortcutWebhook(
@@ -52,7 +68,8 @@ export function normalizeShortcutWebhook(
   if (!payload) throw new Error("Shortcut webhook payload must be a JSON object");
 
   const normalizedHeaders = normalizeHeaders(headers);
-  const actions = readActions(payload).map((action) => {
+  const skippedEventTypes: string[] = [];
+  const actions = readActions(payload).flatMap((action) => {
     const objectType = String(action.entity_type ?? "").trim().toLowerCase();
     const verb = String(action.action ?? "").trim().toLowerCase();
     const objectId = String(action.id ?? "").trim();
@@ -60,7 +77,11 @@ export function normalizeShortcutWebhook(
       throw new Error("Shortcut webhook action must include entity_type, action, and id");
     }
     const eventType = normalizeEventType(objectType, verb);
-    return {
+    if (!eventType) {
+      skippedEventTypes.push(`${objectType}.${verb}`);
+      return [];
+    }
+    return [{
       provider: SHORTCUT_PROVIDER as typeof SHORTCUT_PROVIDER,
       eventType,
       action: verb,
@@ -69,14 +90,19 @@ export function normalizeShortcutWebhook(
       payload: { ...payload, action: { ...action } },
       ...(options.connectionId ? { connectionId: options.connectionId } : {}),
       ...(options.deliveryId ? { deliveryId: options.deliveryId } : {}),
-    };
+    }];
   });
+
+  if (actions.length === 0 && skippedEventTypes.length > 0) {
+    throw unsupportedShortcutWebhookEventError(skippedEventTypes);
+  }
 
   return {
     provider: SHORTCUT_PROVIDER,
     eventId: readString(payload, "id"),
     changedAt: readString(payload, "changed_at"),
     actions,
+    skippedEventTypes,
     headers: normalizedHeaders,
     ...(options.connectionId ? { connectionId: options.connectionId } : {}),
     ...(options.deliveryId ? { deliveryId: options.deliveryId } : {}),
@@ -98,14 +124,14 @@ function readActions(payload: Record<string, unknown>): ShortcutWebhookAction[] 
   });
 }
 
-function normalizeEventType(objectType: string, verb: string): string {
+function normalizeEventType(objectType: string, verb: string): string | undefined {
   const direct = `${objectType}.${verb}`;
   if ((SHORTCUT_SUPPORTED_EVENTS as readonly string[]).includes(direct)) return direct;
   const parentType = NESTED_PARENT_TYPES[objectType];
   if (parentType && ["create", "update", "delete"].includes(verb)) {
     return `${parentType}.update`;
   }
-  throw new Error(`Unsupported Shortcut webhook event: ${direct}`);
+  return undefined;
 }
 
 function isWebhookAction(value: Record<string, unknown>): boolean {
