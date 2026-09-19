@@ -41,6 +41,11 @@ export interface ShortcutNormalizedWebhook {
   /**
    * Valid Shortcut actions that do not produce a Relayfile trigger. These are
    * retained so callers can log an otherwise partial webhook delivery.
+   *
+   * Required, not optional: `normalizeShortcutWebhook` always populates it, and
+   * a consumer reading the result must be able to rely on that. Adding it was
+   * released as a breaking change (0.2.0) for anyone constructing this type
+   * by hand.
    */
   skippedEventTypes: string[];
   headers: Record<string, string>;
