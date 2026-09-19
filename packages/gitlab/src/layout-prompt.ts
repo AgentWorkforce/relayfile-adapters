@@ -12,6 +12,12 @@ Always run \`ls\` before constructing a path. GitLab projects may live in nested
 
 Directory records own child files and use \`<id>__<slug>/meta.json\`: merge requests, issues, pipelines, and commits. Merge requests may have \`diff.patch\`, \`discussions/*.json\`, and \`approvals.json\` next to \`meta.json\`; issues and commits may have \`comments/*.json\`; pipelines may have \`jobs/*.json\`. Flat records with no child files use \`<slug>__<id>.json\` or \`<id>.json\` when no useful slug exists.
 
+## Writeback
+
+Create an issue by writing a valid JSON document with \`title\` to any non-canonical filename under \`/gitlab/projects/<namespace>/<project>/issues/\`. Create a merge request by writing \`source_branch\`, \`target_branch\`, and \`title\` under \`/gitlab/projects/<namespace>/<project>/merge-requests/\`; create its branch first by writing \`branch\` and \`ref\` under \`refs/\`. To update an existing issue or merge request, write mutable fields to its canonical \`meta.json\`. Accept a merge request with an optional \`merge_commit_message\`, \`squash\`, or \`should_remove_source_branch\` payload at \`merge_requests/<iid>__<slug>/merge.json\`; close or reopen it with \`{ "state_event": "close" }\` or \`{ "state_event": "reopen" }\` at sibling \`close.json\`.
+
+Declared writable templates: \`/gitlab/projects/{projectPath}/issues\`, \`/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json\`, \`/gitlab/projects/{projectPath}/merge-requests\`, \`/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json\`, \`/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json\`, \`/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json\`, \`/gitlab/projects/{projectPath}/refs\`, \`/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions\`, and \`/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments\`.
+
 ## Indexes
 
 Project rows use:

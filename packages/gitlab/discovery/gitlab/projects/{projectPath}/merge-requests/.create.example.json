@@ -1,0 +1,6 @@
+{
+  "source_branch": "factory/gitlab-parity",
+  "target_branch": "main",
+  "title": "Replace example merge request title",
+  "description": "Replace example merge request description."
+}

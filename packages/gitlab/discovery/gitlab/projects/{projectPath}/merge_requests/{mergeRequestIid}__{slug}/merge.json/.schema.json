@@ -1,10 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab issue note",
+  "title": "Merge GitLab merge request",
   "type": "object",
-  "required": [
-    "body"
-  ],
+  "required": [],
   "properties": {
     "id": {
       "type": "string",
@@ -71,16 +69,17 @@
       "readOnly": true,
       "additionalProperties": true
     },
-    "body": {
+    "merge_commit_message": {
       "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
+      "description": "Custom commit message for the merge commit."
     },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+    "squash": {
+      "type": "boolean",
+      "description": "Whether GitLab should squash commits before merge."
+    },
+    "should_remove_source_branch": {
+      "type": "boolean",
+      "description": "Whether GitLab should remove the source branch after merge."
     }
   },
   "additionalProperties": false,

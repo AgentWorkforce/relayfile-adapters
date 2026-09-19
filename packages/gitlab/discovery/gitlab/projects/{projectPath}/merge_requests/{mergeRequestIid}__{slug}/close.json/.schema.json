@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab issue note",
+  "title": "Close or reopen GitLab merge request",
   "type": "object",
   "required": [
-    "body"
+    "state_event"
   ],
   "properties": {
     "id": {
@@ -71,16 +71,12 @@
       "readOnly": true,
       "additionalProperties": true
     },
-    "body": {
-      "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+    "state_event": {
+      "enum": [
+        "close",
+        "reopen"
+      ],
+      "description": "Set `close` to close the merge request or `reopen` to reopen it."
     }
   },
   "additionalProperties": false,

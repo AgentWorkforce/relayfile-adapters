@@ -58,9 +58,24 @@ resources:
     path: /gitlab/projects/{namespace}/{project}/pipelines/{id}__{ref}/jobs/{job_id}.json
     iterate: true
 writebacks:
+  issue_create:
+    match: /gitlab/projects/*/issues/*.json
+    endpoint: POST /projects/{project_id}/issues
   merge_request_update:
     match: /gitlab/projects/*/merge_requests/*/meta.json
     endpoint: PUT /projects/{project_id}/merge_requests/{iid}
+  merge_request_create:
+    match: /gitlab/projects/*/merge-requests/*.json
+    endpoint: POST /projects/{project_id}/merge_requests
+  merge_request_merge:
+    match: /gitlab/projects/*/merge_requests/*/merge.json
+    endpoint: PUT /projects/{project_id}/merge_requests/{iid}/merge
+  merge_request_close:
+    match: /gitlab/projects/*/merge_requests/*/close.json
+    endpoint: PUT /projects/{project_id}/merge_requests/{iid}
+  branch_create:
+    match: /gitlab/projects/*/refs/*.json
+    endpoint: POST /projects/{project_id}/repository/branches
   merge_request_discussion:
     match: /gitlab/projects/*/merge_requests/*/discussions/*.json
     endpoint: POST /projects/{project_id}/merge_requests/{iid}/discussions
