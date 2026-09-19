@@ -102,13 +102,6 @@
     "confidential": {
       "type": "boolean",
       "description": "Whether the issue is confidential."
-    },
-    "state_event": {
-      "enum": [
-        "close",
-        "reopen"
-      ],
-      "description": "Lifecycle event when updating an existing issue."
     }
   },
   "additionalProperties": false,

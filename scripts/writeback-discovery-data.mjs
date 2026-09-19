@@ -181,8 +181,8 @@ export const adapters = [
       ['/gitlab/projects/<namespace>/<project>/tags/<tagRef>/meta.json', 'Tag records.'],
     ],
     endpoints: [
-      endpoint('/gitlab/projects/{projectPath}/issues/new.json', 'Create GitLab issue', 'Creates a GitLab issue in the project named by the path.', ['title'], gitlabIssueProps(), { title: 'Replace example issue title', description: 'Replace example issue description.', labels: ['factory'] }, { operations: ['create'] }),
-      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json', 'Update GitLab issue', 'Updates mutable fields on a GitLab issue.', [], gitlabIssueProps(), { title: 'Replace example issue title' }, { operations: ['update'] }),
+      endpoint('/gitlab/projects/{projectPath}/issues/new.json', 'Create GitLab issue', 'Creates a GitLab issue in the project named by the path.', ['title'], gitlabIssueCreateProps(), { title: 'Replace example issue title', description: 'Replace example issue description.', labels: ['factory'] }, { operations: ['create'] }),
+      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json', 'Update GitLab issue', 'Updates mutable fields on a GitLab issue.', [], gitlabIssueUpdateProps(), { title: 'Replace example issue title' }, { operations: ['update'] }),
       endpoint('/gitlab/projects/{projectPath}/merge-requests/new.json', 'Create GitLab merge request', 'Creates a GitLab merge request from a source branch into a target branch.', ['source_branch', 'target_branch', 'title'], gitlabMergeRequestProps(), { source_branch: 'factory/gitlab-parity', target_branch: 'main', title: 'Replace example merge request title', description: 'Replace example merge request description.' }, { operations: ['create'] }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json', 'Update GitLab merge request', 'Updates mutable fields on a GitLab merge request.', [], gitlabMergeRequestUpdateProps(), { title: 'Replace example merge request title' }, { operations: ['update'] }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json', 'Merge GitLab merge request', 'Accepts a GitLab merge request.', [], gitlabMergeProps(), { merge_commit_message: 'feat: merge factory work', squash: true }, { operations: ['update'] }),
@@ -1018,7 +1018,7 @@ function gitlabDiscussionProps() {
   };
 }
 
-function gitlabIssueProps() {
+function gitlabIssueCreateProps() {
   return {
     title: str('Issue title.'),
     description: str('Markdown issue description.'),
@@ -1026,7 +1026,13 @@ function gitlabIssueProps() {
     assignee_ids: arr(int('GitLab user id.'), 'GitLab user IDs to assign.'),
     milestone_id: int('GitLab milestone ID.'),
     confidential: bool('Whether the issue is confidential.'),
-    state_event: en(['close', 'reopen'], 'Lifecycle event when updating an existing issue.'),
+  };
+}
+
+function gitlabIssueUpdateProps() {
+  return {
+    ...gitlabIssueCreateProps(),
+    state_event: en(['close', 'reopen'], 'Lifecycle event for the issue.'),
   };
 }
 

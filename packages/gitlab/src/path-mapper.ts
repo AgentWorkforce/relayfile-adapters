@@ -9,6 +9,7 @@ export type GitLabResourceType =
   | 'issues'
   | 'merge_requests'
   | 'pipelines'
+  | 'refs'
   | 'snippets'
   | 'tags';
 
@@ -24,13 +25,15 @@ export interface GitLabPathContext {
   title?: string | null;
 }
 
-const RESOURCE_SEGMENTS = new Set<GitLabResourceType>([
+const RESOURCE_SEGMENTS = new Set<string>([
   'commits',
   'deployments',
   'files',
   'issues',
   'merge_requests',
+  'merge-requests',
   'pipelines',
+  'refs',
   'snippets',
   'tags',
 ]);
@@ -98,6 +101,18 @@ export function gitLabProjectPrefix(projectPath: string): string {
 
 export function gitLabProjectMetadataPath(projectPath: string): string {
   return `${gitLabProjectPrefix(projectPath)}/meta.json`;
+}
+
+export function computeIssueCreateDraftPath(projectPath: string, draftName: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/issues/${draftFilename(draftName)}`;
+}
+
+export function computeMergeRequestCreateDraftPath(projectPath: string, draftName: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/merge-requests/${draftFilename(draftName)}`;
+}
+
+export function computeRefCreateDraftPath(projectPath: string, branchName: string): string {
+  return `${gitLabProjectPrefix(projectPath)}/refs/${draftFilename(branchName)}`;
 }
 
 export function gitLabProjectResourceIndexPath(
@@ -306,6 +321,22 @@ export function computeMergeRequestApprovalsPath(
   return `${gitLabProjectPrefix(projectPath)}/merge_requests/${gitLabRecordDirectorySegment(iid, title)}/approvals.json`;
 }
 
+export function computeMergeRequestMergePath(
+  projectPath: string,
+  iid: number | string,
+  title?: string | null,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/merge_requests/${gitLabRecordDirectorySegment(iid, title)}/merge.json`;
+}
+
+export function computeMergeRequestClosePath(
+  projectPath: string,
+  iid: number | string,
+  title?: string | null,
+): string {
+  return `${gitLabProjectPrefix(projectPath)}/merge_requests/${gitLabRecordDirectorySegment(iid, title)}/close.json`;
+}
+
 export function computePipelineJobPath(
   projectPath: string,
   pipelineId: number | string,
@@ -364,10 +395,13 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
   }
 
   const projectPath = decodeProjectPath(segments.slice(2, objectIndex).join('/'));
-  const objectType = segments[objectIndex] as GitLabResourceType;
+  const resourceSegment = segments[objectIndex];
+  const objectType = resourceSegment === 'merge-requests'
+    ? 'merge_requests'
+    : resourceSegment as GitLabResourceType;
   const rawObjectSegment = segments[objectIndex + 1] ?? '';
   const remainder = segments.slice(objectIndex + 2);
-  const objectId = decodeObjectId(objectType, rawObjectSegment);
+  const objectId = decodeGitLabPathObjectId(objectType, rawObjectSegment, remainder);
   const subResource = remainder.length > 0 ? remainder[0] : undefined;
   const subResourceId =
     remainder.length > 1 ? decodeURIComponent(remainder[1].replace(/\.json$/, '')) : undefined;
@@ -385,11 +419,16 @@ export function parseGitLabPath(path: string): ParsedGitLabPath | null {
 function gitLabResourceSegmentIndex(segments: readonly string[]): number {
   for (let index = segments.length - 2; index > 1; index -= 1) {
     const segment = segments[index];
-    if (segment && RESOURCE_SEGMENTS.has(segment as GitLabResourceType)) {
+    if (segment && RESOURCE_SEGMENTS.has(segment)) {
       return index;
     }
   }
   return -1;
+}
+
+function draftFilename(value: string): string {
+  const draftName = assertNonEmptySegment(value, 'draft name').replace(/\.json$/u, '');
+  return `${encodeGitLabPathSegment(draftName)}.json`;
 }
 
 export function computeGitLabPath(
@@ -574,6 +613,9 @@ function refPathContext(context: GitLabPathContext): string | null | undefined {
 }
 
 function decodeObjectId(objectType: GitLabResourceType, segment: string): string {
+  if (objectType === 'refs') {
+    return decodeURIComponent(segment.replace(/\.json$/u, ''));
+  }
   if (DIRECTORY_RESOURCES.has(objectType)) {
     return decodeDirectoryObjectId(segment);
   }
@@ -581,6 +623,22 @@ function decodeObjectId(objectType: GitLabResourceType, segment: string): string
     return decodeFlatObjectId(segment);
   }
   return decodeURIComponent(segment);
+}
+
+function decodeGitLabPathObjectId(
+  objectType: GitLabResourceType,
+  segment: string,
+  remainder: readonly string[],
+): string {
+  const objectId = decodeObjectId(objectType, segment);
+  if (
+    remainder.length === 0 &&
+    (objectType === 'issues' || objectType === 'merge_requests') &&
+    objectId.endsWith('.json')
+  ) {
+    return objectId.slice(0, -'.json'.length);
+  }
+  return objectId;
 }
 
 function decodeDirectoryObjectId(segment: string): string {

@@ -36,6 +36,7 @@ interface CanonicalTarget {
 interface GitLabWritebackResponse {
   id?: number | string;
   iid?: number | string;
+  name?: string;
 }
 
 interface IssueWritebackPayload extends WritebackPayload {
@@ -88,16 +89,16 @@ const READ_ONLY_FIELDS = new Set<string>([
   '_webhook',
   '_connection',
 ]);
-const ISSUE_FIELDS = [
+const ISSUE_CREATE_FIELDS = [
   'title',
   'description',
   'labels',
   'assignee_ids',
   'milestone_id',
   'confidential',
-  'state_event',
 ] as const;
-const MR_FIELDS = [
+const ISSUE_UPDATE_FIELDS = [...ISSUE_CREATE_FIELDS, 'state_event'] as const;
+const MR_CREATE_FIELDS = [
   'source_branch',
   'target_branch',
   'title',
@@ -105,8 +106,8 @@ const MR_FIELDS = [
   'labels',
   'remove_source_branch',
   'draft',
-  'state_event',
 ] as const;
+const MR_UPDATE_FIELDS = [...MR_CREATE_FIELDS, 'state_event'] as const;
 
 export class GitLabWritebackHandler {
   constructor(
@@ -189,7 +190,7 @@ export class GitLabWritebackHandler {
       const result = response.data;
       return {
         success: true,
-        externalId: result?.id ? String(result.id) : result?.iid ? String(result.iid) : undefined,
+        externalId: externalIdForWriteback(path, result),
       };
     } catch (error) {
       return {
@@ -329,7 +330,7 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
 
 function issuePayload(content: string, creating: boolean): IssueWritebackPayload {
   const context = `GitLab issue ${creating ? 'create' : 'update'} payload`;
-  const source = typed(content, context, ISSUE_FIELDS);
+  const source = typed(content, context, creating ? ISSUE_CREATE_FIELDS : ISSUE_UPDATE_FIELDS);
   const body: IssueWritebackPayload = {};
 
   addString(body, source, 'title', creating);
@@ -347,7 +348,7 @@ function issuePayload(content: string, creating: boolean): IssueWritebackPayload
 
 function mrPayload(content: string, creating: boolean): MergeRequestWritebackPayload {
   const context = `GitLab merge request ${creating ? 'create' : 'update'} payload`;
-  const source = typed(content, context, MR_FIELDS);
+  const source = typed(content, context, creating ? MR_CREATE_FIELDS : MR_UPDATE_FIELDS);
   const body: MergeRequestWritebackPayload = {};
 
   for (const field of ['source_branch', 'target_branch', 'title'] as const) {
@@ -589,4 +590,26 @@ function unsupported(path: string): Error {
   return new Error(
     `Unsupported GitLab writeback path: ${path}. Expected an issue, merge request create/update, branch ref, merge request merge/close, discussion, or issue note.`,
   );
+}
+
+function externalIdForWriteback(
+  path: string,
+  result: GitLabWritebackResponse | null,
+): string | undefined {
+  if (!result) {
+    return undefined;
+  }
+
+  const route = classifyWrite(path, resources);
+  switch (route?.resource.name) {
+    case 'issues':
+    case 'merge-requests':
+    case 'merge':
+    case 'close-merge-request':
+      return result.iid !== undefined ? String(result.iid) : result.id !== undefined ? String(result.id) : undefined;
+    case 'refs':
+      return result.name;
+    default:
+      return result.id !== undefined ? String(result.id) : undefined;
+  }
 }

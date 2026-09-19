@@ -106,7 +106,7 @@
         "close",
         "reopen"
       ],
-      "description": "Lifecycle event when updating an existing issue."
+      "description": "Lifecycle event for the issue."
     }
   },
   "additionalProperties": false,
