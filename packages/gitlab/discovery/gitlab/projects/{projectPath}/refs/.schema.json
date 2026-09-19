@@ -1,9 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab issue note",
+  "title": "GitLab branch",
   "type": "object",
   "required": [
-    "body"
+    "branch",
+    "ref"
   ],
   "properties": {
     "id": {
@@ -71,16 +72,13 @@
       "readOnly": true,
       "additionalProperties": true
     },
-    "body": {
+    "branch": {
       "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
+      "description": "New branch name."
     },
-    "created_at": {
+    "ref": {
       "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+      "description": "Existing branch, tag, or commit SHA to branch from."
     }
   },
   "additionalProperties": false,

@@ -2,11 +2,37 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyWrite } from '@relayfile/adapter-core';
 
-import { GitLabWritebackHandler, resolveDeleteRequest } from '../src/writeback.js';
+import { GitLabWritebackHandler, resolveDeleteRequest, resolveGitLabWritebackRequest } from '../src/writeback.js';
 import { resources } from '../src/resources.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabWritebackHandler', () => {
+  it('creates issues, merge requests, and branches through GitLab v4', () => {
+    assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/issues/factory-draft.json', JSON.stringify({ title: 'Parity', labels: ['factory'] })), {
+      method: 'POST', endpoint: '/api/v4/projects/acme%2Fapi/issues', body: { title: 'Parity', labels: 'factory' },
+    });
+    assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/merge-requests/factory-draft.json', JSON.stringify({ source_branch: 'factory/parity', target_branch: 'main', title: 'Parity' })), {
+      method: 'POST', endpoint: '/api/v4/projects/acme%2Fapi/merge_requests', body: { source_branch: 'factory/parity', target_branch: 'main', title: 'Parity' },
+    });
+    assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/refs/factory-branch.json', JSON.stringify({ branch: 'factory/parity', ref: 'main' })), {
+      method: 'POST', endpoint: '/api/v4/projects/acme%2Fapi/repository/branches', body: { branch: 'factory/parity', ref: 'main' },
+    });
+  });
+
+  it('accepts and closes merge requests through canonical sidecars', () => {
+    assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/merge_requests/42__parity/merge.json', JSON.stringify({ squash: true })), {
+      method: 'PUT', endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42/merge', body: { squash: true },
+    });
+    assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/merge_requests/42__parity/close.json', JSON.stringify({ state_event: 'close' })), {
+      method: 'PUT', endpoint: '/api/v4/projects/acme%2Fapi/merge_requests/42', body: { state_event: 'close' },
+    });
+  });
+
+  it('rejects missing GitLab create fields, invalid lifecycle states, and unsupported paths', () => {
+    assert.throws(() => resolveGitLabWritebackRequest('/gitlab/projects/acme/api/issues/draft.json', JSON.stringify({})), /GitLab issue create payload.title must be a non-empty string/);
+    assert.throws(() => resolveGitLabWritebackRequest('/gitlab/projects/acme/api/merge_requests/42__parity/close.json', JSON.stringify({ state_event: 'merged' })), /state_event must be one of close, reopen/);
+    assert.throws(() => resolveGitLabWritebackRequest('/gitlab/projects/acme/api/pipelines/draft.json', '{}'), /Expected an issue, merge request create\/update, branch ref, merge request merge\/close, discussion, or issue note/);
+  });
   it('matches merge request metadata writebacks', async () => {
     const provider = new MockProvider();
     provider.register('PUT', '/api/v4/projects/acme%2Fapi/merge_requests/42', ok({ iid: 42 }));
@@ -60,7 +86,7 @@ describe('GitLabWritebackHandler', () => {
     );
 
     assert.strictEqual(missingBody.success, false);
-    assert.match(missingBody.error ?? '', /requires `body`/);
+    assert.match(missingBody.error ?? '', /body must be a non-empty string/);
     assert.strictEqual(readOnly.success, false);
     assert.match(readOnly.error ?? '', /read-only/);
     assert.strictEqual(provider.requests.length, 0);
@@ -83,10 +109,8 @@ describe('GitLabWritebackHandler', () => {
     );
 
     assert.deepStrictEqual(update, { success: true, externalId: '7' });
-    assert.deepStrictEqual(invalid, {
-      success: false,
-      error: 'Unsupported GitLab writeback path: /gitlab/projects/acme/api/issues/7__fix-bug/comments/11.json',
-    });
+    assert.strictEqual(invalid.success, false);
+    assert.match(invalid.error ?? '', /Expected an issue, merge request create\/update, branch ref, merge request merge\/close, discussion, or issue note/);
   });
 
   it('maps canonical discussion and note paths to DELETE requests', () => {

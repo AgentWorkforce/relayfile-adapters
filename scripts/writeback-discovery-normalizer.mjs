@@ -217,6 +217,22 @@ function readOnlyString(description, format) {
 }
 
 function resourceNameFor(adapterSlug, resourcePath) {
+  if (adapterSlug === 'gitlab') {
+    if (
+      resourcePath === '/gitlab/projects/{projectPath}/issues' ||
+      resourcePath === '/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json'
+    ) {
+      return 'issues';
+    }
+    if (
+      resourcePath === '/gitlab/projects/{projectPath}/merge-requests' ||
+      resourcePath === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json'
+    ) {
+      return 'merge-requests';
+    }
+    if (resourcePath.endsWith('/merge.json')) return 'merge';
+    if (resourcePath.endsWith('/close.json')) return 'close-merge-request';
+  }
   if (adapterSlug === 'github' && resourcePath.includes('/issues/') && resourcePath.endsWith('/comments')) {
     return 'issue-comments';
   }
@@ -263,10 +279,22 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/merge_requests/{mergeRequestIid}__{slug}/discussions')) {
-    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$';
+    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?|/[^/]+/notes/[^/]+\\.json)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/issues/{issueIid}__{slug}/comments')) {
     return '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$';
+  }
+  if (adapterSlug === 'gitlab' && resourcePath === '/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json') {
+    return '^/gitlab/projects/.+?/issues/[1-9]\\d*(?:__[^/]+)?/meta\\.json$';
+  }
+  if (adapterSlug === 'gitlab' && resourcePath === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json') {
+    return '^/gitlab/projects/.+?/merge_requests/[1-9]\\d*(?:__[^/]+)?/meta\\.json$';
+  }
+  if (adapterSlug === 'gitlab' && resourcePath === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json') {
+    return '^/gitlab/projects/.+?/merge_requests/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
+  }
+  if (adapterSlug === 'gitlab' && resourcePath === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json') {
+    return '^/gitlab/projects/.+?/merge_requests/[1-9]\\d*(?:__[^/]+)?/close\\.json$';
   }
   if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
     return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
@@ -328,6 +356,23 @@ function idPatternFor(adapterSlug, resourcePath) {
     return pattern('^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$');
   }
   if (adapterSlug === 'gitlab') {
+    if (resourcePath === '/gitlab/projects/{projectPath}/issues') {
+      return pattern('^[1-9]\\d*$');
+    }
+    if (resourcePath === '/gitlab/projects/{projectPath}/merge-requests') {
+      return pattern('^[1-9]\\d*$');
+    }
+    if (resourcePath === '/gitlab/projects/{projectPath}/refs') {
+      return pattern('^$');
+    }
+    if (
+      resourcePath === '/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json' ||
+      resourcePath === '/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json' ||
+      resourcePath.endsWith('/merge.json') ||
+      resourcePath.endsWith('/close.json')
+    ) {
+      return pattern('^[1-9]\\d*(?:__.*)?$');
+    }
     return pattern('^[A-Za-z0-9_.:-]+$');
   }
   if (adapterSlug === 'granola') {

@@ -379,6 +379,16 @@ export const WRITEBACK_PATH_CATALOG = {
     ]
   },
   "gitlab": {
+    "close-merge-request": [
+      {
+        "path": "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json",
+        "params": [
+          "projectPath",
+          "mergeRequestIid",
+          "slug"
+        ]
+      }
+    ],
     "comments": [
       {
         "path": "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments",
@@ -396,6 +406,56 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ]
+      }
+    ],
+    "issues": [
+      {
+        "path": "/gitlab/projects/{projectPath}/issues",
+        "params": [
+          "projectPath"
+        ]
+      },
+      {
+        "path": "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json",
+        "params": [
+          "projectPath",
+          "issueIid",
+          "slug"
+        ]
+      }
+    ],
+    "merge": [
+      {
+        "path": "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json",
+        "params": [
+          "projectPath",
+          "mergeRequestIid",
+          "slug"
+        ]
+      }
+    ],
+    "merge-requests": [
+      {
+        "path": "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json",
+        "params": [
+          "projectPath",
+          "mergeRequestIid",
+          "slug"
+        ]
+      },
+      {
+        "path": "/gitlab/projects/{projectPath}/merge-requests",
+        "params": [
+          "projectPath"
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "path": "/gitlab/projects/{projectPath}/refs",
+        "params": [
+          "projectPath"
         ]
       }
     ]

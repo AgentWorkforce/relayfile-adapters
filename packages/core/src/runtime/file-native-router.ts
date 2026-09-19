@@ -708,15 +708,27 @@ function readExactFileResourceId(
 ): string | undefined {
   const pathSegments = path.split("/").filter(Boolean);
   const resourceSegments = resource.path.split("/").filter(Boolean);
-  if (pathSegments.length !== resourceSegments.length) {
+  if (pathSegments.length < resourceSegments.length) {
     return undefined;
   }
 
-  for (let index = resourceSegments.length - 1; index >= 0; index -= 1) {
-    const resourceSegment = resourceSegments[index];
-    const pathSegment = pathSegments[index];
+  // A `{projectPath}` placeholder may stand for a nested GitLab namespace,
+  // so an exact sidecar template can have fewer segments than its concrete
+  // path. Match fixed suffix segments from the right and return the nearest
+  // dynamic record-id segment instead of requiring equal segment counts.
+  let pathIndex = pathSegments.length - 1;
+  for (let resourceIndex = resourceSegments.length - 1; resourceIndex >= 0; resourceIndex -= 1) {
+    const resourceSegment = resourceSegments[resourceIndex];
+    const pathSegment = pathSegments[pathIndex];
+    if (!resourceSegment || !pathSegment) {
+      return undefined;
+    }
     const placeholder = /\{[^}]+\}/u.exec(resourceSegment);
-    if (!placeholder || !pathSegment) {
+    if (!placeholder) {
+      if (resourceSegment !== pathSegment) {
+        return undefined;
+      }
+      pathIndex -= 1;
       continue;
     }
     if (resourceSegment.endsWith(".json") && pathSegment.endsWith(".json")) {

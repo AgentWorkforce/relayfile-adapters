@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { layoutManifest } from '../src/layout.js';
 import { gitLabLayoutPromptFile } from '../src/layout-prompt.js';
+import { resources } from '../src/resources.js';
 
 test('layoutManifest exposes GitLab resources with canonical aliases and writeback schema pointers', () => {
   const manifest = layoutManifest();
@@ -49,4 +50,11 @@ test('gitLabLayoutPromptFile emits a provider-specific root guide', () => {
   assert.match(file.content, /by-priority/u);
   assert.match(file.content, /by-ref/u);
   assert.match(file.content, /jq/u);
+});
+
+test('GitLab LAYOUT advertises every declared writeback resource', () => {
+  const content = gitLabLayoutPromptFile().content;
+  for (const resource of resources) assert.ok(content.includes(resource.path), `missing ${resource.path}`);
+  const manifestPaths = layoutManifest().resources.flatMap((resource) => resource.writebackResources.map((writeback) => writeback.path));
+  for (const path of ['gitlab/projects/**/issues', 'gitlab/projects/**/merge-requests', 'gitlab/projects/**/merge_requests', 'gitlab/projects/**/refs']) assert.ok(manifestPaths.includes(path), `missing ${path}`);
 });

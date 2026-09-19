@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab issue note",
+  "title": "GitLab issue",
   "type": "object",
   "required": [
-    "body"
+    "title"
   ],
   "properties": {
     "id": {
@@ -71,16 +71,44 @@
       "readOnly": true,
       "additionalProperties": true
     },
-    "body": {
+    "title": {
       "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
+      "description": "Issue title."
     },
-    "created_at": {
+    "description": {
       "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+      "description": "Markdown issue description."
+    },
+    "labels": {
+      "type": "array",
+      "description": "Label names. The adapter sends them to GitLab as a comma-separated labels value.",
+      "items": {
+        "type": "string",
+        "description": "GitLab label name."
+      }
+    },
+    "assignee_ids": {
+      "type": "array",
+      "description": "GitLab user IDs to assign.",
+      "items": {
+        "type": "integer",
+        "description": "GitLab user id."
+      }
+    },
+    "milestone_id": {
+      "type": "integer",
+      "description": "GitLab milestone ID."
+    },
+    "confidential": {
+      "type": "boolean",
+      "description": "Whether the issue is confidential."
+    },
+    "state_event": {
+      "enum": [
+        "close",
+        "reopen"
+      ],
+      "description": "Lifecycle event when updating an existing issue."
     }
   },
   "additionalProperties": false,

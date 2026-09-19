@@ -6,22 +6,6 @@
     "body"
   ],
   "properties": {
-    "body": {
-      "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
-    },
-    "position": {
-      "type": "object",
-      "description": "Optional GitLab position object for diff discussions.",
-      "additionalProperties": true
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -86,6 +70,22 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "body": {
+      "type": "string",
+      "description": "Markdown note body.",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "position": {
+      "type": "object",
+      "description": "Optional GitLab position object for diff discussions.",
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional timestamp for imports when supported by GitLab."
     }
   },
   "additionalProperties": false,

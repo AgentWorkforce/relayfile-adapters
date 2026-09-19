@@ -1,10 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GitLab issue note",
+  "title": "Update GitLab merge request",
   "type": "object",
-  "required": [
-    "body"
-  ],
+  "required": [],
   "properties": {
     "id": {
       "type": "string",
@@ -71,16 +69,44 @@
       "readOnly": true,
       "additionalProperties": true
     },
-    "body": {
+    "source_branch": {
       "type": "string",
-      "description": "Markdown note body.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
+      "description": "Existing source branch name."
     },
-    "created_at": {
+    "target_branch": {
       "type": "string",
-      "format": "date-time",
-      "description": "Optional timestamp for imports when supported by GitLab."
+      "description": "Target branch name."
+    },
+    "title": {
+      "type": "string",
+      "description": "Merge request title."
+    },
+    "description": {
+      "type": "string",
+      "description": "Markdown merge request description."
+    },
+    "labels": {
+      "type": "array",
+      "description": "Label names. The adapter sends them to GitLab as a comma-separated labels value.",
+      "items": {
+        "type": "string",
+        "description": "GitLab label name."
+      }
+    },
+    "remove_source_branch": {
+      "type": "boolean",
+      "description": "Whether GitLab should remove the source branch after merge."
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "Whether to create the merge request as a draft."
+    },
+    "state_event": {
+      "enum": [
+        "close",
+        "reopen"
+      ],
+      "description": "Lifecycle event for the merge request."
     }
   },
   "additionalProperties": false,
