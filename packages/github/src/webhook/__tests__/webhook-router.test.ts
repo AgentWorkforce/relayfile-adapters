@@ -138,6 +138,23 @@ describe('WebhookRouter', () => {
     assert.strictEqual(mocks.ingestCheckRun.mock.calls.length, 0);
   });
 
+  it('routes PR review-readiness and label changes through pull request updates', async () => {
+    for (const action of ['ready_for_review', 'labeled', 'unlabeled']) {
+      const mocks = createAdapterMocks();
+      const router = new WebhookRouter(mocks.adapter);
+      const payload = {
+        action,
+        repository: { full_name: 'acme/widgets' },
+        pull_request: { number: 7 },
+      };
+
+      const result = await router.route({ 'x-github-event': 'pull_request' }, payload);
+      assert.deepStrictEqual(result, createResult('/github/repos/acme/widgets/pulls/7/diff.patch'));
+      assert.strictEqual(mocks.updatePullRequest.mock.calls.length, 1);
+      assert.deepStrictEqual(mocks.updatePullRequest.mock.calls[0].arguments, [payload]);
+    }
+  });
+
   it('route calls correct handler for issue opened', async () => {
     const mocks = createAdapterMocks();
     const router = new WebhookRouter(mocks.adapter);
@@ -274,7 +291,7 @@ describe('WebhookRouter', () => {
     assert.strictEqual(router.isSupported('deployment_status.created'), true);
   });
 
-  it('getSupportedEvents lists all 21 events', () => {
+  it('getSupportedEvents lists all 24 events', () => {
     const router = new WebhookRouter(createAdapterMocks().adapter);
 
     assert.deepStrictEqual(router.getSupportedEvents(), [
@@ -282,6 +299,9 @@ describe('WebhookRouter', () => {
       'pull_request.synchronize',
       'pull_request.edited',
       'pull_request.reopened',
+      'pull_request.ready_for_review',
+      'pull_request.labeled',
+      'pull_request.unlabeled',
       'pull_request.closed',
       'pull_request_review.submitted',
       'pull_request_review.edited',
@@ -300,6 +320,6 @@ describe('WebhookRouter', () => {
       'status',
       'deployment_status.created',
     ]);
-    assert.strictEqual(router.getSupportedEvents().length, 21);
+    assert.strictEqual(router.getSupportedEvents().length, 24);
   });
 });

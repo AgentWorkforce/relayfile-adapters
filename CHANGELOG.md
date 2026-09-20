@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-github` now declares and routes pull-request `ready_for_review`, `labeled`, and `unlabeled` webhooks so review flows can wake on draft and policy-label transitions.
 - `@relayfile/adapter-github` and the core GitHub mapping now declare `check_run` and `issue_comment` webhook keys, so consumers that read the mapping's `webhooks:` block can subscribe to CI check completions and issue/PR conversation comments.
 - `@relayfile/adapter-github` now exports a cursor-resumable pull-index convergence primitive that backfills `headRef` with one GitHub list request per invocation and no per-record metadata, file, or diff fetches.
 - `@relayfile/adapter-linear` now materializes `/linear/issues/by-project/<project-id>/<identifier>.json` aliases so project-scoped consumers can avoid mounting the full issue tree. The path mapper and generated `LAYOUT.md` contract expose the new lookup; existing mounts must resync to materialize and discover it.
