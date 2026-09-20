@@ -23,6 +23,9 @@ const DEFAULT_SUPPORTED_EVENTS = [
   'pull_request.synchronize', // new commits were pushed to an open PR (re-review / re-run CI)
   'pull_request.edited', // PR title/body/base metadata changed
   'pull_request.reopened', // a closed PR was reopened
+  'pull_request.ready_for_review', // a draft PR became ready for review
+  'pull_request.labeled', // a label was added to an open PR
+  'pull_request.unlabeled', // a label was removed from an open PR
   'pull_request.closed', // a PR was closed (check `merged` in the payload to tell merge from abandon)
   'pull_request_review.submitted', // someone (human or bot) submitted a review — has `review.state` (approved / changes_requested / commented)
   'pull_request_review.edited', // review body or metadata changed
