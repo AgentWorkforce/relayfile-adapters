@@ -36,13 +36,14 @@ export function githubCheckRunPullRequestNumber(
   const entry = asCheckRunPullRequestEntry(value);
   if (!entry) return null;
 
-  const urlValue =
-    typeof entry.url === 'string'
-      ? entry.url
-      : typeof entry.html_url === 'string'
-        ? entry.html_url
-        : null;
-  if (!urlValue) return positiveSafeInteger(entry.number);
+  const hasApiUrl = Object.prototype.hasOwnProperty.call(entry, 'url');
+  const hasHtmlUrl = Object.prototype.hasOwnProperty.call(entry, 'html_url');
+  if (!hasApiUrl && !hasHtmlUrl) return positiveSafeInteger(entry.number);
+
+  // A supplied URL field is authoritative, including when its value is empty
+  // or malformed. Prefer the API URL exactly as GitHub's payload does.
+  const urlValue = hasApiUrl ? entry.url : entry.html_url;
+  if (typeof urlValue !== 'string' || urlValue.length === 0) return null;
 
   let parsedUrl: URL;
   try {
@@ -65,8 +66,7 @@ export function githubCheckRunPullRequestNumber(
     parsedUrl.username !== '' ||
     parsedUrl.password !== '' ||
     pathParts.length !== numberIndex + 1 ||
-    (pathParts[kindIndex]?.toLowerCase() !== 'pull' &&
-      pathParts[kindIndex]?.toLowerCase() !== 'pulls') ||
+    pathParts[kindIndex]?.toLowerCase() !== (isApiPath ? 'pulls' : 'pull') ||
     pathParts[ownerIndex]?.toLowerCase() !== expectedRepository.owner.toLowerCase() ||
     pathParts[repoIndex]?.toLowerCase() !== expectedRepository.repo.toLowerCase() ||
     !/^\d+$/.test(pullNumberSegment ?? '')

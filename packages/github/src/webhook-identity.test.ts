@@ -38,6 +38,22 @@ describe('githubCheckRunPullRequestNumber', () => {
       ),
       93,
     );
+    for (const entry of [
+      { number: 7, url: '' },
+      { number: 7, html_url: '' },
+      {
+        number: 7,
+        url: '',
+        html_url: 'https://github.com/AgentWorkforce/cloud/pull/93',
+      },
+      {
+        number: 7,
+        url: null,
+        html_url: 'https://github.com/AgentWorkforce/cloud/pull/93',
+      },
+    ]) {
+      assert.equal(githubCheckRunPullRequestNumber(entry, repository), null);
+    }
   });
 
   it('fails closed for foreign repositories and unrecognized hosts', () => {
@@ -72,6 +88,8 @@ describe('githubCheckRunPullRequestNumber', () => {
       { url: 'https://api.github.com:444/repos/AgentWorkforce/cloud/pulls/1' },
       { url: 'https://user@api.github.com/repos/AgentWorkforce/cloud/pulls/1' },
       { url: 'https://api.github.com/repos/AgentWorkforce/cloud/issues/1' },
+      { url: 'https://api.github.com/repos/AgentWorkforce/cloud/pull/1' },
+      { html_url: 'https://github.com/AgentWorkforce/cloud/pulls/1' },
       { url: 'https://api.github.com/repos/AgentWorkforce/cloud/pulls/1/files' },
       { url: 'https://github.com/AgentWorkforce/cloud/pull/0' },
       { url: 'https://github.com/AgentWorkforce/cloud/pull/9007199254740992' },
