@@ -40,6 +40,11 @@
       "types": "./dist/inbound.d.ts",
       "import": "./dist/inbound.js",
       "default": "./dist/inbound.js"
+    },
+    "./webhook-identity": {
+      "types": "./dist/webhook-identity.d.ts",
+      "import": "./dist/webhook-identity.js",
+      "default": "./dist/webhook-identity.js"
     }
   },
   "files": [

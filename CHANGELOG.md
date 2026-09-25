@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-github/webhook-identity` now exports fail-closed check-run pull-request identity parsing for API and HTML URLs, including repository ownership validation for webhook consumers.
 - `@relayfile/adapter-gitlab` now creates issues, branches, and merge requests from file-native drafts; accepts or closes/reopens merge requests through canonical sidecars; and publishes schemas, examples, catalog paths, and `LAYOUT.md` guidance for every supported GitLab writeback route.
 - `@relayfile/adapter-github` now declares and routes pull-request `ready_for_review`, `labeled`, and `unlabeled` webhooks so review flows can wake on draft and policy-label transitions.
 - `@relayfile/adapter-github` and the core GitHub mapping now declare `check_run` and `issue_comment` webhook keys, so consumers that read the mapping's `webhooks:` block can subscribe to CI check completions and issue/PR conversation comments.
