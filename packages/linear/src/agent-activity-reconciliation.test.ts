@@ -99,4 +99,58 @@ describe('Linear AgentActivity reconciliation', () => {
       /invalid cursor/,
     );
   });
+
+  it('fails closed when successful history responses are incomplete', async () => {
+    const malformedPayloads = [
+      { data: { agentSession: null } },
+      { data: { agentSession: {} } },
+      { data: { agentSession: { activities: { pageInfo: {
+        hasNextPage: false,
+      } } } } },
+      { data: { agentSession: { activities: {
+        nodes: [],
+        pageInfo: {},
+      } } } },
+    ];
+
+    for (const data of malformedPayloads) {
+      await assert.rejects(
+        reconcileLinearAgentActivity({
+          sessionId: 'session-1',
+          activity: { type: 'response', body: 'Ready for review.' },
+          execute: async () => ({ ok: true, status: 200, data }),
+        }),
+        /malformed history/,
+      );
+    }
+  });
+
+  it('requires a stable provider id before confirming a content match', async () => {
+    await assert.rejects(
+      reconcileLinearAgentActivity({
+        sessionId: 'session-1',
+        activity: { type: 'response', body: 'Ready for review.' },
+        execute: async () => ({
+          ok: true,
+          status: 200,
+          data: {
+            data: {
+              agentSession: {
+                activities: {
+                  nodes: [{
+                    content: {
+                      __typename: 'AgentActivityResponseContent',
+                      body: 'Ready for review.',
+                    },
+                  }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            },
+          },
+        }),
+      }),
+      /missing an id or content/,
+    );
+  });
 });

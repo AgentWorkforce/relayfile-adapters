@@ -94,6 +94,10 @@ function request(sessionId: string, after: string | null): LinearWritebackReques
   };
 }
 
+function malformedHistory(message: string): never {
+  throw new Error(`Linear activity reconciliation returned malformed history: ${message}`);
+}
+
 /**
  * Reconcile an ambiguously completed AgentActivity create against Linear's
  * frozen session history. The adapter owns the GraphQL contract, pagination,
@@ -116,23 +120,36 @@ export async function reconcileLinearAgentActivity(input: {
           `Linear activity reconciliation failed with status ${response.status}`,
       );
     }
-    const data = record(record(response.data)?.data);
+    const envelope = record(response.data);
+    const data = record(envelope?.data);
     const session = record(data?.agentSession);
     const activities = record(session?.activities);
-    const nodes = Array.isArray(activities?.nodes) ? activities.nodes : [];
+    if (!envelope || !data || !session || !activities) {
+      malformedHistory('missing agent session activities');
+    }
+    if (!Array.isArray(activities.nodes)) {
+      malformedHistory('activities.nodes is not an array');
+    }
+    const pageInfo = record(activities.pageInfo);
+    if (!pageInfo || typeof pageInfo.hasNextPage !== 'boolean') {
+      malformedHistory('pageInfo.hasNextPage is not a boolean');
+    }
+    const nodes = activities.nodes;
     for (const nodeValue of nodes) {
       const node = record(nodeValue);
-      if (node && contentMatches(node.content, input.activity)) {
-        const externalId = optionalString(node.id);
+      const externalId = optionalString(node?.id)?.trim();
+      if (!node || !externalId || !record(node.content)) {
+        malformedHistory('activity node is missing an id or content');
+      }
+      if (contentMatches(node.content, input.activity)) {
         return {
           found: true,
-          ...(externalId ? { externalId } : {}),
+          externalId,
           status: response.status,
         };
       }
     }
-    const pageInfo = record(activities?.pageInfo);
-    if (pageInfo?.hasNextPage !== true) {
+    if (!pageInfo.hasNextPage) {
       return { found: false, status: response.status };
     }
     const endCursor = optionalString(pageInfo.endCursor);
