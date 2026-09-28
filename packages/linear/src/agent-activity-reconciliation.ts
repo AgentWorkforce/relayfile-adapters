@@ -26,6 +26,7 @@ const AGENT_SESSION_ACTIVITIES_QUERY = `
       activities(first: 50, after: $after) {
         nodes {
           id
+          createdAt
           content {
             __typename
             ... on AgentActivityThoughtContent { body }
@@ -143,8 +144,13 @@ function malformedHistory(message: string): never {
 export async function reconcileLinearAgentActivity(input: {
   readonly sessionId: string;
   readonly activity: LinearAgentActivity;
+  readonly createdAtOrAfter: string;
   readonly execute: LinearAgentActivityRequestExecutor;
 }): Promise<LinearAgentActivityReconciliationResult> {
+  const createdAtOrAfter = Date.parse(input.createdAtOrAfter);
+  if (!Number.isFinite(createdAtOrAfter)) {
+    throw new Error('Linear activity reconciliation requires a valid creation-time boundary');
+  }
   let after: string | null = null;
   const seenCursors = new Set<string>();
   for (;;) {
@@ -174,11 +180,16 @@ export async function reconcileLinearAgentActivity(input: {
     for (const nodeValue of nodes) {
       const node = record(nodeValue);
       const externalId = optionalString(node?.id)?.trim();
-      if (!node || !externalId) {
-        malformedHistory('activity node is missing an id or content');
+      const createdAtValue = optionalString(node?.createdAt);
+      const createdAt = createdAtValue ? Date.parse(createdAtValue) : Number.NaN;
+      if (!node || !externalId || !Number.isFinite(createdAt)) {
+        malformedHistory('activity node is missing an id, createdAt, or content');
       }
       const content = validateActivityContent(node.content);
-      if (contentMatches(content, input.activity)) {
+      if (
+        createdAt >= createdAtOrAfter &&
+        contentMatches(content, input.activity)
+      ) {
         return {
           found: true,
           externalId,

@@ -8,6 +8,7 @@ describe('Linear AgentActivity reconciliation', () => {
     const result = await reconcileLinearAgentActivity({
       sessionId: 'session-1',
       activity: { type: 'response', body: 'Ready for review.' },
+      createdAtOrAfter: '2026-09-28T10:00:00.000Z',
       execute: async (request) => {
         const variables = request.body.variables as {
           sessionId: string;
@@ -24,13 +25,24 @@ describe('Linear AgentActivity reconciliation', () => {
               data: {
                 agentSession: {
                   activities: {
-                    nodes: [{
-                      id: 'prompt-1',
-                      content: {
-                        __typename: 'AgentActivityPromptContent',
-                        body: 'Please keep going.',
+                    nodes: [
+                      {
+                        id: 'prompt-1',
+                        createdAt: '2026-09-28T09:58:00.000Z',
+                        content: {
+                          __typename: 'AgentActivityPromptContent',
+                          body: 'Please keep going.',
+                        },
                       },
-                    }],
+                      {
+                        id: 'old-identical-activity',
+                        createdAt: '2026-09-28T09:59:00.000Z',
+                        content: {
+                          __typename: 'AgentActivityResponseContent',
+                          body: 'Ready for review.',
+                        },
+                      },
+                    ],
                     pageInfo: { hasNextPage: true, endCursor: 'page-2' },
                   },
                 },
@@ -47,6 +59,7 @@ describe('Linear AgentActivity reconciliation', () => {
                 activities: {
                   nodes: [{
                     id: 'activity-1',
+                    createdAt: '2026-09-28T10:00:01.000Z',
                     content: {
                       __typename: 'AgentActivityResponseContent',
                       body: 'Ready for review.',
@@ -74,6 +87,7 @@ describe('Linear AgentActivity reconciliation', () => {
       reconcileLinearAgentActivity({
         sessionId: 'session-1',
         activity: { type: 'error', body: 'Failed.' },
+        createdAtOrAfter: '2026-09-28T10:00:00.000Z',
         execute: async () => ({
           ok: true,
           status: 200,
@@ -87,6 +101,7 @@ describe('Linear AgentActivity reconciliation', () => {
       reconcileLinearAgentActivity({
         sessionId: 'session-1',
         activity: { type: 'error', body: 'Failed.' },
+        createdAtOrAfter: '2026-09-28T10:00:00.000Z',
         execute: async () => ({
           ok: true,
           status: 200,
@@ -124,6 +139,7 @@ describe('Linear AgentActivity reconciliation', () => {
         reconcileLinearAgentActivity({
           sessionId: 'session-1',
           activity: { type: 'response', body: 'Ready for review.' },
+          createdAtOrAfter: '2026-09-28T10:00:00.000Z',
           execute: async () => ({ ok: true, status: 200, data }),
         }),
         /malformed history/,
@@ -137,6 +153,7 @@ describe('Linear AgentActivity reconciliation', () => {
         reconcileLinearAgentActivity({
           sessionId: 'session-1',
           activity: { type: 'response', body: 'Ready for review.' },
+          createdAtOrAfter: '2026-09-28T10:00:00.000Z',
           execute: async () => ({
             ok: true,
             status: 200,
@@ -163,6 +180,7 @@ describe('Linear AgentActivity reconciliation', () => {
       reconcileLinearAgentActivity({
         sessionId: 'session-1',
         activity: { type: 'response', body: 'Ready for review.' },
+        createdAtOrAfter: '2026-09-28T10:00:00.000Z',
         execute: async () => ({
           ok: true,
           status: 200,
@@ -171,6 +189,7 @@ describe('Linear AgentActivity reconciliation', () => {
               agentSession: {
                 activities: {
                   nodes: [{
+                    createdAt: '2026-09-28T10:00:01.000Z',
                     content: {
                       __typename: 'AgentActivityResponseContent',
                       body: 'Ready for review.',
@@ -183,7 +202,7 @@ describe('Linear AgentActivity reconciliation', () => {
           },
         }),
       }),
-      /missing an id or content/,
+      /missing an id, createdAt, or content/,
     );
   });
 
@@ -204,6 +223,7 @@ describe('Linear AgentActivity reconciliation', () => {
         reconcileLinearAgentActivity({
           sessionId: 'session-1',
           activity: { type: 'response', body: 'Ready for review.' },
+          createdAtOrAfter: '2026-09-28T10:00:00.000Z',
           execute: async () => ({
             ok: true,
             status: 200,
@@ -211,7 +231,11 @@ describe('Linear AgentActivity reconciliation', () => {
               data: {
                 agentSession: {
                   activities: {
-                    nodes: [{ id: 'activity-1', content }],
+                    nodes: [{
+                      id: 'activity-1',
+                      createdAt: '2026-09-28T10:00:01.000Z',
+                      content,
+                    }],
                     pageInfo: { hasNextPage: false, endCursor: null },
                   },
                 },
