@@ -95,6 +95,8 @@ function validateActivityContent(value: unknown): Record<string, unknown> {
         malformedHistory(`${typename} has an invalid ${field}`);
       }
     }
+  } else {
+    malformedHistory(`unsupported activity content typename ${typename}`);
   }
   return content;
 }

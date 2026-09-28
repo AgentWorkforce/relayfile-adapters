@@ -184,6 +184,7 @@ describe('Linear AgentActivity reconciliation', () => {
   it('rejects incomplete activity content before reporting absence', async () => {
     const malformedContent = [
       {},
+      { __typename: 'AgentActivityFutureContent' },
       { __typename: 'AgentActivityResponseContent' },
       {
         __typename: 'AgentActivityActionContent',
