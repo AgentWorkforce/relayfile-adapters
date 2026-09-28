@@ -3,6 +3,12 @@ import { resources } from './resources.js';
 import type { JsonValue, LinearAgentActivity, LinearAgentActivityType, LinearWritebackRequest } from './types.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
+export { reconcileLinearAgentActivity } from './agent-activity-reconciliation.js';
+export type {
+  LinearAgentActivityProxyResponse,
+  LinearAgentActivityReconciliationResult,
+  LinearAgentActivityRequestExecutor,
+} from './agent-activity-reconciliation.js';
 
 /**
  * Mounted Linear records used to resolve human-readable issue-create
