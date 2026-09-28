@@ -153,4 +153,40 @@ describe('Linear AgentActivity reconciliation', () => {
       /missing an id or content/,
     );
   });
+
+  it('rejects incomplete activity content before reporting absence', async () => {
+    const malformedContent = [
+      {},
+      { __typename: 'AgentActivityResponseContent' },
+      {
+        __typename: 'AgentActivityActionContent',
+        action: 'deploy',
+        parameter: null,
+      },
+    ];
+
+    for (const content of malformedContent) {
+      await assert.rejects(
+        reconcileLinearAgentActivity({
+          sessionId: 'session-1',
+          activity: { type: 'response', body: 'Ready for review.' },
+          execute: async () => ({
+            ok: true,
+            status: 200,
+            data: {
+              data: {
+                agentSession: {
+                  activities: {
+                    nodes: [{ id: 'activity-1', content }],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                  },
+                },
+              },
+            },
+          }),
+        }),
+        /malformed history/,
+      );
+    }
+  });
 });

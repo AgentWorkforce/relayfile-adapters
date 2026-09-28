@@ -71,6 +71,34 @@ function contentMatches(value: unknown, expected: LinearAgentActivity): boolean 
     optionalString(content.result) === expected.result;
 }
 
+function validateActivityContent(value: unknown): Record<string, unknown> {
+  const content = record(value);
+  const typename = optionalString(content?.__typename);
+  if (!content || !typename) {
+    malformedHistory('activity content is missing a typename');
+  }
+  if (
+    typename === 'AgentActivityThoughtContent' ||
+    typename === 'AgentActivityElicitationContent' ||
+    typename === 'AgentActivityResponseContent' ||
+    typename === 'AgentActivityErrorContent'
+  ) {
+    if (typeof content.body !== 'string') {
+      malformedHistory(`${typename} is missing its body`);
+    }
+  } else if (typename === 'AgentActivityActionContent') {
+    for (const field of ['action', 'parameter', 'result'] as const) {
+      if (
+        !Object.prototype.hasOwnProperty.call(content, field) ||
+        (content[field] !== null && typeof content[field] !== 'string')
+      ) {
+        malformedHistory(`${typename} has an invalid ${field}`);
+      }
+    }
+  }
+  return content;
+}
+
 function graphqlError(data: unknown): string | undefined {
   const envelope = record(data);
   if (!Array.isArray(envelope?.errors) || envelope.errors.length === 0) {
@@ -138,10 +166,11 @@ export async function reconcileLinearAgentActivity(input: {
     for (const nodeValue of nodes) {
       const node = record(nodeValue);
       const externalId = optionalString(node?.id)?.trim();
-      if (!node || !externalId || !record(node.content)) {
+      if (!node || !externalId) {
         malformedHistory('activity node is missing an id or content');
       }
-      if (contentMatches(node.content, input.activity)) {
+      const content = validateActivityContent(node.content);
+      if (contentMatches(content, input.activity)) {
         return {
           found: true,
           externalId,
