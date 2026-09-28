@@ -33,6 +33,7 @@ const AGENT_SESSION_ACTIVITIES_QUERY = `
             ... on AgentActivityActionContent { action parameter result }
             ... on AgentActivityResponseContent { body }
             ... on AgentActivityErrorContent { body }
+            ... on AgentActivityPromptContent { body }
           }
         }
         pageInfo { hasNextPage endCursor }
@@ -81,7 +82,8 @@ function validateActivityContent(value: unknown): Record<string, unknown> {
     typename === 'AgentActivityThoughtContent' ||
     typename === 'AgentActivityElicitationContent' ||
     typename === 'AgentActivityResponseContent' ||
-    typename === 'AgentActivityErrorContent'
+    typename === 'AgentActivityErrorContent' ||
+    typename === 'AgentActivityPromptContent'
   ) {
     if (typeof content.body !== 'string') {
       malformedHistory(`${typename} is missing its body`);

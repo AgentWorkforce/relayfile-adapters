@@ -24,7 +24,13 @@ describe('Linear AgentActivity reconciliation', () => {
               data: {
                 agentSession: {
                   activities: {
-                    nodes: [],
+                    nodes: [{
+                      id: 'prompt-1',
+                      content: {
+                        __typename: 'AgentActivityPromptContent',
+                        body: 'Please keep going.',
+                      },
+                    }],
                     pageInfo: { hasNextPage: true, endCursor: 'page-2' },
                   },
                 },
