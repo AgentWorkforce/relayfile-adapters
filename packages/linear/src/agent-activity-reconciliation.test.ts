@@ -125,6 +125,33 @@ describe('Linear AgentActivity reconciliation', () => {
     }
   });
 
+  it('rejects malformed GraphQL error envelopes before trusting history', async () => {
+    for (const errors of [null, 'upstream failed', { message: 'failed' }]) {
+      await assert.rejects(
+        reconcileLinearAgentActivity({
+          sessionId: 'session-1',
+          activity: { type: 'response', body: 'Ready for review.' },
+          execute: async () => ({
+            ok: true,
+            status: 200,
+            data: {
+              errors,
+              data: {
+                agentSession: {
+                  activities: {
+                    nodes: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                  },
+                },
+              },
+            },
+          }),
+        }),
+        /GraphQL errors is not an array/,
+      );
+    }
+  });
+
   it('requires a stable provider id before confirming a content match', async () => {
     await assert.rejects(
       reconcileLinearAgentActivity({

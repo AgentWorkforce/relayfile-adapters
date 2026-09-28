@@ -101,9 +101,13 @@ function validateActivityContent(value: unknown): Record<string, unknown> {
 
 function graphqlError(data: unknown): string | undefined {
   const envelope = record(data);
-  if (!Array.isArray(envelope?.errors) || envelope.errors.length === 0) {
+  if (!envelope || !Object.prototype.hasOwnProperty.call(envelope, 'errors')) {
     return undefined;
   }
+  if (!Array.isArray(envelope.errors)) {
+    malformedHistory('GraphQL errors is not an array');
+  }
+  if (envelope.errors.length === 0) return undefined;
   return envelope.errors
     .map((entry) => optionalString(record(entry)?.message))
     .filter((message): message is string => Boolean(message))
