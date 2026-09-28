@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { reconcileLinearAgentActivity } from './agent-activity-reconciliation.js';
+
+describe('Linear AgentActivity reconciliation', () => {
+  it('owns cursor pagination and finds exact frozen content', async () => {
+    const cursors: unknown[] = [];
+    const result = await reconcileLinearAgentActivity({
+      sessionId: 'session-1',
+      activity: { type: 'response', body: 'Ready for review.' },
+      execute: async (request) => {
+        const variables = request.body.variables as {
+          sessionId: string;
+          after: string | null;
+        };
+        cursors.push(variables.after);
+        assert.equal(request.action, 'list_agent_activities');
+        assert.match(String(request.body.query), /RelayfileAgentSessionActivities/);
+        if (variables.after === null) {
+          return {
+            ok: true,
+            status: 200,
+            data: {
+              data: {
+                agentSession: {
+                  activities: {
+                    nodes: [],
+                    pageInfo: { hasNextPage: true, endCursor: 'page-2' },
+                  },
+                },
+              },
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          data: {
+            data: {
+              agentSession: {
+                activities: {
+                  nodes: [{
+                    id: 'activity-1',
+                    content: {
+                      __typename: 'AgentActivityResponseContent',
+                      body: 'Ready for review.',
+                    },
+                  }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
+                },
+              },
+            },
+          },
+        };
+      },
+    });
+
+    assert.deepEqual(cursors, [null, 'page-2']);
+    assert.deepEqual(result, {
+      found: true,
+      externalId: 'activity-1',
+      status: 200,
+    });
+  });
+
+  it('fails closed on provider errors and repeated cursors', async () => {
+    await assert.rejects(
+      reconcileLinearAgentActivity({
+        sessionId: 'session-1',
+        activity: { type: 'error', body: 'Failed.' },
+        execute: async () => ({
+          ok: true,
+          status: 200,
+          data: { errors: [{ message: 'permission denied' }] },
+        }),
+      }),
+      /permission denied/,
+    );
+
+    await assert.rejects(
+      reconcileLinearAgentActivity({
+        sessionId: 'session-1',
+        activity: { type: 'error', body: 'Failed.' },
+        execute: async () => ({
+          ok: true,
+          status: 200,
+          data: {
+            data: {
+              agentSession: {
+                activities: {
+                  nodes: [],
+                  pageInfo: { hasNextPage: true, endCursor: 'same' },
+                },
+              },
+            },
+          },
+        }),
+      }),
+      /invalid cursor/,
+    );
+  });
+});
