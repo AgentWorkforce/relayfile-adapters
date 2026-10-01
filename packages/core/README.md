@@ -84,8 +84,13 @@ Pass the mapping object produced by your build step to the runtime adapter:
 
 ```ts
 import { SchemaAdapter, type MappingSpec } from "@relayfile/adapter-core";
+import type { ConnectionProvider, RelayFileClient } from "@relayfile/sdk";
 
-export function createAdapter(spec: MappingSpec) {
+export function createAdapter(
+  client: RelayFileClient,
+  provider: ConnectionProvider,
+  spec: MappingSpec
+) {
   return new SchemaAdapter({
     client,
     provider,
