@@ -5,7 +5,7 @@ import {
   SchemaAdapter,
   type MappingSpec,
 } from '@relayfile/adapter-core';
-import { parseMappingSpecText } from '@relayfile/adapter-core/ingest';
+import { parseMappingSpecText } from '@relayfile/adapter-core/ingest/mapping';
 import type { RelayFileClient } from '@relayfile/sdk';
 
 import type { ConnectionProvider } from '@relayfile/sdk';

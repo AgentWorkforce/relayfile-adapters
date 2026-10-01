@@ -56,6 +56,10 @@
     "./generate": {
       "types": "./dist/src/generate/index.d.ts",
       "default": "./dist/src/generate/index.js"
+    },
+    "./ingest/mapping": {
+      "types": "./dist/src/spec/parser.d.ts",
+      "default": "./dist/src/spec/parser.js"
     }
   },
   "bin": {

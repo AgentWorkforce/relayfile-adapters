@@ -56,6 +56,30 @@ test('published CLI resolves tooling subpaths', () => {
   }
 });
 
+test('GitHub runtime resolves only the narrow YAML mapping parser', async () => {
+  const result = await build({
+    absWorkingDir: repoRoot,
+    stdin: {
+      contents: 'export { GitHubAdapter } from "@relayfile/adapter-github";',
+      resolveDir: repoRoot,
+    },
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    treeShaking: false,
+    ignoreAnnotations: true,
+    write: false,
+    metafile: true,
+  });
+  const inputs = Object.keys(result.metafile.inputs).map(path => path.replaceAll('\\', '/'));
+  assert.ok(inputs.some(path => path.endsWith('core/dist/src/spec/parser.js')));
+  assert.ok(inputs.some(path => path.includes('node_modules/yaml/')));
+  assert.deepEqual(inputs.filter(path => forbidden.test(path)
+    && !path.includes('node_modules/yaml/')
+    && !path.endsWith('core/dist/src/spec/parser.js')), []);
+  assert.deepEqual(Object.values(result.metafile.outputs).flatMap(output => output.exports), ['GitHubAdapter']);
+});
+
 test('public ingest/generate subpaths and CLI generate work offline', async () => {
   const ingest = await import('@relayfile/adapter-core/ingest');
   const generate = await import('@relayfile/adapter-core/generate');

@@ -102,12 +102,15 @@ exported from the root now require an explicit subpath (a breaking import change
 | --- | --- |
 | `@relayfile/adapter-core/docs` | `DocsCrawler`, `APIExtractor`, `SpecGenerator`, `MappingGenerator`, `ChangeDetector`, `SpecUpdater`, `defaultSyncConfig`, and docs types |
 | `@relayfile/adapter-core/ingest` | `loadServiceSpecFromMapping`, OpenAPI/Postman/sample loaders, `loadMappingSpec`, `parseMappingSpecText`, `validateMappingSpec`, and service types |
+| `@relayfile/adapter-core/ingest/mapping` | Mapping parser/validator only, for consumers that need YAML mapping loading without docs or service-spec ingestion |
 | `@relayfile/adapter-core/generate` | Adapter/type generators, `detectDrift`, and trigger/scope-key/writeback-path/inbound catalog generators |
 
 Keep these imports in build scripts or Node.js tooling. For a Worker/runtime
 bundle, load the mapping at build time and pass the resulting object to
 `SchemaAdapter`. The CLI commands are unchanged. Tooling dependencies remain
-installed for the CLI, but are not reachable from the runtime entry.
+installed for the CLI, but are not reachable from the runtime entry. GitHub's
+existing lazy mapping loader uses `/ingest/mapping`; it still requires YAML
+but does not resolve crawlers or Postman conversion.
 
 Core and adapter library packages declare `sideEffects: false`: their module
 initializers create local data/functions without global registration or I/O.
