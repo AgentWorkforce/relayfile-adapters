@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "npx turbo build",
-    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npm run test:adapter-mapping-bundle && npm run test:runtime-bundle && npx turbo test catalog:check",
+    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npm run test:adapter-mapping-bundle && npx turbo test catalog:check && npm run test:runtime-bundle",
     "test:catalog-task-graph": "node scripts/verify-catalog-check-task.mjs",
     "test:publish-targets": "node --test scripts/resolve-publish-targets.test.mjs",
     "test:internal-dependencies": "node scripts/sync-internal-dependencies.mjs --check",
