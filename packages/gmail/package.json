@@ -3,6 +3,7 @@
   "version": "0.3.4",
   "description": "Gmail storage bridge adapter for Relayfile",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

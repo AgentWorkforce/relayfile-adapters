@@ -214,7 +214,11 @@ Working in ${ROOT} on branch feat/docs-to-spec.
    
    - src/docs/types.ts — all shared types
 
-3. Add CLI commands to src/cli.ts:
+3. Export docs tooling from @relayfile/adapter-core/docs and import it from
+   that subpath in src/cli.ts. Use @relayfile/adapter-core/ingest for spec loaders
+   and @relayfile/adapter-core/generate for generators/catalog tooling. Keep
+   build-time tooling out of the runtime root entry.
+   Add CLI commands to src/cli.ts:
    - docs-to-spec (one-shot bootstrap)
    - docs-update (re-crawl + diff, only if changed)
    - docs-check (cheap change detection only, no LLM)

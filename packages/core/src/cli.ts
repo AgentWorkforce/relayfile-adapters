@@ -6,32 +6,32 @@ import YAML from "yaml";
 import {
   ChangeDetector,
   defaultSyncConfig,
-} from "./docs/change-detector.js";
-import { DocsCrawler } from "./docs/crawler.js";
-import { APIExtractor } from "./docs/extractor.js";
-import { SpecGenerator } from "./docs/generator.js";
-import { MappingGenerator } from "./docs/mapping-generator.js";
-import { SpecUpdater } from "./docs/updater.js";
-import type {
-  DocsLlmConfig,
-  DocsSourceConfig,
-  DocsSpecMetadata,
-  DocsSyncConfig,
-} from "./docs/types.js";
-import { detectDrift } from "./drift/drift-checker.js";
-import { generateAdapterModule } from "./generate/adapter-generator.js";
-import { generateTypeDefinitions } from "./generate/types-generator.js";
-import { loadServiceSpecFromMapping } from "./ingest/index.js";
-import type { ServiceSpec } from "./ingest/types.js";
+  DocsCrawler,
+  APIExtractor,
+  SpecGenerator,
+  MappingGenerator,
+  SpecUpdater,
+  type DocsLlmConfig,
+  type DocsSourceConfig,
+  type DocsSpecMetadata,
+  type DocsSyncConfig,
+} from "@relayfile/adapter-core/docs";
 import {
+  detectDrift,
+  generateAdapterModule,
+  generateTypeDefinitions,
+  writeTriggerCatalog,
+  writeScopeKeyCatalog,
+  writeWritebackPathCatalog,
+  writeInboundCapabilityCatalog,
+} from "@relayfile/adapter-core/generate";
+import {
+  loadServiceSpecFromMapping,
   loadMappingSpec,
   validateMappingSpec,
-} from "./spec/parser.js";
+  type ServiceSpec,
+} from "@relayfile/adapter-core/ingest";
 import type { MappingSpec } from "./spec/types.js";
-import { writeTriggerCatalog } from "./triggers/catalog-generator.js";
-import { writeScopeKeyCatalog } from "./scope-keys/catalog-generator.js";
-import { writeWritebackPathCatalog } from "./writeback-paths/catalog-generator.js";
-import { writeInboundCapabilityCatalog } from "./inbound/catalog-generator.js";
 
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv;

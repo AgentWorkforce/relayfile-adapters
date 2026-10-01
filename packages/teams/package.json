@@ -3,6 +3,7 @@
   "version": "0.4.1",
   "description": "Microsoft Teams adapter for relayfile — maps Teams channels, messages, and change notifications to relayfile VFS paths",
   "type": "module",
+  "sideEffects": false,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

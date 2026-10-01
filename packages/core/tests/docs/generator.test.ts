@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import YAML from "yaml";
-import { SpecGenerator } from "../../src/docs/generator.js";
+import { SpecGenerator } from "@relayfile/adapter-core/docs";
 
 test("SpecGenerator emits OpenAPI with security and x-webhooks", () => {
   const generator = new SpecGenerator();

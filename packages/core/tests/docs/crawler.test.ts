@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DocsCrawler } from "../../src/docs/crawler.js";
+import { DocsCrawler } from "@relayfile/adapter-core/docs";
 
 test("DocsCrawler extracts main content and follows next links", async () => {
   const responses = new Map<string, string>([

@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "npx turbo build",
-    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npm run test:adapter-mapping-bundle && npx turbo test catalog:check",
+    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npm run test:adapter-mapping-bundle && npm run test:runtime-bundle && npx turbo test catalog:check",
     "test:catalog-task-graph": "node scripts/verify-catalog-check-task.mjs",
     "test:publish-targets": "node --test scripts/resolve-publish-targets.test.mjs",
     "test:internal-dependencies": "node scripts/sync-internal-dependencies.mjs --check",
@@ -17,11 +17,13 @@
     "test:digest-contracts": "node --test scripts/digest-layout-contracts.test.mjs && node scripts/digest-layout-contracts.mjs",
     "test:writeback-e2e": "node scripts/verify-file-native-writeback-e2e.mjs",
     "typecheck": "npx turbo typecheck",
-    "test:adapter-mapping-bundle": "node --test scripts/bundle-adapter-mappings.test.mjs"
+    "test:adapter-mapping-bundle": "node --test scripts/bundle-adapter-mappings.test.mjs",
+    "test:runtime-bundle": "node --test scripts/core-runtime-bundle.test.mjs"
   },
   "devDependencies": {
     "@agentworkforce/workload-router": "^0.1.3",
     "agent-trajectories": "^0.5.8",
+    "esbuild": "^0.27.7",
     "turbo": "^2.5.0",
     "typescript": "^5.7.0",
     "yaml": "^2.8.1"

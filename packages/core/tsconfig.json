@@ -28,7 +28,8 @@
     "tests/inbound/**/*.test.ts",
     "tests/scope-keys/**/*.test.ts",
     "tests/writeback-paths/**/*.test.ts",
-    "tests/vfs-client/**/*.test.ts"
+    "tests/vfs-client/**/*.test.ts",
+    "tests/docs/**/*.test.ts"
   ],
   "extends": "../../tsconfig.base.json"
 }

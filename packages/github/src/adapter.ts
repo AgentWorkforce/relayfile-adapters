@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
-  parseMappingSpecText,
   SchemaAdapter,
   type MappingSpec,
 } from '@relayfile/adapter-core';
+import { parseMappingSpecText } from '@relayfile/adapter-core/ingest';
 import type { RelayFileClient } from '@relayfile/sdk';
 
 import type { ConnectionProvider } from '@relayfile/sdk';

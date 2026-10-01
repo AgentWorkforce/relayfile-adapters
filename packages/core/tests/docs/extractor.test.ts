@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APIExtractor } from "../../src/docs/extractor.js";
+import { APIExtractor } from "@relayfile/adapter-core/docs";
 
 test("APIExtractor parses structured JSON responses from the LLM", async () => {
   const extractor = new APIExtractor({
