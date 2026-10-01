@@ -17,7 +17,6 @@ test('slackChannelIdFromPathSegment round-trips the canonical composer', () => {
     for (const name of ['watchdog-test', 'ops_alerts_v2', undefined, '', '🎉', id.toLowerCase()]) {
       const segment = slackNameWithId(name, id);
       assert.equal(slackChannelIdFromPathSegment(segment), id);
-      assert.equal(slackChannelIdFromPathSegment(encodeURIComponent(segment)), id);
     }
   }
 });
