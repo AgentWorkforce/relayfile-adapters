@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-jira",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Jira adapter package for Relayfile",
   "type": "module",
   "sideEffects": false,
@@ -66,7 +66,7 @@
     "directory": "packages/jira"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.6.4"
+    "@relayfile/adapter-core": "^0.7.0"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

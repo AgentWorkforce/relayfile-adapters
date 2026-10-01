@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-recall",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Recall adapter package for Relayfile",
   "type": "module",
   "sideEffects": false,
@@ -56,7 +56,7 @@
     "directory": "packages/recall"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.6.4"
+    "@relayfile/adapter-core": "^0.7.0"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"

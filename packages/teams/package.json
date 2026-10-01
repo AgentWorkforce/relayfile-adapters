@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-teams",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Microsoft Teams adapter for relayfile — maps Teams channels, messages, and change notifications to relayfile VFS paths",
   "type": "module",
   "sideEffects": false,
@@ -37,7 +37,7 @@
     "directory": "packages/teams"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.6.4"
+    "@relayfile/adapter-core": "^0.7.0"
   },
   "peerDependencies": {
     "@relayfile/sdk": ">=0.6.0 <1"
