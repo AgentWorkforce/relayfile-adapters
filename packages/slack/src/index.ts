@@ -23,6 +23,7 @@ export {
   parseSlackThreadReplyObjectId,
   reactionPath,
   sanitizeSlackPathSegment,
+  slackChannelIdFromPathSegment,
   slackBotsAliasPath,
   slackByNameChannelAliasPath,
   slackByNameUserAliasPath,
