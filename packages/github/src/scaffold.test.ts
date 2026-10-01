@@ -40,6 +40,9 @@ describe('scaffold', () => {
     assert.strictEqual(adapter.name, 'github');
     assert.strictEqual(adapter.version, '0.1.0');
     assert.ok(adapter.supportedEvents().includes('check_run.completed'));
+    assert.ok(adapter.supportedEvents().includes('pull_request.ready_for_review'));
+    assert.ok(adapter.supportedEvents().includes('pull_request.labeled'));
+    assert.ok(adapter.supportedEvents().includes('pull_request.unlabeled'));
 
     const result = await adapter.ingestPullRequest({
       number: 42,

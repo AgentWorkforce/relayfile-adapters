@@ -3,20 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@10.8.2",
-  "description": "Relayfile adapters — map external services to the relayfile VFS",
+  "description": "Relayfile adapters \u2014 map external services to the relayfile VFS",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build": "npx turbo build",
-    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npx turbo test catalog:check",
+    "test": "npm run test:publish-targets && npm run test:internal-dependencies && npm run test:writeback-discovery && npm run test:digest-contracts && npm run test:catalog-task-graph && npm run test:adapter-mapping-bundle && npx turbo test catalog:check",
     "test:catalog-task-graph": "node scripts/verify-catalog-check-task.mjs",
     "test:publish-targets": "node --test scripts/resolve-publish-targets.test.mjs",
     "test:internal-dependencies": "node scripts/sync-internal-dependencies.mjs --check",
     "test:writeback-discovery": "node --test scripts/writeback-discovery-normalizer.test.mjs && node scripts/verify-writeback-discovery.mjs",
     "test:digest-contracts": "node --test scripts/digest-layout-contracts.test.mjs && node scripts/digest-layout-contracts.mjs",
     "test:writeback-e2e": "node scripts/verify-file-native-writeback-e2e.mjs",
-    "typecheck": "npx turbo typecheck"
+    "typecheck": "npx turbo typecheck",
+    "test:adapter-mapping-bundle": "node --test scripts/bundle-adapter-mappings.test.mjs"
   },
   "devDependencies": {
     "@agentworkforce/workload-router": "^0.1.3",

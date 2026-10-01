@@ -52,9 +52,37 @@ describe("Shortcut adapter", () => {
     ]);
   });
 
+  it("keeps a supported story create when a bundled action is unsupported", () => {
+    const normalized = normalizeShortcutWebhook({
+      actions: [
+        { id: 35, entity_type: "story", action: "create" },
+        { id: 9, entity_type: "label", action: "create" },
+      ],
+    });
+
+    assert.deepEqual(normalized.actions.map((action) => action.eventType), ["story.create"]);
+    assert.deepEqual(normalized.skippedEventTypes, ["label.create"]);
+  });
+
+  it("keeps a supported story update after unsupported bundled actions", () => {
+    const normalized = normalizeShortcutWebhook({
+      actions: [
+        { id: 8, entity_type: "pull-request", action: "update" },
+        { id: 7, entity_type: "branch", action: "push" },
+        { id: 35, entity_type: "story", action: "update" },
+      ],
+    });
+
+    assert.deepEqual(normalized.actions.map((action) => action.eventType), ["story.update"]);
+    assert.deepEqual(normalized.skippedEventTypes, ["pull-request.update", "branch.push"]);
+  });
+
   it("rejects malformed and unsupported webhook actions consistently", () => {
     assert.throws(() => normalizeShortcutWebhook({ action: { id: 1, entity_type: "story", action: "archive" } }));
-    assert.throws(() => normalizeShortcutWebhook({ action: { id: 1, entity_type: "unknown", action: "update" } }));
+    assert.throws(
+      () => normalizeShortcutWebhook({ action: { id: 1, entity_type: "unknown", action: "update" } }),
+      /Unsupported Shortcut webhook event: unknown\.update; no supported actions; skipped event types: unknown\.update/,
+    );
     assert.throws(() => normalizeShortcutWebhook({ actions: [{ id: 1, entity_type: "story" }] }));
   });
 

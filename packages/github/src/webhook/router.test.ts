@@ -327,12 +327,15 @@ test('WebhookRouter.getSupportedEvents returns all mapped events', () => {
   const router = new WebhookRouter(new RecordingAdapter());
   const events = router.getSupportedEvents();
 
-  assert.equal(events.length, 21);
+  assert.equal(events.length, 24);
   assert.deepEqual(events, [
     'pull_request.opened',
     'pull_request.synchronize',
     'pull_request.edited',
     'pull_request.reopened',
+    'pull_request.ready_for_review',
+    'pull_request.labeled',
+    'pull_request.unlabeled',
     'pull_request.closed',
     'pull_request_review.submitted',
     'pull_request_review.edited',

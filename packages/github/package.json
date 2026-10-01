@@ -1,6 +1,6 @@
 {
   "name": "@relayfile/adapter-github",
-  "version": "0.5.9",
+  "version": "0.5.12",
   "description": "GitHub adapter scaffold for Relayfile",
   "type": "module",
   "main": "dist/index.js",
@@ -40,6 +40,11 @@
       "types": "./dist/inbound.d.ts",
       "import": "./dist/inbound.js",
       "default": "./dist/inbound.js"
+    },
+    "./webhook-identity": {
+      "types": "./dist/webhook-identity.d.ts",
+      "import": "./dist/webhook-identity.js",
+      "default": "./dist/webhook-identity.js"
     }
   },
   "files": [
@@ -58,7 +63,7 @@
     "@relayfile/sdk": ">=0.6.0 <1"
   },
   "dependencies": {
-    "@relayfile/adapter-core": "^0.5.22"
+    "@relayfile/adapter-core": "^0.6.4"
   },
   "devDependencies": {
     "@relayfile/sdk": "^0.6.0",

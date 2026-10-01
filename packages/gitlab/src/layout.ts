@@ -26,10 +26,14 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       materialization: 'eager',
       aliasSegments: ['by-id', 'by-title', 'by-state', 'by-assignee', 'by-creator', 'by-priority'],
       writebackResources: [
+        { path: 'gitlab/projects/**/merge-requests', schemaId: 'gitlab/merge-request' },
         { path: 'gitlab/projects/**/merge_requests', schemaId: 'gitlab/merge-request' },
         { path: 'gitlab/projects/**/merge_requests/discussions', schemaId: 'gitlab/merge-request-discussion' },
+        { path: 'gitlab/projects/**/merge_requests/*/merge.json', schemaId: 'gitlab/merge-request-merge' },
+        { path: 'gitlab/projects/**/merge_requests/*/close.json', schemaId: 'gitlab/merge-request-close' },
       ],
     },
+    { path: 'gitlab/projects/**/refs', title: 'Branch refs', materialization: 'lazy', aliasSegments: [], writebackResources: [{ path: 'gitlab/projects/**/refs', schemaId: 'gitlab/ref' }] },
     {
       path: 'gitlab/projects/**/issues',
       title: 'Issues',

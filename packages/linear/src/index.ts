@@ -11,6 +11,7 @@ export * from './webhook-normalizer.js';
 export * from './types.js';
 export * from './queries.js';
 export * from './writeback.js';
+export * from './agent-activity-reconciliation.js';
 export * from './emit-auxiliary-files.js';
 
 export * from './resources.js';

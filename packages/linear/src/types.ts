@@ -49,6 +49,7 @@ export interface LinearWritebackRequest {
     | 'create-project'
     | 'delete_issue'
     | 'delete_label'
+    | 'list_agent_activities'
     | 'update_issue'
     | 'update_label'
     | 'update-project';

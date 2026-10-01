@@ -21,6 +21,7 @@
     "src/types.ts",
     "src/resources.ts",
     "src/writeback.ts",
+    "src/webhook-identity.ts",
     "src/webhook/event-map.ts"
   ],
   "exclude": [

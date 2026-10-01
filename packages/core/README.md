@@ -28,6 +28,24 @@ writebacks:
 
 See [../../docs/MAPPING_YAML_SPEC.md](../../docs/MAPPING_YAML_SPEC.md) for the full mapping YAML specification.
 
+## Bundled adapter mappings
+
+The published package ships every adapter's mapping YAML, not only the core
+fallbacks:
+
+- `mappings/<provider>.mapping.yaml` — the core fallbacks (`github`, `slack`),
+  unchanged.
+- `mappings/adapters/<provider>.mapping.yaml` — a verbatim copy of each
+  `packages/<adapter>/<provider>.mapping.yaml`, so a consumer that depends only
+  on `@relayfile/adapter-core` (for example `AgentWorkforce/flows`, which
+  generates its trigger namespaces from the `webhooks:` blocks) sees the
+  adapter's own events. Apply adapter-local over fallback.
+
+The copies are generated and committed: `npm run mappings:bundle -w
+@relayfile/adapter-core` refreshes them and `catalog:check` (run by
+`turbo test`) fails when they drift, so a tarball can never carry a stale
+bundle.
+
 ## CLI
 
 ```bash

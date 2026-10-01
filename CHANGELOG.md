@@ -10,6 +10,11 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 ### Added
 
 - `@relayfile/adapter-slack` now exports `slackChannelIdFromPathSegment` so channel-scoped watch matchers and writeback share ID recovery across current, legacy, and bare channel paths.
+- `@relayfile/adapter-linear` now owns cursor-safe AgentActivity reconciliation so consumers can prevent duplicate terminal activities after ambiguous provider writes.
+- `@relayfile/adapter-github/webhook-identity` now exports fail-closed check-run pull-request identity parsing for API and HTML URLs, including repository ownership validation for webhook consumers.
+- `@relayfile/adapter-gitlab` now creates issues, branches, and merge requests from file-native drafts; accepts or closes/reopens merge requests through canonical sidecars; and publishes schemas, examples, catalog paths, and `LAYOUT.md` guidance for every supported GitLab writeback route.
+- `@relayfile/adapter-github` now declares and routes pull-request `ready_for_review`, `labeled`, and `unlabeled` webhooks so review flows can wake on draft and policy-label transitions.
+- `@relayfile/adapter-github` and the core GitHub mapping now declare `check_run` and `issue_comment` webhook keys, so consumers that read the mapping's `webhooks:` block can subscribe to CI check completions and issue/PR conversation comments.
 - `@relayfile/adapter-github` now exports a cursor-resumable pull-index convergence primitive that backfills `headRef` with one GitHub list request per invocation and no per-record metadata, file, or diff fetches.
 - `@relayfile/adapter-linear` now materializes `/linear/issues/by-project/<project-id>/<identifier>.json` aliases so project-scoped consumers can avoid mounting the full issue tree. The path mapper and generated `LAYOUT.md` contract expose the new lookup; existing mounts must resync to materialize and discover it.
 - `@relayfile/adapter-ramp` now provides read-only Ramp finance materialization with canonical bill, purchase-order, item-receipt, vendor-agreement, transaction, reimbursement, receipt, vendor, transfer, repayment, dimension, and accounting paths; stable indexes and aliases; a generated `LAYOUT.md` contract; Hookdeck-aware inbound declarations; webhook normalization and signature verification; and digest-visible lifecycle classification. Existing consumers must resync to materialize and discover the new canonical paths and layout contract.
@@ -36,6 +41,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-shortcut` now keeps supported story and epic actions from bundled webhook deliveries that also contain unsupported Shortcut entities, and exposes skipped event types for delivery diagnostics. **Breaking (0.2.0):** `ShortcutNormalizedWebhook` gains a required `skippedEventTypes: string[]`; consumers that construct the type by hand must supply it (`normalizeShortcutWebhook` always does).
 - `@relayfile/adapter-github` pull-index convergence now fails closed when a page cannot be persisted and reports fetched versus persisted row counts separately, preventing exhausted CAS writes from appearing complete.
 - `@relayfile/adapter-linear` issue creates now accept synced `team.id` and label ids directly, resolve `team.key`/`team.name` plus label names through mounted team/label indexes, and keep explicit `teamId`/`labelIds` authoritative; adapter-core now enforces the schema's at-least-one team reference.
 - `@relayfile/adapter-github` now backfills label names into legacy issue `_index.json` rows from materialized issue artifacts, keeping label-filtered consumers on the index-only path.

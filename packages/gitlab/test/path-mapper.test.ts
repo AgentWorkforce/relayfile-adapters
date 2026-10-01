@@ -4,12 +4,17 @@ import assert from 'node:assert/strict';
 import {
   computeCommitCommentPath,
   computeGitLabPath,
+  computeIssueCreateDraftPath,
   computeIssueCommentPath,
+  computeMergeRequestClosePath,
   computeMergeRequestApprovalsPath,
+  computeMergeRequestCreateDraftPath,
   computeMergeRequestDiffPath,
   computeMergeRequestDiscussionPath,
+  computeMergeRequestMergePath,
   computeMetadataPath,
   computePipelineJobPath,
+  computeRefCreateDraftPath,
   computeSnippetCommentPath,
   gitLabByAssigneeAliasPath,
   gitLabByCreatorAliasPath,
@@ -119,6 +124,56 @@ describe('path mapper', () => {
         subResourceId: 'abc',
       },
     );
+  });
+
+  it('round-trips GitLab writeback paths through the shared parser', () => {
+    const projectPath = 'group/subgroup/project';
+    const issueDraftPath = computeIssueCreateDraftPath(projectPath, 'factory-issue');
+    const mergeRequestDraftPath = computeMergeRequestCreateDraftPath(projectPath, 'factory-merge-request');
+    const refDraftPath = computeRefCreateDraftPath(projectPath, 'factory/branch');
+    const mergePath = computeMergeRequestMergePath(projectPath, 42, 'Add OAuth');
+    const closePath = computeMergeRequestClosePath(projectPath, 42, 'Add OAuth');
+
+    assert.deepStrictEqual(parseGitLabPath(issueDraftPath), {
+      path: issueDraftPath,
+      projectPath,
+      objectType: 'issues',
+      objectId: 'factory-issue',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+    assert.deepStrictEqual(parseGitLabPath(mergeRequestDraftPath), {
+      path: mergeRequestDraftPath,
+      projectPath,
+      objectType: 'merge_requests',
+      objectId: 'factory-merge-request',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+    assert.deepStrictEqual(parseGitLabPath(refDraftPath), {
+      path: refDraftPath,
+      projectPath,
+      objectType: 'refs',
+      objectId: 'factory/branch',
+      subResource: undefined,
+      subResourceId: undefined,
+    });
+    assert.deepStrictEqual(parseGitLabPath(mergePath), {
+      path: mergePath,
+      projectPath,
+      objectType: 'merge_requests',
+      objectId: '42',
+      subResource: 'merge.json',
+      subResourceId: undefined,
+    });
+    assert.deepStrictEqual(parseGitLabPath(closePath), {
+      path: closePath,
+      projectPath,
+      objectType: 'merge_requests',
+      objectId: '42',
+      subResource: 'close.json',
+      subResourceId: undefined,
+    });
   });
 
   it('round-trips complex GitLab tag refs with slashes and double underscores', () => {

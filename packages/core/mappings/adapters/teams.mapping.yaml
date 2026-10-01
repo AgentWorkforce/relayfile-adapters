@@ -1,0 +1,95 @@
+# Declarative mapping for @relayfile/adapter-teams
+
+provider: teams
+version: "1.0"
+apiBaseUrl: "https://graph.microsoft.com/v1.0"
+
+paths:
+  team:
+    pattern: "/teams/{teamId}/metadata.json"
+    source: "GET /teams/{teamId}"
+
+  channel:
+    pattern: "/teams/{teamId}/channels/{channelId}/metadata.json"
+    source: "GET /teams/{teamId}/channels/{channelId}"
+
+  message:
+    pattern: "/teams/{teamId}/channels/{channelId}/messages/{messageId}.json"
+    source: "GET /teams/{teamId}/channels/{channelId}/messages/{messageId}"
+
+  reply:
+    pattern: "/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies/{replyId}.json"
+    source: "GET /teams/{teamId}/channels/{channelId}/messages/{messageId}/replies/{replyId}"
+
+  tab:
+    pattern: "/teams/{teamId}/channels/{channelId}/tabs/{tabId}.json"
+    source: "GET /teams/{teamId}/channels/{channelId}/tabs/{tabId}"
+
+  member:
+    pattern: "/teams/{teamId}/members/{userId}.json"
+    source: "GET /teams/{teamId}/members/{memberId}"
+    note: "The adapter rewrites member IDs to user IDs when payload data is available."
+
+  chat:
+    pattern: "/teams/chats/{chatId}/metadata.json"
+    source: "GET /chats/{chatId}"
+
+  chat_message:
+    pattern: "/teams/chats/{chatId}/messages/{messageId}.json"
+    source: "GET /chats/{chatId}/messages/{messageId}"
+
+  reaction:
+    pattern: "/teams/{teamId}/channels/{channelId}/messages/{messageId}/reactions/{reactionType}--{userId}.json"
+    source: "derived from chatMessage.reactions[]"
+
+subscriptions:
+  tenant_messages:
+    resource: "/teams/getAllMessages"
+    changeTypes: [created, updated, deleted]
+    richNotifications: true
+
+  tenant_chats:
+    resource: "/chats/getAllMessages"
+    changeTypes: [created, updated, deleted]
+    richNotifications: true
+
+  tenant_channels:
+    resource: "/teams/getAllChannels"
+    changeTypes: [created, updated, deleted]
+    richNotifications: false
+
+  team_updates:
+    resource: "/teams"
+    changeTypes: [updated, deleted]
+    richNotifications: false
+
+  team_members:
+    resource: "/teams/{teamId}/members"
+    changeTypes: [created, updated, deleted]
+    richNotifications: false
+
+  channel_messages:
+    resource: "/teams/{teamId}/channels/{channelId}/messages"
+    changeTypes: [created, updated, deleted]
+    richNotifications: true
+
+  chat_messages:
+    resource: "/chats/{chatId}/messages"
+    changeTypes: [created, updated, deleted]
+    richNotifications: true
+
+writeback:
+  channel_message:
+    match: "/teams/{teamId}/channels/{channelId}/messages/{messageId}.json"
+    method: POST
+    endpoint: "/teams/{teamId}/channels/{channelId}/messages"
+
+  thread_reply:
+    match: "/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies/{replyId}.json"
+    method: POST
+    endpoint: "/teams/{teamId}/channels/{channelId}/messages/{messageId}/replies"
+
+  chat_message:
+    match: "/teams/chats/{chatId}/messages/{messageId}.json"
+    method: POST
+    endpoint: "/chats/{chatId}/messages"

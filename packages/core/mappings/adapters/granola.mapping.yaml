@@ -1,0 +1,17 @@
+adapter:
+  name: granola
+  version: "1.0.0"
+  baseUrl: https://api.granola.ai
+# Granola webhook delivery is normalized by a hand-written webhook-normalizer
+# plus path-mapper, not by schema-driven mapping interpolation. The trigger
+# catalog consumes only the webhook keys below.
+webhooks:
+  note.generated: {}
+  note.edited: {}
+  note.access_granted: {}
+  # Storage-bridge event: emitted when any pipeline (e.g. NB-Whisper) writes
+  # a note directly to the granola VFS mount (/granola/notes/<id>.json).
+  # This is NOT a Granola API webhook — it fires via the storage-change
+  # dispatcher the same way gmail/google-drive file.created events do.
+  file.created:
+    description: A note was written to the granola VFS mount (storage-bridge path, e.g. from the NB-Whisper transcript pipeline).

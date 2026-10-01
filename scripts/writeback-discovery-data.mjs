@@ -171,7 +171,7 @@ export const adapters = [
     slug: 'gitlab',
     title: 'GitLab adapter',
     overview:
-      'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, jobs, deployments, and tags under `/gitlab`, with writeback routes for merge request discussions and issue notes.',
+      'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, jobs, deployments, and tags under `/gitlab`. Relayfile writeback can create and update issues and merge requests, create branches, accept or close/reopen merge requests, and add merge request discussions and issue notes.',
     readPaths: [
       ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/meta.json', 'Merge request metadata.'],
       ['/gitlab/projects/<namespace>/<project>/merge_requests/<iid>__<slug>/discussions/<discussionId>.json', 'Merge request discussions.'],
@@ -181,6 +181,13 @@ export const adapters = [
       ['/gitlab/projects/<namespace>/<project>/tags/<tagRef>/meta.json', 'Tag records.'],
     ],
     endpoints: [
+      endpoint('/gitlab/projects/{projectPath}/issues/new.json', 'Create GitLab issue', 'Creates a GitLab issue in the project named by the path.', ['title'], gitlabIssueCreateProps(), { title: 'Replace example issue title', description: 'Replace example issue description.', labels: ['factory'] }, { operations: ['create'] }),
+      endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json', 'Update GitLab issue', 'Updates mutable fields on a GitLab issue.', [], gitlabIssueUpdateProps(), { title: 'Replace example issue title' }, { operations: ['update'] }),
+      endpoint('/gitlab/projects/{projectPath}/merge-requests/new.json', 'Create GitLab merge request', 'Creates a GitLab merge request from a source branch into a target branch.', ['source_branch', 'target_branch', 'title'], gitlabMergeRequestProps(), { source_branch: 'factory/gitlab-parity', target_branch: 'main', title: 'Replace example merge request title', description: 'Replace example merge request description.' }, { operations: ['create'] }),
+      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json', 'Update GitLab merge request', 'Updates mutable fields on a GitLab merge request.', [], gitlabMergeRequestUpdateProps(), { title: 'Replace example merge request title' }, { operations: ['update'] }),
+      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json', 'Merge GitLab merge request', 'Accepts a GitLab merge request.', [], gitlabMergeProps(), { merge_commit_message: 'feat: merge factory work', squash: true }, { operations: ['update'] }),
+      endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json', 'Close or reopen GitLab merge request', 'Closes or reopens a GitLab merge request.', ['state_event'], gitlabMergeRequestCloseProps(), { state_event: 'close' }, { operations: ['update'] }),
+      endpoint('/gitlab/projects/{projectPath}/refs/new.json', 'Create GitLab branch', 'Creates a GitLab branch from an existing branch, tag, or commit ref.', ['branch', 'ref'], gitlabRefProps(), { branch: 'factory/gitlab-parity', ref: 'main' }, { operations: ['create'] }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/new.json', 'Create GitLab merge request discussion', 'Creates a discussion on a merge request.', ['body'], gitlabDiscussionProps(), { body: 'Replace example discussion body.' }),
       endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/new.json', 'Create GitLab issue note', 'Creates a note on an issue.', ['body'], gitlabIssueNoteProps(), { body: 'Replace example note body.' }),
     ],
@@ -1008,6 +1015,64 @@ function gitlabDiscussionProps() {
     body: str('Markdown note body.', undefined, { minLength: 1, pattern: '.*\\S.*' }),
     position: obj('Optional GitLab position object for diff discussions.'),
     created_at: str('Optional timestamp for imports when supported by GitLab.', 'date-time'),
+  };
+}
+
+function gitlabIssueCreateProps() {
+  return {
+    title: str('Issue title.'),
+    description: str('Markdown issue description.'),
+    labels: arr(str('GitLab label name.'), 'Label names. The adapter sends them to GitLab as a comma-separated labels value.'),
+    assignee_ids: arr(int('GitLab user id.'), 'GitLab user IDs to assign.'),
+    milestone_id: int('GitLab milestone ID.'),
+    confidential: bool('Whether the issue is confidential.'),
+  };
+}
+
+function gitlabIssueUpdateProps() {
+  return {
+    ...gitlabIssueCreateProps(),
+    state_event: en(['close', 'reopen'], 'Lifecycle event for the issue.'),
+  };
+}
+
+function gitlabMergeRequestProps() {
+  return {
+    source_branch: str('Existing source branch name.'),
+    target_branch: str('Target branch name.'),
+    title: str('Merge request title.'),
+    description: str('Markdown merge request description.'),
+    labels: arr(str('GitLab label name.'), 'Label names. The adapter sends them to GitLab as a comma-separated labels value.'),
+    remove_source_branch: bool('Whether GitLab should remove the source branch after merge.'),
+    draft: bool('Whether to create the merge request as a draft.'),
+  };
+}
+
+function gitlabMergeRequestUpdateProps() {
+  return {
+    ...gitlabMergeRequestProps(),
+    state_event: en(['close', 'reopen'], 'Lifecycle event for the merge request.'),
+  };
+}
+
+function gitlabMergeProps() {
+  return {
+    merge_commit_message: str('Custom commit message for the merge commit.'),
+    squash: bool('Whether GitLab should squash commits before merge.'),
+    should_remove_source_branch: bool('Whether GitLab should remove the source branch after merge.'),
+  };
+}
+
+function gitlabMergeRequestCloseProps() {
+  return {
+    state_event: en(['close', 'reopen'], 'Set `close` to close the merge request or `reopen` to reopen it.'),
+  };
+}
+
+function gitlabRefProps() {
+  return {
+    branch: str('New branch name.'),
+    ref: str('Existing branch, tag, or commit SHA to branch from.'),
   };
 }
 

@@ -18,6 +18,21 @@ webhooks:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/commits/{{head_commit.id}}/metadata.json
   issues:
     path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/metadata.json
+  issue_comment:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/issues/{{issue.number}}/comments/{{comment.id}}/meta.json
+    extract:
+      - action
+      - issue.number
+      - comment.id
+  check_run:
+    path: /github/repos/{{repository.owner.login}}/{{repository.name}}/checks/{{check_run.id}}.json
+    extract:
+      - action
+      - check_run.id
+      - check_run.name
+      - check_run.status
+      - check_run.conclusion
+      - check_run.head_sha
 resources:
   pull_request:
     endpoint: GET /repos/{owner}/{repo}/pulls/{pull_number}

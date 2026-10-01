@@ -1,0 +1,7 @@
+webhooks:
+  story.create: {}
+  story.update: {}
+  story.delete: {}
+  epic.create: {}
+  epic.update: {}
+  epic.delete: {}

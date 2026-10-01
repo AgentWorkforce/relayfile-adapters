@@ -1,0 +1,7 @@
+webhooks:
+  file.created:
+    description: A new record or schema object was synced from Postgres.
+  file.updated:
+    description: An existing record or schema object was updated in Postgres.
+  file.deleted:
+    description: A record or schema object was deleted from Postgres.
