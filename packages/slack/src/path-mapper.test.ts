@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { slackChannelIdFromPathSegment } from './path-mapper.js';
+import { slackChannelIdFromPathSegment, slackNameWithId } from './path-mapper.js';
 
 test('slackChannelIdFromPathSegment recovers the id from every emitted form', () => {
   // v2 (current, since "v2 parity")
@@ -10,6 +10,16 @@ test('slackChannelIdFromPathSegment recovers the id from every emitted form', ()
   assert.equal(slackChannelIdFromPathSegment('watchdog-test--C0B9Z4CLG1J'), 'C0B9Z4CLG1J');
   // bare
   assert.equal(slackChannelIdFromPathSegment('C0B9Z4CLG1J'), 'C0B9Z4CLG1J');
+});
+
+test('slackChannelIdFromPathSegment round-trips the canonical composer', () => {
+  for (const id of ['C0B9Z4CLG1J', 'G0B9Z4CLG1J', 'D0B9Z4CLG1J']) {
+    for (const name of ['watchdog-test', 'ops_alerts_v2', undefined, '', '🎉', id.toLowerCase()]) {
+      const segment = slackNameWithId(name, id);
+      assert.equal(slackChannelIdFromPathSegment(segment), id);
+      assert.equal(slackChannelIdFromPathSegment(encodeURIComponent(segment)), id);
+    }
+  }
 });
 
 test('slackChannelIdFromPathSegment keys off the id, not the slug', () => {
