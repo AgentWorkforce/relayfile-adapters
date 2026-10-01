@@ -56,6 +56,17 @@ test('published CLI resolves tooling subpaths', () => {
   }
 });
 
+test('Resend example loads its mapping through the public ingest subpath', () => {
+  const output = execFileSync(process.execPath, ['packages/core/examples/resend/verify-schema-adapter.mjs'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  const result = JSON.parse(output);
+  assert.equal(result.adapter, 'resend');
+  assert.ok(result.resourceName);
+  assert.ok(result.computedPath.startsWith('/resend/'));
+});
+
 test('GitHub runtime resolves only the narrow YAML mapping parser', async () => {
   const result = await build({
     absWorkingDir: repoRoot,
