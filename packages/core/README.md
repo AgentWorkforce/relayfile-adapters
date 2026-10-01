@@ -80,17 +80,31 @@ Generated mapping files use `adapter.source.docs` so the existing runtime and ge
 
 ## Runtime
 
+Pass the mapping object produced by your build step to the runtime adapter:
+
 ```ts
-import { SchemaAdapter } from "@relayfile/adapter-core";
+import { SchemaAdapter, type MappingSpec } from "@relayfile/adapter-core";
+
+export function createAdapter(spec: MappingSpec) {
+  return new SchemaAdapter({
+    client,
+    provider,
+    spec,
+    defaultConnectionId: "conn_123"
+  });
+}
+```
+
+In a separate Node.js **build script**, load the YAML and save the validated
+mapping as JSON. Bundle that JSON into your app and pass it to `createAdapter`:
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
 import { loadMappingSpec } from "@relayfile/adapter-core/ingest";
 
 const spec = await loadMappingSpec("./mappings/github.mapping.yaml");
-const adapter = new SchemaAdapter({
-  client,
-  provider,
-  spec,
-  defaultConnectionId: "conn_123"
-});
+await mkdir("./generated", { recursive: true });
+await writeFile("./generated/github.mapping.json", JSON.stringify(spec));
 ```
 
 ## Build-time tooling imports

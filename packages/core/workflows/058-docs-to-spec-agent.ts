@@ -281,6 +281,9 @@ Verify:
 9. Demo generates a real spec from real API docs
 10. No hardcoded LLM keys — configurable endpoint
 11. .adapter-core-state.json stores hashes (gitignored, not committed)
+12. CLI and public tooling tests import from @relayfile/adapter-core/docs,
+    /ingest, or /generate; the runtime root exports no build-time tooling.
+    Run npm run test:runtime-bundle after building to verify that dependency boundary.
 
 The key test: does docs-check cost zero LLM tokens when nothing changed?
 And: could someone bootstrap with just "npx adapter-core docs-to-spec --url ..."?
