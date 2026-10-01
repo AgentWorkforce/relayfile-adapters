@@ -214,7 +214,11 @@ Working in ${ROOT} on branch feat/docs-to-spec.
    
    - src/docs/types.ts — all shared types
 
-3. Add CLI commands to src/cli.ts:
+3. Export docs tooling from @relayfile/adapter-core/docs and import it from
+   that subpath in src/cli.ts. Use @relayfile/adapter-core/ingest for spec loaders
+   and @relayfile/adapter-core/generate for generators/catalog tooling. Keep
+   build-time tooling out of the runtime root entry.
+   Add CLI commands to src/cli.ts:
    - docs-to-spec (one-shot bootstrap)
    - docs-update (re-crawl + diff, only if changed)
    - docs-check (cheap change detection only, no LLM)
@@ -277,6 +281,9 @@ Verify:
 9. Demo generates a real spec from real API docs
 10. No hardcoded LLM keys — configurable endpoint
 11. .adapter-core-state.json stores hashes (gitignored, not committed)
+12. CLI and public tooling tests import from @relayfile/adapter-core/docs,
+    /ingest, or /generate; the runtime root exports no build-time tooling.
+    Run npm run test:runtime-bundle after building to verify that dependency boundary.
 
 The key test: does docs-check cost zero LLM tokens when nothing changed?
 And: could someone bootstrap with just "npx adapter-core docs-to-spec --url ..."?

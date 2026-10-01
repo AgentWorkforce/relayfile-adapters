@@ -80,17 +80,66 @@ Generated mapping files use `adapter.source.docs` so the existing runtime and ge
 
 ## Runtime
 
+Pass the mapping object produced by your build step to the runtime adapter:
+
 ```ts
-import { SchemaAdapter, loadMappingSpec } from "@relayfile/adapter-core";
+import { SchemaAdapter, type MappingSpec } from "@relayfile/adapter-core";
+import type { ConnectionProvider, RelayFileClient } from "@relayfile/sdk";
+
+export function createAdapter(
+  client: RelayFileClient,
+  provider: ConnectionProvider,
+  spec: MappingSpec
+) {
+  return new SchemaAdapter({
+    client,
+    provider,
+    spec,
+    defaultConnectionId: "conn_123"
+  });
+}
+```
+
+In a separate Node.js **build script**, load the YAML and save the validated
+mapping as JSON. Bundle that JSON into your app and pass it to `createAdapter`:
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import { loadMappingSpec } from "@relayfile/adapter-core/ingest";
 
 const spec = await loadMappingSpec("./mappings/github.mapping.yaml");
-const adapter = new SchemaAdapter({
-  client,
-  provider,
-  spec,
-  defaultConnectionId: "conn_123"
-});
+await mkdir("./generated", { recursive: true });
+await writeFile("./generated/github.mapping.json", JSON.stringify(spec));
 ```
+
+## Build-time tooling imports
+
+The root entry exports runtime helpers and shared types. Tooling values previously
+exported from the root now require an explicit subpath (a breaking import change):
+
+| Subpath | Exports |
+| --- | --- |
+| `@relayfile/adapter-core/docs` | `DocsCrawler`, `APIExtractor`, `SpecGenerator`, `MappingGenerator`, `ChangeDetector`, `SpecUpdater`, `defaultSyncConfig`, and docs types |
+| `@relayfile/adapter-core/ingest` | `loadServiceSpecFromMapping`, OpenAPI/Postman/sample loaders, `loadMappingSpec`, `parseMappingSpecText`, `validateMappingSpec`, and service types |
+| `@relayfile/adapter-core/ingest/mapping` | Mapping parser/validator only, for consumers that need YAML mapping loading without docs or service-spec ingestion |
+| `@relayfile/adapter-core/generate` | Adapter/type generators, `detectDrift`, and trigger/scope-key/writeback-path/inbound catalog generators |
+
+Keep these imports in build scripts or Node.js tooling. For a Worker/runtime
+bundle, load the mapping at build time and pass the resulting object to
+`SchemaAdapter`. The CLI commands are unchanged. Tooling dependencies remain
+installed for the CLI, but are not reachable from the runtime entry. GitHub's
+existing lazy mapping loader uses `/ingest/mapping`; it still requires YAML
+but does not resolve crawlers or Postman conversion.
+
+Core and adapter library packages declare `sideEffects: false`: their module
+initializers create local data/functions without global registration or I/O.
+`relay-helpers` is excluded because its authorizer initializes process-global
+coordination. The core CLI is an executable entry and still runs normally.
+
+After release, publish adapters with synchronized core dependency versions, then
+update Cloud's dependencies and lockfile. Cloud can remove its temporary
+`experimental.optimizePackageImports` entry for core after verifying the Worker
+size check against that release.
 
 ## What It Generates
 

@@ -30,6 +30,8 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Breaking
 
+- `@relayfile/adapter-core` build-time imports move to `/docs`, `/ingest`, and `/generate`, keeping crawlers and YAML/Postman tooling out of runtime bundles.
+
 - Writeback creation is now file-native. The reserved `new.json` create path is no longer special; create operations happen when an agent writes a valid JSON document to any non-canonical filename in a writable resource directory.
 - Writeback dispatch is keyed by each resource's declared canonical `idPattern`: canonical `<id>.json` paths edit existing records, non-canonical filenames create new records, and deleting canonical files requests provider-side deletion.
 

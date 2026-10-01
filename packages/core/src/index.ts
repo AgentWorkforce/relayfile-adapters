@@ -1,25 +1,12 @@
+// Runtime entry: build-time tooling lives in /docs, /ingest, and /generate.
 export * from "./spec/types.js";
 export * from "./spec/template.js";
-export * from "./spec/parser.js";
-export * from "./ingest/types.js";
-export * from "./ingest/index.js";
-export * from "./ingest/openapi.js";
-export * from "./ingest/postman.js";
-export * from "./ingest/sample.js";
+export type * from "./ingest/types.js";
 export * from "./runtime/schema-adapter.js";
 export * from "./runtime/file-native-router.js";
 export * from "./runtime/writeback-status.js";
 export { WritebackError } from "./vfs-client/index.js";
-export * from "./generate/adapter-generator.js";
-export * from "./generate/types-generator.js";
-export * from "./drift/drift-checker.js";
-export * from "./docs/types.js";
-export * from "./docs/crawler.js";
-export * from "./docs/extractor.js";
-export * from "./docs/generator.js";
-export * from "./docs/mapping-generator.js";
-export * from "./docs/change-detector.js";
-export * from "./docs/updater.js";
+export type * from "./docs/types.js";
 export * from "./http/index.js";
 export * from "./storage-bridge/index.js";
 export * from "./atomic-index/index.js";

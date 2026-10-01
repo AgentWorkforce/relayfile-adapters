@@ -44,7 +44,23 @@
       "import": "./dist/src/inbound/index.js",
       "default": "./dist/src/inbound/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./docs": {
+      "types": "./dist/src/docs/index.d.ts",
+      "default": "./dist/src/docs/index.js"
+    },
+    "./ingest": {
+      "types": "./dist/src/ingest/index.d.ts",
+      "default": "./dist/src/ingest/index.js"
+    },
+    "./generate": {
+      "types": "./dist/src/generate/index.d.ts",
+      "default": "./dist/src/generate/index.js"
+    },
+    "./ingest/mapping": {
+      "types": "./dist/src/spec/parser.d.ts",
+      "default": "./dist/src/spec/parser.js"
+    }
   },
   "bin": {
     "adapter-core": "./dist/src/cli.js"
@@ -92,5 +108,6 @@
     "type": "git",
     "url": "https://github.com/AgentWorkforce/relayfile-adapters",
     "directory": "packages/core"
-  }
+  },
+  "sideEffects": false
 }

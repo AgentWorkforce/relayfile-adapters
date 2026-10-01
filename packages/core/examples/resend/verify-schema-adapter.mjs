@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { SchemaAdapter, loadMappingSpec } from "../../dist/src/index.js";
+import { SchemaAdapter } from "@relayfile/adapter-core";
+import { loadMappingSpec } from "@relayfile/adapter-core/ingest";
 
 const mappingPath = fileURLToPath(new URL("./resend.mapping.yaml", import.meta.url));
 const spec = await loadMappingSpec(mappingPath);

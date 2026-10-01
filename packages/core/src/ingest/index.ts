@@ -41,3 +41,9 @@ export async function loadServiceSpecFromMapping(
 
   throw new Error("Mapping spec does not define a supported source");
 }
+
+export * from "./types.js";
+export * from "./openapi.js";
+export * from "./postman.js";
+export * from "./sample.js";
+export * from "../spec/parser.js";

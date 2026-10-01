@@ -6,7 +6,7 @@ import test from "node:test";
 import {
   ChangeDetector,
   defaultSyncConfig,
-} from "../../src/docs/change-detector.js";
+} from "@relayfile/adapter-core/docs";
 
 test("ChangeDetector stores and reuses content hashes", async () => {
   const stateDir = await mkdtemp(join(tmpdir(), "adapter-core-docs-"));
