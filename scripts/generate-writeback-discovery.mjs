@@ -65,17 +65,14 @@ function renderAdapterReadme(adapter) {
     '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${discoveryMountPath(resource.schemaPath)}\` | ${resource.examplePath ? `\`${discoveryMountPath(resource.examplePath)}\`` : '—'} | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${discoveryMountPath(resource.schemaPath)}\` | ${resource.examplePath ? `\`${discoveryMountPath(resource.examplePath)}\`${exampleLabel(resource) === 'Payload example' ? ' (payload example)' : ''}` : '—'} | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
     '',
     '## Operations',
     '',
     '| To... | Do... |',
     '|---|---|',
     '| Read | `cat <canonical-resource-path>` after listing the resource directory or following an alias when one is available. Use the resource table and ID patterns below to determine whether a resource uses a bare id, an adapter-specific slug/id filename, or an exact sidecar path such as `content.md`. |',
-    '| Edit | Write the resource update payload to the canonical resource path. For JSON resources, included mutable fields PATCH; fields marked `readOnly` in `.schema.json` are rejected. |',
-    '| Create | For resources with a create example, write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at its canonical resource path and rewrites the draft as `{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }`. Resources whose ID pattern is `exact file path` are written in place and never created from drafts. |',
-    '| Ignore | Editor scratch files named `partial.json`, `.tmp.json`, `.partial.json`, `*.tmp.json`, or `*.partial.json` are ignored and never treated as create drafts. |',
-    '| Delete | `rm <canonical-resource-path>` for canonical records. |',
+    ...renderOperationRows(adapter.endpoints),
     '',
     '## ID Patterns',
     ...resources.map((resource) => renderIdPattern(resource)),
@@ -89,6 +86,35 @@ function renderAdapterReadme(adapter) {
   ];
 
   return `${lines.join('\n')}`;
+}
+
+// Generic operation rows, qualified by declared per-resource operations. When
+// every endpoint declares operations, rows no resource supports are omitted.
+function renderOperationRows(endpoints) {
+  const declared = endpoints.filter((endpoint) => Array.isArray(endpoint.operations));
+  const allDeclared = declared.length === endpoints.length;
+  const supports = (operation) => !allDeclared || declared.some((endpoint) => endpoint.operations.includes(operation));
+  const exceptions = (operation) => declared.length > 0
+    ? ` Resources whose \`Operations:\` line omits \`${operation}\` reject this.`
+    : '';
+  return [
+    ...(supports('update')
+      ? [`| Edit | Write the resource update payload to the canonical resource path. For JSON resources, included mutable fields PATCH; fields marked \`readOnly\` in \`.schema.json\` are rejected.${exceptions('update')} |`]
+      : []),
+    ...(supports('create')
+      ? [`| Create | For resources with a create example, write JSON to any non-canonical filename such as \`create request.json\`. The adapter creates the record at its canonical resource path and rewrites the draft as \`{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }\`. Resources whose ID pattern is \`exact file path\` are written in place and never created from drafts.${exceptions('create')} |`]
+      : []),
+    '| Ignore | Editor scratch files named `partial.json`, `.tmp.json`, `.partial.json`, `*.tmp.json`, or `*.partial.json` are ignored and never treated as create drafts. |',
+    ...(supports('delete')
+      ? [`| Delete | \`rm <canonical-resource-path>\` for canonical records.${exceptions('delete')} |`]
+      : []),
+  ];
+}
+
+// Update-only resources still ship an example document, but it is a payload
+// shape for writing the canonical file, not a create draft.
+function exampleLabel(resource) {
+  return resource.operations && !resource.operations.includes('create') ? 'Payload example' : 'Create example';
 }
 
 function renderEndpointContract(endpoint) {
@@ -108,7 +134,7 @@ function renderEndpointContract(endpoint) {
     ...(operations
       ? [`Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`]
       : []),
-    ...(resource.examplePath ? [`Create example: \`${discoveryMountPath(resource.examplePath)}\``] : ['Create example: none; use the provider UI or another supported operation.']),
+    ...(resource.examplePath ? [`${exampleLabel(resource)}: \`${discoveryMountPath(resource.examplePath)}\``] : ['Create example: none; use the provider UI or another supported operation.']),
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
     `Optional fields: ${optional.length > 0 ? optional.map((fieldName) => `\`${fieldName}\``).join(', ') : 'none'}.`,
     ...renderValidationNotes(endpoint.schema),
