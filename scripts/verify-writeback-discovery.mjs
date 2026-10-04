@@ -28,6 +28,14 @@ for (const adapter of adapters) {
     failures.push(`${adapter.slug}: .adapter.md must document ignored temporary/partial writeback filenames`);
   }
 
+  // Operations lines are only rendered for endpoints that declare them, so
+  // undeclared endpoints are never advertised as supporting every operation.
+  const declaredOperations = adapter.endpoints.filter((endpoint) => Array.isArray(endpoint.operations)).length;
+  const renderedOperations = adapterMd.match(/^Operations: /gm)?.length ?? 0;
+  if (hasAdapterMd && renderedOperations !== declaredOperations) {
+    failures.push(`${adapter.slug}: .adapter.md lists ${renderedOperations} Operations lines but the data declares operations for ${declaredOperations} endpoints`);
+  }
+
   for (const endpoint of adapter.endpoints) {
     const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
     const discoveryPath = endpoint.discoveryPath ?? resourcePath;

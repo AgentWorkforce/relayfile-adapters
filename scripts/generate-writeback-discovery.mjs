@@ -96,21 +96,24 @@ function renderEndpointContract(endpoint) {
   const required = new Set(endpoint.schema.required ?? []);
   const fieldNames = Object.keys(endpoint.schema.properties ?? {});
   const optional = fieldNames.filter((fieldName) => !required.has(fieldName));
-  const operations = endpoint.operations ?? ['create', 'update', 'delete'];
+  // Only advertise operations the data declares. Defaulting to all three
+  // overstated create-only and update-only routes.
+  const operations = endpoint.operations;
+  const fields = renderSchemaFields(endpoint.schema);
   const lines = [
     `### ${endpoint.schema.title}`,
     '',
     `Resource: \`${resourceWritePath(resource)}\``,
     `Schema: \`${discoveryMountPath(resource.schemaPath)}\``,
-    `Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`,
+    ...(operations
+      ? [`Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`]
+      : []),
     ...(resource.examplePath ? [`Create example: \`${discoveryMountPath(resource.examplePath)}\``] : ['Create example: none; use the provider UI or another supported operation.']),
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
     `Optional fields: ${optional.length > 0 ? optional.map((fieldName) => `\`${fieldName}\``).join(', ') : 'none'}.`,
     ...renderValidationNotes(endpoint.schema),
     '',
-    'Fields:',
-    '',
-    ...renderSchemaFields(endpoint.schema),
+    ...(fields.length > 0 ? ['Fields:', '', ...fields] : ['Fields: none. Write an empty JSON object.']),
     '',
   ];
 
