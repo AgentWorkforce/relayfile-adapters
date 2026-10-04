@@ -296,6 +296,19 @@ test('keeps the live Telegram message edit route ahead of the send route and sha
   assert.ok(new RegExp(send.pathPatternSource).test('/telegram/chats/C123/messages/relayfile-writeback--messages-1.json'));
 });
 
+test('documents GitHub review comment replies at the review-comments path the router uses', () => {
+  const github = normalizeWritebackDiscoveryAdapter(adapters.find((adapter) => adapter.slug === 'github'));
+  const replies = github.resources.find((resource) => resource.name === 'replies');
+
+  assert.ok(replies, 'expected GitHub replies resource');
+  // Matches packages/github/src/resources.ts and PR_COMMENT_REPLY_WRITEBACK_PATH in writeback.ts.
+  assert.equal(replies.resourcePath, '/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies');
+  assert.equal(replies.schemaPath, '/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.schema.json');
+  const pathPattern = new RegExp(replies.pathPatternSource);
+  assert.ok(pathPattern.test('/github/repos/acme/widgets/pulls/42/review-comments/999/replies/reply-draft.json'));
+  assert.ok(!pathPattern.test('/github/repos/acme/widgets/pulls/42/comments/999/replies/reply-draft.json'));
+});
+
 test('attaches optional layoutManifest-style writeback metadata by static path segments', () => {
   const github = adapters.find((adapter) => adapter.slug === 'github');
   assert.ok(github);
