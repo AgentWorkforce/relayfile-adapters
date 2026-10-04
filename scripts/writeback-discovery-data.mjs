@@ -673,7 +673,7 @@ export const adapters = [
     slug: 'zendesk',
     title: 'Zendesk adapter',
     overview:
-      'The Zendesk adapter exposes tickets, users, and organizations under `/zendesk`, with writeback routes for creating tickets, ticket comments, and users.',
+      'The Zendesk adapter exposes tickets, users, and organizations under `/zendesk`, with writeback routes for creating, updating, and deleting tickets and users, and for creating ticket comments.',
     readPaths: [
       ['/zendesk/tickets/<ticketId>.json', 'Ticket records.'],
       ['/zendesk/tickets/<ticketId>/comments/<commentId>.json', 'Ticket comment records.'],
@@ -685,9 +685,9 @@ export const adapters = [
         body: str('Plain-text comment body.'),
         html_body: str('HTML comment body.'),
         public: bool('Whether the comment is public. Defaults to true.'),
-      }, { body: 'Replace example comment body.', public: true }),
-      endpoint('/zendesk/tickets/new.json', 'Create Zendesk ticket', 'Creates a Zendesk ticket.', ['subject'], zendeskTicketProps(), { subject: 'Replace example ticket subject' }),
-      endpoint('/zendesk/users/new.json', 'Create Zendesk user', 'Creates a Zendesk user.', ['name'], zendeskUserProps(), { name: 'Ada Lovelace', email: 'ada@example.com' }),
+      }, { body: 'Replace example comment body.', public: true }, { operations: ['create'] }),
+      endpoint('/zendesk/tickets/new.json', 'Create Zendesk ticket', 'Creates a Zendesk ticket.', ['subject'], zendeskTicketProps(), { subject: 'Replace example ticket subject' }, { operations: ['create', 'update', 'delete'] }),
+      endpoint('/zendesk/users/new.json', 'Create Zendesk user', 'Creates a Zendesk user.', ['name'], zendeskUserProps(), { name: 'Ada Lovelace', email: 'ada@example.com' }, { operations: ['create', 'update', 'delete'] }),
     ],
   },
   {
