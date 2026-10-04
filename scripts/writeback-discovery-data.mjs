@@ -160,7 +160,7 @@ export const adapters = [
         sha: str('Git object SHA already present in the repository.'),
         force: bool('Allow a non-fast-forward update when writing the canonical ref file.'),
       }, { ref: 'refs/heads/factory/issue-52', sha: '0123456789abcdef0123456789abcdef01234567' }),
-      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json', 'Close GitHub pull request', 'Closes a pull request without closing an issue. Write an empty JSON object.', [], {}, {}),
+      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json', 'Close GitHub pull request', 'Closes a pull request without closing an issue.', [], {}, {}),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json', 'pulls/merge', { merge_method: 'squash' }, {
         title: 'Merge GitHub pull request',
         description: 'Merges a pull request. Uses the repository default merge strategy when no merge method is supplied.',
