@@ -28,12 +28,19 @@ for (const adapter of adapters) {
     failures.push(`${adapter.slug}: .adapter.md must document ignored temporary/partial writeback filenames`);
   }
 
-  // Operations lines are only rendered for endpoints that declare them, so
-  // undeclared endpoints are never advertised as supporting every operation.
-  const declaredOperations = adapter.endpoints.filter((endpoint) => Array.isArray(endpoint.operations)).length;
-  const renderedOperations = adapterMd.match(/^Operations: /gm)?.length ?? 0;
-  if (hasAdapterMd && renderedOperations !== declaredOperations) {
-    failures.push(`${adapter.slug}: .adapter.md lists ${renderedOperations} Operations lines but the data declares operations for ${declaredOperations} endpoints`);
+  // Each endpoint contract must list exactly its declared operations, and no
+  // Operations line when none are declared (never a blanket default).
+  const renderedOperations = renderedOperationsByResource(adapterMd);
+  for (const endpoint of hasAdapterMd ? adapter.endpoints : []) {
+    const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
+    const writePath = /\.(?:json|md)$/.test(resourcePath) ? resourcePath : `${resourcePath}/<id>.json`;
+    const expected = Array.isArray(endpoint.operations)
+      ? endpoint.operations.length > 0 ? endpoint.operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'
+      : undefined;
+    const rendered = renderedOperations.get(writePath);
+    if (rendered !== expected) {
+      failures.push(`${adapter.slug}: .adapter.md Operations for ${writePath} must be ${expected ?? 'omitted'}, found ${rendered ?? 'none'}`);
+    }
   }
 
   for (const endpoint of adapter.endpoints) {
@@ -100,6 +107,17 @@ if (failures.length > 0) {
 }
 
 console.log(`Verified ${adapters.reduce((sum, adapter) => sum + adapter.endpoints.length, 0)} writeback discovery endpoints.`);
+
+function renderedOperationsByResource(adapterMd) {
+  const operations = new Map();
+  for (const section of adapterMd.split(/^### /m).slice(1)) {
+    const resource = section.match(/^Resource: `([^`]+)`$/m)?.[1];
+    if (resource) {
+      operations.set(resource, section.match(/^Operations: (.+)\.$/m)?.[1]);
+    }
+  }
+  return operations;
+}
 
 async function assertFile(path, label) {
   try {
