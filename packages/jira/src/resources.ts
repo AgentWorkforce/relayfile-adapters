@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?\d+$/,
     schema: "discovery/jira/issues/{issueIdOrKey}/comments/.schema.json",
     createExample: "discovery/jira/issues/{issueIdOrKey}/comments/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "issues",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__)(?:[A-Z][A-Z0-9]+(?:-\d+)?|\d+)|[A-Z][A-Z0-9]+-\d+|\d+)$/,
     schema: "discovery/jira/issues/.schema.json",
     createExample: "discovery/jira/issues/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "transitions",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^$/,
     schema: "discovery/jira/issues/{issueIdOrKey}/transitions/.schema.json",
     createExample: "discovery/jira/issues/{issueIdOrKey}/transitions/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "projects",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__)(?:[A-Z][A-Z0-9]+(?:-\d+)?|\d+)|[A-Z][A-Z0-9]+-\d+|\d+)$/,
     schema: "discovery/jira/projects/.schema.json",
     createExample: "discovery/jira/projects/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

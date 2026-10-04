@@ -287,7 +287,7 @@ export const adapters = [
     slug: 'jira',
     title: 'Jira adapter',
     overview:
-      'The Jira adapter exposes issues, comments, projects, and sprints under `/jira`, with writeback routes for creating issues, projects, issue comments, and issue transitions.',
+      'The Jira adapter exposes issues, comments, projects, and sprints under `/jira`, with writeback routes for creating, updating, and deleting issues, projects, and issue comments, and for creating issue transitions.',
     readPaths: [
       ['/jira/issues/<issueIdOrKey>.json', 'Issue records.'],
       ['/jira/issues/<issueIdOrKey>/comments/<commentId>.json', 'Issue comment records.'],
@@ -303,7 +303,7 @@ export const adapters = [
             { type: 'string' },
           ],
         },
-      }, { body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Replace example comment text.' }] }] } }),
+      }, { body: { type: 'doc', version: 1, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Replace example comment text.' }] }] } }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/jira/issues/new.json', 'Create Jira issue', 'Creates a Jira issue.', ['fields'], {
         fields: obj('Jira issue fields.', {
           project: obj('Project object. Usually includes `key` or `id`.'),
@@ -313,12 +313,12 @@ export const adapters = [
           priority: obj('Priority object. Usually includes `name` or `id`.'),
           labels: arr(str('Issue label.'), 'Issue labels.'),
         }, { required: ['project', 'summary', 'issuetype'] }),
-      }, { fields: { project: { key: 'PROJ' }, summary: 'Replace example summary', issuetype: { name: 'Task' } } }),
+      }, { fields: { project: { key: 'PROJ' }, summary: 'Replace example summary', issuetype: { name: 'Task' } } }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/jira/issues/{issueIdOrKey}/transitions/new.json', 'Transition Jira issue', 'Transitions a Jira issue to another workflow state.', ['transition'], {
         transition: obj('Jira transition.', {
           id: str('Transition id.'),
         }, { required: ['id'] }),
-      }, { transition: { id: '31' } }),
+      }, { transition: { id: '31' } }, { operations: ['create'] }),
       endpoint('/jira/projects/new.json', 'Create Jira project', 'Creates a Jira project.', ['key', 'name', 'projectTypeKey', 'leadAccountId'], {
         key: str('Project key.'),
         name: str('Project name.'),
@@ -327,7 +327,7 @@ export const adapters = [
         description: str('Project description.'),
         url: str('Project URL.', 'uri'),
         assigneeType: str('Default assignee type.'),
-      }, { key: 'EX', name: 'Example Project', projectTypeKey: 'software', leadAccountId: 'replace-account-id' }),
+      }, { key: 'EX', name: 'Example Project', projectTypeKey: 'software', leadAccountId: 'replace-account-id' }, { operations: ['create', 'update', 'delete'] }),
     ],
   },
   {
