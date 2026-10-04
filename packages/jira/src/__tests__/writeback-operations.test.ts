@@ -45,9 +45,13 @@ test('jira comments, issues, and projects still route create, update, and delete
   assert.equal(resolveJiraWritebackRequest('/jira/issues/ENG-1.json', '{"fields":{"summary":"Renamed"}}').action, 'update_issue');
   assert.equal(resolveJiraDeleteRequest('/jira/issues/ENG-1.json').action, 'delete_issue');
 
-  // Project creates route here, but the resolver currently rejects the
-  // required `key` as read-only (tracked separately), so assert routing only.
-  assert.equal(classifyWrite('/jira/projects/new-project.json', resources)?.kind, 'create');
+  assert.equal(
+    resolveJiraWritebackRequest(
+      '/jira/projects/new-project.json',
+      '{"key":"OPS","name":"Ops","projectTypeKey":"software","leadAccountId":"abc"}',
+    ).action,
+    'create_project',
+  );
   assert.equal(resolveJiraWritebackRequest('/jira/projects/10000.json', '{"name":"Engineering"}').action, 'update_project');
   assert.equal(resolveJiraDeleteRequest('/jira/projects/10000.json').action, 'delete_project');
 });
