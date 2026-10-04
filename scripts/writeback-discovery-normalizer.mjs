@@ -110,6 +110,7 @@ export function normalizeWritebackEndpointResource(adapterSlug, endpoint, layout
     pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapterSlug, resourcePath)),
     ...idPatternFor(adapterSlug, resourcePath),
     ...(Array.isArray(endpoint.operations) ? { operations: [...endpoint.operations] } : {}),
+    ...(endpoint.idPatternNote ? { idPatternNote: endpoint.idPatternNote } : {}),
     ...(layoutMatch
       ? {
           layoutResource: layoutMatch.resource,

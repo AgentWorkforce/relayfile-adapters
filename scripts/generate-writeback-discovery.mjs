@@ -138,6 +138,9 @@ function renderIdPattern(resource) {
   if (writePath === resource.resourcePath) {
     return `- \`${writePath}\`: exact file path.`;
   }
+  if (resource.idPatternNote) {
+    return `- \`${writePath}\`: \`${resource.idPatternSource}\`. ${resource.idPatternNote}`;
+  }
   return resource.operations && !resource.operations.includes('create')
     ? `- \`${writePath}\`: \`${resource.idPatternSource}\`. Non-canonical filenames are not writeback routes for this resource.`
     : `- \`${writePath}\`: \`${resource.idPatternSource}\`. Filenames that do not match this pattern are treated as create drafts.`;
