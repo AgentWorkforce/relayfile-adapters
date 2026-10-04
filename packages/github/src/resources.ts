@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^[1-9]\d*$/,
     schema: "discovery/github/repos/{owner}/{repo}/issues/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/issues/.create.example.json",
+    operations: ["create","update"],
   },
   {
     name: "issue-comments",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:meta|\d+)$/,
     schema: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/.create.example.json",
+    operations: ["create","update"],
   },
   {
     name: "reviews",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "pull-requests",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^[1-9]\d*$/,
     schema: "discovery/github/repos/{owner}/{repo}/pull-requests/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pull-requests/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "refs",
@@ -47,6 +54,7 @@ export const resources = [
     idPattern: /^refs\/[^\/]+\/[^\/].*$/,
     schema: "discovery/github/repos/{owner}/{repo}/refs/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/refs/.create.example.json",
+    operations: ["create","update"],
   },
   {
     name: "close-pull-request",
@@ -55,6 +63,7 @@ export const resources = [
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "merge",
@@ -63,6 +72,7 @@ export const resources = [
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "replies",
@@ -71,6 +81,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.schema.json",
     createExample: "discovery/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/.create.example.json",
+    operations: ["create"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

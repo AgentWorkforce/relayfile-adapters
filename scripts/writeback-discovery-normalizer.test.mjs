@@ -153,6 +153,8 @@ test('normalizes existing writeback discovery adapter endpoints without changing
     pathPatternLiteral: '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/issues(?:\\/[^\\/]+(?:\\.json)?)?$/',
     idPatternLiteral: '/^[1-9]\\d*$/',
     idPatternSource: '^[1-9]\\d*$',
+
+    operations: ['create', 'update'],
   });
 
   const commentEndpoint = normalized.endpoints.find((endpoint) => endpoint.path === '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json');
@@ -167,6 +169,8 @@ test('normalizes existing writeback discovery adapter endpoints without changing
     pathPatternLiteral: '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/issues\\/[^\\/]+\\/comments(?:\\/[^\\/]+(?:\\.json|\\/meta\\.json)?)?$/',
     idPatternLiteral: '/^(?:meta|\\d+)$/',
     idPatternSource: '^(?:meta|\\d+)$',
+
+    operations: ['create', 'update'],
   });
 });
 
