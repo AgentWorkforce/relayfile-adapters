@@ -243,7 +243,7 @@ export const adapters = [
     slug: 'hubspot',
     title: 'HubSpot adapter',
     overview:
-      'The HubSpot adapter exposes CRM contacts, companies, deals, and tickets under `/hubspot`, with writeback routes for creating and updating those CRM objects.',
+      'The HubSpot adapter exposes CRM contacts, companies, deals, and tickets under `/hubspot`, with writeback routes for creating, updating, and deleting those CRM objects.',
     readPaths: [
       ['/hubspot/contacts/<contactId>.json', 'Contact records.'],
       ['/hubspot/companies/<companyId>.json', 'Company records.'],
@@ -908,7 +908,7 @@ function hubspotEndpoint(path, title, description, example) {
   return {
     ...endpoint(path, title, description, [], {
       properties: obj('HubSpot properties object. If omitted, top-level writable keys are treated as properties.'),
-    }, { properties: example }),
+    }, { properties: example }, { operations: ['create', 'update', 'delete'] }),
     schema: {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       title,
