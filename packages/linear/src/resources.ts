@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/linear/issues/.schema.json",
     createExample: "discovery/linear/issues/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "comments",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/linear/issues/{issueId}/comments/.schema.json",
     createExample: "discovery/linear/issues/{issueId}/comments/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "labels",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/linear/labels/.schema.json",
     createExample: "discovery/linear/labels/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "projects",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/linear/projects/.schema.json",
     createExample: "discovery/linear/projects/.create.example.json",
+    operations: ["create","update"],
   },
   {
     name: "projects",
@@ -47,6 +54,7 @@ export const resources = [
     idPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     schema: "discovery/linear/projects/{projectId}/meta.json/.schema.json",
     createExample: "discovery/linear/projects/{projectId}/meta.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "project-issue-assignments",
@@ -55,6 +63,7 @@ export const resources = [
     idPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     schema: "discovery/linear/projects/{projectId}/add-issues.json/.schema.json",
     createExample: "discovery/linear/projects/{projectId}/add-issues.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "agent-activities",
@@ -63,6 +72,7 @@ export const resources = [
     idPattern: /^(?:activity_[A-Za-z0-9_-]+|[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/linear/agent-sessions/{sessionId}/activities/.schema.json",
     createExample: "discovery/linear/agent-sessions/{sessionId}/activities/.create.example.json",
+    operations: ["create"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

@@ -334,7 +334,7 @@ export const adapters = [
     slug: 'linear',
     title: 'Linear adapter',
     overview:
-      'The Linear adapter exposes teams, issues, users, comments, labels, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating issues and comments, creating/updating/deleting labels, and creating, updating, archiving, and grouping issues into Linear projects. Companion cloud actions use slugs `create-project`, `update-project`, `add-issues-to-project`, and `archive-project` at `POST /linear/projects`, `PATCH /linear/projects/:id`, `POST /linear/projects/:id/add-issues`, and `POST /linear/projects/:id/archive` with Linear OAuth scope `write`.',
+      'The Linear adapter exposes teams, issues, users, comments, labels, projects, cycles, milestones, and roadmaps under `/linear`, with writeback routes for creating/updating/deleting issues, creating comments and agent activities, creating/updating/deleting labels, and creating, updating, archiving, and grouping issues into Linear projects. Companion cloud actions use slugs `create-project`, `update-project`, `add-issues-to-project`, and `archive-project` at `POST /linear/projects`, `PATCH /linear/projects/:id`, `POST /linear/projects/:id/add-issues`, and `POST /linear/projects/:id/archive` with Linear OAuth scope `write`.',
     readPaths: [
       ['/linear/teams/<teamId>.json', 'Team records.'],
       ['/linear/issues/<issueId>.json', 'Issue records.'],
@@ -374,6 +374,7 @@ export const adapters = [
         estimate: num('Linear estimate value.'),
         parentId: str('Parent issue UUID.', 'uuid'),
       }, { teamId: '00000000-0000-0000-0000-000000000000', title: 'Replace example title', description: 'Optional markdown body.', priority: 0 }, {
+        operations: ['create', 'update', 'delete'],
         anyOf: [
           { required: ['teamId'] },
           { required: ['team'] },
@@ -383,14 +384,14 @@ export const adapters = [
         body: str('Comment body.', undefined, { minLength: 1 }),
         parentId: str('Parent comment UUID for threaded replies.', 'uuid'),
         doNotSubscribeToIssue: bool('Whether to avoid subscribing the commenter to the issue.'),
-      }, { body: 'Replace example comment body.' }),
+      }, { body: 'Replace example comment body.' }, { operations: ['create'] }),
       endpoint('/linear/labels/new.json', 'Create Linear label', 'Creates a Linear issue label when written to a non-canonical draft filename, updates mutable label fields when written to `/linear/labels/{labelId}.json`, and deletes a label when the canonical file is removed.', ['name'], {
         name: str('Label name.', undefined, { minLength: 1 }),
         description: str('Label description.'),
         color: str('Label color as a hex string.'),
         teamId: str('Linear team UUID for a team-scoped label. Omit for a workspace-level label.', 'uuid'),
         parentId: str('Parent label UUID for nested labels.', 'uuid'),
-      }, { name: 'Replace example label name', color: '#bec2c8' }),
+      }, { name: 'Replace example label name', color: '#bec2c8' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/linear/projects/new.json', 'Create Linear project', 'Creates a Linear project. The draft filename (for example `factory-create-<uuid>.json`) is an operator-supplied idempotency key; the created Linear UUID is returned as `id` by the companion action. Payloads must provide `teamId` or `teamIds`.', ['name'], {
         name: str('Project name.', undefined, { minLength: 1 }),
         description: str('Markdown project description.'),
@@ -403,6 +404,7 @@ export const adapters = [
         color: str('Linear project color.'),
         icon: str('Linear project icon.'),
       }, { name: 'Replace example project name', teamIds: ['00000000-0000-0000-0000-000000000000'] }, {
+        operations: ['create', 'update'],
         anyOf: [
           { required: ['teamId'] },
           { required: ['teamIds'] },
@@ -418,7 +420,7 @@ export const adapters = [
         color: str('Linear project color.'),
         icon: str('Linear project icon.'),
         archived: bool('When true, archive the project via Linear projectArchive. Soft archive only; the adapter never sets `trash`, and hard-trash requires the Linear UI. Unarchive and hard-delete are out of scope.'),
-      }, { state: 'started' }),
+      }, { state: 'started' }, { operations: ['update'] }),
       endpoint(
         '/linear/projects/{projectId}/add-issues.json',
         'Add Linear issues to project',
@@ -431,6 +433,7 @@ export const adapters = [
           }),
         },
         { issueIds: ['00000000-0000-0000-0000-000000000000'] },
+        { operations: ['update'] },
       ),
       endpoint('/linear/agent-sessions/{sessionId}/activities/new.json', 'Create Linear agent activity', 'Creates an activity on a Linear agent session.', ['type'], {
         type: en(['action', 'elicitation', 'error', 'response', 'thought'], 'Linear agent activity content type.'),
@@ -438,7 +441,7 @@ export const adapters = [
         action: str('Action name for action-type activities.'),
         parameter: str('Action parameter or target.'),
         result: str('Action result summary.'),
-      }, { type: 'response', body: 'Replace example agent activity body.' }),
+      }, { type: 'response', body: 'Replace example agent activity body.' }, { operations: ['create'] }),
     ],
   },
   {
