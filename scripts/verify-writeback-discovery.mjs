@@ -58,8 +58,16 @@ for (const adapter of adapters) {
     validateSchema(adapter.slug, schemaPath, schema);
     if (hasExample) validateExample(adapter.slug, examplePath, schema, example);
 
-    if (!adapterMd.includes(`\`${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
-      failures.push(`${adapter.slug}: .adapter.md must list ${schemaPath} plus Operations and ID Patterns sections`);
+    if (!adapterMd.includes(`\`/discovery${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
+      failures.push(`${adapter.slug}: .adapter.md must list /discovery${schemaPath} plus Operations and ID Patterns sections`);
+    }
+    if (hasExample && !adapterMd.includes(`\`/discovery${examplePath}\``)) {
+      failures.push(`${adapter.slug}: .adapter.md must list /discovery${examplePath}`);
+    }
+    for (const unprefixedPath of [schemaPath, examplePath]) {
+      if (adapterMd.includes(`\`${unprefixedPath}\``)) {
+        failures.push(`${adapter.slug}: .adapter.md must advertise ${unprefixedPath} under the /discovery mount root, not the live resource directory`);
+      }
     }
     if (/\.(?:json|md)$/.test(resourcePath) && adapterMd.includes(`\`${resourcePath}/<id>.json\``)) {
       failures.push(`${adapter.slug}: .adapter.md must document exact-file resource ${resourcePath}, not ${resourcePath}/<id>.json`);
