@@ -59,9 +59,11 @@ function renderAdapterReadme(adapter) {
     '',
     'Resources:',
     '',
+    `Schema and create example files are served under the \`/discovery\` mount root (\`/discovery/${adapter.slug}/...\`), not beside the live resource directory.`,
+    '',
     '| Resource | Schema | Create example | ID pattern | What it does |',
     '|---|---|---|---|---|',
-    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${resource.schemaPath}\` | ${resource.examplePath ? `\`${resource.examplePath}\`` : '—'} | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
+    ...resources.map((resource) => `| \`${resourceWritePath(resource)}\` | \`${discoveryMountPath(resource.schemaPath)}\` | ${resource.examplePath ? `\`${discoveryMountPath(resource.examplePath)}\`` : '—'} | ${resourceIdPatternCell(resource)} | ${resource.description} |`),
     '',
     '## Operations',
     '',
@@ -80,7 +82,7 @@ function renderAdapterReadme(adapter) {
     '',
     ...adapter.endpoints.flatMap((endpoint) => renderEndpointContract(endpoint)),
     '## Create Examples',
-    'Read the resource `.schema.json` first, then use the sibling `.create.example.json` as a minimal create document when the resource advertises one. The example intentionally omits read-only fields.',
+    'Read the resource `.schema.json` under `/discovery` first, then use the sibling `.create.example.json` as a minimal create document when the resource advertises one. The example intentionally omits read-only fields.',
     '',
   ];
 
@@ -97,9 +99,9 @@ function renderEndpointContract(endpoint) {
     `### ${endpoint.schema.title}`,
     '',
     `Resource: \`${resourceWritePath(resource)}\``,
-    `Schema: \`${resource.schemaPath}\``,
+    `Schema: \`${discoveryMountPath(resource.schemaPath)}\``,
     `Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`,
-    ...(resource.examplePath ? [`Create example: \`${resource.examplePath}\``] : ['Create example: none; use the provider UI or another supported operation.']),
+    ...(resource.examplePath ? [`Create example: \`${discoveryMountPath(resource.examplePath)}\``] : ['Create example: none; use the provider UI or another supported operation.']),
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
     `Optional fields: ${optional.length > 0 ? optional.map((fieldName) => `\`${fieldName}\``).join(', ') : 'none'}.`,
     ...renderValidationNotes(endpoint.schema),
@@ -111,6 +113,13 @@ function renderEndpointContract(endpoint) {
   ];
 
   return lines;
+}
+
+// Schema and example files are materialized under the workspace /discovery
+// root (see the `discovery${...}` paths in renderResourcesTs), so the docs must
+// advertise that prefix rather than the live resource directory.
+function discoveryMountPath(path) {
+  return `/discovery${path}`;
 }
 
 function resourceWritePath(resource) {

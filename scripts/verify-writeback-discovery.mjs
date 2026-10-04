@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,12 +58,30 @@ for (const adapter of adapters) {
     validateSchema(adapter.slug, schemaPath, schema);
     if (hasExample) validateExample(adapter.slug, examplePath, schema, example);
 
-    if (!adapterMd.includes(`\`${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
-      failures.push(`${adapter.slug}: .adapter.md must list ${schemaPath} plus Operations and ID Patterns sections`);
+    if (!adapterMd.includes(`\`/discovery${schemaPath}\``) || !adapterMd.includes('## Operations') || !adapterMd.includes('## ID Patterns')) {
+      failures.push(`${adapter.slug}: .adapter.md must list /discovery${schemaPath} plus Operations and ID Patterns sections`);
+    }
+    if (hasExample && !adapterMd.includes(`\`/discovery${examplePath}\``)) {
+      failures.push(`${adapter.slug}: .adapter.md must list /discovery${examplePath}`);
+    }
+    for (const unprefixedPath of [schemaPath, examplePath]) {
+      if (adapterMd.includes(`\`${unprefixedPath}\``)) {
+        failures.push(`${adapter.slug}: .adapter.md must advertise ${unprefixedPath} under the /discovery mount root, not the live resource directory`);
+      }
     }
     if (/\.(?:json|md)$/.test(resourcePath) && adapterMd.includes(`\`${resourcePath}/<id>.json\``)) {
       failures.push(`${adapter.slug}: .adapter.md must document exact-file resource ${resourcePath}, not ${resourcePath}/<id>.json`);
     }
+  }
+}
+
+// Hand-maintained .adapter.md files (adapters outside writeback-discovery-data)
+// must also advertise schema/example files at the absolute /discovery mount path.
+for (const slug of await readdir(join(root, 'packages'))) {
+  const adapterMd = await readOptionalFile(join(root, 'packages', slug, 'discovery', slug, '.adapter.md'));
+  const relativePaths = adapterMd.match(/`discovery\/[^`]*\.(?:schema|create\.example)\.json`/g) ?? [];
+  for (const relativePath of relativePaths) {
+    failures.push(`${slug}: .adapter.md must use the absolute /discovery mount path, not ${relativePath}`);
   }
 }
 
