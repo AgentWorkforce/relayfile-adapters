@@ -85,8 +85,8 @@ export const adapters = [
       ['/confluence/spaces/<spaceIdOrKey>/pages/<pageId>.json', 'Space-scoped page records.'],
     ],
     endpoints: [
-      endpoint('/confluence/pages/new.json', 'Create Confluence page', 'Creates a Confluence page when `spaceId` is supplied in the document.', ['title', 'spaceId', 'body'], confluencePageProps(), { title: 'Replace example page title', spaceId: '12345', body: '<p>Replace example page body.</p>' }),
-      endpoint('/confluence/spaces/{spaceIdOrKey}/pages/new.json', 'Create Confluence space page', 'Creates a Confluence page in the space named by the path.', ['title', 'body'], confluencePageProps({ includeSpaceId: false }), { title: 'Replace example page title', body: '<p>Replace example page body.</p>' }),
+      endpoint('/confluence/pages/new.json', 'Create Confluence page', 'Creates a Confluence page when `spaceId` is supplied in the document.', ['title', 'spaceId', 'body'], confluencePageProps(), { title: 'Replace example page title', spaceId: '12345', body: '<p>Replace example page body.</p>' }, { operations: ['create', 'update', 'delete'] }),
+      endpoint('/confluence/spaces/{spaceIdOrKey}/pages/new.json', 'Create Confluence space page', 'Creates a Confluence page in the space named by the path.', ['title', 'body'], confluencePageProps({ includeSpaceId: false }), { title: 'Replace example page title', body: '<p>Replace example page body.</p>' }, { operations: ['create', 'update', 'delete'] }),
     ],
   },
   {
