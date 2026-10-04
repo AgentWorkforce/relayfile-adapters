@@ -30,8 +30,9 @@ for (const adapter of adapters) {
 
   for (const endpoint of adapter.endpoints) {
     const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
-    const schemaPath = `${resourcePath}/.schema.json`;
-    const examplePath = `${resourcePath}/.create.example.json`;
+    const discoveryPath = endpoint.discoveryPath ?? resourcePath;
+    const schemaPath = `${discoveryPath}/.schema.json`;
+    const examplePath = `${discoveryPath}/.create.example.json`;
 
     if (endpoint.path.endsWith('/new.json')) {
       const legacySchemaFile = join(root, 'packages', adapter.slug, 'discovery', endpoint.path.replace(/new\.json$/, 'new.schema.json').slice(1));

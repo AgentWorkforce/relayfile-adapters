@@ -238,6 +238,63 @@ test('normalizes GitLab slugged nested writeback paths to runtime matchers', () 
   );
 });
 
+test('keeps live GitHub pull request, ref, and close routes in generated resources', () => {
+  const github = normalizeWritebackDiscoveryAdapter(adapters.find((adapter) => adapter.slug === 'github'));
+  const byName = new Map(github.resources.map((resource) => [resource.name, resource]));
+
+  // These literals match packages/github/src/resources.ts, which the
+  // writeback handler routes against by resource name.
+  assert.deepEqual(
+    ['pull-requests', 'refs', 'close-pull-request'].map((name) => {
+      const resource = byName.get(name);
+      assert.ok(resource, `expected GitHub ${name} resource`);
+      return [resource.resourcePath, resource.pathPatternLiteral, resource.idPatternLiteral, resource.schemaPath, resource.examplePath];
+    }),
+    [
+      [
+        '/github/repos/{owner}/{repo}/pull-requests',
+        '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/pull-requests(?:\\/[^\\/]+(?:\\.json)?)?$/',
+        '/^[1-9]\\d*$/',
+        '/github/repos/{owner}/{repo}/pull-requests/.schema.json',
+        '/github/repos/{owner}/{repo}/pull-requests/.create.example.json',
+      ],
+      [
+        '/github/repos/{owner}/{repo}/refs',
+        '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/refs(?:\\/[^\\/]+(?:\\.json)?)?$/',
+        '/^refs\\/[^\\/]+\\/[^\\/].*$/',
+        '/github/repos/{owner}/{repo}/refs/.schema.json',
+        '/github/repos/{owner}/{repo}/refs/.create.example.json',
+      ],
+      [
+        '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json',
+        '/^\\/github\\/repos\\/[^\\/]+\\/[^\\/]+\\/pulls\\/[1-9]\\d*(?:__[^\\/]+)?\\/close\\.json$/',
+        '/^[1-9]\\d*(?:__.*)?$/',
+        '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json/.schema.json',
+        '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json/.create.example.json',
+      ],
+    ],
+  );
+});
+
+test('keeps the live Telegram message edit route ahead of the send route and sharing its schema', () => {
+  const telegram = normalizeWritebackDiscoveryAdapter(adapters.find((adapter) => adapter.slug === 'telegram'));
+  const [edit, send] = telegram.resources;
+
+  assert.equal(edit.name, 'messages');
+  assert.equal(edit.resourcePath, '/telegram/chats/{chatId}/messages/{messageId}.json');
+  assert.equal(edit.pathPatternLiteral, '/^\\/telegram\\/chats\\/[^\\/]+\\/messages\\/\\d+\\.json$/');
+  assert.equal(edit.idPatternLiteral, '/^\\d+$/');
+  assert.equal(edit.schemaPath, '/telegram/chats/{chatId}/messages/.schema.json');
+  assert.equal(edit.sharedDiscovery, true);
+  assert.equal(edit.examplePath, undefined);
+  assert.equal(send.resourcePath, '/telegram/chats/{chatId}/messages');
+  assert.equal(send.schemaPath, edit.schemaPath);
+
+  const editPattern = new RegExp(edit.pathPatternSource);
+  assert.ok(editPattern.test('/telegram/chats/C123/messages/42.json'));
+  assert.ok(!editPattern.test('/telegram/chats/C123/messages/relayfile-writeback--messages-1.json'));
+});
+
 test('attaches optional layoutManifest-style writeback metadata by static path segments', () => {
   const github = adapters.find((adapter) => adapter.slug === 'github');
   assert.ok(github);
