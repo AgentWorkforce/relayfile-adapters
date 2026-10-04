@@ -176,9 +176,9 @@ export const adapters = [
           },
         },
       }),
-      contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/new.json', 'pulls/create-reply-for-review-comment', { body: 'Replace example reply body.' }, {
+      contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/new.json', 'pulls/create-reply-for-review-comment', { body: 'Replace example reply body.' }, {
         title: 'Reply to GitHub pull request review comment',
-        description: 'Creates a reply to a top-level pull request review comment thread. Write to a path like `/github/repos/{owner}/{repo}/pulls/{pullNumber}/comments/{commentId}/replies/new.json` where {commentId} is the ID of the top-level review comment to reply to.',
+        description: 'Creates a reply to a top-level pull request review comment thread. Write to a path like `/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/new.json` where {commentId} is the ID of the top-level review comment to reply to.',
       }),
     ],
   },
