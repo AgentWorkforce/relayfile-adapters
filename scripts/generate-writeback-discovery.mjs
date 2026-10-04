@@ -73,7 +73,7 @@ function renderAdapterReadme(adapter) {
     '|---|---|',
     '| Read | `cat <canonical-resource-path>` after listing the resource directory or following an alias when one is available. Use the resource table and ID patterns below to determine whether a resource uses a bare id, an adapter-specific slug/id filename, or an exact sidecar path such as `content.md`. |',
     '| Edit | Write the resource update payload to the canonical resource path. For JSON resources, included mutable fields PATCH; fields marked `readOnly` in `.schema.json` are rejected. |',
-    '| Create | For resources with a create example, write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at its canonical resource path and rewrites the draft as `{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }`. |',
+    '| Create | For resources with a create example, write JSON to any non-canonical filename such as `create request.json`. The adapter creates the record at its canonical resource path and rewrites the draft as `{ "created": "<real-id>", "path": "<canonical-resource-path>", "url": "<provider-url>" }`. Resources whose ID pattern is `exact file path` are written in place and never created from drafts. |',
     '| Ignore | Editor scratch files named `partial.json`, `.tmp.json`, `.partial.json`, `*.tmp.json`, or `*.partial.json` are ignored and never treated as create drafts. |',
     '| Delete | `rm <canonical-resource-path>` for canonical records. |',
     '',
@@ -96,21 +96,24 @@ function renderEndpointContract(endpoint) {
   const required = new Set(endpoint.schema.required ?? []);
   const fieldNames = Object.keys(endpoint.schema.properties ?? {});
   const optional = fieldNames.filter((fieldName) => !required.has(fieldName));
-  const operations = endpoint.operations ?? ['create', 'update', 'delete'];
+  // Only advertise operations the data declares. Defaulting to all three
+  // overstated create-only and update-only routes.
+  const operations = endpoint.operations;
+  const fields = renderSchemaFields(endpoint.schema);
   const lines = [
     `### ${endpoint.schema.title}`,
     '',
     `Resource: \`${resourceWritePath(resource)}\``,
     `Schema: \`${discoveryMountPath(resource.schemaPath)}\``,
-    `Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`,
+    ...(operations
+      ? [`Operations: ${operations.length > 0 ? operations.map((operation) => `\`${operation}\``).join(', ') : 'read-only'}.`]
+      : []),
     ...(resource.examplePath ? [`Create example: \`${discoveryMountPath(resource.examplePath)}\``] : ['Create example: none; use the provider UI or another supported operation.']),
     `Required fields: ${required.size > 0 ? [...required].map((fieldName) => `\`${fieldName}\``).join(', ') : 'none at the top level'}.`,
     `Optional fields: ${optional.length > 0 ? optional.map((fieldName) => `\`${fieldName}\``).join(', ') : 'none'}.`,
     ...renderValidationNotes(endpoint.schema),
     '',
-    'Fields:',
-    '',
-    ...renderSchemaFields(endpoint.schema),
+    ...(fields.length > 0 ? ['Fields:', '', ...fields] : ['Fields: none. Write an empty JSON object.']),
     '',
   ];
 
@@ -134,6 +137,9 @@ function renderIdPattern(resource) {
   const writePath = resourceWritePath(resource);
   if (writePath === resource.resourcePath) {
     return `- \`${writePath}\`: exact file path.`;
+  }
+  if (resource.idPatternNote) {
+    return `- \`${writePath}\`: \`${resource.idPatternSource}\`. ${resource.idPatternNote}`;
   }
   return resource.operations && !resource.operations.includes('create')
     ? `- \`${writePath}\`: \`${resource.idPatternSource}\`. Non-canonical filenames are not writeback routes for this resource.`
