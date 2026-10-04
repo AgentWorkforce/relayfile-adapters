@@ -3,7 +3,7 @@ export const adapters = [
     slug: 'asana',
     title: 'Asana adapter',
     overview:
-      'The Asana adapter exposes task, project, section, and workspace records under `/asana`, with writeback routes for creating tasks, projects, and sections plus updating existing records.',
+      'The Asana adapter exposes task, project, section, and workspace records under `/asana`, with writeback routes for creating, updating, and deleting tasks, projects, and sections, and creating sections inside a project.',
     readPaths: [
       ['/asana/tasks/<taskId>.json', 'Task records.'],
       ['/asana/projects/<projectId>.json', 'Project records.'],
@@ -28,7 +28,7 @@ export const adapters = [
         tags: arr(str('Tag gid.'), 'Tag gids to attach.'),
         custom_fields: obj('Asana custom field gid to value map.'),
         parent: str('Parent task gid for subtasks.'),
-      }, { name: 'Replace example task name', workspace: '1200000000000000' }),
+      }, { name: 'Replace example task name', workspace: '1200000000000000' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/asana/projects/new.json', 'Create Asana project', 'Creates an Asana project.', ['name'], {
         name: str('Project name.'),
         workspace: str('Workspace gid for the project.'),
@@ -41,14 +41,14 @@ export const adapters = [
         public: bool('Whether the project is public to the workspace.'),
         archived: bool('Whether the project starts archived.'),
         custom_fields: obj('Asana custom field gid to value map.'),
-      }, { name: 'Replace example project name', workspace: '1200000000000000' }),
+      }, { name: 'Replace example project name', workspace: '1200000000000000' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/asana/sections/new.json', 'Create Asana section', 'Creates an Asana section when the project gid is supplied in the document.', ['name', 'project'], {
         name: str('Section name.'),
         project: str('Project gid that will contain the section.'),
-      }, { name: 'Replace example section name', project: '1200000000000000' }),
+      }, { name: 'Replace example section name', project: '1200000000000000' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/asana/projects/{projectId}/sections/new.json', 'Create Asana project section', 'Creates a section inside the project named by the path.', ['name'], {
         name: str('Section name.'),
-      }, { name: 'Replace example section name' }),
+      }, { name: 'Replace example section name' }, { operations: ['create'] }),
     ],
   },
   {
