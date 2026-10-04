@@ -19,6 +19,8 @@ for (const adapter of normalizedAdapters) {
 
   for (const endpoint of adapter.endpoints) {
     const resource = endpoint.resource;
+    // The owning endpoint writes shared schema/example files.
+    if (resource.sharedDiscovery) continue;
     await writeDiscoveryFile(
       join(root, 'packages', adapter.slug, 'discovery', resource.schemaPath.slice(1)),
       `${JSON.stringify(fullRecordSchema(endpoint.schema), null, 2)}\n`,

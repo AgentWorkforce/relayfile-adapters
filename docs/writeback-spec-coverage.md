@@ -8,7 +8,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 
 | Adapter | Contract source | Contract-backed endpoints | Inline endpoints | Notes |
 |---|---|---:|---:|---|
-| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 4 | 0 | `issues/create`, `issues/create-comment`, `pulls/create-review`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. |
+| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 5 | 3 | `issues/create`, `issues/create-comment`, `pulls/create-review`, `pulls/merge`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. Pull request create, ref push, and pull request close (`close.json`) use inline JS schemas. |
 | asana | None | 0 | 4 | Inline JS schemas. |
 | azure-blob | None | 0 | 2 | Inline JS schemas. |
 | box | None | 0 | 2 | Inline JS schemas. |
@@ -40,7 +40,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | sharepoint | None | 0 | 2 | Inline JS schemas. |
 | slack | None | 0 | 4 | Inline JS schemas. |
 | teams | None | 0 | 3 | Inline JS schemas. |
-| telegram | None | 0 | 6 | Inline JS schemas for Telegram Bot API messaging, reactions, callbacks, inline query answers, commands, and menu buttons. |
+| telegram | None | 0 | 7 | Inline JS schemas for Telegram Bot API messaging (send and edit; edit shares the send schema), reactions, callbacks, inline query answers, commands, and menu buttons. |
 | x | None | 0 | 0 | Read-only social search adapter; no writeback endpoints. |
 | zendesk | None | 0 | 3 | Inline JS schemas. |
 

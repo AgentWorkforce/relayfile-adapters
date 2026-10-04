@@ -93,14 +93,18 @@ export function escapeMarkdownTableCell(value) {
 
 export function normalizeWritebackEndpointResource(adapterSlug, endpoint, layoutManifest) {
   const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
+  // Routes that share another resource's discovery files (e.g. an edit route
+  // reusing the collection's send schema) point their schema/example there.
+  const discoveryPath = endpoint.discoveryPath ?? resourcePath;
   const layoutMatch = layoutManifest ? findLayoutWritebackResource(layoutManifest, resourcePath) : undefined;
   return {
     name: resourceNameFor(adapterSlug, resourcePath),
     resourcePath,
-    schemaPath: `${resourcePath}/.schema.json`,
+    schemaPath: `${discoveryPath}/.schema.json`,
+    ...(endpoint.discoveryPath ? { sharedDiscovery: true } : {}),
     ...(endpoint.createSupported === false || endpoint.example === undefined
       ? {}
-      : { examplePath: `${resourcePath}/.create.example.json` }),
+      : { examplePath: `${discoveryPath}/.create.example.json` }),
     description: endpoint.description,
     pathPatternSource: pathPatternSourceFor(adapterSlug, resourcePath),
     pathPatternLiteral: patternLiteral(pathPatternSourceFor(adapterSlug, resourcePath)),
@@ -233,6 +237,9 @@ function resourceNameFor(adapterSlug, resourcePath) {
     if (resourcePath.endsWith('/merge.json')) return 'merge';
     if (resourcePath.endsWith('/close.json')) return 'close-merge-request';
   }
+  if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json') {
+    return 'close-pull-request';
+  }
   if (adapterSlug === 'github' && resourcePath.includes('/issues/') && resourcePath.endsWith('/comments')) {
     return 'issue-comments';
   }
@@ -298,6 +305,14 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
   }
   if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
     return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/merge\\.json$';
+  }
+  if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json') {
+    return '^/github/repos/[^/]+/[^/]+/pulls/[1-9]\\d*(?:__[^/]+)?/close\\.json$';
+  }
+  if (adapterSlug === 'telegram' && resourcePath === '/telegram/chats/{chatId}/messages/{messageId}.json') {
+    // Numeric message ids only, so non-numeric create drafts fall through to
+    // the collection route.
+    return '^/telegram/chats/[^/]+/messages/\\d+\\.json$';
   }
   if (adapterSlug === 'github' && resourcePath === '/github/repos/{owner}/{repo}/issues/{issueNumber}/comments') {
     // Issue comments are directory records (`comments/<id>/meta.json`); the
@@ -385,8 +400,21 @@ function idPatternFor(adapterSlug, resourcePath) {
       ? pattern('^[A-Za-z0-9_/-]+$')
       : pattern('^[A-Za-z0-9_][A-Za-z0-9_-]{1,63}$');
   }
+  if (adapterSlug === 'telegram' && resourcePath === '/telegram/chats/{chatId}/messages/{messageId}.json') {
+    return pattern('^\\d+$');
+  }
   if (adapterSlug === 'github') {
-    if (resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json') {
+    if (resourcePath.endsWith('/pull-requests')) {
+      return pattern('^[1-9]\\d*$');
+    }
+    if (resourcePath.endsWith('/refs')) {
+      // Canonical ref filenames percent-encode the full normalized ref.
+      return pattern('^refs/[^/]+/[^/].*$');
+    }
+    if (
+      resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json' ||
+      resourcePath === '/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json'
+    ) {
       return pattern('^[1-9]\\d*(?:__.*)?$');
     }
     if (resourcePath.endsWith('/issues')) {

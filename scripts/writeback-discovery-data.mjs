@@ -93,7 +93,7 @@ export const adapters = [
     slug: 'github',
     title: 'GitHub adapter',
     overview:
-      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and updating issues, creating and updating issue comments, submitting pull request reviews, merging pull requests, and replying to pull request review comment threads.',
+      'The GitHub adapter exposes repository pull requests, issues, reviews, comments, commits, files, and checks under `/github`, with writeback support for creating and closing pull requests, creating and updating refs, creating and updating issues, creating and updating issue comments, submitting pull request reviews, merging pull requests, and replying to pull request review comment threads.',
     readPaths: [
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/meta.json', 'Pull request metadata.'],
       ['/github/repos/<owner>/<repo>/pulls/<pullNumber>/files/<path>', 'Pull request file records.'],
@@ -146,6 +146,21 @@ export const adapters = [
           },
         },
       }),
+      endpoint('/github/repos/{owner}/{repo}/pull-requests/new.json', 'Create GitHub pull request', 'Creates a pull request.', ['title', 'head', 'base'], {
+        title: str('Pull request title.'),
+        head: str('Head branch or `owner:branch`.'),
+        base: str('Base branch.'),
+        body: str('Pull request description.'),
+        draft: bool('Whether to create the pull request as a draft.'),
+        maintainerCanModify: bool('Whether maintainers may modify the head branch.'),
+        author: en(['app', 'user'], 'Credential identity selected by the write orchestrator; it is not sent in the GitHub REST body.'),
+      }, { title: 'Implement workspace GitHub writeback', head: 'factory/issue-52', base: 'main', body: 'Created through the authenticated workspace connection.' }),
+      endpoint('/github/repos/{owner}/{repo}/refs/new.json', 'Push GitHub ref', 'Creates or updates a Git ref. Canonical filenames percent-encode the normalized full ref.', ['ref', 'sha'], {
+        ref: str('Full ref or branch name. For updates, it must match the ref encoded in the canonical filename.'),
+        sha: str('Git object SHA already present in the repository.'),
+        force: bool('Allow a non-fast-forward update when writing the canonical ref file.'),
+      }, { ref: 'refs/heads/factory/issue-52', sha: '0123456789abcdef0123456789abcdef01234567' }),
+      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json', 'Close GitHub pull request', 'Closes a pull request without closing an issue.', [], {}, {}),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json', 'pulls/merge', { merge_method: 'squash' }, {
         title: 'Merge GitHub pull request',
         description: 'Merges a pull request. Uses the repository default merge strategy when no merge method is supplied.',
@@ -634,6 +649,16 @@ export const adapters = [
       ['/telegram/updates/<updateId>.json', 'Raw Telegram update envelopes captured by optional history sync.'],
     ],
     endpoints: [
+      // Edits share the send-message discovery schema, so this entry points at
+      // the collection's files instead of emitting its own. It must stay ahead
+      // of the collection route: numeric canonical filenames are edits.
+      endpoint('/telegram/chats/{chatId}/messages/{messageId}.json', 'Edit Telegram message', 'Edits the text and reply markup of a message the bot sent.', ['text'], {
+        text: str('Replacement message text.'),
+        parse_mode: en(['Markdown', 'MarkdownV2', 'HTML'], 'Telegram parse mode for `text`.'),
+        disable_web_page_preview: bool('Whether Telegram should suppress link previews.'),
+        reply_markup: obj('InlineKeyboardMarkup payload.'),
+        business_connection_id: str('Business connection id when editing on behalf of a business account.'),
+      }, undefined, { discoveryPath: '/telegram/chats/{chatId}/messages' }),
       endpoint('/telegram/chats/{chatId}/messages/new.json', 'Send Telegram message', 'Sends a Telegram Bot API message with optional rich reply markup.', [], telegramMessageProps(), { text: 'Replace example Telegram message text.' }, telegramMessageRequirement()),
       endpoint('/telegram/chats/{chatId}/messages/{messageId}/reactions/new.json', 'Set Telegram reaction', 'Sets a Telegram reaction on a message.', [], telegramReactionProps(), { reaction: [{ type: 'emoji', emoji: '👍' }] }, { required: ['reaction'] }),
       endpoint('/telegram/callback-queries/new.json', 'Answer Telegram callback query', 'Answers an inline keyboard callback query.', [], telegramCallbackAnswerProps(), { callback_query_id: 'replace-callback-query-id', text: 'Done' }, { required: ['callback_query_id'], 'x-relayfile-writableSystemFields': ['url'] }),
@@ -797,9 +822,10 @@ export const adapters = [
 ];
 
 function endpoint(path, title, description, required, properties, example, schemaExtra = {}) {
-  const { operations, createSupported, ...schemaOverrides } = schemaExtra;
+  const { operations, createSupported, discoveryPath, ...schemaOverrides } = schemaExtra;
   return {
     path,
+    ...(discoveryPath ? { discoveryPath } : {}),
     schemaPath: path.replace(/new\.json$/, 'new.schema.json'),
     ...(createSupported === false || example === undefined ? { createSupported: false } : {}),
     ...(operations ? { operations } : {}),
