@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/,
     schema: "discovery/clickup/tasks/{taskId}/comments/.schema.json",
     createExample: "discovery/clickup/tasks/{taskId}/comments/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "tasks",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/,
     schema: "discovery/clickup/lists/{listId}/tasks/.schema.json",
     createExample: "discovery/clickup/lists/{listId}/tasks/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "lists",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/,
     schema: "discovery/clickup/folders/{folderId}/lists/.schema.json",
     createExample: "discovery/clickup/folders/{folderId}/lists/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "lists",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/,
     schema: "discovery/clickup/spaces/{spaceId}/lists/.schema.json",
     createExample: "discovery/clickup/spaces/{spaceId}/lists/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "folders",
@@ -47,6 +54,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?[A-Za-z0-9_]+$/,
     schema: "discovery/clickup/spaces/{spaceId}/folders/.schema.json",
     createExample: "discovery/clickup/spaces/{spaceId}/folders/.create.example.json",
+    operations: ["create"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
