@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/hubspot/contacts/.schema.json",
     createExample: "discovery/hubspot/contacts/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "companies",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/hubspot/companies/.schema.json",
     createExample: "discovery/hubspot/companies/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "deals",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/hubspot/deals/.schema.json",
     createExample: "discovery/hubspot/deals/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "tickets",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/hubspot/tickets/.schema.json",
     createExample: "discovery/hubspot/tickets/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
