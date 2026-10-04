@@ -104,6 +104,7 @@ export const adapters = [
     endpoints: [
       contractEndpoint('/github/repos/{owner}/{repo}/issues/new.json', 'issues/create', { title: 'Replace example issue title', body: 'Replace example issue body.', labels: ['triage'] }, {
         title: 'Create GitHub issue',
+        operations: ['create', 'update'],
         description: 'Creates a GitHub issue.',
         schemaOverrides: {
           properties: {
@@ -116,10 +117,12 @@ export const adapters = [
       }),
       contractEndpoint('/github/repos/{owner}/{repo}/issues/{issueNumber}/comments/new.json', 'issues/create-comment', { body: 'Replace example comment body.' }, {
         title: 'Create GitHub issue comment',
+        operations: ['create', 'update'],
         description: 'Creates or updates a GitHub issue comment.',
       }),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/reviews/new.json', 'pulls/create-review', { event: 'COMMENT', body: 'Replace example review body.', comments: [] }, {
         title: 'Submit GitHub pull request review',
+        operations: ['create', 'update', 'delete'],
         description: 'Submits a pull request review with optional inline comments.',
         schemaOverrides: {
           required: ['event', 'body', 'comments'],
@@ -154,17 +157,19 @@ export const adapters = [
         draft: bool('Whether to create the pull request as a draft.'),
         maintainerCanModify: bool('Whether maintainers may modify the head branch.'),
         author: en(['app', 'user'], 'Credential identity selected by the write orchestrator; it is not sent in the GitHub REST body.'),
-      }, { title: 'Implement workspace GitHub writeback', head: 'factory/issue-52', base: 'main', body: 'Created through the authenticated workspace connection.' }),
+      }, { title: 'Implement workspace GitHub writeback', head: 'factory/issue-52', base: 'main', body: 'Created through the authenticated workspace connection.' }, { operations: ['create'] }),
       endpoint('/github/repos/{owner}/{repo}/refs/new.json', 'Push GitHub ref', 'Creates or updates a Git ref. Canonical filenames percent-encode the normalized full ref.', ['ref', 'sha'], {
         ref: str('Full ref or branch name. For updates, it must match the ref encoded in the canonical filename.'),
         sha: str('Git object SHA already present in the repository.'),
         force: bool('Allow a non-fast-forward update when writing the canonical ref file.'),
       }, { ref: 'refs/heads/factory/issue-52', sha: '0123456789abcdef0123456789abcdef01234567' }, {
+        operations: ['create', 'update'],
         idPatternNote: 'The full normalized ref is percent-encoded as one filename segment; filenames that do not decode to this pattern are treated as create drafts.',
       }),
-      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json', 'Close GitHub pull request', 'Closes a pull request without closing an issue.', [], {}, {}),
+      endpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/close.json', 'Close GitHub pull request', 'Closes a pull request without closing an issue.', [], {}, {}, { operations: ['update'] }),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/merge.json', 'pulls/merge', { merge_method: 'squash' }, {
         title: 'Merge GitHub pull request',
+        operations: ['update'],
         description: 'Merges a pull request. Uses the repository default merge strategy when no merge method is supplied.',
         schemaOverrides: {
           type: 'object',
@@ -180,6 +185,7 @@ export const adapters = [
       }),
       contractEndpoint('/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/new.json', 'pulls/create-reply-for-review-comment', { body: 'Replace example reply body.' }, {
         title: 'Reply to GitHub pull request review comment',
+        operations: ['create'],
         description: 'Creates a reply to a top-level pull request review comment thread. Write to a path like `/github/repos/{owner}/{repo}/pulls/{pullNumber}/review-comments/{commentId}/replies/new.json` where {commentId} is the ID of the top-level review comment to reply to.',
       }),
     ],
@@ -856,6 +862,7 @@ function contractEndpoint(path, operationId, example, options = {}) {
     example,
     ...(options.title ? { title: options.title } : {}),
     ...(options.description ? { description: options.description } : {}),
+    ...(options.operations ? { operations: options.operations } : {}),
     contract: {
       operationId,
       ...(options.schemaOverrides ? { schemaOverrides: options.schemaOverrides } : {}),
