@@ -55,7 +55,7 @@ export const adapters = [
     slug: 'clickup',
     title: 'ClickUp adapter',
     overview:
-      'The ClickUp adapter exposes spaces, folders, lists, tasks, and comments under `/clickup`, with writeback routes for creating tasks, lists, folders, and task comments under their parent paths. Updates and deletes use the top-level record paths: write or remove `/clickup/tasks/<taskId>.json`, `/clickup/lists/<listId>.json`, or `/clickup/folders/<folderId>.json`, and write `/clickup/spaces/<spaceId>.json` to update a space.',
+      'The ClickUp adapter exposes spaces, folders, lists, tasks, and comments under `/clickup`, with writeback routes for creating tasks, lists, folders, and task comments.',
     readPaths: [
       ['/clickup/spaces/<spaceId>.json', 'Space records.'],
       ['/clickup/folders/<folderId>.json', 'Folder records.'],
