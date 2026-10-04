@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/zendesk/tickets/{ticketId}/comments/.schema.json",
     createExample: "discovery/zendesk/tickets/{ticketId}/comments/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "tickets",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/zendesk/tickets/.schema.json",
     createExample: "discovery/zendesk/tickets/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "users",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^\d+$/,
     schema: "discovery/zendesk/users/.schema.json",
     createExample: "discovery/zendesk/users/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
