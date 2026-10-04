@@ -673,7 +673,7 @@ export const adapters = [
     slug: 'zendesk',
     title: 'Zendesk adapter',
     overview:
-      'The Zendesk adapter exposes tickets, users, and organizations under `/zendesk`, with writeback routes for creating tickets, ticket comments, and users.',
+      'The Zendesk adapter exposes tickets, users, and organizations under `/zendesk`, with writeback routes for creating, updating, and deleting tickets and users, and for creating ticket comments.',
     readPaths: [
       ['/zendesk/tickets/<ticketId>.json', 'Ticket records.'],
       ['/zendesk/tickets/<ticketId>/comments/<commentId>.json', 'Ticket comment records.'],
