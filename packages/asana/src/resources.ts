@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/asana/tasks/.schema.json",
     createExample: "discovery/asana/tasks/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "projects",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/asana/projects/.schema.json",
     createExample: "discovery/asana/projects/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "sections",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/asana/sections/.schema.json",
     createExample: "discovery/asana/sections/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "sections",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/asana/projects/{projectId}/sections/.schema.json",
     createExample: "discovery/asana/projects/{projectId}/sections/.create.example.json",
+    operations: ["create"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
