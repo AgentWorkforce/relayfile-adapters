@@ -31,6 +31,7 @@ for (const adapter of adapters) {
   // Each endpoint contract must list exactly its declared operations, and no
   // Operations line when none are declared (never a blanket default).
   const renderedOperations = renderedOperationsByResource(adapterMd);
+  const renderedExampleLabels = renderedExampleLabelsByResource(adapterMd);
   for (const endpoint of hasAdapterMd ? adapter.endpoints : []) {
     const resourcePath = endpoint.path.replace(/\/new\.json$/, '');
     const writePath = /\.(?:json|md)$/.test(resourcePath) ? resourcePath : `${resourcePath}/<id>.json`;
@@ -40,6 +41,12 @@ for (const adapter of adapters) {
     const rendered = renderedOperations.get(writePath);
     if (rendered !== expected) {
       failures.push(`${adapter.slug}: .adapter.md Operations for ${writePath} must be ${expected ?? 'omitted'}, found ${rendered ?? 'none'}`);
+    }
+    // Update-only resources ship a payload example, never a create draft.
+    const updateOnlyExample = endpoint.example !== undefined && Array.isArray(endpoint.operations) && !endpoint.operations.includes('create');
+    const exampleLabel = renderedExampleLabels.get(writePath);
+    if (updateOnlyExample && exampleLabel !== 'Payload example') {
+      failures.push(`${adapter.slug}: .adapter.md must label the ${writePath} example as a payload example, found ${exampleLabel ?? 'none'}`);
     }
   }
 
@@ -107,6 +114,17 @@ if (failures.length > 0) {
 }
 
 console.log(`Verified ${adapters.reduce((sum, adapter) => sum + adapter.endpoints.length, 0)} writeback discovery endpoints.`);
+
+function renderedExampleLabelsByResource(adapterMd) {
+  const labels = new Map();
+  for (const section of adapterMd.split(/^### /m).slice(1)) {
+    const resource = section.match(/^Resource: `([^`]+)`$/m)?.[1];
+    if (resource) {
+      labels.set(resource, section.match(/^(Create example|Payload example): /m)?.[1]);
+    }
+  }
+  return labels;
+}
 
 function renderedOperationsByResource(adapterMd) {
   const operations = new Map();
