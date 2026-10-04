@@ -293,6 +293,7 @@ test('keeps the live Telegram message edit route ahead of the send route and sha
   const editPattern = new RegExp(edit.pathPatternSource);
   assert.ok(editPattern.test('/telegram/chats/C123/messages/42.json'));
   assert.ok(!editPattern.test('/telegram/chats/C123/messages/relayfile-writeback--messages-1.json'));
+  assert.ok(new RegExp(send.pathPatternSource).test('/telegram/chats/C123/messages/relayfile-writeback--messages-1.json'));
 });
 
 test('attaches optional layoutManifest-style writeback metadata by static path segments', () => {
