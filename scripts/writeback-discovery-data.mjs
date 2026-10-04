@@ -65,13 +65,13 @@ export const adapters = [
     endpoints: [
       endpoint('/clickup/tasks/{taskId}/comments/new.json', 'Create ClickUp task comment', 'Adds a comment to a ClickUp task.', ['comment_text'], {
         comment_text: str('Comment body. A plain string body is also accepted by the resolver.'),
-      }, { comment_text: 'Replace example comment text.' }),
-      endpoint('/clickup/lists/{listId}/tasks/new.json', 'Create ClickUp task', 'Creates a task in a ClickUp list.', ['name'], clickupTaskProps(), { name: 'Replace example task name' }),
-      endpoint('/clickup/folders/{folderId}/lists/new.json', 'Create ClickUp folder list', 'Creates a list inside a ClickUp folder.', ['name'], clickupListProps(), { name: 'Replace example list name' }),
-      endpoint('/clickup/spaces/{spaceId}/lists/new.json', 'Create ClickUp space list', 'Creates a folderless list inside a ClickUp space.', ['name'], clickupListProps(), { name: 'Replace example list name' }),
+      }, { comment_text: 'Replace example comment text.' }, { operations: ['create'] }),
+      endpoint('/clickup/lists/{listId}/tasks/new.json', 'Create ClickUp task', 'Creates a task in a ClickUp list.', ['name'], clickupTaskProps(), { name: 'Replace example task name' }, { operations: ['create'] }),
+      endpoint('/clickup/folders/{folderId}/lists/new.json', 'Create ClickUp folder list', 'Creates a list inside a ClickUp folder.', ['name'], clickupListProps(), { name: 'Replace example list name' }, { operations: ['create'] }),
+      endpoint('/clickup/spaces/{spaceId}/lists/new.json', 'Create ClickUp space list', 'Creates a folderless list inside a ClickUp space.', ['name'], clickupListProps(), { name: 'Replace example list name' }, { operations: ['create'] }),
       endpoint('/clickup/spaces/{spaceId}/folders/new.json', 'Create ClickUp folder', 'Creates a folder inside a ClickUp space.', ['name'], {
         name: str('Folder name.'),
-      }, { name: 'Replace example folder name' }),
+      }, { name: 'Replace example folder name' }, { operations: ['create'] }),
     ],
   },
   {
