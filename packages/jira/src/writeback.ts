@@ -207,7 +207,9 @@ function buildIssueTransition(issueIdOrKey: string, content: string): JiraWriteb
 
 function buildProjectCreate(content: string): JiraWritebackRequest {
   const body = parseJsonObject(content);
-  rejectReadOnlyFields(body);
+  // `key` is the caller-chosen project key on create (and required), not a
+  // server-managed field; it stays read-only for updates.
+  rejectReadOnlyFields(body, PROJECT_CREATE_WRITABLE_FIELDS);
   for (const required of ['key', 'name', 'projectTypeKey', 'leadAccountId']) {
     if (!readString(body, required)) {
       throw new Error(`project create writeback requires ${required}`);
@@ -334,9 +336,14 @@ function normalizeIssueFields(payload: Record<string, unknown>): Record<string, 
   return pickAllowed(source, ISSUE_FIELD_ALLOWLIST);
 }
 
-function rejectReadOnlyFields(payload: Record<string, unknown>): void {
+const PROJECT_CREATE_WRITABLE_FIELDS: ReadonlySet<string> = new Set(['key']);
+
+function rejectReadOnlyFields(
+  payload: Record<string, unknown>,
+  writable: ReadonlySet<string> = new Set(),
+): void {
   for (const key of Object.keys(payload)) {
-    if (READ_ONLY_FIELDS.has(key)) {
+    if (READ_ONLY_FIELDS.has(key) && !writable.has(key)) {
       throw new ReadOnlyFieldError(key);
     }
   }

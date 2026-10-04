@@ -43,6 +43,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-jira` project create writeback now accepts the required project `key`; previously every project create was rejected as writing a read-only field.
 - Generated `.adapter.md` discovery docs now list `.schema.json` and `.create.example.json` at their real `/discovery/<provider>/...` mount paths instead of unprefixed live-resource paths that 404.
 - `@relayfile/adapter-shortcut` now keeps supported story and epic actions from bundled webhook deliveries that also contain unsupported Shortcut entities, and exposes skipped event types for delivery diagnostics. **Breaking (0.2.0):** `ShortcutNormalizedWebhook` gains a required `skippedEventTypes: string[]`; consumers that construct the type by hand must supply it (`normalizeShortcutWebhook` always does).
 - `@relayfile/adapter-github` pull-index convergence now fails closed when a page cannot be persisted and reports fetched versus persisted row counts separately, preventing exhausted CAS writes from appearing complete.
