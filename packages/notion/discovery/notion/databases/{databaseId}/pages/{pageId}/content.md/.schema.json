@@ -4,10 +4,6 @@
   "type": "object",
   "required": [],
   "properties": {
-    "markdown": {
-      "type": "string",
-      "description": "Plain markdown body written to content.md."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -72,6 +68,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "markdown": {
+      "type": "string",
+      "description": "Plain markdown body written to content.md."
     }
   },
   "additionalProperties": false,

@@ -8,22 +8,6 @@
     "name"
   ],
   "properties": {
-    "account": {
-      "type": "string",
-      "description": "Azure account."
-    },
-    "container": {
-      "type": "string",
-      "description": "Container."
-    },
-    "name": {
-      "type": "string",
-      "description": "Blob name."
-    },
-    "contentBase64": {
-      "type": "string",
-      "description": "Base64 content."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -88,6 +72,22 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "account": {
+      "type": "string",
+      "description": "Azure account."
+    },
+    "container": {
+      "type": "string",
+      "description": "Container."
+    },
+    "name": {
+      "type": "string",
+      "description": "Blob name."
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 content."
     }
   },
   "additionalProperties": false,

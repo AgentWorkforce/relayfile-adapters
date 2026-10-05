@@ -6,18 +6,6 @@
     "endpointUrl"
   ],
   "properties": {
-    "endpointUrl": {
-      "type": "string",
-      "description": "Webhook endpoint URL."
-    },
-    "includedEventTypes": {
-      "type": "array",
-      "description": "Included event types.",
-      "items": {
-        "type": "string",
-        "description": "Azure event type."
-      }
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -82,6 +70,18 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "endpointUrl": {
+      "type": "string",
+      "description": "Webhook endpoint URL."
+    },
+    "includedEventTypes": {
+      "type": "array",
+      "description": "Included event types.",
+      "items": {
+        "type": "string",
+        "description": "Azure event type."
+      }
     }
   },
   "additionalProperties": false,

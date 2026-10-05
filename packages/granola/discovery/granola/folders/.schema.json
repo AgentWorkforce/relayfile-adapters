@@ -6,15 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Folder name.",
-      "minLength": 1
-    },
-    "parent_folder_id": {
-      "type": "string",
-      "description": "Parent Granola folder id (`fol_…`). Omit for a top-level folder."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -79,6 +70,15 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Folder name.",
+      "minLength": 1
+    },
+    "parent_folder_id": {
+      "type": "string",
+      "description": "Parent Granola folder id (`fol_…`). Omit for a top-level folder."
     }
   },
   "additionalProperties": false,

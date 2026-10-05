@@ -9,22 +9,6 @@
     "expirationDateTime"
   ],
   "properties": {
-    "resource": {
-      "type": "string",
-      "description": "Graph resource."
-    },
-    "changeType": {
-      "type": "string",
-      "description": "Graph change type."
-    },
-    "notificationUrl": {
-      "type": "string",
-      "description": "Notification URL."
-    },
-    "expirationDateTime": {
-      "type": "string",
-      "description": "Expiration."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -89,6 +73,22 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "resource": {
+      "type": "string",
+      "description": "Graph resource."
+    },
+    "changeType": {
+      "type": "string",
+      "description": "Graph change type."
+    },
+    "notificationUrl": {
+      "type": "string",
+      "description": "Notification URL."
+    },
+    "expirationDateTime": {
+      "type": "string",
+      "description": "Expiration."
     }
   },
   "additionalProperties": false,

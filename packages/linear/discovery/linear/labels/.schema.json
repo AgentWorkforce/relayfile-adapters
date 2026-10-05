@@ -6,29 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Label name.",
-      "minLength": 1
-    },
-    "description": {
-      "type": "string",
-      "description": "Label description."
-    },
-    "color": {
-      "type": "string",
-      "description": "Label color as a hex string."
-    },
-    "teamId": {
-      "type": "string",
-      "format": "uuid",
-      "description": "Linear team UUID for a team-scoped label. Omit for a workspace-level label."
-    },
-    "parentId": {
-      "type": "string",
-      "format": "uuid",
-      "description": "Parent label UUID for nested labels."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -93,6 +70,29 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Label name.",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Label description."
+    },
+    "color": {
+      "type": "string",
+      "description": "Label color as a hex string."
+    },
+    "teamId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Linear team UUID for a team-scoped label. Omit for a workspace-level label."
+    },
+    "parentId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent label UUID for nested labels."
     }
   },
   "additionalProperties": false,

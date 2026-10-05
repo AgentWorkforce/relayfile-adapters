@@ -6,14 +6,6 @@
     "db"
   ],
   "properties": {
-    "db": {
-      "type": "integer",
-      "description": "Redis database."
-    },
-    "pattern": {
-      "type": "string",
-      "description": "Pattern."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -78,6 +70,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "db": {
+      "type": "integer",
+      "description": "Redis database."
+    },
+    "pattern": {
+      "type": "string",
+      "description": "Pattern."
     }
   },
   "additionalProperties": false,

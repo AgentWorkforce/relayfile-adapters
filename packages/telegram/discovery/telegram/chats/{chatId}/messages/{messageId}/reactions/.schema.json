@@ -6,19 +6,6 @@
     "reaction"
   ],
   "properties": {
-    "reaction": {
-      "type": "array",
-      "description": "Reaction list to set.",
-      "items": {
-        "type": "object",
-        "description": "Telegram ReactionType object, e.g. `{ \"type\": \"emoji\", \"emoji\": \"👍\" }`.",
-        "additionalProperties": true
-      }
-    },
-    "is_big": {
-      "type": "boolean",
-      "description": "Whether Telegram should show a big reaction animation."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -83,6 +70,19 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "reaction": {
+      "type": "array",
+      "description": "Reaction list to set.",
+      "items": {
+        "type": "object",
+        "description": "Telegram ReactionType object, e.g. `{ \"type\": \"emoji\", \"emoji\": \"👍\" }`.",
+        "additionalProperties": true
+      }
+    },
+    "is_big": {
+      "type": "boolean",
+      "description": "Whether Telegram should show a big reaction animation."
     }
   },
   "additionalProperties": false,

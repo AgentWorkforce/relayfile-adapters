@@ -6,17 +6,6 @@
     "issueIds"
   ],
   "properties": {
-    "issueIds": {
-      "type": "array",
-      "description": "Linear issue UUIDs to move into the project.",
-      "items": {
-        "type": "string",
-        "format": "uuid",
-        "description": "Linear issue UUID."
-      },
-      "minItems": 1,
-      "uniqueItems": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -81,6 +70,17 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "issueIds": {
+      "type": "array",
+      "description": "Linear issue UUIDs to move into the project.",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "description": "Linear issue UUID."
+      },
+      "minItems": 1,
+      "uniqueItems": true
     }
   },
   "additionalProperties": false,

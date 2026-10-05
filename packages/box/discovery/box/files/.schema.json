@@ -6,19 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "File name."
-    },
-    "parent": {
-      "type": "object",
-      "description": "Parent folder.",
-      "additionalProperties": true
-    },
-    "contentBase64": {
-      "type": "string",
-      "description": "Base64 content."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -83,6 +70,19 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "File name."
+    },
+    "parent": {
+      "type": "object",
+      "description": "Parent folder.",
+      "additionalProperties": true
+    },
+    "contentBase64": {
+      "type": "string",
+      "description": "Base64 content."
     }
   },
   "additionalProperties": false,

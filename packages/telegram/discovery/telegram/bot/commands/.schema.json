@@ -6,24 +6,6 @@
     "commands"
   ],
   "properties": {
-    "commands": {
-      "type": "array",
-      "description": "Commands to expose in Telegram clients.",
-      "items": {
-        "type": "object",
-        "description": "Telegram BotCommand object with command and description.",
-        "additionalProperties": true
-      }
-    },
-    "scope": {
-      "type": "object",
-      "description": "Optional BotCommandScope object.",
-      "additionalProperties": true
-    },
-    "language_code": {
-      "type": "string",
-      "description": "Optional ISO 639-1 language code."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -88,6 +70,24 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "commands": {
+      "type": "array",
+      "description": "Commands to expose in Telegram clients.",
+      "items": {
+        "type": "object",
+        "description": "Telegram BotCommand object with command and description.",
+        "additionalProperties": true
+      }
+    },
+    "scope": {
+      "type": "object",
+      "description": "Optional BotCommandScope object.",
+      "additionalProperties": true
+    },
+    "language_code": {
+      "type": "string",
+      "description": "Optional ISO 639-1 language code."
     }
   },
   "additionalProperties": false,

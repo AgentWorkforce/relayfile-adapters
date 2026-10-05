@@ -6,10 +6,6 @@
     "comment_text"
   ],
   "properties": {
-    "comment_text": {
-      "type": "string",
-      "description": "Comment body. A plain string body is also accepted by the resolver."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -74,6 +70,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "comment_text": {
+      "type": "string",
+      "description": "Comment body. A plain string body is also accepted by the resolver."
     }
   },
   "additionalProperties": false,

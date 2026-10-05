@@ -6,20 +6,6 @@
     "body"
   ],
   "properties": {
-    "body": {
-      "type": "string",
-      "description": "Comment body.",
-      "minLength": 1
-    },
-    "parentId": {
-      "type": "string",
-      "format": "uuid",
-      "description": "Parent comment UUID for threaded replies."
-    },
-    "doNotSubscribeToIssue": {
-      "type": "boolean",
-      "description": "Whether to avoid subscribing the commenter to the issue."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -84,6 +70,20 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "body": {
+      "type": "string",
+      "description": "Comment body.",
+      "minLength": 1
+    },
+    "parentId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent comment UUID for threaded replies."
+    },
+    "doNotSubscribeToIssue": {
+      "type": "boolean",
+      "description": "Whether to avoid subscribing the commenter to the issue."
     }
   },
   "additionalProperties": false,

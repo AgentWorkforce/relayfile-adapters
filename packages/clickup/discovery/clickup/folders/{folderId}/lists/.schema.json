@@ -6,30 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "List name."
-    },
-    "content": {
-      "type": "string",
-      "description": "List description."
-    },
-    "due_date": {
-      "type": "integer",
-      "description": "Due date as Unix epoch milliseconds."
-    },
-    "priority": {
-      "type": "integer",
-      "description": "ClickUp priority id."
-    },
-    "assignee": {
-      "type": "string",
-      "description": "Assignee user id."
-    },
-    "status": {
-      "type": "string",
-      "description": "List status."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -94,6 +70,30 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "List name."
+    },
+    "content": {
+      "type": "string",
+      "description": "List description."
+    },
+    "due_date": {
+      "type": "integer",
+      "description": "Due date as Unix epoch milliseconds."
+    },
+    "priority": {
+      "type": "integer",
+      "description": "ClickUp priority id."
+    },
+    "assignee": {
+      "type": "string",
+      "description": "Assignee user id."
+    },
+    "status": {
+      "type": "string",
+      "description": "List status."
     }
   },
   "additionalProperties": false,

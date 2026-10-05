@@ -7,18 +7,6 @@
     "Key"
   ],
   "properties": {
-    "Bucket": {
-      "type": "string",
-      "description": "Bucket."
-    },
-    "Key": {
-      "type": "string",
-      "description": "Object key."
-    },
-    "BodyBase64": {
-      "type": "string",
-      "description": "Base64 body."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -83,6 +71,18 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "Bucket": {
+      "type": "string",
+      "description": "Bucket."
+    },
+    "Key": {
+      "type": "string",
+      "description": "Object key."
+    },
+    "BodyBase64": {
+      "type": "string",
+      "description": "Base64 body."
     }
   },
   "additionalProperties": false,

@@ -6,11 +6,6 @@
     "message"
   ],
   "properties": {
-    "message": {
-      "type": "object",
-      "description": "Draft message.",
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -74,6 +69,11 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "message": {
+      "type": "object",
+      "description": "Draft message.",
       "additionalProperties": true
     }
   },

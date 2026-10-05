@@ -6,11 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Subreddit name without the `r/` prefix.",
-      "minLength": 1
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -75,6 +70,11 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Subreddit name without the `r/` prefix.",
+      "minLength": 1
     }
   },
   "additionalProperties": false,

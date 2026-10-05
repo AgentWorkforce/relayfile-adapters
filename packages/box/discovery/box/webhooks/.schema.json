@@ -8,23 +8,6 @@
     "address"
   ],
   "properties": {
-    "target": {
-      "type": "object",
-      "description": "Webhook target.",
-      "additionalProperties": true
-    },
-    "triggers": {
-      "type": "array",
-      "description": "Triggers.",
-      "items": {
-        "type": "string",
-        "description": "Trigger."
-      }
-    },
-    "address": {
-      "type": "string",
-      "description": "Webhook address."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -89,6 +72,23 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "target": {
+      "type": "object",
+      "description": "Webhook target.",
+      "additionalProperties": true
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Triggers.",
+      "items": {
+        "type": "string",
+        "description": "Trigger."
+      }
+    },
+    "address": {
+      "type": "string",
+      "description": "Webhook address."
     }
   },
   "additionalProperties": false,

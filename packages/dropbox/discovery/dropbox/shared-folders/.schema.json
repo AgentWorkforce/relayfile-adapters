@@ -8,12 +8,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "description": "Provider canonical record id.",
+      "description": "Dropbox shared folder id.",
       "readOnly": true
-    },
-    "name": {
-      "type": "string",
-      "description": "Shared folder name."
     },
     "createdAt": {
       "type": "string",
@@ -74,6 +70,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Shared folder name."
     }
   },
   "additionalProperties": false,

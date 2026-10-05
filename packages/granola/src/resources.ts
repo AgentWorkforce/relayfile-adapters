@@ -4,30 +4,32 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
-  readonly sampleIndexPath?: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
-    name: 'notes',
-    path: '/granola/notes',
-    pathPattern: /^\/granola\/notes(?:\/[^/]+(?:\.json)?)?$/,
+    name: "notes",
+    path: "/granola/notes",
+    pathPattern: /^\/granola\/notes(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^not_[A-Za-z0-9]{14}$/,
-    schema: 'discovery/granola/notes/.schema.json',
-    createExample: 'discovery/granola/notes/.create.example.json',
+    schema: "discovery/granola/notes/.schema.json",
+    createExample: "discovery/granola/notes/.create.example.json",
   },
   {
-    name: 'folders',
-    path: '/granola/folders',
-    pathPattern: /^\/granola\/folders(?:\/[^/]+(?:\.json)?)?$/,
+    name: "folders",
+    path: "/granola/folders",
+    pathPattern: /^\/granola\/folders(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^fol_[A-Za-z0-9]{14}$/,
-    schema: 'discovery/granola/folders/.schema.json',
-    createExample: 'discovery/granola/folders/.create.example.json',
+    schema: "discovery/granola/folders/.schema.json",
+    createExample: "discovery/granola/folders/.create.example.json",
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
 export function findResourceByPath(path: string): AdapterResourceConfig | undefined {
-  const normalizedPath = path.endsWith('.json') ? path : path.replace(/\/$/, '');
+  const normalizedPath = path.endsWith(".json") ? path : path.replace(/\/$/, "");
   return resources.find((resource) => resource.pathPattern.test(normalizedPath));
 }

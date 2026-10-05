@@ -8,19 +8,6 @@
     "value"
   ],
   "properties": {
-    "key": {
-      "type": "string",
-      "description": "Redis key."
-    },
-    "type": {
-      "type": "string",
-      "description": "Value type."
-    },
-    "value": {
-      "type": "object",
-      "description": "Value.",
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -84,6 +71,19 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "key": {
+      "type": "string",
+      "description": "Redis key."
+    },
+    "type": {
+      "type": "string",
+      "description": "Value type."
+    },
+    "value": {
+      "type": "object",
+      "description": "Value.",
       "additionalProperties": true
     }
   },

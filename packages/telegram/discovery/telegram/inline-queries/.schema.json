@@ -7,37 +7,6 @@
     "results"
   ],
   "properties": {
-    "inline_query_id": {
-      "type": "string",
-      "description": "Inline query id from `/telegram/inline-queries`."
-    },
-    "results": {
-      "type": "array",
-      "description": "Inline results to return.",
-      "items": {
-        "type": "object",
-        "description": "Telegram InlineQueryResult object.",
-        "additionalProperties": true
-      }
-    },
-    "cache_time": {
-      "type": "integer",
-      "description": "Maximum cache time in seconds.",
-      "minimum": 0
-    },
-    "is_personal": {
-      "type": "boolean",
-      "description": "Whether results are cached only for the requesting user."
-    },
-    "next_offset": {
-      "type": "string",
-      "description": "Pagination offset for the next inline query page."
-    },
-    "button": {
-      "type": "object",
-      "description": "Optional InlineQueryResultsButton object.",
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -101,6 +70,37 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "inline_query_id": {
+      "type": "string",
+      "description": "Inline query id from `/telegram/inline-queries`."
+    },
+    "results": {
+      "type": "array",
+      "description": "Inline results to return.",
+      "items": {
+        "type": "object",
+        "description": "Telegram InlineQueryResult object.",
+        "additionalProperties": true
+      }
+    },
+    "cache_time": {
+      "type": "integer",
+      "description": "Maximum cache time in seconds.",
+      "minimum": 0
+    },
+    "is_personal": {
+      "type": "boolean",
+      "description": "Whether results are cached only for the requesting user."
+    },
+    "next_offset": {
+      "type": "string",
+      "description": "Pagination offset for the next inline query page."
+    },
+    "button": {
+      "type": "object",
+      "description": "Optional InlineQueryResultsButton object.",
       "additionalProperties": true
     }
   },

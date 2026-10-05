@@ -8,16 +8,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "description": "Provider canonical record id.",
+      "description": "Thread id.",
       "readOnly": true
-    },
-    "labelIds": {
-      "type": "array",
-      "description": "Labels.",
-      "items": {
-        "type": "string",
-        "description": "Label id."
-      }
     },
     "createdAt": {
       "type": "string",
@@ -78,6 +70,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "labelIds": {
+      "type": "array",
+      "description": "Labels.",
+      "items": {
+        "type": "string",
+        "description": "Label id."
+      }
     }
   },
   "additionalProperties": false,

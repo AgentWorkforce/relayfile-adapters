@@ -6,32 +6,6 @@
     "type"
   ],
   "properties": {
-    "type": {
-      "enum": [
-        "action",
-        "elicitation",
-        "error",
-        "response",
-        "thought"
-      ],
-      "description": "Linear agent activity content type."
-    },
-    "body": {
-      "type": "string",
-      "description": "Response, thought, elicitation, or error body."
-    },
-    "action": {
-      "type": "string",
-      "description": "Action name for action-type activities."
-    },
-    "parameter": {
-      "type": "string",
-      "description": "Action parameter or target."
-    },
-    "result": {
-      "type": "string",
-      "description": "Action result summary."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -96,6 +70,32 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "type": {
+      "enum": [
+        "action",
+        "elicitation",
+        "error",
+        "response",
+        "thought"
+      ],
+      "description": "Linear agent activity content type."
+    },
+    "body": {
+      "type": "string",
+      "description": "Response, thought, elicitation, or error body."
+    },
+    "action": {
+      "type": "string",
+      "description": "Action name for action-type activities."
+    },
+    "parameter": {
+      "type": "string",
+      "description": "Action parameter or target."
+    },
+    "result": {
+      "type": "string",
+      "description": "Action result summary."
     }
   },
   "additionalProperties": false,

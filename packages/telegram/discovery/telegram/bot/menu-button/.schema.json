@@ -6,15 +6,6 @@
     "menu_button"
   ],
   "properties": {
-    "chat_id": {
-      "type": "string",
-      "description": "Optional chat id. Omit for default menu button."
-    },
-    "menu_button": {
-      "type": "object",
-      "description": "Telegram MenuButton object, such as `{ \"type\": \"commands\" }` or web_app.",
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -78,6 +69,15 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "chat_id": {
+      "type": "string",
+      "description": "Optional chat id. Omit for default menu button."
+    },
+    "menu_button": {
+      "type": "object",
+      "description": "Telegram MenuButton object, such as `{ \"type\": \"commands\" }` or web_app.",
       "additionalProperties": true
     }
   },
