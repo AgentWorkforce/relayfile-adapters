@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -9,6 +9,7 @@ import { loadWritebackContracts } from './writeback-contracts.mjs';
 import {
   escapeMarkdownTableCell,
   fullRecordSchema,
+  manualResourcesTsDrift,
   normalizeLayoutManifest,
   normalizeWritebackDiscoveryAdapter,
   normalizeWritebackDiscoveryData,
@@ -503,6 +504,39 @@ test('generated full-record schemas keep system fields read-only where the data 
     assert.equal(property?.readOnly, true, `${path} ${field}`);
     assert.equal(property?.format, format, `${path} ${field} format`);
   }
+});
+
+test('only reddit opts out of a generated resources.ts', () => {
+  const manual = normalizeWritebackDiscoveryData(adapters).adapters
+    .filter((adapter) => adapter.manualResourcesTs)
+    .map((adapter) => adapter.slug);
+  assert.deepEqual(manual, ['reddit']);
+});
+
+test('manualResourcesTsDrift accepts the hand-written reddit resources.ts', () => {
+  const reddit = normalizeWritebackDiscoveryData(adapters).adapters.find((adapter) => adapter.slug === 'reddit');
+  const resourcesTs = readFileSync(new URL('../packages/reddit/src/resources.ts', import.meta.url), 'utf8');
+  assert.deepEqual(manualResourcesTsDrift(reddit, resourcesTs), []);
+});
+
+test('manualResourcesTsDrift reports name, path, schema, and count drift', () => {
+  const reddit = normalizeWritebackDiscoveryData(adapters).adapters.find((adapter) => adapter.slug === 'reddit');
+  const resourcesTs = readFileSync(new URL('../packages/reddit/src/resources.ts', import.meta.url), 'utf8');
+
+  assert.deepEqual(manualResourcesTsDrift(reddit, resourcesTs.replace("path: '/reddit/subreddits',", "path: '/reddit/subs',")), [
+    "reddit: hand-written src/resources.ts resource 0 path is /reddit/subs, data declares /reddit/subreddits",
+  ]);
+  assert.deepEqual(manualResourcesTsDrift(reddit, resourcesTs.replace("name: 'posts',", "name: 'post',")), [
+    'reddit: hand-written src/resources.ts resource 1 name is post, data declares posts',
+  ]);
+  assert.deepEqual(
+    manualResourcesTsDrift(reddit, resourcesTs.replace("schema: 'discovery/reddit/subreddits/.schema.json',", "schema: 'discovery/reddit/subreddit/.schema.json',")),
+    ['reddit: hand-written src/resources.ts resource 0 schema is discovery/reddit/subreddit/.schema.json, data declares discovery/reddit/subreddits/.schema.json'],
+  );
+  const withoutPosts = resourcesTs.replace(/\n  \{\n    name: 'posts',[\s\S]*?\n  \},/, '');
+  assert.deepEqual(manualResourcesTsDrift(reddit, withoutPosts), [
+    'reddit: hand-written src/resources.ts declares 1 resources, data declares 2',
+  ]);
 });
 
 test('escapeMarkdownTableCell escapes literal pipes inside regex cells', () => {

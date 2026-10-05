@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { adapters } from './writeback-discovery-data.mjs';
+import { manualResourcesTsDrift, normalizeWritebackDiscoveryData } from './writeback-discovery-normalizer.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const failures = [];
@@ -19,6 +20,10 @@ for (const adapter of adapters) {
   const resourcesTs = await readOptionalFile(resourcesTsPath);
   if (!resourcesTs.includes('pathPattern: /') || !resourcesTs.includes('idPattern: /')) {
     failures.push(`${adapter.slug}: src/resources.ts must declare pathPattern and idPattern regexes`);
+  }
+  if (adapter.manualResourcesTs) {
+    const normalizedAdapter = normalizeWritebackDiscoveryData([adapter]).adapters[0];
+    failures.push(...manualResourcesTsDrift(normalizedAdapter, resourcesTs));
   }
 
   const adapterMdPath = join(root, 'packages', adapter.slug, 'discovery', adapter.slug, '.adapter.md');

@@ -15,7 +15,10 @@ const normalizedAdapters = normalizeWritebackDiscoveryData(adapters).adapters;
 for (const adapter of normalizedAdapters) {
   const adapterRoot = join(root, 'packages', adapter.slug, 'discovery', adapter.slug);
   await writeDiscoveryFile(join(adapterRoot, '.adapter.md'), renderAdapterReadme(adapter));
-  await writeDiscoveryFile(join(root, 'packages', adapter.slug, 'src', 'resources.ts'), renderResourcesTs(adapter));
+  // Adapters whose routing patterns the generator cannot express keep a hand-written resources.ts.
+  if (!adapter.manualResourcesTs) {
+    await writeDiscoveryFile(join(root, 'packages', adapter.slug, 'src', 'resources.ts'), renderResourcesTs(adapter));
+  }
 
   for (const endpoint of adapter.endpoints) {
     const resource = endpoint.resource;

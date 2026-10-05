@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -14,7 +17,6 @@ export const resources = [
     pathPattern: /^\/telegram\/chats\/[^\/]+\/messages\/\d+\.json$/,
     idPattern: /^\d+$/,
     schema: "discovery/telegram/chats/{chatId}/messages/.schema.json",
-    createExample: "discovery/telegram/chats/{chatId}/messages/.create.example.json",
   },
   {
     name: "messages",

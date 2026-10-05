@@ -514,6 +514,8 @@ export const adapters = [
   {
     slug: 'reddit',
     title: 'Reddit adapter',
+    // resources.ts is hand-written: its pathPatterns require `.json` and exclude `_index.json`, and it sets sampleIndexPath.
+    manualResourcesTs: true,
     overview:
       'The Reddit adapter exposes tracked subreddits and posts under `/reddit`, with writeback routes for tracking subreddits and creating posts.',
     readPaths: [
