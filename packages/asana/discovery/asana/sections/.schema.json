@@ -7,14 +7,6 @@
     "project"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Section name."
-    },
-    "project": {
-      "type": "string",
-      "description": "Project gid that will contain the section."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -79,6 +71,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Section name."
+    },
+    "project": {
+      "type": "string",
+      "description": "Project gid that will contain the section."
     }
   },
   "additionalProperties": false,

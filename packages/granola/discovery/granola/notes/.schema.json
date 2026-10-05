@@ -6,28 +6,6 @@
     "title"
   ],
   "properties": {
-    "title": {
-      "type": "string",
-      "description": "Note title.",
-      "minLength": 1
-    },
-    "summary_markdown": {
-      "type": "string",
-      "description": "Markdown note body."
-    },
-    "summary_text": {
-      "type": "string",
-      "description": "Plain-text note summary."
-    },
-    "folder_membership": {
-      "type": "array",
-      "description": "Folders the note belongs to.",
-      "items": {
-        "type": "object",
-        "description": "Folder membership entry. Provide the Granola folder `id` (`fol_…`). List `/granola/folders/` to find available folders.",
-        "additionalProperties": true
-      }
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -92,6 +70,28 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "title": {
+      "type": "string",
+      "description": "Note title.",
+      "minLength": 1
+    },
+    "summary_markdown": {
+      "type": "string",
+      "description": "Markdown note body."
+    },
+    "summary_text": {
+      "type": "string",
+      "description": "Plain-text note summary."
+    },
+    "folder_membership": {
+      "type": "array",
+      "description": "Folders the note belongs to.",
+      "items": {
+        "type": "object",
+        "description": "Folder membership entry. Provide the Granola folder `id` (`fol_…`). List `/granola/folders/` to find available folders.",
+        "additionalProperties": true
+      }
     }
   },
   "additionalProperties": false,

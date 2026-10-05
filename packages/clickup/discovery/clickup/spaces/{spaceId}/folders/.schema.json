@@ -6,10 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "Folder name."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -74,6 +70,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Folder name."
     }
   },
   "additionalProperties": false,

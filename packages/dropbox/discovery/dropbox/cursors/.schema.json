@@ -6,14 +6,6 @@
     "cursor"
   ],
   "properties": {
-    "cursor": {
-      "type": "string",
-      "description": "Dropbox cursor."
-    },
-    "accountId": {
-      "type": "string",
-      "description": "Account id."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -78,6 +70,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Dropbox cursor."
+    },
+    "accountId": {
+      "type": "string",
+      "description": "Account id."
     }
   },
   "additionalProperties": false,

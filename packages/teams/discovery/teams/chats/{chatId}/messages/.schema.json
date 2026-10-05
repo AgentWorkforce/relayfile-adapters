@@ -29,35 +29,6 @@
     }
   ],
   "properties": {
-    "body": {
-      "type": "object",
-      "description": "Teams message body.",
-      "properties": {
-        "contentType": {
-          "enum": [
-            "html",
-            "text"
-          ],
-          "description": "Message content type. The adapter sends html by default."
-        },
-        "content": {
-          "type": "string",
-          "description": "Message body content."
-        }
-      },
-      "additionalProperties": true,
-      "required": [
-        "content"
-      ]
-    },
-    "text": {
-      "type": "string",
-      "description": "Plain text or HTML message content. Used when `body.content` is omitted."
-    },
-    "content": {
-      "type": "string",
-      "description": "Plain text or HTML message content. Used when `body.content` and `text` are omitted."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -122,6 +93,35 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "body": {
+      "type": "object",
+      "description": "Teams message body.",
+      "properties": {
+        "contentType": {
+          "enum": [
+            "html",
+            "text"
+          ],
+          "description": "Message content type. The adapter sends html by default."
+        },
+        "content": {
+          "type": "string",
+          "description": "Message body content."
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "content"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "description": "Plain text or HTML message content. Used when `body.content` is omitted."
+    },
+    "content": {
+      "type": "string",
+      "description": "Plain text or HTML message content. Used when `body.content` and `text` are omitted."
     }
   },
   "additionalProperties": false,

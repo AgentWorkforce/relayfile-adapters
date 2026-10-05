@@ -12,43 +12,6 @@
     "pattern": "^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$"
   },
   "properties": {
-    "Name": {
-      "type": "string",
-      "description": "Opportunity name."
-    },
-    "StageName": {
-      "type": "string",
-      "description": "Opportunity stage name."
-    },
-    "CloseDate": {
-      "type": "string",
-      "format": "date",
-      "description": "Expected close date in YYYY-MM-DD form."
-    },
-    "Amount": {
-      "type": "number",
-      "description": "Opportunity amount."
-    },
-    "AccountId": {
-      "type": "string",
-      "description": "Linked Account id."
-    },
-    "Type": {
-      "type": "string",
-      "description": "Opportunity type."
-    },
-    "LeadSource": {
-      "type": "string",
-      "description": "Lead source."
-    },
-    "OwnerId": {
-      "type": "string",
-      "description": "Owner user id."
-    },
-    "Description": {
-      "type": "string",
-      "description": "Opportunity description."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -113,6 +76,43 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "Name": {
+      "type": "string",
+      "description": "Opportunity name."
+    },
+    "StageName": {
+      "type": "string",
+      "description": "Opportunity stage name."
+    },
+    "CloseDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected close date in YYYY-MM-DD form."
+    },
+    "Amount": {
+      "type": "number",
+      "description": "Opportunity amount."
+    },
+    "AccountId": {
+      "type": "string",
+      "description": "Linked Account id."
+    },
+    "Type": {
+      "type": "string",
+      "description": "Opportunity type."
+    },
+    "LeadSource": {
+      "type": "string",
+      "description": "Lead source."
+    },
+    "OwnerId": {
+      "type": "string",
+      "description": "Owner user id."
+    },
+    "Description": {
+      "type": "string",
+      "description": "Opportunity description."
     }
   },
   "additionalProperties": false

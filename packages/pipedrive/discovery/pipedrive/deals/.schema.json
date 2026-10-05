@@ -6,60 +6,6 @@
     "title"
   ],
   "properties": {
-    "title": {
-      "type": "string",
-      "description": "Deal title."
-    },
-    "value": {
-      "type": "number",
-      "description": "Deal value."
-    },
-    "currency": {
-      "type": "string",
-      "description": "Currency code."
-    },
-    "status": {
-      "enum": [
-        "open",
-        "won",
-        "lost",
-        "deleted"
-      ],
-      "description": "Deal status."
-    },
-    "stage_id": {
-      "type": "integer",
-      "description": "Pipeline stage id."
-    },
-    "pipeline_id": {
-      "type": "integer",
-      "description": "Pipeline id."
-    },
-    "person_id": {
-      "type": "integer",
-      "description": "Linked person id."
-    },
-    "org_id": {
-      "type": "integer",
-      "description": "Linked organization id."
-    },
-    "user_id": {
-      "type": "integer",
-      "description": "Owner user id."
-    },
-    "expected_close_date": {
-      "type": "string",
-      "format": "date",
-      "description": "Expected close date in YYYY-MM-DD form."
-    },
-    "probability": {
-      "type": "integer",
-      "description": "Deal probability percentage."
-    },
-    "label": {
-      "type": "string",
-      "description": "Deal label."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -124,6 +70,60 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "title": {
+      "type": "string",
+      "description": "Deal title."
+    },
+    "value": {
+      "type": "number",
+      "description": "Deal value."
+    },
+    "currency": {
+      "type": "string",
+      "description": "Currency code."
+    },
+    "status": {
+      "enum": [
+        "open",
+        "won",
+        "lost",
+        "deleted"
+      ],
+      "description": "Deal status."
+    },
+    "stage_id": {
+      "type": "integer",
+      "description": "Pipeline stage id."
+    },
+    "pipeline_id": {
+      "type": "integer",
+      "description": "Pipeline id."
+    },
+    "person_id": {
+      "type": "integer",
+      "description": "Linked person id."
+    },
+    "org_id": {
+      "type": "integer",
+      "description": "Linked organization id."
+    },
+    "user_id": {
+      "type": "integer",
+      "description": "Owner user id."
+    },
+    "expected_close_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected close date in YYYY-MM-DD form."
+    },
+    "probability": {
+      "type": "integer",
+      "description": "Deal probability percentage."
+    },
+    "label": {
+      "type": "string",
+      "description": "Deal label."
     }
   },
   "additionalProperties": false,

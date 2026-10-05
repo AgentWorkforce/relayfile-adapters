@@ -6,18 +6,6 @@
     "topicName"
   ],
   "properties": {
-    "topicName": {
-      "type": "string",
-      "description": "Pub/Sub topic."
-    },
-    "labelIds": {
-      "type": "array",
-      "description": "Labels.",
-      "items": {
-        "type": "string",
-        "description": "Label id."
-      }
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -82,6 +70,18 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "topicName": {
+      "type": "string",
+      "description": "Pub/Sub topic."
+    },
+    "labelIds": {
+      "type": "array",
+      "description": "Labels.",
+      "items": {
+        "type": "string",
+        "description": "Label id."
+      }
     }
   },
   "additionalProperties": false,

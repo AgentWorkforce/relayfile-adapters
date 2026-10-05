@@ -7,10 +7,6 @@
     "body"
   ],
   "properties": {
-    "body": {
-      "type": "string",
-      "description": "The text of the review comment."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -75,6 +71,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "body": {
+      "type": "string",
+      "description": "The text of the review comment."
     }
   },
   "additionalProperties": false,

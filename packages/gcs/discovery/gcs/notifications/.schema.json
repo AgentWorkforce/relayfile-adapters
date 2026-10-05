@@ -7,14 +7,6 @@
     "topic"
   ],
   "properties": {
-    "bucket": {
-      "type": "string",
-      "description": "Bucket."
-    },
-    "topic": {
-      "type": "string",
-      "description": "Pub/Sub topic."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -79,6 +71,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "bucket": {
+      "type": "string",
+      "description": "Bucket."
+    },
+    "topic": {
+      "type": "string",
+      "description": "Pub/Sub topic."
     }
   },
   "additionalProperties": false,

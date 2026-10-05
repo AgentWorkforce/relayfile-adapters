@@ -6,16 +6,6 @@
     "url"
   ],
   "properties": {
-    "url": {
-      "type": "string",
-      "format": "uri",
-      "description": "Provider URL for the record.",
-      "readOnly": true
-    },
-    "name": {
-      "type": "string",
-      "description": "Shared link name."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -31,6 +21,12 @@
       "type": "string",
       "format": "date-time",
       "description": "Provider last update timestamp.",
+      "readOnly": true
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Dropbox shared link URL.",
       "readOnly": true
     },
     "identifier": {
@@ -74,6 +70,10 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "Shared link name."
     }
   },
   "additionalProperties": false,

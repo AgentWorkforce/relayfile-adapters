@@ -7,18 +7,6 @@
     "address"
   ],
   "properties": {
-    "resourceId": {
-      "type": "string",
-      "description": "Resource id."
-    },
-    "address": {
-      "type": "string",
-      "description": "Webhook address."
-    },
-    "type": {
-      "type": "string",
-      "description": "Channel type."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -83,6 +71,18 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "resourceId": {
+      "type": "string",
+      "description": "Resource id."
+    },
+    "address": {
+      "type": "string",
+      "description": "Webhook address."
+    },
+    "type": {
+      "type": "string",
+      "description": "Channel type."
     }
   },
   "additionalProperties": false,

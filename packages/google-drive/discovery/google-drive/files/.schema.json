@@ -6,22 +6,6 @@
     "name"
   ],
   "properties": {
-    "name": {
-      "type": "string",
-      "description": "File name."
-    },
-    "mimeType": {
-      "type": "string",
-      "description": "MIME type."
-    },
-    "parents": {
-      "type": "array",
-      "description": "Parents.",
-      "items": {
-        "type": "string",
-        "description": "Parent id."
-      }
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -86,6 +70,22 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "name": {
+      "type": "string",
+      "description": "File name."
+    },
+    "mimeType": {
+      "type": "string",
+      "description": "MIME type."
+    },
+    "parents": {
+      "type": "array",
+      "description": "Parents.",
+      "items": {
+        "type": "string",
+        "description": "Parent id."
+      }
     }
   },
   "additionalProperties": false,

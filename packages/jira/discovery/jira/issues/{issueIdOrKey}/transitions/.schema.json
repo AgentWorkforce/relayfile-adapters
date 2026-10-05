@@ -6,20 +6,6 @@
     "transition"
   ],
   "properties": {
-    "transition": {
-      "type": "object",
-      "description": "Jira transition.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Transition id."
-        }
-      },
-      "additionalProperties": true,
-      "required": [
-        "id"
-      ]
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -84,6 +70,20 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "transition": {
+      "type": "object",
+      "description": "Jira transition.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Transition id."
+        }
+      },
+      "additionalProperties": true,
+      "required": [
+        "id"
+      ]
     }
   },
   "additionalProperties": false,

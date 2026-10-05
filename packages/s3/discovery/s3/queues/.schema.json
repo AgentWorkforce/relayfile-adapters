@@ -6,14 +6,6 @@
     "QueueUrl"
   ],
   "properties": {
-    "QueueUrl": {
-      "type": "string",
-      "description": "SQS Queue URL."
-    },
-    "Bucket": {
-      "type": "string",
-      "description": "Bucket."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -78,6 +70,14 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "QueueUrl": {
+      "type": "string",
+      "description": "SQS Queue URL."
+    },
+    "Bucket": {
+      "type": "string",
+      "description": "Bucket."
     }
   },
   "additionalProperties": false,

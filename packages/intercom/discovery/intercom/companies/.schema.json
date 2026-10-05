@@ -4,27 +4,6 @@
   "type": "object",
   "required": [],
   "properties": {
-    "company_id": {
-      "type": "string",
-      "description": "Stable company id."
-    },
-    "name": {
-      "type": "string",
-      "description": "Company name."
-    },
-    "plan": {
-      "type": "string",
-      "description": "Plan name."
-    },
-    "website": {
-      "type": "string",
-      "format": "uri",
-      "description": "Company website URL."
-    },
-    "monthly_spend": {
-      "type": "number",
-      "description": "Monthly spend value."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -89,6 +68,27 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "company_id": {
+      "type": "string",
+      "description": "Stable company id."
+    },
+    "name": {
+      "type": "string",
+      "description": "Company name."
+    },
+    "plan": {
+      "type": "string",
+      "description": "Plan name."
+    },
+    "website": {
+      "type": "string",
+      "format": "uri",
+      "description": "Company website URL."
+    },
+    "monthly_spend": {
+      "type": "number",
+      "description": "Monthly spend value."
     }
   },
   "additionalProperties": false,

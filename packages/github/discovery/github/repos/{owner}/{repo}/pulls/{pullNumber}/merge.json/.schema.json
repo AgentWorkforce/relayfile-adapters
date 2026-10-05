@@ -5,42 +5,6 @@
   "type": "object",
   "required": [],
   "properties": {
-    "commit_title": {
-      "type": "string",
-      "description": "Title for the automatic commit message."
-    },
-    "commit_message": {
-      "type": "string",
-      "description": "Extra detail to append to automatic commit message."
-    },
-    "sha": {
-      "type": "string",
-      "description": "Expected head SHA. GitHub refuses the merge if the pull request head has moved."
-    },
-    "merge_method": {
-      "type": "string",
-      "description": "Merge strategy. When omitted, GitHub uses the repository default.",
-      "enum": [
-        "merge",
-        "squash",
-        "rebase"
-      ]
-    },
-    "metadata": {
-      "type": "object",
-      "description": "Optional submission metadata.",
-      "properties": {
-        "connectionId": {
-          "type": "string",
-          "description": "Relayfile connection id override."
-        },
-        "providerConfigKey": {
-          "type": "string",
-          "description": "GitHub provider config key override."
-        }
-      },
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -104,6 +68,42 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "commit_title": {
+      "type": "string",
+      "description": "Title for the automatic commit message."
+    },
+    "commit_message": {
+      "type": "string",
+      "description": "Extra detail to append to automatic commit message."
+    },
+    "sha": {
+      "type": "string",
+      "description": "Expected head SHA. GitHub refuses the merge if the pull request head has moved."
+    },
+    "merge_method": {
+      "type": "string",
+      "description": "Merge strategy. When omitted, GitHub uses the repository default.",
+      "enum": [
+        "merge",
+        "squash",
+        "rebase"
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional submission metadata.",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "Relayfile connection id override."
+        },
+        "providerConfigKey": {
+          "type": "string",
+          "description": "GitHub provider config key override."
+        }
+      },
       "additionalProperties": true
     }
   },

@@ -8,19 +8,6 @@
     "row"
   ],
   "properties": {
-    "_op": {
-      "type": "string",
-      "description": "Operation."
-    },
-    "primaryKey": {
-      "type": "string",
-      "description": "Primary key column."
-    },
-    "row": {
-      "type": "object",
-      "description": "Row values.",
-      "additionalProperties": true
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -84,6 +71,19 @@
       "type": "object",
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
+      "additionalProperties": true
+    },
+    "_op": {
+      "type": "string",
+      "description": "Operation."
+    },
+    "primaryKey": {
+      "type": "string",
+      "description": "Primary key column."
+    },
+    "row": {
+      "type": "object",
+      "description": "Row values.",
       "additionalProperties": true
     }
   },

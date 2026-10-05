@@ -6,39 +6,6 @@
     "title"
   ],
   "properties": {
-    "title": {
-      "type": "string",
-      "description": "Post title.",
-      "minLength": 1
-    },
-    "text": {
-      "type": "string",
-      "description": "Self-post body. Used when `kind` is `self`."
-    },
-    "link_url": {
-      "type": "string",
-      "format": "uri",
-      "description": "External URL for link posts. Used when `kind` is `link`."
-    },
-    "kind": {
-      "enum": [
-        "self",
-        "link"
-      ],
-      "description": "Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`."
-    },
-    "flair_id": {
-      "type": "string",
-      "description": "Subreddit flair template id."
-    },
-    "nsfw": {
-      "type": "boolean",
-      "description": "Whether the post is marked NSFW."
-    },
-    "spoiler": {
-      "type": "boolean",
-      "description": "Whether the post is marked as a spoiler."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -103,6 +70,39 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "title": {
+      "type": "string",
+      "description": "Post title.",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "description": "Self-post body. Used when `kind` is `self`."
+    },
+    "link_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "External URL for link posts. Used when `kind` is `link`."
+    },
+    "kind": {
+      "enum": [
+        "self",
+        "link"
+      ],
+      "description": "Post kind. Defaults to `link` when `link_url` is provided, otherwise `self`."
+    },
+    "flair_id": {
+      "type": "string",
+      "description": "Subreddit flair template id."
+    },
+    "nsfw": {
+      "type": "boolean",
+      "description": "Whether the post is marked NSFW."
+    },
+    "spoiler": {
+      "type": "boolean",
+      "description": "Whether the post is marked as a spoiler."
     }
   },
   "additionalProperties": false,

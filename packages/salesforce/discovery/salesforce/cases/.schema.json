@@ -10,51 +10,6 @@
     "pattern": "^[A-Za-z][A-Za-z0-9_]*(__(c|r))?$"
   },
   "properties": {
-    "Subject": {
-      "type": "string",
-      "description": "Case subject."
-    },
-    "Description": {
-      "type": "string",
-      "description": "Case description."
-    },
-    "Status": {
-      "type": "string",
-      "description": "Case status."
-    },
-    "Priority": {
-      "type": "string",
-      "description": "Case priority."
-    },
-    "Origin": {
-      "type": "string",
-      "description": "Case origin."
-    },
-    "Type": {
-      "type": "string",
-      "description": "Case type."
-    },
-    "Reason": {
-      "type": "string",
-      "description": "Case reason."
-    },
-    "AccountId": {
-      "type": "string",
-      "description": "Linked Account id."
-    },
-    "ContactId": {
-      "type": "string",
-      "description": "Linked Contact id."
-    },
-    "SuppliedEmail": {
-      "type": "string",
-      "format": "email",
-      "description": "Supplied contact email address."
-    },
-    "OwnerId": {
-      "type": "string",
-      "description": "Owner user id."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -119,6 +74,51 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "Subject": {
+      "type": "string",
+      "description": "Case subject."
+    },
+    "Description": {
+      "type": "string",
+      "description": "Case description."
+    },
+    "Status": {
+      "type": "string",
+      "description": "Case status."
+    },
+    "Priority": {
+      "type": "string",
+      "description": "Case priority."
+    },
+    "Origin": {
+      "type": "string",
+      "description": "Case origin."
+    },
+    "Type": {
+      "type": "string",
+      "description": "Case type."
+    },
+    "Reason": {
+      "type": "string",
+      "description": "Case reason."
+    },
+    "AccountId": {
+      "type": "string",
+      "description": "Linked Account id."
+    },
+    "ContactId": {
+      "type": "string",
+      "description": "Linked Contact id."
+    },
+    "SuppliedEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Supplied contact email address."
+    },
+    "OwnerId": {
+      "type": "string",
+      "description": "Owner user id."
     }
   },
   "additionalProperties": false

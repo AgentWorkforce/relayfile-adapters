@@ -6,18 +6,6 @@
     "body"
   ],
   "properties": {
-    "body": {
-      "type": "string",
-      "description": "Plain-text comment body."
-    },
-    "html_body": {
-      "type": "string",
-      "description": "HTML comment body."
-    },
-    "public": {
-      "type": "boolean",
-      "description": "Whether the comment is public. Defaults to true."
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -82,6 +70,18 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "body": {
+      "type": "string",
+      "description": "Plain-text comment body."
+    },
+    "html_body": {
+      "type": "string",
+      "description": "HTML comment body."
+    },
+    "public": {
+      "type": "boolean",
+      "description": "Whether the comment is public. Defaults to true."
     }
   },
   "additionalProperties": false,

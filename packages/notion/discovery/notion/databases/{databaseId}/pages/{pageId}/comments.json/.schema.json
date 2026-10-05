@@ -16,26 +16,6 @@
     }
   ],
   "properties": {
-    "text": {
-      "type": "string",
-      "description": "Plain text comment body. A raw string body is also accepted by the resolver.",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
-    },
-    "discussionId": {
-      "type": "string",
-      "description": "Optional Notion discussion id to append to."
-    },
-    "richText": {
-      "type": "array",
-      "description": "Optional rich_text array.",
-      "items": {
-        "type": "object",
-        "description": "Notion rich_text object.",
-        "additionalProperties": true
-      },
-      "minItems": 1
-    },
     "id": {
       "type": "string",
       "description": "Provider canonical record id.",
@@ -100,6 +80,26 @@
       "description": "Relayfile connection metadata captured during sync.",
       "readOnly": true,
       "additionalProperties": true
+    },
+    "text": {
+      "type": "string",
+      "description": "Plain text comment body. A raw string body is also accepted by the resolver.",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "discussionId": {
+      "type": "string",
+      "description": "Optional Notion discussion id to append to."
+    },
+    "richText": {
+      "type": "array",
+      "description": "Optional rich_text array.",
+      "items": {
+        "type": "object",
+        "description": "Notion rich_text object.",
+        "additionalProperties": true
+      },
+      "minItems": 1
     }
   },
   "additionalProperties": false,
