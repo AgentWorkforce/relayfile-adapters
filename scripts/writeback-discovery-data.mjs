@@ -541,7 +541,7 @@ export const adapters = [
     slug: 'salesforce',
     title: 'Salesforce adapter',
     overview:
-      'The Salesforce adapter exposes Account, Contact, Opportunity, Lead, and Case sObjects under `/salesforce`, with writeback routes for creating and updating those records.',
+      'The Salesforce adapter exposes Account, Contact, Opportunity, Lead, and Case sObjects under `/salesforce`, with writeback routes for creating, updating, and deleting those records.',
     readPaths: [
       ['/salesforce/accounts/<accountId>.json', 'Account records.'],
       ['/salesforce/contacts/<contactId>.json', 'Contact records.'],
@@ -943,7 +943,7 @@ function hubspotEndpoint(path, title, description, example) {
 
 function salesforceEndpoint(path, title, description, example, required = [], properties = {}) {
   return {
-    ...endpoint(path, title, description, required, properties, example),
+    ...endpoint(path, title, description, required, properties, example, { operations: ['create', 'update', 'delete'] }),
     schema: {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       title,

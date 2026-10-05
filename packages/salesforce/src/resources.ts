@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/,
     schema: "discovery/salesforce/accounts/.schema.json",
     createExample: "discovery/salesforce/accounts/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "contacts",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/,
     schema: "discovery/salesforce/contacts/.schema.json",
     createExample: "discovery/salesforce/contacts/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "opportunities",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/,
     schema: "discovery/salesforce/opportunities/.schema.json",
     createExample: "discovery/salesforce/opportunities/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "leads",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/,
     schema: "discovery/salesforce/leads/.schema.json",
     createExample: "discovery/salesforce/leads/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "cases",
@@ -47,6 +54,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/,
     schema: "discovery/salesforce/cases/.schema.json",
     createExample: "discovery/salesforce/cases/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
