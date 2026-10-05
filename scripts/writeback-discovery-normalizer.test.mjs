@@ -9,10 +9,12 @@ import { loadWritebackContracts } from './writeback-contracts.mjs';
 import {
   escapeMarkdownTableCell,
   fullRecordSchema,
+  generatedPathspecs,
   manualResourcesTsDrift,
   normalizeLayoutManifest,
   normalizeWritebackDiscoveryAdapter,
   normalizeWritebackDiscoveryData,
+  orphanedGeneratedFiles,
 } from './writeback-discovery-normalizer.mjs';
 
 test('loads GitHub writeback operations from a local OpenAPI contract', () => {
@@ -537,6 +539,25 @@ test('manualResourcesTsDrift reports name, path, schema, and count drift', () =>
   assert.deepEqual(manualResourcesTsDrift(reddit, withoutPosts), [
     'reddit: hand-written src/resources.ts declares 1 resources, data declares 2',
   ]);
+});
+
+test('generatedPathspecs covers discovery trees and only generated resources.ts files', () => {
+  assert.deepEqual(generatedPathspecs([{ slug: 'intercom' }, { slug: 'reddit', manualResourcesTs: true }]), [
+    'packages/intercom/discovery/',
+    'packages/intercom/src/resources.ts',
+    'packages/reddit/discovery/',
+  ]);
+});
+
+test('orphanedGeneratedFiles reports tracked files a fresh generation no longer writes', () => {
+  const expected = ['packages/gcs/discovery/gcs/.adapter.md', 'packages/gcs/discovery/gcs/objects/.schema.json'];
+  assert.deepEqual(orphanedGeneratedFiles(expected, expected), []);
+  assert.deepEqual(
+    orphanedGeneratedFiles([...expected, 'packages/gcs/discovery/gcs/notifications/.schema.json', 'packages/gcs/discovery/gcs/notifications/.create.example.json'], expected),
+    ['packages/gcs/discovery/gcs/notifications/.create.example.json', 'packages/gcs/discovery/gcs/notifications/.schema.json'],
+  );
+  // Expected paths built with Windows separators still match git's `/` paths.
+  assert.deepEqual(orphanedGeneratedFiles(expected, expected.map((path) => path.replaceAll('/', '\\'))), []);
 });
 
 test('escapeMarkdownTableCell escapes literal pipes inside regex cells', () => {

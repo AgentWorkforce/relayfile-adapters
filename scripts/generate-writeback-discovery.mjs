@@ -1,5 +1,5 @@
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -10,14 +10,23 @@ import {
 import { adapters } from './writeback-discovery-data.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+// `--out-dir <dir>` writes the generated tree under <dir> instead of the repo,
+// so checks can compute the expected output set without touching the checkout.
+const outDirIndex = process.argv.indexOf('--out-dir');
+const outDirValue = outDirIndex === -1 ? undefined : process.argv[outDirIndex + 1];
+if (outDirIndex !== -1 && (!outDirValue || outDirValue.startsWith('-'))) {
+  console.error('Usage: node scripts/generate-writeback-discovery.mjs [--out-dir <dir>]');
+  process.exit(2);
+}
+const outRoot = outDirValue === undefined ? root : resolve(outDirValue);
 const normalizedAdapters = normalizeWritebackDiscoveryData(adapters).adapters;
 
 for (const adapter of normalizedAdapters) {
-  const adapterRoot = join(root, 'packages', adapter.slug, 'discovery', adapter.slug);
+  const adapterRoot = join(outRoot, 'packages', adapter.slug, 'discovery', adapter.slug);
   await writeDiscoveryFile(join(adapterRoot, '.adapter.md'), renderAdapterReadme(adapter));
   // Adapters whose routing patterns the generator cannot express keep a hand-written resources.ts.
   if (!adapter.manualResourcesTs) {
-    await writeDiscoveryFile(join(root, 'packages', adapter.slug, 'src', 'resources.ts'), renderResourcesTs(adapter));
+    await writeDiscoveryFile(join(outRoot, 'packages', adapter.slug, 'src', 'resources.ts'), renderResourcesTs(adapter));
   }
 
   for (const endpoint of adapter.endpoints) {
@@ -25,16 +34,16 @@ for (const adapter of normalizedAdapters) {
     // The owning endpoint writes shared schema/example files.
     if (resource.sharedDiscovery) continue;
     await writeDiscoveryFile(
-      join(root, 'packages', adapter.slug, 'discovery', resource.schemaPath.slice(1)),
+      join(outRoot, 'packages', adapter.slug, 'discovery', resource.schemaPath.slice(1)),
       `${JSON.stringify(fullRecordSchema(endpoint.schema), null, 2)}\n`,
     );
     if (resource.examplePath && endpoint.example !== undefined) {
       await writeDiscoveryFile(
-        join(root, 'packages', adapter.slug, 'discovery', resource.examplePath.slice(1)),
+        join(outRoot, 'packages', adapter.slug, 'discovery', resource.examplePath.slice(1)),
         `${JSON.stringify(endpoint.example, null, 2)}\n`,
       );
     } else {
-      await removeDiscoveryFile(join(root, 'packages', adapter.slug, 'discovery', `${resource.resourcePath}/.create.example.json`.replace(/^\//, '')));
+      await removeDiscoveryFile(join(outRoot, 'packages', adapter.slug, 'discovery', `${resource.resourcePath}/.create.example.json`.replace(/^\//, '')));
     }
   }
 }

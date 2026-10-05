@@ -68,6 +68,24 @@ export function manualResourcesTsDrift(adapter, resourcesTs) {
   return failures;
 }
 
+// Git pathspecs for every file the generator owns: each data adapter's
+// discovery tree, plus its src/resources.ts unless it is hand-written.
+export function generatedPathspecs(adapters) {
+  return adapters.flatMap((adapter) => [
+    `packages/${adapter.slug}/discovery/`,
+    ...(adapter.manualResourcesTs ? [] : [`packages/${adapter.slug}/src/resources.ts`]),
+  ]);
+}
+
+// Tracked generated files that a fresh generation no longer writes (e.g. the
+// schema of a removed endpoint). Regenerating in place never deletes these.
+// Paths are compared with `/` separators (git's form) so Windows paths match.
+export function orphanedGeneratedFiles(trackedPaths, expectedPaths) {
+  const toPosix = (path) => path.replaceAll('\\', '/');
+  const expected = new Set(expectedPaths.map(toPosix));
+  return trackedPaths.map(toPosix).filter((path) => !expected.has(path)).sort();
+}
+
 export function fullRecordSchema(schema) {
   const writableSystemFields = new Set(schema['x-relayfile-writableSystemFields'] ?? []);
   const systemProperties = {
