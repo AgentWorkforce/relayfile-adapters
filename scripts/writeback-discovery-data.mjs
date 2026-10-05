@@ -331,7 +331,7 @@ export const adapters = [
         projectTypeKey: str('Project type key such as software, business, or service_desk.'),
         leadAccountId: str('Jira account id for the project lead.'),
         description: str('Project description.'),
-        url: str('Project URL.', 'uri'),
+        url: { ...str('Project URL.', 'uri'), readOnly: true },
         assigneeType: str('Default assignee type.'),
       }, { key: 'EX', name: 'Example Project', projectTypeKey: 'software', leadAccountId: 'replace-account-id' }, { operations: ['create', 'update', 'delete'] }),
     ],
@@ -727,8 +727,8 @@ export const adapters = [
     endpoints: [
       endpoint('/dropbox/files/new.json', 'Create Dropbox file', 'Uploads a Dropbox file.', ['path_display'], { path_display: str('Dropbox display path.'), contentBase64: str('Base64 content.'), mode: str('Upload mode.') }, { path_display: '/Team/Notes.md' }),
       endpoint('/dropbox/folders/new.json', 'Create Dropbox folder', 'Creates or updates Dropbox folder metadata.', ['path_display'], { path_display: str('Dropbox display path.'), name: str('Folder name.') }, { path_display: '/Team' }),
-      endpoint('/dropbox/shared-folders/new.json', 'Create Dropbox shared folder marker', 'Creates or updates Dropbox shared folder metadata.', ['id'], { id: str('Dropbox shared folder id.'), name: str('Shared folder name.') }, { id: '845281924' }),
-      endpoint('/dropbox/shared-links/new.json', 'Create Dropbox shared link marker', 'Creates or updates Dropbox shared link metadata.', ['url'], { url: str('Dropbox shared link URL.'), name: str('Shared link name.') }, { url: 'https://www.dropbox.com/scl/fi/example/report.pdf?dl=0' }),
+      endpoint('/dropbox/shared-folders/new.json', 'Create Dropbox shared folder marker', 'Creates or updates Dropbox shared folder metadata.', ['id'], { id: { ...str('Dropbox shared folder id.'), readOnly: true }, name: str('Shared folder name.') }, { id: '845281924' }),
+      endpoint('/dropbox/shared-links/new.json', 'Create Dropbox shared link marker', 'Creates or updates Dropbox shared link metadata.', ['url'], { url: { ...str('Dropbox shared link URL.', 'uri'), readOnly: true }, name: str('Shared link name.') }, { url: 'https://www.dropbox.com/scl/fi/example/report.pdf?dl=0' }),
       endpoint('/dropbox/cursors/new.json', 'Create Dropbox cursor', 'Stores a list_folder cursor.', ['cursor'], { cursor: str('Dropbox cursor.'), accountId: str('Account id.') }, { cursor: 'cursor-2' }),
     ],
   },
@@ -748,7 +748,7 @@ export const adapters = [
     overview: 'The Gmail adapter exposes threads, drafts, and watches with file-native writeback discovery.',
     readPaths: [['/gmail/<account>/threads/<threadId>.json', 'Gmail thread records.']],
     endpoints: [
-      endpoint('/gmail/threads/new.json', 'Create Gmail thread marker', 'Creates or updates a Gmail thread record.', ['id'], { id: str('Thread id.'), labelIds: arr(str('Label id.'), 'Labels.') }, { id: 'thread-1' }),
+      endpoint('/gmail/threads/new.json', 'Create Gmail thread marker', 'Creates or updates a Gmail thread record.', ['id'], { id: { ...str('Thread id.'), readOnly: true }, labelIds: arr(str('Label id.'), 'Labels.') }, { id: 'thread-1' }),
       endpoint('/gmail/drafts/new.json', 'Create Gmail draft', 'Creates a Gmail draft.', ['message'], { message: obj('Draft message.') }, { message: { raw: 'RnJvbTogbWVAZXhhbXBsZS5jb20K' } }),
       endpoint('/gmail/watches/new.json', 'Create Gmail watch', 'Starts a Gmail watch.', ['topicName'], { topicName: str('Pub/Sub topic.'), labelIds: arr(str('Label id.'), 'Labels.') }, { topicName: 'projects/example/topics/gmail' }),
     ],

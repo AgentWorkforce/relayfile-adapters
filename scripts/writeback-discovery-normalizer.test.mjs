@@ -488,6 +488,21 @@ test('fullRecordSchema allows explicitly writable system field names', () => {
   assert.equal(schema.properties.id.readOnly, true);
 });
 
+test('generated full-record schemas keep system fields read-only where the data declares them', () => {
+  const endpoints = normalizeWritebackDiscoveryData(adapters).adapters.flatMap((adapter) => adapter.endpoints);
+  const cases = [
+    ['/jira/projects/new.json', 'url'],
+    ['/dropbox/shared-folders/new.json', 'id'],
+    ['/dropbox/shared-links/new.json', 'url'],
+    ['/gmail/threads/new.json', 'id'],
+  ];
+  for (const [path, field] of cases) {
+    const endpoint = endpoints.find((candidate) => candidate.path === path);
+    assert.ok(endpoint, path);
+    assert.equal(fullRecordSchema(endpoint.schema).properties[field]?.readOnly, true, `${path} ${field}`);
+  }
+});
+
 test('escapeMarkdownTableCell escapes literal pipes inside regex cells', () => {
   assert.equal(escapeMarkdownTableCell('/^(a|b)$/'), '/^(a\\|b)$/');
 });
