@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "pages",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}/meta.json/.create.example.json",
+    operations: ["update","delete"],
   },
   {
     name: "properties",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/{pageId}/properties.json/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}/properties.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "content",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/{pageId}/content.md/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}/content.md/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "comments",
@@ -47,6 +54,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/databases/{databaseId}/pages/{pageId}/comments.json/.schema.json",
     createExample: "discovery/notion/databases/{databaseId}/pages/{pageId}/comments.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "pages",
@@ -55,6 +63,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/pages/{pageId}/meta.json/.schema.json",
     createExample: "discovery/notion/pages/{pageId}/meta.json/.create.example.json",
+    operations: ["update","delete"],
   },
   {
     name: "properties",
@@ -63,6 +72,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/pages/{pageId}/properties.json/.schema.json",
     createExample: "discovery/notion/pages/{pageId}/properties.json/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "content",
@@ -71,6 +81,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/pages/{pageId}/content.md/.schema.json",
     createExample: "discovery/notion/pages/{pageId}/content.md/.create.example.json",
+    operations: ["update"],
   },
   {
     name: "comments",
@@ -79,6 +90,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i,
     schema: "discovery/notion/pages/{pageId}/comments.json/.schema.json",
     createExample: "discovery/notion/pages/{pageId}/comments.json/.create.example.json",
+    operations: ["update"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

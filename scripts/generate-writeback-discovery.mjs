@@ -83,7 +83,7 @@ function renderAdapterReadme(adapter) {
     '## Create Examples',
     'Read the resource `.schema.json` under `/discovery` first, then use the sibling `.create.example.json` as a minimal create document when the resource advertises one. The example intentionally omits read-only fields.',
     ...(adapter.resources.some((resource) => resource.examplePath && exampleLabel(resource) === 'Payload example')
-      ? ['Examples labelled `Payload example` belong to update-only resources: write them to the canonical resource path as an update payload, never as a create draft.']
+      ? ['Examples labelled `Payload example` belong to resources that do not support `create`: write them to the canonical resource path as an update payload, never as a create draft.']
       : []),
     '',
   ];

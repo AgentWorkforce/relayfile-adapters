@@ -466,31 +466,31 @@ export const adapters = [
         properties: obj('Serialized Notion property map. Each property value should match the adapter property serializer shape.'),
         children: arr(obj('Notion block object.'), 'Optional child blocks for the new page.'),
         markdown: str('Optional markdown body. When present the adapter uses the Notion markdown API version.'),
-      }, { properties: { Name: { type: 'title', value: 'Replace example page title' } } }),
+      }, { properties: { Name: { type: 'title', value: 'Replace example page title' } } }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/meta.json', 'Update Notion database page properties', 'Updates properties, archive state, icon, or cover for a page inside a Notion database.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
-      }, notionPagePatchRequirement()),
+      }, { ...notionPagePatchRequirement(), operations: ['update', 'delete'] }),
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/properties.json', 'Update Notion database page properties file', 'Updates properties, archive state, icon, or cover through a database page properties sidecar.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
-      }, notionPagePatchRequirement()),
+      }, { ...notionPagePatchRequirement(), operations: ['update'] }),
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/content.md', 'Replace Notion database page markdown', 'Replaces the rendered markdown body for a page inside a Notion database.', [], {
         markdown: str('Plain markdown body written to content.md.'),
-      }, { markdown: '# Replace page content' }),
+      }, { markdown: '# Replace page content' }, { operations: ['update'] }),
       endpoint('/notion/databases/{databaseId}/pages/{pageId}/comments.json', 'Create Notion database page comment', 'Creates a Notion comment on a page inside a Notion database from comments.json.', [], notionCommentProps(), {
         text: 'Replace example comment body.',
-      }, notionCommentRequirement()),
+      }, { ...notionCommentRequirement(), operations: ['update'] }),
       endpoint('/notion/pages/{pageId}/meta.json', 'Update Notion standalone page properties', 'Updates properties, archive state, icon, or cover for a standalone page.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
-      }, notionPagePatchRequirement()),
+      }, { ...notionPagePatchRequirement(), operations: ['update', 'delete'] }),
       endpoint('/notion/pages/{pageId}/properties.json', 'Update Notion standalone page properties file', 'Updates properties, archive state, icon, or cover through a standalone page properties sidecar.', [], notionPagePatchProps(), {
         properties: { Status: { type: 'select', value: 'In progress' } },
-      }, notionPagePatchRequirement()),
+      }, { ...notionPagePatchRequirement(), operations: ['update'] }),
       endpoint('/notion/pages/{pageId}/content.md', 'Replace Notion standalone page markdown', 'Replaces the rendered markdown body for a standalone page.', [], {
         markdown: str('Plain markdown body written to content.md.'),
-      }, { markdown: '# Replace page content' }),
+      }, { markdown: '# Replace page content' }, { operations: ['update'] }),
       endpoint('/notion/pages/{pageId}/comments.json', 'Create Notion standalone page comment', 'Creates a Notion comment on a standalone page from comments.json.', [], notionCommentProps(), {
         text: 'Replace example comment body.',
-      }, notionCommentRequirement()),
+      }, { ...notionCommentRequirement(), operations: ['update'] }),
     ],
   },
   {
