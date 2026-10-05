@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9_-]+$/,
     schema: "discovery/intercom/conversations/.schema.json",
     createExample: "discovery/intercom/conversations/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "contacts",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9_-]+$/,
     schema: "discovery/intercom/contacts/.schema.json",
     createExample: "discovery/intercom/contacts/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "companies",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9_-]+$/,
     schema: "discovery/intercom/companies/.schema.json",
     createExample: "discovery/intercom/companies/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

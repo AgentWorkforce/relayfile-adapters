@@ -261,7 +261,7 @@ export const adapters = [
     slug: 'intercom',
     title: 'Intercom adapter',
     overview:
-      'The Intercom adapter exposes conversations, contacts, and companies under `/intercom`, with writeback routes for creating and updating those objects.',
+      'The Intercom adapter exposes conversations, contacts, and companies under `/intercom`, with writeback routes for creating, updating, and deleting those objects.',
     readPaths: [
       ['/intercom/conversations/<conversationId>.json', 'Conversation records.'],
       ['/intercom/contacts/<contactId>.json', 'Contact records.'],
@@ -272,21 +272,21 @@ export const adapters = [
         from: obj('Message author. Include the shape required by Intercom for the selected source type.'),
         body: str('Conversation body.'),
         message_type: str('Conversation message type.'),
-      }, { from: { type: 'user', id: 'replace-user-id' }, body: 'Replace example conversation body.' }),
+      }, { from: { type: 'user', id: 'replace-user-id' }, body: 'Replace example conversation body.' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/intercom/contacts/new.json', 'Create Intercom contact', 'Creates an Intercom contact.', [], {
         role: str('Contact role, such as user or lead.'),
         email: str('Contact email address.', 'email'),
         name: str('Contact display name.'),
         external_id: str('External id for upsert-style workflows.'),
         phone: str('Contact phone number.'),
-      }, { role: 'user', email: 'ada@example.com' }),
+      }, { role: 'user', email: 'ada@example.com' }, { operations: ['create', 'update', 'delete'] }),
       endpoint('/intercom/companies/new.json', 'Create Intercom company', 'Creates an Intercom company.', [], {
         company_id: str('Stable company id.'),
         name: str('Company name.'),
         plan: str('Plan name.'),
         website: str('Company website URL.', 'uri'),
         monthly_spend: num('Monthly spend value.'),
-      }, { company_id: 'example-company', name: 'Example Inc' }),
+      }, { company_id: 'example-company', name: 'Example Inc' }, { operations: ['create', 'update', 'delete'] }),
     ],
   },
   {
