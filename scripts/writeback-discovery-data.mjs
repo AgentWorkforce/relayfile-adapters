@@ -497,7 +497,7 @@ export const adapters = [
     slug: 'pipedrive',
     title: 'Pipedrive adapter',
     overview:
-      'The Pipedrive adapter exposes deals, persons, organizations, and activities under `/pipedrive`, with writeback routes for creating and updating those objects.',
+      'The Pipedrive adapter exposes deals, persons, organizations, and activities under `/pipedrive`, with writeback routes for creating, updating, and deleting those objects.',
     readPaths: [
       ['/pipedrive/deals/<dealId>.json', 'Deal records.'],
       ['/pipedrive/persons/<personId>.json', 'Person records.'],
@@ -505,10 +505,10 @@ export const adapters = [
       ['/pipedrive/activities/<activityId>.json', 'Activity records.'],
     ],
     endpoints: [
-      endpoint('/pipedrive/deals/new.json', 'Create Pipedrive deal', 'Creates a Pipedrive deal.', ['title'], pipedriveDealProps(), { title: 'Replace example deal title' }),
-      endpoint('/pipedrive/persons/new.json', 'Create Pipedrive person', 'Creates a Pipedrive person.', ['name'], pipedrivePersonProps(), { name: 'Replace example person name' }),
-      endpoint('/pipedrive/organizations/new.json', 'Create Pipedrive organization', 'Creates a Pipedrive organization.', ['name'], pipedriveOrganizationProps(), { name: 'Replace example organization name' }),
-      endpoint('/pipedrive/activities/new.json', 'Create Pipedrive activity', 'Creates a Pipedrive activity.', ['subject'], pipedriveActivityProps(), { subject: 'Replace example activity subject' }),
+      endpoint('/pipedrive/deals/new.json', 'Create Pipedrive deal', 'Creates a Pipedrive deal.', ['title'], pipedriveDealProps(), { title: 'Replace example deal title' }, { operations: ['create', 'update', 'delete'] }),
+      endpoint('/pipedrive/persons/new.json', 'Create Pipedrive person', 'Creates a Pipedrive person.', ['name'], pipedrivePersonProps(), { name: 'Replace example person name' }, { operations: ['create', 'update', 'delete'] }),
+      endpoint('/pipedrive/organizations/new.json', 'Create Pipedrive organization', 'Creates a Pipedrive organization.', ['name'], pipedriveOrganizationProps(), { name: 'Replace example organization name' }, { operations: ['create', 'update', 'delete'] }),
+      endpoint('/pipedrive/activities/new.json', 'Create Pipedrive activity', 'Creates a Pipedrive activity.', ['subject'], pipedriveActivityProps(), { subject: 'Replace example activity subject' }, { operations: ['create', 'update', 'delete'] }),
     ],
   },
   {

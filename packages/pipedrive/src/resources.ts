@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/pipedrive/deals/.schema.json",
     createExample: "discovery/pipedrive/deals/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "persons",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/pipedrive/persons/.schema.json",
     createExample: "discovery/pipedrive/persons/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "organizations",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/pipedrive/organizations/.schema.json",
     createExample: "discovery/pipedrive/organizations/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "activities",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.~-]+--)?\d+$/,
     schema: "discovery/pipedrive/activities/.schema.json",
     createExample: "discovery/pipedrive/activities/.create.example.json",
+    operations: ["create","update","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
