@@ -491,15 +491,17 @@ test('fullRecordSchema allows explicitly writable system field names', () => {
 test('generated full-record schemas keep system fields read-only where the data declares them', () => {
   const endpoints = normalizeWritebackDiscoveryData(adapters).adapters.flatMap((adapter) => adapter.endpoints);
   const cases = [
-    ['/jira/projects/new.json', 'url'],
-    ['/dropbox/shared-folders/new.json', 'id'],
-    ['/dropbox/shared-links/new.json', 'url'],
-    ['/gmail/threads/new.json', 'id'],
+    ['/jira/projects/new.json', 'url', 'uri'],
+    ['/dropbox/shared-folders/new.json', 'id', undefined],
+    ['/dropbox/shared-links/new.json', 'url', 'uri'],
+    ['/gmail/threads/new.json', 'id', undefined],
   ];
-  for (const [path, field] of cases) {
+  for (const [path, field, format] of cases) {
     const endpoint = endpoints.find((candidate) => candidate.path === path);
     assert.ok(endpoint, path);
-    assert.equal(fullRecordSchema(endpoint.schema).properties[field]?.readOnly, true, `${path} ${field}`);
+    const property = fullRecordSchema(endpoint.schema).properties[field];
+    assert.equal(property?.readOnly, true, `${path} ${field}`);
+    assert.equal(property?.format, format, `${path} ${field} format`);
   }
 });
 
