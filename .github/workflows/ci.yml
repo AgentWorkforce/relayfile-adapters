@@ -35,3 +35,6 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Writeback discovery regeneration is in sync
+        run: npm run check:writeback-discovery-regen

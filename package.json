@@ -14,6 +14,7 @@
     "test:publish-targets": "node --test scripts/resolve-publish-targets.test.mjs",
     "test:internal-dependencies": "node scripts/sync-internal-dependencies.mjs --check",
     "test:writeback-discovery": "node --test scripts/writeback-discovery-normalizer.test.mjs && node scripts/verify-writeback-discovery.mjs",
+    "check:writeback-discovery-regen": "node scripts/check-writeback-discovery-regen.mjs",
     "test:digest-contracts": "node --test scripts/digest-layout-contracts.test.mjs && node scripts/digest-layout-contracts.mjs",
     "test:writeback-e2e": "node scripts/verify-file-native-writeback-e2e.mjs",
     "typecheck": "npx turbo typecheck",
