@@ -35,6 +35,7 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
     title: adapter.title,
     overview: adapter.overview,
     ...(adapter.mountLabel ? { mountLabel: adapter.mountLabel } : {}),
+    ...(adapter.manualResourcesTs ? { manualResourcesTs: true } : {}),
     readPaths: adapter.readPaths.map(([path, description]) => [path, description]),
     ...(layoutManifest ? { layoutManifest } : {}),
     endpoints,
