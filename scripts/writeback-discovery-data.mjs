@@ -606,7 +606,7 @@ export const adapters = [
     slug: 'slack',
     title: 'Slack adapter',
     overview:
-      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions. Direct messages use `/slack/users/<userId>/messages` as the product contract for both reads and writes; Slack internal `D...` IM channel ids stay in record payload metadata. It also advertises history-independent discovery lookup indexes for Slack channel and user ids under `/discovery/slack`.',
+      'The Slack adapter exposes channels, users, messages, threads, replies, files, and reactions under `/slack`, with writeback routes for posting channel messages, direct messages, replies, and reactions, editing and deleting channel messages and replies, and removing reactions. Direct messages use `/slack/users/<userId>/messages` as the product contract for both reads and writes; Slack internal `D...` IM channel ids stay in record payload metadata. It also advertises history-independent discovery lookup indexes for Slack channel and user ids under `/discovery/slack`.',
     readPaths: [
       ['/slack/channels/<channelId>.json', 'Channel records.'],
       ['/slack/channels/<channelId>/messages/<messageTs>/meta.json', 'Message records.'],
@@ -618,14 +618,14 @@ export const adapters = [
       ['/discovery/slack/users/_index.json', 'History-independent user id/name lookup rows for direct-message writeback context, materialized from Slack user discovery syncs.'],
     ],
     endpoints: [
-      endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, slackContentRequirement()),
-      endpoint('/slack/users/{userId}/messages/new.json', 'Post Slack direct message', 'Opens or reuses a direct message conversation and posts a Slack message.', [], slackDirectMessageProps(), { text: 'Replace example direct message text.' }, slackContentRequirement()),
-      endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }, slackContentRequirement()),
+      endpoint('/slack/channels/{channelId}/messages/new.json', 'Post Slack message', 'Posts a top-level Slack message.', [], slackMessageProps(), { text: 'Replace example message text.' }, { ...slackContentRequirement(), operations: ['create', 'update', 'delete'] }),
+      endpoint('/slack/users/{userId}/messages/new.json', 'Post Slack direct message', 'Opens or reuses a direct message conversation and posts a Slack message.', [], slackDirectMessageProps(), { text: 'Replace example direct message text.' }, { ...slackContentRequirement(), operations: ['create'] }),
+      endpoint('/slack/channels/{channelId}/messages/{messageTs}/replies/new.json', 'Post Slack thread reply', 'Posts a reply in a Slack thread.', [], { ...slackMessageProps(), reply_broadcast: bool('Whether Slack should also broadcast the reply to the channel.') }, { text: 'Replace example reply text.' }, { ...slackContentRequirement(), operations: ['create', 'update', 'delete'] }),
       endpoint('/slack/channels/{channelId}/messages/{messageTs}/reactions/new.json', 'Add Slack reaction', 'Adds an emoji reaction to a Slack message.', [], {
         name: str('Emoji name without surrounding colons. `reaction` is also accepted.'),
         reaction: str('Alias for `name`.'),
         channel: str('Optional Slack channel id override.'),
-      }, { name: 'eyes' }, { anyOf: [{ required: ['name'] }, { required: ['reaction'] }] }),
+      }, { name: 'eyes' }, { anyOf: [{ required: ['name'] }, { required: ['reaction'] }], operations: ['create', 'delete'] }),
     ],
   },
   {

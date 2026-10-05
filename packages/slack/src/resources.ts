@@ -4,8 +4,11 @@ export interface AdapterResourceConfig {
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
-  readonly createExample: string;
+  readonly createExample?: string;
+  readonly operations?: readonly AdapterResourceOperation[];
 }
+
+export type AdapterResourceOperation = "create" | "update" | "delete";
 
 export const resources = [
   {
@@ -15,6 +18,7 @@ export const resources = [
     idPattern: /^(?:meta|(?:[A-Za-z0-9_.:-]+--)?\d{10,}(?:_\d+)?)$/,
     schema: "discovery/slack/channels/{channelId}/messages/.schema.json",
     createExample: "discovery/slack/channels/{channelId}/messages/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "direct-messages",
@@ -23,6 +27,7 @@ export const resources = [
     idPattern: /^$/,
     schema: "discovery/slack/users/{userId}/messages/.schema.json",
     createExample: "discovery/slack/users/{userId}/messages/.create.example.json",
+    operations: ["create"],
   },
   {
     name: "replies",
@@ -31,6 +36,7 @@ export const resources = [
     idPattern: /^(?:[A-Za-z0-9_.:-]+--)?\d{10,}(?:_\d+)?$/,
     schema: "discovery/slack/channels/{channelId}/messages/{messageTs}/replies/.schema.json",
     createExample: "discovery/slack/channels/{channelId}/messages/{messageTs}/replies/.create.example.json",
+    operations: ["create","update","delete"],
   },
   {
     name: "reactions",
@@ -39,6 +45,7 @@ export const resources = [
     idPattern: /^[A-Za-z0-9_.:-]+(?:--[A-Za-z0-9_.:-]+)*$/,
     schema: "discovery/slack/channels/{channelId}/messages/{messageTs}/reactions/.schema.json",
     createExample: "discovery/slack/channels/{channelId}/messages/{messageTs}/reactions/.create.example.json",
+    operations: ["create","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 
