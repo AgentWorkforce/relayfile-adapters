@@ -79,9 +79,11 @@ export function generatedPathspecs(adapters) {
 
 // Tracked generated files that a fresh generation no longer writes (e.g. the
 // schema of a removed endpoint). Regenerating in place never deletes these.
+// Paths are compared with `/` separators (git's form) so Windows paths match.
 export function orphanedGeneratedFiles(trackedPaths, expectedPaths) {
-  const expected = new Set(expectedPaths);
-  return trackedPaths.filter((path) => !expected.has(path)).sort();
+  const toPosix = (path) => path.replaceAll('\\', '/');
+  const expected = new Set(expectedPaths.map(toPosix));
+  return trackedPaths.map(toPosix).filter((path) => !expected.has(path)).sort();
 }
 
 export function fullRecordSchema(schema) {

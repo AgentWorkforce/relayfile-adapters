@@ -13,7 +13,12 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 // `--out-dir <dir>` writes the generated tree under <dir> instead of the repo,
 // so checks can compute the expected output set without touching the checkout.
 const outDirIndex = process.argv.indexOf('--out-dir');
-const outRoot = outDirIndex === -1 ? root : resolve(process.argv[outDirIndex + 1]);
+const outDirValue = outDirIndex === -1 ? undefined : process.argv[outDirIndex + 1];
+if (outDirIndex !== -1 && (!outDirValue || outDirValue.startsWith('-'))) {
+  console.error('Usage: node scripts/generate-writeback-discovery.mjs [--out-dir <dir>]');
+  process.exit(2);
+}
+const outRoot = outDirValue === undefined ? root : resolve(outDirValue);
 const normalizedAdapters = normalizeWritebackDiscoveryData(adapters).adapters;
 
 for (const adapter of normalizedAdapters) {

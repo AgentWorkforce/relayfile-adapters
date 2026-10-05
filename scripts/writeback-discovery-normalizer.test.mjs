@@ -556,6 +556,8 @@ test('orphanedGeneratedFiles reports tracked files a fresh generation no longer 
     orphanedGeneratedFiles([...expected, 'packages/gcs/discovery/gcs/notifications/.schema.json', 'packages/gcs/discovery/gcs/notifications/.create.example.json'], expected),
     ['packages/gcs/discovery/gcs/notifications/.create.example.json', 'packages/gcs/discovery/gcs/notifications/.schema.json'],
   );
+  // Expected paths built with Windows separators still match git's `/` paths.
+  assert.deepEqual(orphanedGeneratedFiles(expected, expected.map((path) => path.replaceAll('/', '\\'))), []);
 });
 
 test('escapeMarkdownTableCell escapes literal pipes inside regex cells', () => {
