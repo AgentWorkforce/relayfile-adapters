@@ -43,6 +43,31 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
   };
 }
 
+// The generator skips resources.ts for adapters marked `manualResourcesTs`, so
+// check the fields it would have written (name, path, schema) still match the
+// data, in order. Returns failure messages; empty when the file is in sync.
+export function manualResourcesTsDrift(adapter, resourcesTs) {
+  const read = (field) => [...resourcesTs.matchAll(new RegExp(`^\\s*${field}:\\s*(['"])(.*?)\\1,`, 'gm'))].map((match) => match[2]);
+  const names = read('name');
+  const paths = read('path');
+  const schemas = read('schema');
+  const failures = [];
+  const label = `${adapter.slug}: hand-written src/resources.ts`;
+  if (names.length !== adapter.resources.length) {
+    failures.push(`${label} declares ${names.length} resources, data declares ${adapter.resources.length}`);
+  }
+  adapter.resources.slice(0, names.length).forEach((resource, index) => {
+    const expected = { name: resource.name, path: resource.resourcePath, schema: `discovery${resource.schemaPath}` };
+    const actual = { name: names[index], path: paths[index], schema: schemas[index] };
+    for (const field of ['name', 'path', 'schema']) {
+      if (actual[field] !== expected[field]) {
+        failures.push(`${label} resource ${index} ${field} is ${actual[field]}, data declares ${expected[field]}`);
+      }
+    }
+  });
+  return failures;
+}
+
 export function fullRecordSchema(schema) {
   const writableSystemFields = new Set(schema['x-relayfile-writableSystemFields'] ?? []);
   const systemProperties = {
