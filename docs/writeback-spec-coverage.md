@@ -8,7 +8,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 
 | Adapter | Contract source | Contract-backed endpoints | Inline endpoints | Notes |
 |---|---|---:|---:|---|
-| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 5 | 3 | `issues/create`, `issues/create-comment`, `pulls/create-review`, `pulls/merge`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. Pull request create, ref push, and pull request close (`close.json`) use inline JS schemas. |
+| github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 5 | 3 | `issues/create`, `issues/create-comment`, `pulls/create-review`, `pulls/merge`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. Pull request create, ref push, and pull request close (`close.json`) use inline JS schemas. The separate `/labels` helper confirms caller-resolved label requests and does not add file-native resources or schemas. |
 | asana | None | 0 | 4 | Inline JS schemas. |
 | azure-blob | None | 0 | 2 | Inline JS schemas. |
 | box | None | 0 | 2 | Inline JS schemas. |

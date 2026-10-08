@@ -46,6 +46,11 @@
       "types": "./dist/webhook-identity.d.ts",
       "import": "./dist/webhook-identity.js",
       "default": "./dist/webhook-identity.js"
+    },
+    "./labels": {
+      "types": "./dist/labels.d.ts",
+      "import": "./dist/labels.js",
+      "default": "./dist/labels.js"
     }
   },
   "files": [

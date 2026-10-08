@@ -9,6 +9,8 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
+- `@relayfile/adapter-github/labels` now confirms repository-label ensures and single issue-label additions/removals, including existing-label repair and absent-label verification, through an injected transport.
+
 - `@relayfile/adapter-slack` now exports `slackChannelIdFromPathSegment` so channel-scoped watch matchers and writeback share ID recovery across current, legacy, and bare channel paths.
 - `@relayfile/adapter-linear` now owns cursor-safe AgentActivity reconciliation so consumers can prevent duplicate terminal activities after ambiguous provider writes.
 - `@relayfile/adapter-github/webhook-identity` now exports fail-closed check-run pull-request identity parsing for API and HTML URLs, including repository ownership validation for webhook consumers.
