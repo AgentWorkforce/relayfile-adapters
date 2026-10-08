@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   build-and-test:
-    if: (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || github.head_ref == 'trunk'
     name: Build & Test
     runs-on: ubuntu-latest
     steps:
