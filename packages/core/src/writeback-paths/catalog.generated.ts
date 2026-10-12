@@ -49,6 +49,26 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
+  "bitbucket": {
+    "issues": [
+      {
+        "path": "/bitbucket/repositories/{workspace}/{repository}/issues",
+        "params": [
+          "workspace",
+          "repository"
+        ]
+      }
+    ],
+    "pull-requests": [
+      {
+        "path": "/bitbucket/repositories/{workspace}/{repository}/pull-requests",
+        "params": [
+          "workspace",
+          "repository"
+        ]
+      }
+    ]
+  },
   "box": {
     "files": [
       {

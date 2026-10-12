@@ -14,6 +14,9 @@ export const asanaClient = (opts?: RelayClientOptions): ProviderClient<'asana'> 
 export const azureBlobClient = (opts?: RelayClientOptions): ProviderClient<'azure-blob'> =>
   providerClient('azure-blob', opts);
 
+export const bitbucketClient = (opts?: RelayClientOptions): ProviderClient<'bitbucket'> =>
+  providerClient('bitbucket', opts);
+
 export const boxClient = (opts?: RelayClientOptions): ProviderClient<'box'> =>
   providerClient('box', opts);
 
