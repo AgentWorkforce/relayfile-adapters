@@ -10,7 +10,6 @@ export const BITBUCKET_SUPPORTED_EVENTS = [
   'repo:push', 'repo:updated', 'repo:deleted',
   'pullrequest:created', 'pullrequest:updated', 'pullrequest:fulfilled', 'pullrequest:rejected',
   'pullrequest:comment_created', 'pullrequest:comment_deleted',
-  'issue:created', 'issue:updated', 'issue:comment_created',
   'repo:commit_status_created', 'repo:commit_status_updated',
 ] as const;
 

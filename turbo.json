@@ -53,6 +53,7 @@
         "build",
         "@relayfile/adapter-airtable#build",
         "@relayfile/adapter-asana#build",
+        "@relayfile/adapter-bitbucket#build",
         "@relayfile/adapter-calendly#build",
         "@relayfile/adapter-clickup#build",
         "@relayfile/adapter-cloudflare#build",

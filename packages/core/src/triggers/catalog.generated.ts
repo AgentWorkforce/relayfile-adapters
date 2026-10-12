@@ -43,9 +43,6 @@ export const KNOWN_TRIGGER_CATALOG = {
     "file.updated"
   ],
   "bitbucket": [
-    "issue:comment_created",
-    "issue:created",
-    "issue:updated",
     "pullrequest:comment_created",
     "pullrequest:comment_deleted",
     "pullrequest:created",
