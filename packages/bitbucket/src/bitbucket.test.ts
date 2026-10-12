@@ -33,5 +33,9 @@ describe('Bitbucket adapter', () => {
       return [{ id: '1', timestamp: '2026-10-12T12:00:00Z', action: 'file.updated', canonicalPath: '/bitbucket/repositories/acme/api/pull-requests/7.json', content: { state: 'MERGED' } }];
     } });
     assert.match(section?.bullets[0]?.text ?? '', /was merged/);
+    const pipeline = await digest({ provider: 'bitbucket', window: { from: '2026-10-12T00:00:00Z', to: '2026-10-13T00:00:00Z' }, async changeEvents() {
+      return [{ id: '2', timestamp: '2026-10-12T12:00:00Z', action: 'file.updated', canonicalPath: '/bitbucket/repositories/acme/api/pipelines/%7Bpipe%7D.json', content: { state: { name: 'COMPLETED' } } }];
+    } });
+    assert.match(pipeline?.bullets[0]?.text ?? '', /was completed/);
   });
 });
