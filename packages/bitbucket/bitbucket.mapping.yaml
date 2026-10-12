@@ -1,0 +1,20 @@
+adapter:
+  name: bitbucket
+  version: "1.0.0"
+  baseUrl: https://api.bitbucket.org/2.0
+webhooks:
+  "repo:push": {}
+  "repo:updated": {}
+  "repo:deleted": {}
+  "pullrequest:created": {}
+  "pullrequest:updated": {}
+  "pullrequest:fulfilled": {}
+  "pullrequest:rejected": {}
+  "pullrequest:comment_created": {}
+  "pullrequest:comment_deleted": {}
+  "issue:created": {}
+  "issue:updated": {}
+  "issue:comment_created": {}
+  "repo:commit_status_created": {}
+  "repo:commit_status_updated": {}
+resources: {}
