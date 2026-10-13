@@ -54,6 +54,7 @@ describe('Bitbucket adapter', () => {
     assert.equal(index[0].title, 'Newer commit');
     assert.equal(index[0].updated, '2026-10-12T12:00:00Z');
     assert.equal(index[0].canonicalPath, '/bitbucket/repositories/acme/api/commits/newer.json');
+    assert.ok(files.has(index[0].canonicalPath));
     assert.deepEqual(JSON.parse(files.get('/bitbucket/repositories/acme/api/commits/_index.json') ?? 'null'), index);
     assert.ok(files.has('/bitbucket/commits/by-id/acme%2Fapi%3Anewer.json'));
     const root = JSON.parse(files.get('/bitbucket/_index.json') ?? 'null');
@@ -91,14 +92,29 @@ describe('Bitbucket adapter', () => {
     const alias = '/bitbucket/commits/by-id/acme%2Fapi%3Aabc.json';
     assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketCommit', records: [record] })).errors, []);
     assert.ok(files.has(alias));
+    assert.ok(files.has('/bitbucket/repositories/acme/api/commits/abc.json'));
     const tombstones = bitbucketRecordBucketing.bucketRecords([
       { id: record.id, _nango_metadata: { last_action: 'deleted' } },
     ], 'BitbucketCommit').commits ?? [];
     assert.deepEqual(tombstones, [{ id: record.id, _deleted: true }]);
     assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketCommit', records: tombstones })).errors, []);
     assert.equal(files.has(alias), false);
+    assert.equal(files.has('/bitbucket/repositories/acme/api/commits/abc.json'), false);
     assert.deepEqual(JSON.parse(files.get('/bitbucket/commits/_index.json') ?? 'null'), []);
     assert.deepEqual(JSON.parse(files.get('/bitbucket/repositories/acme/api/commits/_index.json') ?? 'null'), []);
+  });
+
+  it('allows Cloud to own canonical writes without duplicate events', async () => {
+    const files = new Map<string, string>();
+    const client = {
+      async readFile(input: { path: string }) { return files.has(input.path) ? { content: files.get(input.path)! } : null; },
+      async writeFile(input: { path: string; content: string }) { files.set(input.path, input.content); },
+    };
+    const record = { id: 'acme/api:7', pullrequest_id: 7, title: 'Ship', repository: 'acme/api' };
+    const result = await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPullRequest', records: [record], emitCanonical: false });
+    assert.deepEqual(result.errors, []);
+    assert.equal(files.has(computeBitbucketPath('BitbucketPullRequest', record)), false);
+    assert.ok(files.has('/bitbucket/pull-requests/by-id/acme%2Fapi%3A7.json'));
   });
 
   it('reconciles lifecycle and ownership aliases on update and deletion', async () => {

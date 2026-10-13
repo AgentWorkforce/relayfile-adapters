@@ -18,7 +18,7 @@ interface IndexRow {
 
 export async function emitBitbucketAuxiliaryFiles(
   client: AuxiliaryEmitterClient,
-  input: { workspaceId: string; model: string; records: readonly Record<string, unknown>[] },
+  input: { workspaceId: string; model: string; records: readonly Record<string, unknown>[]; emitCanonical?: boolean },
 ): Promise<EmitAuxiliaryFilesResult> {
   const result: EmitAuxiliaryFilesResult = { written: 0, deleted: 0, errors: [] };
   const type = normalizeNangoBitbucketModel(input.model);
@@ -101,7 +101,7 @@ export async function emitBitbucketAuxiliaryFiles(
       if (previousCanonicalPath && previousCanonicalPath !== canonicalPath) scopedIndex(previousCanonicalPath).remove(id);
       const lookupPaths = bitbucketLookupAliasPaths(input.model, record);
       const content = `${JSON.stringify(record, null, 2)}\n`;
-      for (const path of [aliasPath, ...lookupPaths]) {
+      for (const path of [...(input.emitCanonical === false ? [] : [canonicalPath]), aliasPath, ...lookupPaths]) {
         await client.writeFile({ workspaceId: input.workspaceId, path, content, contentType });
         result.written += 1;
       }
