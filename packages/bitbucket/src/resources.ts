@@ -12,7 +12,7 @@ interface AdapterResourceConfig {
 export const resources = [
   {
     name: 'pull-requests', path: '/bitbucket/repositories/{workspace}/{repository}/pull-requests',
-    sampleIndexPath: '/bitbucket/pull-requests',
+    sampleIndexPath: '/bitbucket/pull-requests/_index.json',
     pathPattern: /^\/bitbucket\/repositories\/[^/]+\/[^/]+\/pull-requests\/[^/]+\.json$/u,
     idPattern: /^\d+$/u,
     schema: 'discovery/bitbucket/repositories/{workspace}/{repository}/pull-requests/.schema.json',

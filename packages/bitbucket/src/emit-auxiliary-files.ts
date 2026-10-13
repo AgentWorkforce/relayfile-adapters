@@ -4,7 +4,7 @@ import {
   type AuxiliaryEmitterClient,
   type EmitAuxiliaryFilesResult,
 } from '@relayfile/adapter-core';
-import { bitbucketByIdPath, computeBitbucketPath, normalizeNangoBitbucketModel } from './path-mapper.js';
+import { bitbucketByIdPath, bitbucketLookupAliasPaths, computeBitbucketPath, normalizeNangoBitbucketModel } from './path-mapper.js';
 
 const contentType = EMIT_AUXILIARY_JSON_CONTENT_TYPE;
 
@@ -47,19 +47,44 @@ export async function emitBitbucketAuxiliaryFiles(
       continue;
     }
     try {
-      const canonicalPath = computeBitbucketPath(input.model, record);
       const aliasPath = bitbucketByIdPath(input.model, record);
+      let prior: Record<string, unknown> | null = null;
+      if (client.readFile) {
+        try {
+          const existing = await client.readFile({ workspaceId: input.workspaceId, path: aliasPath });
+          if (existing?.content) prior = JSON.parse(existing.content) as Record<string, unknown>;
+        } catch (error) {
+          result.errors.push({ path: aliasPath, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+      const previousPaths = prior ? bitbucketLookupAliasPaths(input.model, prior) : [];
       if (deleted) {
         index.remove(id);
         if (client.deleteFile) {
-          await client.deleteFile({ workspaceId: input.workspaceId, path: aliasPath });
-          result.deleted += 1;
+          for (const path of [aliasPath, ...previousPaths]) {
+            await client.deleteFile({ workspaceId: input.workspaceId, path });
+            result.deleted += 1;
+          }
+        } else {
+          result.errors.push({ path: aliasPath, error: 'Bitbucket deletion requires deleteFile' });
         }
         continue;
       }
+      const canonicalPath = computeBitbucketPath(input.model, record);
+      const lookupPaths = bitbucketLookupAliasPaths(input.model, record);
       const content = `${JSON.stringify(record, null, 2)}\n`;
-      await client.writeFile({ workspaceId: input.workspaceId, path: aliasPath, content, contentType });
-      result.written += 1;
+      for (const path of [aliasPath, ...lookupPaths]) {
+        await client.writeFile({ workspaceId: input.workspaceId, path, content, contentType });
+        result.written += 1;
+      }
+      if (client.deleteFile) {
+        for (const path of previousPaths.filter((previousPath) => !lookupPaths.includes(previousPath))) {
+          await client.deleteFile({ workspaceId: input.workspaceId, path });
+          result.deleted += 1;
+        }
+      } else if (previousPaths.some((previousPath) => !lookupPaths.includes(previousPath))) {
+        result.errors.push({ path: aliasPath, error: 'Bitbucket alias reconciliation requires deleteFile' });
+      }
       index.upsert({
         id,
         canonicalPath,

@@ -49,6 +49,10 @@ List pull requests: jq '.[] | {title, canonicalPath}' /bitbucket/pull-requests/_
 Find merged work: jq '.[] | select(.state == "MERGED")' /bitbucket/pull-requests/_index.json
 Read a record by following the canonicalPath from an index, or use its stable
 encoded id in /bitbucket/pull-requests/by-id/.
+Pull requests and historical issues also have by-state, by-assignee,
+by-creator, and by-priority mirrors when those fields are present. Pipelines
+and deployments have by-status mirrors. Lookup paths use a normalized bucket
+and an encoded stable id; stale mirrors are removed on lifecycle changes.
 `,
   };
 }

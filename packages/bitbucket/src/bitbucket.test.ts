@@ -6,6 +6,7 @@ import { BITBUCKET_SUPPORTED_EVENTS, normalizeBitbucketWebhook } from './webhook
 import { emitBitbucketAuxiliaryFiles } from './emit-auxiliary-files.js';
 import { bitbucketLayoutPromptFile } from './layout-prompt.js';
 import { resources } from './resources.js';
+import { bitbucketRecordBucketing } from './sync-bucketing.js';
 
 describe('Bitbucket adapter', () => {
   const repository = { full_name: 'acme/api', uuid: '{repo}', workspace: { slug: 'acme' } };
@@ -28,6 +29,9 @@ describe('Bitbucket adapter', () => {
 
   it('maps workspace projects independently of repositories', () => {
     assert.equal(computeBitbucketPath('BitbucketProject', { id: '{project}', workspace: 'acme', key: 'OPS' }), '/bitbucket/workspaces/acme/projects/OPS.json');
+    assert.equal(computeBitbucketPath('BitbucketProject', { id: '{project}', workspace: { slug: 'acme', uuid: '{workspace}' }, key: 'OPS' }), '/bitbucket/workspaces/acme/projects/OPS.json');
+    assert.equal(computeBitbucketPath('BitbucketPullRequest', { id: 'acme/api:7', pullrequest_id: 7, repository: { full_name: 'acme/api' } }), '/bitbucket/repositories/acme/api/pull-requests/7.json');
+    assert.equal(computeBitbucketPath('BitbucketPullRequest', { id: 'acme/api:7', pullrequest_id: 7, workspace: { slug: 'acme' }, repo_slug: 'api' }), '/bitbucket/repositories/acme/api/pull-requests/7.json');
   });
 
   it('emits discoverable indexes with titles, update times, and stable canonical anchors', async () => {
@@ -66,6 +70,66 @@ describe('Bitbucket adapter', () => {
     assert.ok(resources.every((resource) => resource.name !== ('issues' as string)));
     assert.ok(resources.every((resource) => resource.operations.length === 0));
     assert.ok(!layout.content.includes('/issues/.schema.json'));
+    assert.equal(resources[0]?.sampleIndexPath, '/bitbucket/pull-requests/_index.json');
+  });
+
+  it('removes ID-only tombstones from the index and by-id alias', async () => {
+    const files = new Map<string, string>();
+    const client = {
+      async readFile(input: { path: string }) { return files.has(input.path) ? { content: files.get(input.path)! } : null; },
+      async writeFile(input: { path: string; content: string }) { files.set(input.path, input.content); },
+      async deleteFile(input: { path: string }) { files.delete(input.path); },
+    };
+    const record = { id: 'acme/api:abc', hash: 'abc', repository: 'acme/api' };
+    const alias = '/bitbucket/commits/by-id/acme%2Fapi%3Aabc.json';
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketCommit', records: [record] })).errors, []);
+    assert.ok(files.has(alias));
+    const tombstones = bitbucketRecordBucketing.bucketRecords([
+      { id: record.id, _nango_metadata: { last_action: 'deleted' } },
+    ], 'BitbucketCommit').commits ?? [];
+    assert.deepEqual(tombstones, [{ id: record.id, _deleted: true }]);
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketCommit', records: tombstones })).errors, []);
+    assert.equal(files.has(alias), false);
+    assert.deepEqual(JSON.parse(files.get('/bitbucket/commits/_index.json') ?? 'null'), []);
+  });
+
+  it('reconciles lifecycle and ownership aliases on update and deletion', async () => {
+    const files = new Map<string, string>();
+    const client = {
+      async readFile(input: { path: string }) { return files.has(input.path) ? { content: files.get(input.path)! } : null; },
+      async writeFile(input: { path: string; content: string }) { files.set(input.path, input.content); },
+      async deleteFile(input: { path: string }) { files.delete(input.path); },
+    };
+    const open = { id: 'acme/api:7', pullrequest_id: 7, repository: 'acme/api', state: 'OPEN', author: { nickname: 'alice' } };
+    const merged = { ...open, state: 'MERGED', author: { nickname: 'bob' } };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPullRequest', records: [open] })).errors, []);
+    assert.ok(files.has('/bitbucket/pull-requests/by-state/open/acme%2Fapi%3A7.json'));
+    assert.ok(files.has('/bitbucket/pull-requests/by-creator/alice/acme%2Fapi%3A7.json'));
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPullRequest', records: [merged] })).errors, []);
+    assert.equal(files.has('/bitbucket/pull-requests/by-state/open/acme%2Fapi%3A7.json'), false);
+    assert.equal(files.has('/bitbucket/pull-requests/by-creator/alice/acme%2Fapi%3A7.json'), false);
+    assert.ok(files.has('/bitbucket/pull-requests/by-state/merged/acme%2Fapi%3A7.json'));
+    assert.ok(files.has('/bitbucket/pull-requests/by-creator/bob/acme%2Fapi%3A7.json'));
+    const issue = { id: 'acme/api:8', issue_id: 8, repository: 'acme/api', state: 'open', assignee: { nickname: 'alice' }, reporter: { nickname: 'bob' }, priority: 'major' };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketIssue', records: [issue] })).errors, []);
+    for (const path of ['by-state/open', 'by-assignee/alice', 'by-creator/bob', 'by-priority/major']) {
+      assert.ok(files.has(`/bitbucket/issues/${path}/acme%2Fapi%3A8.json`));
+    }
+    const secondIssue = { ...issue, id: 'acme/api:9', issue_id: 9 };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketIssue', records: [secondIssue] })).errors, []);
+    for (const path of ['by-state/open', 'by-assignee/alice', 'by-creator/bob', 'by-priority/major']) {
+      assert.ok(files.has(`/bitbucket/issues/${path}/acme%2Fapi%3A8.json`));
+      assert.ok(files.has(`/bitbucket/issues/${path}/acme%2Fapi%3A9.json`));
+    }
+    const pipeline = { id: 'acme/api:{pipe}', uuid: '{pipe}', repository: 'acme/api', state: { name: 'COMPLETED' } };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPipeline', records: [pipeline] })).errors, []);
+    assert.ok(files.has('/bitbucket/pipelines/by-status/completed/acme%2Fapi%3A%7Bpipe%7D.json'));
+    const deployment = { id: 'acme/api:{deploy}', uuid: '{deploy}', repository: 'acme/api', state: { name: 'COMPLETED' } };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketDeployment', records: [deployment] })).errors, []);
+    assert.ok(files.has('/bitbucket/deployments/by-status/completed/acme%2Fapi%3A%7Bdeploy%7D.json'));
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPullRequest', records: [{ id: merged.id, _deleted: true }] })).errors, []);
+    assert.equal(files.has('/bitbucket/pull-requests/by-state/merged/acme%2Fapi%3A7.json'), false);
+    assert.equal(files.has('/bitbucket/pull-requests/by-creator/bob/acme%2Fapi%3A7.json'), false);
   });
 
   it('declares upstream event names and classifies terminal digest states', async () => {
