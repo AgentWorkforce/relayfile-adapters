@@ -49,26 +49,6 @@ export const WRITEBACK_PATH_CATALOG = {
       }
     ]
   },
-  "bitbucket": {
-    "issues": [
-      {
-        "path": "/bitbucket/repositories/{workspace}/{repository}/issues",
-        "params": [
-          "workspace",
-          "repository"
-        ]
-      }
-    ],
-    "pull-requests": [
-      {
-        "path": "/bitbucket/repositories/{workspace}/{repository}/pull-requests",
-        "params": [
-          "workspace",
-          "repository"
-        ]
-      }
-    ]
-  },
   "box": {
     "files": [
       {
@@ -1295,6 +1275,12 @@ export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [
     "packageName": "@relayfile/adapter-airtable",
     "packagePath": "packages/airtable",
     "provider": "airtable",
+    "reason": "No resources.ts with writeback path templates"
+  },
+  {
+    "packageName": "@relayfile/adapter-bitbucket",
+    "packagePath": "packages/bitbucket",
+    "provider": "bitbucket",
     "reason": "No resources.ts with writeback path templates"
   },
   {
