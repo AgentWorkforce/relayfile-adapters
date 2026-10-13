@@ -22,8 +22,7 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     ],
     "detection": {
       "headerAny": [
-        "x-event-key",
-        "x-hub-signature"
+        "x-event-key"
       ]
     },
     "logicalKey": {
@@ -442,4 +441,4 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     }
   }
 ] as const;
-export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:814c51981672b886b6336cb602444bd15a474ab02719054dcd32d330cc4057dc" as const;
+export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:52af479ac4a927bf96a4bc881b9ea6c5a90b2170512a2c7cdd1463798660476f" as const;

@@ -1,6 +1,6 @@
 {
   "schema": "relayfile.inbound-capability-catalog/1",
-  "catalogVersion": "sha256:814c51981672b886b6336cb602444bd15a474ab02719054dcd32d330cc4057dc",
+  "catalogVersion": "sha256:52af479ac4a927bf96a4bc881b9ea6c5a90b2170512a2c7cdd1463798660476f",
   "capabilities": [
     {
       "schema": "relayfile.inbound-capability/1",
@@ -17,8 +17,7 @@
       ],
       "detection": {
         "headerAny": [
-          "x-event-key",
-          "x-hub-signature"
+          "x-event-key"
         ]
       },
       "logicalKey": {

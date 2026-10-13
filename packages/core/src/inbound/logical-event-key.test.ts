@@ -178,6 +178,24 @@ test("GitLab Hookdeck uses the provider event UUID before Hookdeck delivery fall
   assert.equal(result.evidence.providerDeliveryId, "gitlab-event-123");
 });
 
+test("Bitbucket Hookdeck detection does not claim a generic signature header", () => {
+  const input = {
+    source: "hookdeck" as const,
+    headers: { "X-Hub-Signature": "sha256=abc123" },
+    payload: {},
+    rawBody: encoder.encode("{}"),
+  };
+
+  assert.equal(resolveInboundCapability(input), undefined);
+  assert.equal(
+    resolveInboundCapability({
+      ...input,
+      headers: { ...input.headers, "X-Event-Key": "pullrequest:fulfilled" },
+    })?.id,
+    "bitbucket.hookdeck",
+  );
+});
+
 test("Hookdeck capabilities without provider delivery headers key on Hookdeck id before semantic fallback", async () => {
   const capability = defineHookdeckInboundCapability({
     id: "ramp.hookdeck",

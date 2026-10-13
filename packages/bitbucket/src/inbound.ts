@@ -18,7 +18,7 @@ export const inboundCapabilities = defineInboundCapabilities([
     providerId: 'bitbucket',
     pathRoot: '/bitbucket',
     providerConfigAliases,
-    detectionHeaders: ['x-event-key', 'x-hub-signature'],
+    detectionHeaders: ['x-event-key'],
     providerDeliveryIdHeaders: ['x-request-uuid'],
     hookdeckDeliveryIdHeaders: ['x-hookdeck-eventid'],
   }),
