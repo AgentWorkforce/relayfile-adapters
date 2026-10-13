@@ -9,6 +9,73 @@ import type { InboundCapabilityDeclaration } from "./types.js";
 export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[] = [
   {
     "schema": "relayfile.inbound-capability/1",
+    "id": "bitbucket.hookdeck",
+    "providerId": "bitbucket",
+    "pathRoot": "/bitbucket",
+    "providerConfigAliases": [
+      "bitbucket",
+      "bitbucket-relay"
+    ],
+    "source": "hookdeck",
+    "eventKinds": [
+      "webhook"
+    ],
+    "detection": {
+      "headerAny": [
+        "x-event-key"
+      ]
+    },
+    "logicalKey": {
+      "version": "1",
+      "strategies": [
+        "provider-delivery-id",
+        "hookdeck-delivery-id",
+        "semantic-payload"
+      ],
+      "providerDeliveryIdHeaders": [
+        "x-request-uuid"
+      ],
+      "hookdeckDeliveryIdHeaders": [
+        "x-hookdeck-eventid"
+      ],
+      "unknownEventFallback": "raw-body",
+      "semanticPayload": "canonical-json-v1"
+    }
+  },
+  {
+    "schema": "relayfile.inbound-capability/1",
+    "id": "bitbucket.nango",
+    "providerId": "bitbucket",
+    "pathRoot": "/bitbucket",
+    "providerConfigAliases": [
+      "bitbucket",
+      "bitbucket-relay"
+    ],
+    "source": "nango",
+    "eventKinds": [
+      "forward",
+      "sync",
+      "webhook"
+    ],
+    "logicalKey": {
+      "version": "1",
+      "strategies": [
+        "provider-delivery-id",
+        "nango-sync-page",
+        "semantic-payload"
+      ],
+      "providerDeliveryIdHeaders": [
+        "x-nango-delivery-id",
+        "x-nango-webhook-id",
+        "x-nango-id",
+        "webhook-id"
+      ],
+      "unknownEventFallback": "raw-body",
+      "semanticPayload": "canonical-json-v1"
+    }
+  },
+  {
+    "schema": "relayfile.inbound-capability/1",
     "id": "github.nango",
     "providerId": "github",
     "pathRoot": "/github",
@@ -374,4 +441,4 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     }
   }
 ] as const;
-export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:cb738d3754b9e68781d6ee3092345d3109afbfd889497f413640d2be1039ad10" as const;
+export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:52af479ac4a927bf96a4bc881b9ea6c5a90b2170512a2c7cdd1463798660476f" as const;

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bitbucket pull request",
+  "description": "Read-only synchronized Bitbucket Cloud pull request record.",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Stable workspace/repository-qualified Relayfile ID.", "readOnly": true },
+    "pullrequest_id": { "type": "integer", "description": "Repository-local pull request number.", "readOnly": true },
+    "repository": { "type": "string", "description": "Workspace and repository slug.", "readOnly": true },
+    "workspace": { "type": "string", "description": "Workspace slug.", "readOnly": true },
+    "title": { "type": "string", "description": "Pull request title.", "readOnly": true },
+    "state": { "type": "string", "enum": ["OPEN", "MERGED", "DECLINED", "SUPERSEDED"], "description": "Provider lifecycle state.", "readOnly": true },
+    "created_on": { "type": "string", "format": "date-time", "readOnly": true },
+    "updated_on": { "type": "string", "format": "date-time", "readOnly": true }
+  },
+  "required": ["id", "pullrequest_id", "repository", "title"]
+}

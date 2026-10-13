@@ -11,6 +11,7 @@ Contract-backed means the endpoint uses `contractEndpoint(...)`, loads its reque
 | github | OpenAPI snapshot in `scripts/integration-contracts/github/source/openapi.yaml`, selected by `scripts/integration-contracts/github/writeback.openapi.json` | 5 | 3 | `issues/create`, `issues/create-comment`, `pulls/create-review`, `pulls/merge`, and `pulls/create-reply-for-review-comment` are spec-backed with small relayfile overlays. Pull request create, ref push, and pull request close (`close.json`) use inline JS schemas. |
 | asana | None | 0 | 4 | Inline JS schemas. |
 | azure-blob | None | 0 | 2 | Inline JS schemas. |
+| bitbucket | None | 0 | 0 | Sync and webhook records are readable; retired native Issues have no writable contract. Pull-request discovery is sampled from synced records, but no file-native writeback executor is shipped. |
 | box | None | 0 | 2 | Inline JS schemas. |
 | clickup | None | 0 | 5 | Inline JS schemas. |
 | confluence | None | 0 | 2 | Inline JS schemas. |
