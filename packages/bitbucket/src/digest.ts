@@ -17,12 +17,16 @@ export const digest = createDigestHandler({
     const content = event.content && typeof event.content === 'object' ? event.content as Record<string, unknown> : null;
     const payload = content?.payload && typeof content.payload === 'object' ? content.payload as Record<string, unknown> : content;
     const rawState = payload?.state;
-    const state = String(rawState && typeof rawState === 'object' ?
-      (rawState as Record<string, unknown>).name ?? (rawState as Record<string, unknown>).type ?? '' : rawState ?? '').toLowerCase();
+    const stateObject = rawState && typeof rawState === 'object' && !Array.isArray(rawState) ? rawState as Record<string, unknown> : null;
+    const result = stateObject?.result && typeof stateObject.result === 'object' ? stateObject.result as Record<string, unknown> : null;
+    const status = stateObject?.status && typeof stateObject.status === 'object' ? stateObject.status as Record<string, unknown> : null;
+    const state = String(result?.name ?? status?.name ?? stateObject?.name ?? stateObject?.type ?? rawState ?? '').toLowerCase();
     if (state === 'merged') return 'was merged';
     if (state === 'declined' || state === 'closed') return 'was closed';
     if (state === 'resolved') return 'was resolved';
-    if (state === 'completed' || state === 'successful') return 'was completed';
+    if (state === 'failed' || state === 'error') return 'failed';
+    if (state === 'stopped' || state === 'canceled' || state === 'cancelled') return 'was canceled';
+    if (state === 'completed' || state === 'successful' || state === 'succeeded') return 'was completed';
     return null;
   },
 });

@@ -14,14 +14,14 @@ fabricated update time. Follow canonicalPath to read the original provider data.
 
 - repositories/{workspace}/{repository}/meta.json: repository metadata.
 - workspaces/{workspace}/projects/{key}.json: workspace project metadata.
-- repositories/{workspace}/{repository}/pull-requests/{number}.json: pull requests.
+- repositories/{workspace}/{repository}/pull-requests/{title-slug}__{number}.json: pull requests.
 - repositories/{workspace}/{repository}/commits/{hash}.json: commit metadata.
 - repositories/{workspace}/{repository}/pipelines/{uuid}.json: pipeline runs.
 - repositories/{workspace}/{repository}/deployments/{uuid}.json: deployments.
 - repositories/{workspace}/{repository}/tags/{name}.json: tags and target hashes.
-- repositories/{workspace}/{repository}/issues/{number}.json: historical issues.
+- repositories/{workspace}/{repository}/issues/{title-slug}__{number}.json: historical issues.
 
-All paths start at /bitbucket. Path segments are URI encoded. Stable Nango ids
+Canonical record paths start at /bitbucket. Path segments are URI encoded. Stable Nango ids
 for repository children include workspace/repository to prevent cross-repository
 collisions. Each resource also has by-id/{encoded-id}.json, a full record mirror
 with the same data as the canonical file. Projects belong to workspaces and do
@@ -29,7 +29,7 @@ not require repository context.
 
 ## Discovery
 
-- discovery/bitbucket/repositories/{workspace}/{repository}/pull-requests/.schema.json
+- /discovery/bitbucket/repositories/{workspace}/{repository}/pull-requests/.schema.json
 
 Discovery samples /bitbucket/pull-requests/_index.json and follows canonicalPath
 or by-id aliases. Historical issues have no writable discovery contract.

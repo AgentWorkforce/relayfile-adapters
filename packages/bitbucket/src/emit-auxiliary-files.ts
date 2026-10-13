@@ -35,6 +35,24 @@ export async function emitBitbucketAuxiliaryFiles(
       contentType,
     }),
   });
+  const indexes = new Map<string, IndexFileReconciler<IndexRow>>([[indexPath, index]]);
+  const scopedIndex = (canonicalPath: string): IndexFileReconciler<IndexRow> => {
+    const path = type === 'repository' ? indexPath : `${canonicalPath.slice(0, canonicalPath.lastIndexOf('/'))}/_index.json`;
+    const existing = indexes.get(path);
+    if (existing) return existing;
+    const created = new IndexFileReconciler<IndexRow>({
+      client,
+      workspaceId: input.workspaceId,
+      path,
+      builder: (rows) => ({
+        path,
+        content: `${JSON.stringify([...rows].sort((a, b) => (b.updated ?? b.updatedAt ?? '').localeCompare(a.updated ?? a.updatedAt ?? '') || a.id.localeCompare(b.id)), null, 2)}\n`,
+        contentType,
+      }),
+    });
+    indexes.set(path, created);
+    return created;
+  };
 
   for (const raw of input.records) {
     const record = { ...raw };
@@ -58,10 +76,19 @@ export async function emitBitbucketAuxiliaryFiles(
         }
       }
       const previousPaths = prior ? bitbucketLookupAliasPaths(input.model, prior) : [];
+      let previousCanonicalPath: string | null = null;
+      if (prior) {
+        try {
+          previousCanonicalPath = computeBitbucketPath(input.model, prior);
+        } catch (error) {
+          result.errors.push({ path: aliasPath, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
       if (deleted) {
         index.remove(id);
+        if (previousCanonicalPath) scopedIndex(previousCanonicalPath).remove(id);
         if (client.deleteFile) {
-          for (const path of [aliasPath, ...previousPaths]) {
+          for (const path of [aliasPath, ...previousPaths, ...(previousCanonicalPath ? [previousCanonicalPath] : [])]) {
             await client.deleteFile({ workspaceId: input.workspaceId, path });
             result.deleted += 1;
           }
@@ -71,6 +98,7 @@ export async function emitBitbucketAuxiliaryFiles(
         continue;
       }
       const canonicalPath = computeBitbucketPath(input.model, record);
+      if (previousCanonicalPath && previousCanonicalPath !== canonicalPath) scopedIndex(previousCanonicalPath).remove(id);
       const lookupPaths = bitbucketLookupAliasPaths(input.model, record);
       const content = `${JSON.stringify(record, null, 2)}\n`;
       for (const path of [aliasPath, ...lookupPaths]) {
@@ -78,14 +106,17 @@ export async function emitBitbucketAuxiliaryFiles(
         result.written += 1;
       }
       if (client.deleteFile) {
-        for (const path of previousPaths.filter((previousPath) => !lookupPaths.includes(previousPath))) {
+        for (const path of [
+          ...previousPaths.filter((previousPath) => !lookupPaths.includes(previousPath)),
+          ...(previousCanonicalPath && previousCanonicalPath !== canonicalPath ? [previousCanonicalPath] : []),
+        ]) {
           await client.deleteFile({ workspaceId: input.workspaceId, path });
           result.deleted += 1;
         }
       } else if (previousPaths.some((previousPath) => !lookupPaths.includes(previousPath))) {
         result.errors.push({ path: aliasPath, error: 'Bitbucket alias reconciliation requires deleteFile' });
       }
-      index.upsert({
+      const row: IndexRow = {
         id,
         canonicalPath,
         title: [record.title, record.name, record.full_name, record.message, record.hash, record.key]
@@ -94,15 +125,19 @@ export async function emitBitbucketAuxiliaryFiles(
           .find((value): value is string => typeof value === 'string' && value.length > 0) ?? '',
         ...(typeof record.state === 'string' ? { state: record.state } : {}),
         ...(typeof record.updated_on === 'string' ? { updatedAt: record.updated_on } : {}),
-      });
+      };
+      index.upsert(row);
+      if (type !== 'repository') scopedIndex(canonicalPath).upsert(row);
     } catch (error) {
       result.errors.push({ path: indexPath, error: error instanceof Error ? error.message : String(error) });
     }
   }
 
-  const flushed = await index.flush();
-  result.written += flushed.written;
-  result.errors.push(...flushed.errors);
+  for (const reconciler of indexes.values()) {
+    const flushed = await reconciler.flush();
+    result.written += flushed.written;
+    result.errors.push(...flushed.errors);
+  }
   const rootPath = '/bitbucket/_index.json';
   const root = new IndexFileReconciler<IndexRow>({
     client,

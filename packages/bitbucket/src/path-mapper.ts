@@ -76,7 +76,9 @@ export function computeBitbucketPath(model: string, record: Record<string, unkno
     type === 'commit' ? stringField(record, 'hash') :
     type === 'tag' ? stringField(record, 'name') : stringField(record, 'uuid') ?? stringField(record, 'id');
   if (!id) throw new Error(`Missing Bitbucket ${type} id`);
-  return `${prefix}/${collections[type]}/${segment(id)}.json`;
+  const filename = type === 'pull-request' || type === 'issue'
+    ? `${slugifyAlias(stringField(record, 'title') ?? type)}__${id}` : id;
+  return `${prefix}/${collections[type]}/${segment(filename)}.json`;
 }
 
 export function bitbucketLookupAliasPaths(model: string, record: Record<string, unknown>): string[] {

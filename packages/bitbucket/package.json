@@ -8,12 +8,13 @@
   "exports": {
     ".": "./dist/index.js",
     "./path-mapper": "./dist/path-mapper.js",
+    "./inbound": "./dist/inbound.js",
     "./webhook-normalizer": "./dist/webhook-normalizer.js",
     "./digest": "./dist/digest.js"
   },
-  "files": ["dist", "bitbucket.mapping.yaml"],
+  "files": ["dist", "discovery", "bitbucket.mapping.yaml"],
   "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc --noEmit -p tsconfig.json", "test": "node --import tsx --test 'src/**/*.test.ts'", "prepublishOnly": "npm run build" },
-  "dependencies": { "@relayfile/adapter-core": "^0.8.1" },
+  "dependencies": { "@relayfile/adapter-core": "^0.8.0" },
   "peerDependencies": { "@relayfile/sdk": ">=0.6.0 <1" },
   "devDependencies": { "@types/node": "^24.6.0", "tsx": "^4.20.6", "typescript": "^5.9.3" },
   "engines": { "node": ">=18.18" },

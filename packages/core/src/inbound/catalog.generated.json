@@ -1,7 +1,75 @@
 {
   "schema": "relayfile.inbound-capability-catalog/1",
-  "catalogVersion": "sha256:cb738d3754b9e68781d6ee3092345d3109afbfd889497f413640d2be1039ad10",
+  "catalogVersion": "sha256:814c51981672b886b6336cb602444bd15a474ab02719054dcd32d330cc4057dc",
   "capabilities": [
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "bitbucket.hookdeck",
+      "providerId": "bitbucket",
+      "pathRoot": "/bitbucket",
+      "providerConfigAliases": [
+        "bitbucket",
+        "bitbucket-relay"
+      ],
+      "source": "hookdeck",
+      "eventKinds": [
+        "webhook"
+      ],
+      "detection": {
+        "headerAny": [
+          "x-event-key",
+          "x-hub-signature"
+        ]
+      },
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "hookdeck-delivery-id",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-request-uuid"
+        ],
+        "hookdeckDeliveryIdHeaders": [
+          "x-hookdeck-eventid"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
+    {
+      "schema": "relayfile.inbound-capability/1",
+      "id": "bitbucket.nango",
+      "providerId": "bitbucket",
+      "pathRoot": "/bitbucket",
+      "providerConfigAliases": [
+        "bitbucket",
+        "bitbucket-relay"
+      ],
+      "source": "nango",
+      "eventKinds": [
+        "forward",
+        "sync",
+        "webhook"
+      ],
+      "logicalKey": {
+        "version": "1",
+        "strategies": [
+          "provider-delivery-id",
+          "nango-sync-page",
+          "semantic-payload"
+        ],
+        "providerDeliveryIdHeaders": [
+          "x-nango-delivery-id",
+          "x-nango-webhook-id",
+          "x-nango-id",
+          "webhook-id"
+        ],
+        "unknownEventFallback": "raw-body",
+        "semanticPayload": "canonical-json-v1"
+      }
+    },
     {
       "schema": "relayfile.inbound-capability/1",
       "id": "github.nango",
