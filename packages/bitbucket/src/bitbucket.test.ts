@@ -124,9 +124,17 @@ describe('Bitbucket adapter', () => {
     const pipeline = { id: 'acme/api:{pipe}', uuid: '{pipe}', repository: 'acme/api', state: { name: 'COMPLETED' } };
     assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPipeline', records: [pipeline] })).errors, []);
     assert.ok(files.has('/bitbucket/pipelines/by-status/completed/acme%2Fapi%3A%7Bpipe%7D.json'));
+    const failedPipeline = { ...pipeline, state: { name: 'COMPLETED', result: { name: 'FAILED' } } };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPipeline', records: [failedPipeline] })).errors, []);
+    assert.equal(files.has('/bitbucket/pipelines/by-status/completed/acme%2Fapi%3A%7Bpipe%7D.json'), false);
+    assert.ok(files.has('/bitbucket/pipelines/by-status/failed/acme%2Fapi%3A%7Bpipe%7D.json'));
     const deployment = { id: 'acme/api:{deploy}', uuid: '{deploy}', repository: 'acme/api', state: { name: 'COMPLETED' } };
     assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketDeployment', records: [deployment] })).errors, []);
     assert.ok(files.has('/bitbucket/deployments/by-status/completed/acme%2Fapi%3A%7Bdeploy%7D.json'));
+    const successfulDeployment = { ...deployment, state: { name: 'COMPLETED', status: { name: 'SUCCESSFUL' } } };
+    assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketDeployment', records: [successfulDeployment] })).errors, []);
+    assert.equal(files.has('/bitbucket/deployments/by-status/completed/acme%2Fapi%3A%7Bdeploy%7D.json'), false);
+    assert.ok(files.has('/bitbucket/deployments/by-status/successful/acme%2Fapi%3A%7Bdeploy%7D.json'));
     assert.deepEqual((await emitBitbucketAuxiliaryFiles(client, { workspaceId: 'workspace', model: 'BitbucketPullRequest', records: [{ id: merged.id, _deleted: true }] })).errors, []);
     assert.equal(files.has('/bitbucket/pull-requests/by-state/merged/acme%2Fapi%3A7.json'), false);
     assert.equal(files.has('/bitbucket/pull-requests/by-creator/bob/acme%2Fapi%3A7.json'), false);

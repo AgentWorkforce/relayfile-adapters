@@ -47,6 +47,14 @@ function fieldLabel(value: unknown): string | undefined {
     .map((key) => stringField(fields, key)).find(Boolean);
 }
 
+function statusLabel(record: Record<string, unknown>): string | undefined {
+  const state = record.state;
+  const outcome = state && typeof state === 'object' && !Array.isArray(state)
+    ? fieldLabel((state as Record<string, unknown>).result) ?? fieldLabel((state as Record<string, unknown>).status)
+    : undefined;
+  return outcome ?? fieldLabel(record.status) ?? fieldLabel(state);
+}
+
 export function computeBitbucketPath(model: string, record: Record<string, unknown>): string {
   const type = normalizeNangoBitbucketModel(model);
   if (!type) throw new Error(`Unsupported Bitbucket model: ${model}`);
@@ -85,7 +93,7 @@ export function bitbucketLookupAliasPaths(model: string, record: Record<string, 
       ['by-priority', fieldLabel(record.priority)],
     ]
     : type === 'pipeline' || type === 'deployment'
-      ? [['by-status', fieldLabel(record.status) ?? fieldLabel(record.state)]]
+      ? [['by-status', statusLabel(record)]]
       : [];
   return buckets.flatMap(([bucket, value]) => value
     ? [`/bitbucket/${collection}/${bucket}/${segment(slugifyAlias(value))}/${segment(id)}.json`]
