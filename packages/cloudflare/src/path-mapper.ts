@@ -236,9 +236,10 @@ function canonicalCollectionPrefix(objectType: CloudflarePathObjectType): string
 // legitimately be named `scripts`), and so a mount scoped to
 // `/cloudflare/workers/**` sees them.
 //
-//   /cloudflare/workers/errors/_index.json                      one row per script (latest hour)
-//   /cloudflare/workers/errors/<script>/_index.json             that script's recent hourly rollups
-//   /cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json  one UTC hour
+//   /cloudflare/workers/errors/_index.json                        one row per script (latest error day)
+//   /cloudflare/workers/errors/<script>/_index.json               one row per UTC date with errors
+//   /cloudflare/workers/errors/<script>/<YYYY-MM-DD>/_index.json  every error hour that day
+//   /cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json    one UTC hour
 // ---------------------------------------------------------------------------
 
 export const CLOUDFLARE_WORKER_ERRORS_ROOT = `${CLOUDFLARE_PATH_ROOT}/workers/errors`;
@@ -284,6 +285,15 @@ export function cloudflareWorkerErrorRollupScriptIndexPath(scriptName: string): 
   return `${CLOUDFLARE_WORKER_ERRORS_ROOT}/${encodeCloudflarePathSegment(scriptName)}/_index.json`;
 }
 
+/** Complete index of one script's error hours for the UTC date containing `hourStart`. */
+export function cloudflareWorkerErrorRollupDayIndexPath(
+  scriptName: string,
+  hourStart: string | Date,
+): string {
+  const { date } = cloudflareWorkerErrorRollupHour(hourStart);
+  return `${CLOUDFLARE_WORKER_ERRORS_ROOT}/${encodeCloudflarePathSegment(scriptName)}/${date}/_index.json`;
+}
+
 export function cloudflareWorkerErrorRollupPath(
   scriptName: string,
   hourStart: string | Date,
@@ -317,5 +327,32 @@ export function parseCloudflareWorkerErrorRollupPath(
   } catch {
     return null;
   }
+  // Only canonical encodings round-trip (rejects e.g. `%20api` or lowercase `%2f`).
+  if (!scriptName.trim() || encodeCloudflarePathSegment(scriptName) !== encodedScript) {
+    return null;
+  }
   return { scriptName, date, hour, hourStart };
+}
+
+/**
+ * Inverse of {@link cloudflareWorkerErrorRollupId} (`<scriptName>/<hourStart ISO>`),
+ * so bare `{ id, _deleted: true }` tombstones can still be located.
+ */
+export function parseCloudflareWorkerErrorRollupId(
+  id: string,
+): { scriptName: string; hourStart: string } | null {
+  const separator = id.lastIndexOf("/");
+  if (separator <= 0) {
+    return null;
+  }
+  const scriptName = id.slice(0, separator).trim();
+  const rawHour = id.slice(separator + 1);
+  if (!scriptName || !/^\d{4}-\d{2}-\d{2}T\d{2}:00:00(\.000)?Z$/u.test(rawHour)) {
+    return null;
+  }
+  try {
+    return { scriptName, hourStart: cloudflareWorkerErrorRollupHour(rawHour).hourStart };
+  } catch {
+    return null;
+  }
 }

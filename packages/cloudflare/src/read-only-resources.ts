@@ -6,6 +6,8 @@ export interface AdapterResourceConfig {
   readonly schema: string;
   readonly createExample: string;
   readonly sampleIndexPath?: string;
+  /** `[]` marks a resource read-only so the writeback-path catalog omits it. */
+  readonly operations?: readonly string[];
 }
 
 export const readOnlyResources = [
@@ -39,6 +41,7 @@ export const readOnlyResources = [
     createExample:
       "discovery/cloudflare/worker-error-rollups/.create.example.json",
     sampleIndexPath: "/cloudflare/workers/errors/_index.json",
+    operations: [] as const,
   },
   {
     name: "pages-projects",

@@ -13,6 +13,7 @@ import {
   cloudflareWorkerErrorRollupRootIndexPath,
   cloudflareWorkerErrorRollupScriptIndexPath,
   normalizeNangoCloudflareModel,
+  parseCloudflareWorkerErrorRollupId,
   parseCloudflareWorkerErrorRollupPath,
 } from "./path-mapper.js";
 import type { CloudflarePathObjectType } from "./types.js";
@@ -139,6 +140,25 @@ test("worker error rollup helpers reject malformed input", () => {
   assert.equal(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/errors/api-proxy/2026-10-14/24.json"), null);
   assert.equal(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/errors/api-proxy/2026-02-30/01.json"), null);
   assert.equal(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/scripts/api-proxy.json"), null);
+  // Only canonical encodings parse, so parse is a true inverse of compose.
+  assert.equal(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/errors/%20api/2026-10-14/07.json"), null);
+  assert.equal(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/errors/api%2fproxy/2026-10-14/07.json"), null);
+  assert.ok(parseCloudflareWorkerErrorRollupPath("/cloudflare/workers/errors/api%2Fproxy/2026-10-14/07.json"));
+});
+
+test("worker error rollup ids round-trip and locate tombstones", () => {
+  const id = cloudflareWorkerErrorRollupId("api-proxy", "2026-10-14T07:42:00Z");
+  assert.deepEqual(parseCloudflareWorkerErrorRollupId(id), {
+    scriptName: "api-proxy",
+    hourStart: "2026-10-14T07:00:00.000Z",
+  });
+  assert.deepEqual(parseCloudflareWorkerErrorRollupId("ns/script/2026-10-14T07:00:00.000Z"), {
+    scriptName: "ns/script",
+    hourStart: "2026-10-14T07:00:00.000Z",
+  });
+  for (const bad of ["api-proxy", "/2026-10-14T07:00:00.000Z", "api-proxy/2026-10-14T07:30:00.000Z", "api-proxy/nope"]) {
+    assert.equal(parseCloudflareWorkerErrorRollupId(bad), null, bad);
+  }
 });
 
 test("cloudflare path helpers reject missing dns zone context and unsupported models", () => {

@@ -9,7 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Added
 
-- `@relayfile/adapter-cloudflare` now maps hourly per-script Workers error rollups (`CloudflareWorkerErrorRollup`) to `/cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json`, with a per-script recent-hours `_index.json`, a root `/cloudflare/workers/errors/_index.json` pointing at each script's latest rollup, round-trippable path helpers, digest naming, and `LAYOUT.md` guidance. Consumers must bump the dependency and wire the new sync model to materialize it.
+- `@relayfile/adapter-cloudflare` now maps hourly per-script Workers error rollups (`CloudflareWorkerErrorRollup`) to `/cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json`, with complete per-script (by date) and per-day (by hour) `_index.json` files, a root `/cloudflare/workers/errors/_index.json` pointing at each script's latest rollup, round-trippable path and id helpers, a read-only discovery schema, digest naming, and `LAYOUT.md` guidance. Consumers must bump the dependency and wire the new sync model to materialize it.
 - `@relayfile/adapter-bitbucket` now emits sorted root and resource indexes with stable record aliases, documents canonical paths and terminal states in `LAYOUT.md`, and excludes retired native Issues from writable discovery while preserving historical issue records.
 - `@relayfile/adapter-slack` now exports `slackChannelIdFromPathSegment` so channel-scoped watch matchers and writeback share ID recovery across current, legacy, and bare channel paths.
 - `@relayfile/adapter-linear` now owns cursor-safe AgentActivity reconciliation so consumers can prevent duplicate terminal activities after ambiguous provider writes.

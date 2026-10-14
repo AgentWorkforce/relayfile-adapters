@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cloudflare Workers hourly error rollup",
+  "description": "One Worker script's Workers Observability (Workers Logs) error rollup for one UTC hour, sourced from POST /accounts/{account_id}/workers/observability/telemetry/query (view=calculations). Only hours with an error signal (non-ok outcome, 5xx, or a logged error) are materialized. Read-only.",
+  "type": "object",
+  "required": ["id", "script_name", "hour_start", "hour_end", "events", "invocations", "outcomes", "status_classes", "exceptions", "failures", "status_5xx", "top_errors", "top_errors_truncated", "severity"],
+  "properties": {
+    "id": { "type": "string", "description": "`<script_name>/<hour_start>`.", "readOnly": true },
+    "source": { "type": "string", "enum": ["cloudflare"], "description": "Provider.", "readOnly": true },
+    "kind": { "type": "string", "enum": ["runtime"], "description": "Record kind.", "readOnly": true },
+    "occurred_at": { "type": "string", "format": "date-time", "description": "End of the rolled-up hour.", "readOnly": true },
+    "severity": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"], "description": "critical when max(failures, status_5xx) is at least 5% of invocations; high for any failure or 5xx; medium when only logged errors are present.", "readOnly": true },
+    "title": { "type": "string", "description": "Human-readable title.", "readOnly": true },
+    "url": { "type": "string", "description": "Cloudflare API URL of the Worker script.", "readOnly": true },
+    "account_id": { "type": "string", "description": "Cloudflare account id.", "readOnly": true },
+    "script_name": { "type": "string", "description": "Worker script name.", "readOnly": true },
+    "hour_start": { "type": "string", "format": "date-time", "description": "Start of the UTC hour (inclusive).", "readOnly": true },
+    "hour_end": { "type": "string", "format": "date-time", "description": "End of the UTC hour (exclusive).", "readOnly": true },
+    "events": { "type": "number", "description": "All Workers Logs events for the script in the hour (invocations and console logs), sample-weighted.", "readOnly": true },
+    "invocations": { "type": "number", "description": "Events carrying $workers.outcome (cron invocations omit it).", "readOnly": true },
+    "outcomes": {
+      "type": "array",
+      "description": "Invocation counts by $workers.outcome (ok, exception, exceededCpu, canceled, ...), largest first.",
+      "items": { "type": "object", "required": ["outcome", "count"], "properties": { "outcome": { "type": "string", "description": "Workers outcome." }, "count": { "type": "number", "description": "Invocations with that outcome." } } },
+      "readOnly": true
+    },
+    "status_classes": {
+      "type": "array",
+      "description": "Invocation counts by HTTP response status class (1xx-5xx, or none when the invocation has no response status), largest first.",
+      "items": { "type": "object", "required": ["status_class", "count"], "properties": { "status_class": { "type": "string", "enum": ["1xx", "2xx", "3xx", "4xx", "5xx", "none"], "description": "Status class." }, "count": { "type": "number", "description": "Invocations in that class." } } },
+      "readOnly": true
+    },
+    "exceptions": { "type": "number", "description": "Invocations with outcome exception.", "readOnly": true },
+    "failures": { "type": "number", "description": "Invocations whose outcome is anything other than ok.", "readOnly": true },
+    "status_5xx": { "type": "number", "description": "Invocations that returned a 5xx response.", "readOnly": true },
+    "wall_time_ms_p50": { "type": "number", "description": "Median $workers.wallTimeMs.", "readOnly": true },
+    "wall_time_ms_p99": { "type": "number", "description": "p99 $workers.wallTimeMs.", "readOnly": true },
+    "cpu_time_ms_p99": { "type": "number", "description": "p99 $workers.cpuTimeMs.", "readOnly": true },
+    "top_errors": {
+      "type": "array",
+      "description": "Most frequent $metadata.error messages (at most 10), sanitized and truncated, largest first.",
+      "items": { "type": "object", "required": ["message", "count"], "properties": { "message": { "type": "string", "description": "Sanitized error message." }, "count": { "type": "number", "description": "Events with that error." } } },
+      "readOnly": true
+    },
+    "top_errors_truncated": { "type": "boolean", "description": "True when more distinct error messages existed than are listed.", "readOnly": true },
+    "sample_interval": { "type": "number", "description": "Average Workers Logs sample interval; >1 when head sampling is on (counts are already weighted).", "readOnly": true },
+    "captured_at": { "type": "string", "format": "date-time", "description": "When the rollup was computed.", "readOnly": true }
+  },
+  "additionalProperties": true
+}

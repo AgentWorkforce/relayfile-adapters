@@ -205,16 +205,6 @@ export const WRITEBACK_PATH_CATALOG = {
         ]
       }
     ],
-    "worker-error-rollups": [
-      {
-        "path": "/cloudflare/workers/errors/{scriptName}/{date}/{hour}.json",
-        "params": [
-          "scriptName",
-          "date",
-          "hour"
-        ]
-      }
-    ],
     "worker-usage": [
       {
         "path": "/cloudflare/analytics/workers/scripts/{scriptName}.json",
