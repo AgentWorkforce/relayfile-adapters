@@ -18,6 +18,7 @@ test("layoutManifest advertises Cloudflare read-only resources including zone-sc
     [
       { path: "cloudflare/workers/scripts", aliasSegments: ["by-id"], materialization: "lazy", writebackResources: [] },
       { path: "cloudflare/analytics/workers/scripts", aliasSegments: ["by-id"], materialization: "lazy", writebackResources: [] },
+      { path: "cloudflare/workers/errors", aliasSegments: [], materialization: "lazy", writebackResources: [] },
       { path: "cloudflare/pages/projects", aliasSegments: ["by-id"], materialization: "lazy", writebackResources: [] },
       { path: "cloudflare/d1/databases", aliasSegments: ["by-id"], materialization: "lazy", writebackResources: [] },
       { path: "cloudflare/kv/namespaces", aliasSegments: ["by-id"], materialization: "lazy", writebackResources: [] },

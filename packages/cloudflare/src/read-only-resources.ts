@@ -28,6 +28,19 @@ export const readOnlyResources = [
     sampleIndexPath: "/cloudflare/analytics/workers/scripts/_index.json",
   },
   {
+    // Hourly per-script Workers Observability error rollups. The root index
+    // carries one row per script whose canonicalPath is that script's latest
+    // rollup, so discovery can sample without resolving placeholders.
+    name: "worker-error-rollups",
+    path: "/cloudflare/workers/errors/{scriptName}/{date}/{hour}.json",
+    pathPattern: /^\/cloudflare\/workers\/errors\/[^/]+\/\d{4}-\d{2}-\d{2}\/\d{2}\.json$/u,
+    idPattern: /^\d{2}$/u,
+    schema: "discovery/cloudflare/worker-error-rollups/.schema.json",
+    createExample:
+      "discovery/cloudflare/worker-error-rollups/.create.example.json",
+    sampleIndexPath: "/cloudflare/workers/errors/_index.json",
+  },
+  {
     name: "pages-projects",
     path: "/cloudflare/pages/projects/{projectName}.json",
     pathPattern: /^\/cloudflare\/pages\/projects\/[^/]+\.json$/u,

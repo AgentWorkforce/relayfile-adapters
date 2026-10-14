@@ -12,15 +12,27 @@ export function cloudflareRootIndexPath(): string {
   return `${CLOUDFLARE_PATH_ROOT}/_index.json`;
 }
 
+export interface CloudflarePathContext {
+  zoneId?: string;
+  /** worker-error-rollup: narrows the index to one script's hourly rollups. */
+  scriptName?: string;
+  /** worker-error-rollup: any instant inside the rollup hour (UTC). */
+  hourStart?: string | Date;
+}
+
 export function cloudflareCollectionIndexPath(
   objectType: CloudflarePathObjectType,
-  context: { zoneId?: string } = {},
+  context: CloudflarePathContext = {},
 ): string {
   switch (objectType) {
     case "worker-script":
       return `${CLOUDFLARE_PATH_ROOT}/workers/scripts/_index.json`;
     case "worker-usage":
       return `${CLOUDFLARE_PATH_ROOT}/analytics/workers/scripts/_index.json`;
+    case "worker-error-rollup":
+      return context.scriptName
+        ? cloudflareWorkerErrorRollupScriptIndexPath(context.scriptName)
+        : cloudflareWorkerErrorRollupRootIndexPath();
     case "pages-project":
       return `${CLOUDFLARE_PATH_ROOT}/pages/projects/_index.json`;
     case "d1-database":
@@ -52,8 +64,13 @@ export function cloudflareCollectionIndexPath(
 export function cloudflareByIdAliasPath(
   objectType: CloudflarePathObjectType,
   id: string,
-  context: { zoneId?: string } = {},
+  context: CloudflarePathContext = {},
 ): string {
+  if (objectType === "worker-error-rollup") {
+    throw new Error(
+      "Cloudflare worker-error-rollup records have no by-id alias; use the per-script _index.json",
+    );
+  }
   if (objectType === "dns-record") {
     if (!context.zoneId) {
       throw new Error("Cloudflare dns-record alias requires zoneId");
@@ -67,8 +84,14 @@ export function cloudflareByIdAliasPath(
 export function computeCloudflarePath(
   objectType: CloudflarePathObjectType,
   objectId: string,
-  context: { zoneId?: string } = {},
+  context: CloudflarePathContext = {},
 ): string {
+  if (objectType === "worker-error-rollup") {
+    if (context.hourStart === undefined) {
+      throw new Error("Cloudflare worker-error-rollup path requires hourStart");
+    }
+    return cloudflareWorkerErrorRollupPath(objectId, context.hourStart);
+  }
   const id = encodeCloudflarePathSegment(objectId);
 
   switch (objectType) {
@@ -107,7 +130,7 @@ export function computeCloudflarePath(
 export function computeCloudflarePathFromModel(
   model: string,
   objectId: string,
-  context: { zoneId?: string } = {},
+  context: CloudflarePathContext = {},
 ): string {
   const normalizedType = normalizeNangoCloudflareModel(model);
   if (!normalizedType) {
@@ -128,6 +151,10 @@ export function normalizeNangoCloudflareModel(
     case "cloudflareworkerusage":
     case "worker-usage":
       return "worker-usage";
+    case "cloudflareworkererrorrollup":
+    case "worker-error-rollup":
+    case "workers-error-rollup":
+      return "worker-error-rollup";
     case "cloudflarepagesproject":
     case "pages-project":
       return "pages-project";
@@ -172,6 +199,8 @@ function canonicalCollectionPrefix(objectType: CloudflarePathObjectType): string
       return `${CLOUDFLARE_PATH_ROOT}/workers/scripts`;
     case "worker-usage":
       return `${CLOUDFLARE_PATH_ROOT}/analytics/workers/scripts`;
+    case "worker-error-rollup":
+      return CLOUDFLARE_WORKER_ERRORS_ROOT;
     case "pages-project":
       return `${CLOUDFLARE_PATH_ROOT}/pages/projects`;
     case "d1-database":
@@ -195,4 +224,98 @@ function canonicalCollectionPrefix(objectType: CloudflarePathObjectType): string
     case "dns-record":
       throw new Error("dns-record canonicalCollectionPrefix requires zoneId");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Workers error rollups
+//
+// Hourly per-script error/outcome rollups derived from Workers Observability
+// (Workers Logs). They live under a dedicated `errors/` root inside
+// `/cloudflare/workers/` so they never collide with the flat
+// `/cloudflare/workers/scripts/<script>.json` inventory records (a script may
+// legitimately be named `scripts`), and so a mount scoped to
+// `/cloudflare/workers/**` sees them.
+//
+//   /cloudflare/workers/errors/_index.json                      one row per script (latest hour)
+//   /cloudflare/workers/errors/<script>/_index.json             that script's recent hourly rollups
+//   /cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json  one UTC hour
+// ---------------------------------------------------------------------------
+
+export const CLOUDFLARE_WORKER_ERRORS_ROOT = `${CLOUDFLARE_PATH_ROOT}/workers/errors`;
+
+export interface CloudflareWorkerErrorRollupHour {
+  /** UTC date, `YYYY-MM-DD`. */
+  date: string;
+  /** UTC hour, zero-padded `HH`. */
+  hour: string;
+  /** ISO timestamp of the start of the UTC hour. */
+  hourStart: string;
+}
+
+/** Normalize any instant to the UTC hour bucket that contains it. */
+export function cloudflareWorkerErrorRollupHour(
+  value: string | Date,
+): CloudflareWorkerErrorRollupHour {
+  const ms = (value instanceof Date ? value : new Date(value)).getTime();
+  if (!Number.isFinite(ms)) {
+    throw new Error(`Cloudflare worker-error-rollup hourStart is not a valid date: ${String(value)}`);
+  }
+  const iso = new Date(Math.floor(ms / 3_600_000) * 3_600_000).toISOString();
+  return { date: iso.slice(0, 10), hour: iso.slice(11, 13), hourStart: iso };
+}
+
+/** Stable record id for an hourly rollup: `<scriptName>/<hourStart ISO>`. */
+export function cloudflareWorkerErrorRollupId(
+  scriptName: string,
+  hourStart: string | Date,
+): string {
+  const trimmed = scriptName.trim();
+  if (!trimmed) {
+    throw new Error("Cloudflare worker-error-rollup requires a scriptName");
+  }
+  return `${trimmed}/${cloudflareWorkerErrorRollupHour(hourStart).hourStart}`;
+}
+
+export function cloudflareWorkerErrorRollupRootIndexPath(): string {
+  return `${CLOUDFLARE_WORKER_ERRORS_ROOT}/_index.json`;
+}
+
+export function cloudflareWorkerErrorRollupScriptIndexPath(scriptName: string): string {
+  return `${CLOUDFLARE_WORKER_ERRORS_ROOT}/${encodeCloudflarePathSegment(scriptName)}/_index.json`;
+}
+
+export function cloudflareWorkerErrorRollupPath(
+  scriptName: string,
+  hourStart: string | Date,
+): string {
+  const { date, hour } = cloudflareWorkerErrorRollupHour(hourStart);
+  return `${CLOUDFLARE_WORKER_ERRORS_ROOT}/${encodeCloudflarePathSegment(scriptName)}/${date}/${hour}.json`;
+}
+
+const WORKER_ERROR_ROLLUP_PATH_PATTERN =
+  /^\/cloudflare\/workers\/errors\/([^/]+)\/(\d{4}-\d{2}-\d{2})\/(\d{2})\.json$/u;
+
+/** Inverse of {@link cloudflareWorkerErrorRollupPath}; returns null for any other path. */
+export function parseCloudflareWorkerErrorRollupPath(
+  path: string,
+): { scriptName: string; date: string; hour: string; hourStart: string } | null {
+  const match = WORKER_ERROR_ROLLUP_PATH_PATTERN.exec(path);
+  if (!match) {
+    return null;
+  }
+  const encodedScript = match[1]!;
+  const date = match[2]!;
+  const hour = match[3]!;
+  const hourStart = `${date}T${hour}:00:00.000Z`;
+  const parsed = Date.parse(hourStart);
+  if (Number.isNaN(parsed) || new Date(parsed).toISOString() !== hourStart) {
+    return null;
+  }
+  let scriptName: string;
+  try {
+    scriptName = decodeURIComponent(encodedScript);
+  } catch {
+    return null;
+  }
+  return { scriptName, date, hour, hourStart };
 }

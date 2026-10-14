@@ -8,6 +8,10 @@ import {
   cloudflareByIdAliasPath,
   cloudflareCollectionIndexPath,
   cloudflareRootIndexPath,
+  cloudflareWorkerErrorRollupHour,
+  cloudflareWorkerErrorRollupPath,
+  cloudflareWorkerErrorRollupRootIndexPath,
+  cloudflareWorkerErrorRollupScriptIndexPath,
   computeCloudflarePath,
   normalizeNangoCloudflareModel,
 } from "./path-mapper.js";
@@ -44,6 +48,7 @@ export interface EmitCloudflareAuxiliaryFilesInput {
   workspaceId: string;
   workerScripts?: readonly CloudflareRecord[];
   workerUsage?: readonly CloudflareRecord[];
+  workerErrorRollups?: readonly CloudflareRecord[];
   pagesProjects?: readonly CloudflareRecord[];
   d1Databases?: readonly CloudflareRecord[];
   kvNamespaces?: readonly CloudflareRecord[];
@@ -72,6 +77,7 @@ export async function emitCloudflareAuxiliaryFiles(
       [
         { id: "workers", title: "Workers Scripts", canonicalPath: "/cloudflare/workers/scripts/_index.json" },
         { id: "workers-usage", title: "Workers Usage", canonicalPath: "/cloudflare/analytics/workers/scripts/_index.json" },
+        { id: "workers-errors", title: "Workers Error Rollups (hourly)", canonicalPath: cloudflareWorkerErrorRollupRootIndexPath() },
         { id: "pages", title: "Pages Projects", canonicalPath: "/cloudflare/pages/projects/_index.json" },
         { id: "d1", title: "D1 Databases", canonicalPath: "/cloudflare/d1/databases/_index.json" },
         { id: "kv", title: "KV Namespaces", canonicalPath: "/cloudflare/kv/namespaces/_index.json" },
@@ -91,6 +97,7 @@ export async function emitCloudflareAuxiliaryFiles(
 
   await emitCollection(client, input.workspaceId, "worker-script", input.workerScripts ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "worker-usage", input.workerUsage ?? [], aggregate, input.connectionId);
+  await emitWorkerErrorRollupIndexes(client, input.workspaceId, input.workerErrorRollups ?? [], aggregate);
   await emitCollection(client, input.workspaceId, "pages-project", input.pagesProjects ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "d1-database", input.d1Databases ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "kv-namespace", input.kvNamespaces ?? [], aggregate, input.connectionId);
@@ -180,6 +187,136 @@ async function emitCollection(
       aggregate,
     );
   }
+}
+
+/**
+ * Per-script hourly rollup index retention. Rollup files themselves are kept;
+ * the index lists only the most recent week so it stays small and cheap to read.
+ */
+export const CLOUDFLARE_WORKER_ERROR_ROLLUP_INDEX_LIMIT = 168;
+
+/**
+ * Hourly Workers error rollups are not a flat collection: each script owns a
+ * `_index.json` of its recent hours, and the root `/cloudflare/workers/errors/_index.json`
+ * carries one row per script pointing at that script's latest rollup. No `by-id`
+ * aliases are emitted — the (script, hour) path is already the natural key.
+ */
+async function emitWorkerErrorRollupIndexes(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  records: readonly CloudflareRecord[],
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  if (records.length === 0) {
+    return;
+  }
+
+  const byScript = new Map<string, Array<{ record: CloudflareRecord; hourStart: string }>>();
+  for (const record of records) {
+    const scriptName = readString(record.script_name);
+    const rawHour = readString(record.hour_start);
+    let hourStart: string | undefined;
+    try {
+      hourStart = rawHour ? cloudflareWorkerErrorRollupHour(rawHour).hourStart : undefined;
+    } catch {
+      hourStart = undefined;
+    }
+    if (!scriptName || !hourStart) {
+      aggregate.errors.push({
+        path: cloudflareWorkerErrorRollupRootIndexPath(),
+        error: `Skipping worker-error-rollup ${readString(record.id) ?? "unknown"}: missing script_name or hour_start`,
+      });
+      continue;
+    }
+    if (!byScript.has(scriptName)) {
+      byScript.set(scriptName, []);
+    }
+    byScript.get(scriptName)!.push({ record, hourStart });
+  }
+  if (byScript.size === 0) {
+    return;
+  }
+
+  const rootIndexPath = cloudflareWorkerErrorRollupRootIndexPath();
+  const rootRows = new Map(
+    (await readIndex(client, workspaceId, rootIndexPath, aggregate)).map((row) => [row.id, row]),
+  );
+
+  for (const [scriptName, entries] of byScript.entries()) {
+    const scriptIndexPath = cloudflareWorkerErrorRollupScriptIndexPath(scriptName);
+    const rows = new Map(
+      (await readIndex(client, workspaceId, scriptIndexPath, aggregate)).map((row) => [row.id, row]),
+    );
+
+    for (const { record, hourStart } of entries) {
+      if (record._deleted === true) {
+        rows.delete(hourStart);
+        continue;
+      }
+      rows.set(hourStart, buildWorkerErrorRollupRow(scriptName, hourStart, record));
+    }
+
+    const sorted = Array.from(rows.values())
+      .sort((a, b) => String(b.updated).localeCompare(String(a.updated)))
+      .slice(0, CLOUDFLARE_WORKER_ERROR_ROLLUP_INDEX_LIMIT);
+
+    await safeWrite(client, workspaceId, scriptIndexPath, `${JSON.stringify(sorted, null, 2)}\n`, aggregate);
+
+    const latest = sorted[0];
+    if (!latest) {
+      rootRows.delete(scriptName);
+      continue;
+    }
+    rootRows.set(scriptName, {
+      ...latest,
+      id: scriptName,
+      title: scriptName,
+      scriptIndexPath,
+      latestHourStart: latest.id,
+    });
+  }
+
+  await safeWrite(
+    client,
+    workspaceId,
+    rootIndexPath,
+    `${JSON.stringify(
+      Array.from(rootRows.values()).sort((a, b) => String(b.updated).localeCompare(String(a.updated))),
+      null,
+      2,
+    )}\n`,
+    aggregate,
+  );
+}
+
+function buildWorkerErrorRollupRow(
+  scriptName: string,
+  hourStart: string,
+  record: CloudflareRecord,
+): IndexRow {
+  const topErrors = Array.isArray(record.top_errors) ? record.top_errors : [];
+  const firstError = topErrors[0] as Record<string, unknown> | undefined;
+  return {
+    id: hourStart,
+    title: `${scriptName} ${hourStart.slice(0, 13)}:00Z`,
+    // Sort key is the rollup hour (not capture time) so re-captured hours keep their place.
+    updated: hourStart,
+    canonicalPath: cloudflareWorkerErrorRollupPath(scriptName, hourStart),
+    script_name: scriptName,
+    hour_start: hourStart,
+    events: readNumber(record.events) ?? 0,
+    exceptions: readNumber(record.exceptions) ?? 0,
+    failures: readNumber(record.failures) ?? 0,
+    status_5xx: readNumber(record.status_5xx) ?? 0,
+    ...(readString(record.severity) ? { severity: readString(record.severity) } : {}),
+    ...(firstError && readString(firstError.message)
+      ? { top_error: readString(firstError.message), top_error_count: readNumber(firstError.count) ?? 0 }
+      : {}),
+  };
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function groupRecordsByIndexKey(

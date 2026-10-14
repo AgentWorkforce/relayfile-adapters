@@ -15,6 +15,7 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
   resources: [
     { path: "cloudflare/workers/scripts", title: "Workers scripts", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/analytics/workers/scripts", title: "Workers usage summaries", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
+    { path: "cloudflare/workers/errors", title: "Workers hourly error rollups", materialization: "lazy", aliasSegments: [], writebackResources: [] },
     { path: "cloudflare/pages/projects", title: "Pages projects", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/d1/databases", title: "D1 databases", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
     { path: "cloudflare/kv/namespaces", title: "KV namespaces", materialization: "lazy", aliasSegments: ["by-id"], writebackResources: [] },
