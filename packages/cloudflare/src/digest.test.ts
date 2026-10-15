@@ -40,6 +40,39 @@ test("digest distinguishes Cloudflare worker usage identifiers from worker scrip
   });
 });
 
+test("digest names Cloudflare worker error rollups by script and hour and skips their indexes", async () => {
+  const ctx: DigestContext = {
+    provider: "cloudflare",
+    window: { from: "2026-10-14T00:00:00.000Z", to: "2026-10-15T00:00:00.000Z" },
+    async changeEvents() {
+      return [
+        {
+          id: "evt-1",
+          timestamp: "2026-10-14T08:05:00.000Z",
+          action: "created",
+          canonicalPath: "/cloudflare/workers/errors/api-proxy/2026-10-14/07.json",
+        },
+        {
+          id: "evt-2",
+          timestamp: "2026-10-14T08:05:01.000Z",
+          action: "updated",
+          canonicalPath: "/cloudflare/workers/errors/api-proxy/_index.json",
+        },
+      ];
+    },
+  };
+
+  assert.deepEqual(await digest(ctx), {
+    provider: "cloudflare",
+    bullets: [
+      {
+        text: "Worker api-proxy error rollup 2026-10-14 07:00Z was created",
+        canonicalPath: "cloudflare/workers/errors/api-proxy/2026-10-14/07.json",
+      },
+    ],
+  });
+});
+
 test("digest preserves Cloudflare terminal verbs instead of degrading to updated", async () => {
   const ctx: DigestContext = {
     provider: "cloudflare",

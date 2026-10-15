@@ -8,6 +8,8 @@ import {
   type DigestWindow,
 } from "@relayfile/adapter-core/digest";
 
+import { parseCloudflareWorkerErrorRollupPath } from "./path-mapper.js";
+
 export type {
   DigestBullet,
   DigestChangeEvent,
@@ -40,6 +42,8 @@ export const digest: DigestHandler = createDigestHandler({
 
 function cloudflareIdentifier(path: string): string {
   const basename = path.split("/").filter(Boolean).at(-1)?.replace(/\.[^.]+$/u, "") ?? path;
+  const rollup = parseCloudflareWorkerErrorRollupPath(path.startsWith("/") ? path : `/${path}`);
+  if (rollup) return `Worker ${rollup.scriptName} error rollup ${rollup.date} ${rollup.hour}:00Z`;
   if (path.includes("/analytics/workers/scripts/")) return `Worker usage ${basename}`;
   if (path.includes("/workers/scripts/")) return `Worker script ${basename}`;
   if (path.includes("/pages/projects/")) return `Pages project ${basename}`;

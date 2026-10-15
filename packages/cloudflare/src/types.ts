@@ -17,6 +17,7 @@ export type CloudflareWebhookAlertType =
 export type CloudflarePathObjectType =
   | "worker-script"
   | "worker-usage"
+  | "worker-error-rollup"
   | "pages-project"
   | "d1-database"
   | "kv-namespace"

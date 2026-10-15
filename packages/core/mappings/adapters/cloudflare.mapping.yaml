@@ -10,6 +10,8 @@ resources:
     path: /cloudflare/workers/scripts
   worker-usage:
     path: /cloudflare/analytics/workers/scripts
+  worker-error-rollups:
+    path: /cloudflare/workers/errors/{scriptName}
   pages-projects:
     path: /cloudflare/pages/projects
   d1-databases:

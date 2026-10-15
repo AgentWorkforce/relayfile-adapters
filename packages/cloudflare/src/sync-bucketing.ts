@@ -7,6 +7,7 @@ export const syncRecordBucketing = modelBucket({
   buckets: {
     "worker-script": "workerScripts",
     "worker-usage": "workerUsage",
+    "worker-error-rollup": "workerErrorRollups",
     "pages-project": "pagesProjects",
     "d1-database": "d1Databases",
     "kv-namespace": "kvNamespaces",

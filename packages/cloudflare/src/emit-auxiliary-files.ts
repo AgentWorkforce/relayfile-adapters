@@ -8,8 +8,14 @@ import {
   cloudflareByIdAliasPath,
   cloudflareCollectionIndexPath,
   cloudflareRootIndexPath,
+  cloudflareWorkerErrorRollupDayIndexPath,
+  cloudflareWorkerErrorRollupHour,
+  cloudflareWorkerErrorRollupPath,
+  cloudflareWorkerErrorRollupRootIndexPath,
+  cloudflareWorkerErrorRollupScriptIndexPath,
   computeCloudflarePath,
   normalizeNangoCloudflareModel,
+  parseCloudflareWorkerErrorRollupId,
 } from "./path-mapper.js";
 import { type CloudflarePathObjectType } from "./types.js";
 
@@ -44,6 +50,7 @@ export interface EmitCloudflareAuxiliaryFilesInput {
   workspaceId: string;
   workerScripts?: readonly CloudflareRecord[];
   workerUsage?: readonly CloudflareRecord[];
+  workerErrorRollups?: readonly CloudflareRecord[];
   pagesProjects?: readonly CloudflareRecord[];
   d1Databases?: readonly CloudflareRecord[];
   kvNamespaces?: readonly CloudflareRecord[];
@@ -72,6 +79,7 @@ export async function emitCloudflareAuxiliaryFiles(
       [
         { id: "workers", title: "Workers Scripts", canonicalPath: "/cloudflare/workers/scripts/_index.json" },
         { id: "workers-usage", title: "Workers Usage", canonicalPath: "/cloudflare/analytics/workers/scripts/_index.json" },
+        { id: "workers-errors", title: "Workers Error Rollups (hourly)", canonicalPath: cloudflareWorkerErrorRollupRootIndexPath() },
         { id: "pages", title: "Pages Projects", canonicalPath: "/cloudflare/pages/projects/_index.json" },
         { id: "d1", title: "D1 Databases", canonicalPath: "/cloudflare/d1/databases/_index.json" },
         { id: "kv", title: "KV Namespaces", canonicalPath: "/cloudflare/kv/namespaces/_index.json" },
@@ -91,6 +99,7 @@ export async function emitCloudflareAuxiliaryFiles(
 
   await emitCollection(client, input.workspaceId, "worker-script", input.workerScripts ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "worker-usage", input.workerUsage ?? [], aggregate, input.connectionId);
+  await emitWorkerErrorRollupIndexes(client, input.workspaceId, input.workerErrorRollups ?? [], aggregate);
   await emitCollection(client, input.workspaceId, "pages-project", input.pagesProjects ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "d1-database", input.d1Databases ?? [], aggregate, input.connectionId);
   await emitCollection(client, input.workspaceId, "kv-namespace", input.kvNamespaces ?? [], aggregate, input.connectionId);
@@ -180,6 +189,249 @@ async function emitCollection(
       aggregate,
     );
   }
+}
+
+const SEVERITY_RANK: Record<string, number> = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
+
+/**
+ * Hourly Workers error rollups are indexed in three complete levels (no caps,
+ * so every materialized rollup stays enumerable):
+ *
+ * - `/cloudflare/workers/errors/_index.json` — one row per script, mirroring that
+ *   script's latest error day (latest hour's counts, worst severity of the day).
+ * - `/cloudflare/workers/errors/<script>/_index.json` — one row per UTC date that
+ *   had errors, with day totals, `dayIndexPath`, and `canonicalPath` → latest hour.
+ * - `/cloudflare/workers/errors/<script>/<date>/_index.json` — every hour that day.
+ *
+ * No `by-id` aliases are emitted — the (script, date, hour) path is the natural key.
+ * Index merges need `readFile`; without it the emitter refuses to overwrite.
+ */
+async function emitWorkerErrorRollupIndexes(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  records: readonly CloudflareRecord[],
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<void> {
+  const rootIndexPath = cloudflareWorkerErrorRollupRootIndexPath();
+  if (!client.readFile) {
+    if (records.length > 0) {
+      aggregate.errors.push({
+        path: rootIndexPath,
+        error: "Skipping worker-error-rollup indexes: client cannot read existing indexes to merge into",
+      });
+    }
+    return;
+  }
+
+  if (records.length === 0) {
+    // `/cloudflare/_index.json` always links the errors root; make sure it resolves.
+    try {
+      const existing = await client.readFile({ workspaceId, path: rootIndexPath });
+      if (!existing?.content) {
+        await safeWrite(client, workspaceId, rootIndexPath, "[]\n", aggregate);
+      }
+    } catch (error) {
+      aggregate.errors.push({ path: rootIndexPath, error: String(error) });
+    }
+    return;
+  }
+
+  const byScript = new Map<string, Array<{ record: CloudflareRecord; hourStart: string }>>();
+  for (const record of records) {
+    // Tombstones may carry only `{ id, _deleted }`; the composite id locates them.
+    const fromId = readString(record.id) ? parseCloudflareWorkerErrorRollupId(readString(record.id)!) : null;
+    const scriptName = readString(record.script_name) ?? fromId?.scriptName;
+    const rawHour = readString(record.hour_start) ?? fromId?.hourStart;
+    let hourStart: string | undefined;
+    try {
+      hourStart = rawHour ? cloudflareWorkerErrorRollupHour(rawHour).hourStart : undefined;
+    } catch {
+      hourStart = undefined;
+    }
+    if (!scriptName || !hourStart) {
+      aggregate.errors.push({
+        path: cloudflareWorkerErrorRollupRootIndexPath(),
+        error: `Skipping worker-error-rollup ${readString(record.id) ?? "unknown"}: missing script_name or hour_start`,
+      });
+      continue;
+    }
+    if (!byScript.has(scriptName)) {
+      byScript.set(scriptName, []);
+    }
+    byScript.get(scriptName)!.push({ record, hourStart });
+  }
+  if (byScript.size === 0) {
+    return;
+  }
+
+  // A failed read must never become an overwrite: skip the affected index level.
+  const rootExisting = await readIndexStrict(client, workspaceId, rootIndexPath, aggregate);
+  const rootRows = new Map((rootExisting ?? []).map((row) => [row.id, row]));
+  let rootChanged = false;
+
+  for (const [scriptName, entries] of byScript.entries()) {
+    const scriptIndexPath = cloudflareWorkerErrorRollupScriptIndexPath(scriptName);
+    const scriptExisting = await readIndexStrict(client, workspaceId, scriptIndexPath, aggregate);
+    if (!scriptExisting) {
+      continue;
+    }
+    const dayRows = new Map(scriptExisting.map((row) => [row.id, row]));
+
+    const byDate = new Map<string, typeof entries>();
+    for (const entry of entries) {
+      const date = entry.hourStart.slice(0, 10);
+      if (!byDate.has(date)) {
+        byDate.set(date, []);
+      }
+      byDate.get(date)!.push(entry);
+    }
+
+    for (const [date, dateEntries] of byDate.entries()) {
+      const dayIndexPath = cloudflareWorkerErrorRollupDayIndexPath(scriptName, `${date}T00:00:00.000Z`);
+      const dayExisting = await readIndexStrict(client, workspaceId, dayIndexPath, aggregate);
+      if (!dayExisting) {
+        continue;
+      }
+      const hourRows = new Map(dayExisting.map((row) => [row.id, row]));
+      for (const { record, hourStart } of dateEntries) {
+        if (record._deleted === true) {
+          hourRows.delete(hourStart);
+          continue;
+        }
+        hourRows.set(hourStart, buildWorkerErrorRollupRow(scriptName, hourStart, record));
+      }
+      const sortedHours = sortByUpdatedDesc(Array.from(hourRows.values()));
+      await safeWrite(client, workspaceId, dayIndexPath, `${JSON.stringify(sortedHours, null, 2)}\n`, aggregate);
+
+      const dayRow = buildWorkerErrorRollupDayRow(scriptName, date, dayIndexPath, sortedHours);
+      if (dayRow) {
+        dayRows.set(date, dayRow);
+      } else {
+        dayRows.delete(date);
+      }
+    }
+
+    const sortedDays = sortByUpdatedDesc(Array.from(dayRows.values()));
+    await safeWrite(client, workspaceId, scriptIndexPath, `${JSON.stringify(sortedDays, null, 2)}\n`, aggregate);
+
+    const latestDay = sortedDays[0];
+    rootChanged = true;
+    if (!latestDay) {
+      rootRows.delete(scriptName);
+      continue;
+    }
+    rootRows.set(scriptName, {
+      ...latestDay,
+      id: scriptName,
+      title: scriptName,
+      scriptIndexPath,
+      latestDate: latestDay.id,
+    });
+  }
+
+  if (!rootExisting || !rootChanged) {
+    return;
+  }
+  await safeWrite(
+    client,
+    workspaceId,
+    rootIndexPath,
+    `${JSON.stringify(sortByUpdatedDesc(Array.from(rootRows.values())), null, 2)}\n`,
+    aggregate,
+  );
+}
+
+/**
+ * Like {@link readIndex} but distinguishes "missing" (`[]`) from "unreadable"
+ * (`null`, error recorded) so a transient read failure never truncates an index.
+ */
+async function readIndexStrict(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+  aggregate: EmitAuxiliaryFilesResult,
+): Promise<IndexRow[] | null> {
+  try {
+    const current = await client.readFile!({ workspaceId, path });
+    if (!current?.content) {
+      return [];
+    }
+    const parsed = JSON.parse(current.content) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error("index is not a JSON array");
+    }
+    return parsed.filter((entry): entry is IndexRow => typeof entry === "object" && entry !== null);
+  } catch (error) {
+    aggregate.errors.push({ path, error: `Skipping index update after failed read: ${String(error)}` });
+    return null;
+  }
+}
+
+function sortByUpdatedDesc(rows: IndexRow[]): IndexRow[] {
+  return rows.sort((a, b) => String(b.updated).localeCompare(String(a.updated)));
+}
+
+/** Day summary: latest hour's counts and pointer, plus day totals and worst severity. */
+function buildWorkerErrorRollupDayRow(
+  scriptName: string,
+  date: string,
+  dayIndexPath: string,
+  hourRows: readonly IndexRow[],
+): IndexRow | null {
+  const latest = hourRows[0];
+  if (!latest) {
+    return null;
+  }
+  const sum = (key: string) => hourRows.reduce((total, row) => total + (readNumber(row[key]) ?? 0), 0);
+  const worst = hourRows
+    .map((row) => readString(row.severity))
+    .filter((severity): severity is string => Boolean(severity))
+    .sort((a, b) => (SEVERITY_RANK[b] ?? -1) - (SEVERITY_RANK[a] ?? -1))[0];
+  return {
+    ...latest,
+    id: date,
+    title: `${scriptName} ${date}`,
+    updated: latest.updated,
+    canonicalPath: latest.canonicalPath,
+    dayIndexPath,
+    latestHourStart: latest.id,
+    hours: hourRows.length,
+    day_events: sum("events"),
+    day_exceptions: sum("exceptions"),
+    day_failures: sum("failures"),
+    day_status_5xx: sum("status_5xx"),
+    ...(worst ? { severity: worst } : {}),
+  };
+}
+
+function buildWorkerErrorRollupRow(
+  scriptName: string,
+  hourStart: string,
+  record: CloudflareRecord,
+): IndexRow {
+  const topErrors = Array.isArray(record.top_errors) ? record.top_errors : [];
+  const firstError = topErrors[0] as Record<string, unknown> | undefined;
+  return {
+    id: hourStart,
+    title: `${scriptName} ${hourStart.slice(0, 13)}:00Z`,
+    // Sort key is the rollup hour (not capture time) so re-captured hours keep their place.
+    updated: hourStart,
+    canonicalPath: cloudflareWorkerErrorRollupPath(scriptName, hourStart),
+    script_name: scriptName,
+    hour_start: hourStart,
+    events: readNumber(record.events) ?? 0,
+    exceptions: readNumber(record.exceptions) ?? 0,
+    failures: readNumber(record.failures) ?? 0,
+    status_5xx: readNumber(record.status_5xx) ?? 0,
+    ...(readString(record.severity) ? { severity: readString(record.severity) } : {}),
+    ...(firstError && readString(firstError.message)
+      ? { top_error: readString(firstError.message), top_error_count: readNumber(firstError.count) ?? 0 }
+      : {}),
+  };
+}
+
+function readNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function groupRecordsByIndexKey(

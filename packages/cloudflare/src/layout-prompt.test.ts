@@ -14,5 +14,9 @@ test("Cloudflare LAYOUT.md documents indexes, aliases, and discovery contracts",
   assert.match(file.content, /\/cloudflare\/zones\/<zoneId>\/dns-records\//u);
   assert.match(file.content, /\/cloudflare\/notifications\/events\//u);
   assert.match(file.content, /by-id/u);
+  assert.match(file.content, /\/cloudflare\/workers\/errors\/_index\.json/u);
+  assert.match(file.content, /\/cloudflare\/workers\/errors\/<script>\/<YYYY-MM-DD>\/<HH>\.json/u);
+  assert.match(file.content, /discovery\/cloudflare\/worker-error-rollups\/\.schema\.json/u);
+  assert.match(file.content, /top_error/u);
   assert.match(file.content, /\bls\b/u);
 });
