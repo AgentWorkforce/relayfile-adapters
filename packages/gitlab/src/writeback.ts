@@ -338,7 +338,8 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
     /^\/gitlab\/projects\/(.+?)\/merge_requests\/([^/]+)\/discussions\/([^/]+)\/notes\/([^/]+)\.json$/,
   );
   if (nested) {
-    if (!/^[1-9]\d*$/u.test(iid(nested[2])) || !/^[1-9]\d*$/u.test(nested[4])) {
+    if (!/^[1-9]\d*$/u.test(iid(nested[2])) || !/^[1-9]\d*$/u.test(nested[4]) ||
+      !/^(?!\.{1,2}$)[A-Za-z0-9_.:-]+$/u.test(nested[3])) {
       throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
     }
     return {
