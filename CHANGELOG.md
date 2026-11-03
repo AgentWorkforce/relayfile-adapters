@@ -7,6 +7,10 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ## [Unreleased]
 
+### Fixed
+
+- GitLab helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
+
 ### Added
 
 - `@relayfile/adapter-gitlab` declares project/personal and group access token connection aliases for the existing GitLab event and filesystem contract.
