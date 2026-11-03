@@ -9,7 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
-- GitLab helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
+- `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 
 ### Added
 
