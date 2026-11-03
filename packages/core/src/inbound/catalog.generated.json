@@ -1,6 +1,6 @@
 {
   "schema": "relayfile.inbound-capability-catalog/1",
-  "catalogVersion": "sha256:52af479ac4a927bf96a4bc881b9ea6c5a90b2170512a2c7cdd1463798660476f",
+  "catalogVersion": "sha256:c3bea687b04c10fe4b53e0ec7f2d03e477f578b27eb1c42913526194e296073c",
   "capabilities": [
     {
       "schema": "relayfile.inbound-capability/1",
@@ -111,6 +111,8 @@
       "pathRoot": "/gitlab",
       "providerConfigAliases": [
         "gitlab",
+        "gitlab-group-token",
+        "gitlab-pat",
         "gitlab-relay"
       ],
       "source": "hookdeck",
@@ -148,6 +150,8 @@
       "pathRoot": "/gitlab",
       "providerConfigAliases": [
         "gitlab",
+        "gitlab-group-token",
+        "gitlab-pat",
         "gitlab-relay"
       ],
       "source": "nango",

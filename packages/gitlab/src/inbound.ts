@@ -4,7 +4,11 @@ import {
   defineNangoInboundCapability,
 } from "@relayfile/adapter-core/inbound";
 
-const GITLAB_PROVIDER_CONFIG_ALIASES = ["gitlab", "gitlab-relay"] as const;
+/** Auth variants share one provider, event contract, and /gitlab tree. */
+export const GITLAB_TOKEN_CONFIG_KEYS = ["gitlab-pat", "gitlab-group-token"] as const;
+export const GITLAB_PROVIDER_CONFIG_ALIASES = [
+  "gitlab", "gitlab-relay", ...GITLAB_TOKEN_CONFIG_KEYS,
+] as const;
 
 export const inboundCapabilities = defineInboundCapabilities([
   defineNangoInboundCapability({

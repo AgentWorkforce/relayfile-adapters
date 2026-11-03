@@ -116,6 +116,8 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     "pathRoot": "/gitlab",
     "providerConfigAliases": [
       "gitlab",
+      "gitlab-group-token",
+      "gitlab-pat",
       "gitlab-relay"
     ],
     "source": "hookdeck",
@@ -153,6 +155,8 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     "pathRoot": "/gitlab",
     "providerConfigAliases": [
       "gitlab",
+      "gitlab-group-token",
+      "gitlab-pat",
       "gitlab-relay"
     ],
     "source": "nango",
@@ -441,4 +445,4 @@ export const INBOUND_CAPABILITY_CATALOG: readonly InboundCapabilityDeclaration[]
     }
   }
 ] as const;
-export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:52af479ac4a927bf96a4bc881b9ea6c5a90b2170512a2c7cdd1463798660476f" as const;
+export const INBOUND_CAPABILITY_CATALOG_VERSION = "sha256:c3bea687b04c10fe4b53e0ec7f2d03e477f578b27eb1c42913526194e296073c" as const;

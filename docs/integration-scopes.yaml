@@ -282,7 +282,7 @@ integrations:
     status: implemented
     package: "@relayfile/adapter-gitlab"
     nango_slug: gitlab
-    auth_model: oauth
+    auth_model: oauth_or_api_key
     scope_status: verified
     required_scopes:
       - api
@@ -300,7 +300,7 @@ integrations:
       - https://docs.gitlab.com/api/pipelines/
       - https://docs.gitlab.com/api/commits/
       - https://docs.gitlab.com/api/project_webhooks/
-    notes: "GitLab uses OAuth application scopes through Nango's gitlab provider, which is OAUTH2 and declares no default scopes. The adapter reads merge requests, MR diffs/discussions/approvals, issues, pipelines/jobs, and repository commits, and writes merge requests, issues, MR discussions, and issue notes through GitLab REST API endpoints. GitLab documents the `api` scope as complete read/write API access; `read_api` is read-only, `read_repository` covers Git-over-HTTP or the Repository Files API, and `write_repository` is Git-over-HTTP only and does not support API authentication. No separate webhook OAuth scope is documented; project hook management, if Relayfile provisions hooks through the API, is also covered by `api`, while webhook delivery still depends on project/user permissions."
+    notes: "OAuth uses gitlab-relay; Nango gitlab-pat (personal or project access token) and gitlab-group-token use API_KEY credentials and retain the same GitLab resource/event contract. Project tokens need Developer access and api plus write_repository for the Factory repository flow. GitLab uses OAuth application scopes through Nango's gitlab provider, which is OAUTH2 and declares no default scopes. The adapter reads merge requests, MR diffs/discussions/approvals, issues, pipelines/jobs, and repository commits, and writes merge requests, issues, MR discussions, and issue notes through GitLab REST API endpoints. GitLab documents the `api` scope as complete read/write API access; `read_api` is read-only, `read_repository` covers Git-over-HTTP or the Repository Files API, and `write_repository` is Git-over-HTTP only and does not support API authentication. No separate webhook OAuth scope is documented; project hook management, if Relayfile provisions hooks through the API, is also covered by `api`, while webhook delivery still depends on project/user permissions."
 
   - slug: gmail
     display_name: Gmail
