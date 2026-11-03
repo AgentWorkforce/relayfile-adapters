@@ -235,9 +235,14 @@ test('normalizes GitLab slugged nested writeback paths to runtime matchers', () 
 
   assert.ok(discussionEndpoint, 'expected GitLab merge request discussion endpoint');
   assert.ok(commentEndpoint, 'expected GitLab issue comment endpoint');
+  assert.deepEqual(discussionEndpoint.operations, ['create']);
+  const discussionIds = new RegExp(discussionEndpoint.resource.idPatternSource);
+  assert.equal(discussionIds.test('new'), false);
+  assert.equal(discussionIds.test('draft-abc'), false);
+  assert.equal(discussionIds.test('abc123'), true);
   assert.equal(
     discussionEndpoint.resource.pathPatternSource,
-    '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?|/[^/]+/notes/[^/]+\\.json)?$',
+    '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$',
   );
   assert.equal(
     commentEndpoint.resource.pathPatternSource,

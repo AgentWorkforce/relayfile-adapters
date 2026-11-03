@@ -12,6 +12,7 @@ describe('GitLabWritebackHandler', () => {
       ['/gitlab/projects/acme/platform/web/issues/draft-abc123.json', 'file_upsert'],
       ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/draft-abc123.json', 'file_upsert'],
       ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/new.json', 'file_upsert'],
       ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json', 'file_delete'],
       ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123/notes/99.json', 'file_delete'],
       ['/gitlab/projects/acme/platform/web/refs/feature%2Fbranch.json', 'file_upsert'],
@@ -45,6 +46,7 @@ describe('GitLabWritebackHandler', () => {
     for (const [path, endpoint] of [
       ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/draft-abc123.json', '/api/v4/projects/acme%2Fplatform%2Fweb/issues/5/notes'],
       ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/draft-abc123.json', '/api/v4/projects/acme%2Fplatform%2Fweb/merge_requests/7/discussions'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/new.json', '/api/v4/projects/acme%2Fplatform%2Fweb/merge_requests/7/discussions'],
     ]) {
       assert.deepStrictEqual(resolveGitLabWritebackRequest(path, JSON.stringify({ body: 'Helper note', idempotencyKey: 'helper-write-2' })), { method: 'POST', endpoint, body: { body: 'Helper note' } });
     }
@@ -244,8 +246,9 @@ describe('GitLabWritebackHandler', () => {
       },
     );
     const route = classifyWrite(discussionNotePath, resources, { fsEvent: 'delete' });
-    assert.strictEqual(route?.kind, 'delete');
-    assert.strictEqual(route?.resource.name, 'discussions');
+    assert.strictEqual(route, null, 'generic discussion resource does not advertise note deletion');
+    assert.strictEqual(classifyWrite('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json', resources, { fsEvent: 'delete' }), null);
+    assert.strictEqual(isGitLabWritebackPath(discussionNotePath, 'file_delete'), true, 'provider-specific nested note deletion remains executable');
     assert.throws(
       () => resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json'),
       /Unsupported GitLab delete writeback path/,
