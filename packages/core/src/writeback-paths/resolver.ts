@@ -15,6 +15,7 @@ export class WritebackPathError extends Error {
 }
 
 export type WritebackPathParams = Record<string, string | number>;
+type PathVariant = { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] };
 
 /**
  * Resolve the canonical Relayfile-mount directory path for a provider
@@ -34,7 +35,7 @@ export function writebackPath(provider: string, resource: string, params?: Write
 export function writebackPath(provider: string, resource: string, params: WritebackPathParams = {}): string {
   const catalog = WRITEBACK_PATH_CATALOG as Record<
     string,
-    Record<string, readonly { path: string; params: readonly string[] }[]>
+    Record<string, readonly PathVariant[]>
   >;
   // `Object.hasOwn` (not `catalog[provider]`) so prototype keys like
   // "constructor"/"toString" resolve to the loud error, not a stray function
@@ -61,6 +62,16 @@ export function writebackPath(provider: string, resource: string, params: Writeb
         `Missing path parameter "${name}" for ${provider}/${resource} (template "${variant.path}")`
       );
     }
+    if (value === "." || value === "..") {
+      throw new WritebackPathError(`Invalid path parameter "${name}" for ${provider}/${resource}`);
+    }
+    if (variant.multiSegmentParams?.includes(name)) {
+      const segments = String(value).split("/");
+      if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+        throw new WritebackPathError(`Invalid multi-segment path parameter "${name}" for ${provider}/${resource}`);
+      }
+      return segments.map(encodeURIComponent).join("/");
+    }
     return encodeURIComponent(String(value));
   });
 }
@@ -75,9 +86,9 @@ export function writebackPath(provider: string, resource: string, params: Writeb
 function selectVariant(
   provider: string,
   resource: string,
-  variants: readonly { path: string; params: readonly string[] }[],
+  variants: readonly PathVariant[],
   params: WritebackPathParams
-): { path: string; params: readonly string[] } {
+): PathVariant {
   if (variants.length === 1) {
     return variants[0];
   }

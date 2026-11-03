@@ -30,8 +30,13 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
       resource: normalizeWritebackEndpointResource(adapter.slug, contractedEndpoint, layoutManifest),
     };
   });
+  if (adapter.multiSegmentParams !== undefined && (
+    !Array.isArray(adapter.multiSegmentParams) ||
+    adapter.multiSegmentParams.some((name) => typeof name !== 'string' || !endpoints.some((endpoint) => endpoint.resource.resourcePath.includes(`{${name}}`)))
+  )) throw new Error(`${adapter.slug}: invalid multiSegmentParams declaration`);
   return {
     slug: adapter.slug,
+    ...(adapter.multiSegmentParams ? { multiSegmentParams: adapter.multiSegmentParams } : {}),
     title: adapter.title,
     overview: adapter.overview,
     ...(adapter.mountLabel ? { mountLabel: adapter.mountLabel } : {}),

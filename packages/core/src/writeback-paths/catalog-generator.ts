@@ -20,6 +20,8 @@ export interface WritebackResourcePath {
   path: string;
   /** Placeholder names in template order, e.g. `["issueId"]`. */
   params: string[];
+  /** Parameters whose adapter-owned values span several slash-separated segments. */
+  multiSegmentParams?: string[];
 }
 
 /**
@@ -62,6 +64,7 @@ interface AdapterResource {
   name: string;
   path: string;
   operations?: readonly string[];
+  multiSegmentParams?: readonly string[];
 }
 
 const GENERATED_HEADER = `/**
@@ -180,7 +183,7 @@ export function renderWritebackPathCatalogModule(generation: WritebackPathCatalo
   return `${GENERATED_HEADER}
 export const WRITEBACK_PATH_CATALOG = ${renderInlineJson(generation.catalog)} as const satisfies Record<
   string,
-  Record<string, readonly { path: string; params: readonly string[] }[]>
+  Record<string, readonly { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = ${renderInlineJson(generation.adaptersWithoutWritebackPaths)} as const;
@@ -207,19 +210,22 @@ async function readAdapterResources(
 
   let importError: string | undefined;
   if (builtEntryPoint) {
+    let moduleExports: { resources?: unknown } | undefined;
     try {
-      const moduleExports = (await import(pathToFileURL(builtEntryPoint).href)) as {
+      moduleExports = (await import(pathToFileURL(builtEntryPoint).href)) as {
         resources?: unknown;
       };
-      const resources = normalizeResources(moduleExports.resources);
-      if (resources.length > 0) {
-        return { resources };
-      }
     } catch (error) {
       // Remember the import failure so it surfaces as the adapter's reason
       // instead of a generic "no resources" message — a swallowed import
       // error otherwise hides a real build/runtime problem.
       importError = `Could not import built adapter resources: ${errorMessage(error)}`;
+    }
+    // Invalid loaded metadata is a contract error, not an import failure to
+    // silently hide behind a source fallback or an omitted adapter.
+    if (moduleExports) {
+      const resources = normalizeResources(moduleExports.resources);
+      if (resources.length > 0) return { resources };
     }
   }
 
@@ -248,7 +254,8 @@ function normalizeResources(value: unknown): AdapterResource[] {
       path.length > 0 &&
       !(Array.isArray(operations) && operations.length === 0)
     ) {
-      out.push({ name, path });
+      const multiSegmentParams = normalizeMultiSegmentParams(entry.multiSegmentParams, path);
+      out.push({ name, path, ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
     }
   }
   return out;
@@ -268,7 +275,12 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(contents)) !== null) {
     if (/operations:\s*\[\s*\]/u.test(match.groups?.tail ?? "")) continue;
-    out.push({ name: match[1], path: match[2] });
+    const declaration = /\bmultiSegmentParams\s*:\s*(\[[^\]]*\])/u.exec(match.groups?.tail ?? "");
+    if (!declaration && /\bmultiSegmentParams\s*:/u.test(match.groups?.tail ?? "")) {
+      throw new Error(`multiSegmentParams for ${match[2]} must be a literal array of path parameter names`);
+    }
+    const multiSegmentParams = normalizeMultiSegmentParams(declaration ? parseSourceParamArray(declaration[1]) : undefined, match[2]);
+    out.push({ name: match[1], path: match[2], ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
   }
   return out;
 }
@@ -285,7 +297,11 @@ function sortCatalog(
     for (const resource of entry.resources) {
       const byPath = byName.get(resource.name) ?? new Map<string, WritebackResourcePath>();
       if (!byPath.has(resource.path)) {
-        byPath.set(resource.path, { path: resource.path, params: extractParams(resource.path) });
+        byPath.set(resource.path, {
+          path: resource.path,
+          params: extractParams(resource.path),
+          ...(resource.multiSegmentParams?.length ? { multiSegmentParams: [...resource.multiSegmentParams] } : {}),
+        });
       }
       byName.set(resource.name, byPath);
     }
@@ -310,6 +326,26 @@ function sortCatalog(
 
 function normalizeEol(value: string): string {
   return value.replace(/\r\n/gu, "\n");
+}
+
+function normalizeMultiSegmentParams(value: unknown, path: string): string[] {
+  if (value === undefined) return [];
+  const params = extractParams(path);
+  if (!Array.isArray(value) || value.some((name) => typeof name !== "string" || !params.includes(name))) {
+    throw new Error(`Invalid multiSegmentParams for writeback template ${path}`);
+  }
+  return [...new Set(value as string[])];
+}
+
+/** Generated arrays are JSON; handwritten TypeScript also allows single quotes and a trailing comma. */
+function parseSourceParamArray(literal: string): string[] {
+  const entries = literal.slice(1, -1).trim().replace(/,\s*$/u, "");
+  if (!entries) return [];
+  return entries.split(",").map((entry) => {
+    const match = /^\s*(["'])([A-Za-z_][A-Za-z0-9_]*)\1\s*$/u.exec(entry);
+    if (!match) throw new Error("multiSegmentParams must be a literal array of path parameter names");
+    return match[2];
+  });
 }
 
 /** Placeholder names in template order, e.g. `/x/{a}/y/{b}` → `["a","b"]`. */

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { WRITEBACK_PATH_CATALOG, writebackPath, WritebackPathError } from "../../src/index.js";
 import {
@@ -8,6 +10,31 @@ import {
   writebackPathCatalogPaths,
 } from "../../src/writeback-paths/catalog-generator.js";
 import { findRepoRoot } from "../../src/triggers/catalog-generator.js";
+
+test("catalog preserves and validates multi-segment declarations from built and source resources", async (t) => {
+  for (const built of [false, true]) for (const quote of ['"', "'"]) for (const valid of [true, false]) {
+    const root = await mkdtemp(join(tmpdir(), "writeback-path-metadata-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const directory = join(root, "packages", "gitlab", built ? "dist" : "src");
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(root, "packages", "gitlab", "package.json"), JSON.stringify({ name: "@relayfile/adapter-gitlab", type: "module" }));
+    const file = join(directory, built ? "resources.js" : "resources.ts");
+    await writeFile(file, `export const resources = [\n  {\n    name: "issues",\n    path: "/gitlab/projects/{projectPath}/issues",\n    multiSegmentParams: [${quote}${valid ? "projectPath" : "typo"}${quote},],\n  },\n];\n`);
+    if (valid) {
+      const { catalog } = await generateWritebackPathCatalog(root);
+      assert.deepEqual(catalog.gitlab.issues[0].multiSegmentParams, ["projectPath"]);
+    } else {
+      await assert.rejects(generateWritebackPathCatalog(root), /Invalid multiSegmentParams/);
+    }
+    if (!built && valid) {
+      const source = await readFile(file, "utf8");
+      for (const expression of ["null", "projectParams", '"projectPath"']) {
+        await writeFile(file, source.replace(/multiSegmentParams: \[[^\]]*\]/u, `multiSegmentParams : ${expression}`));
+        await assert.rejects(generateWritebackPathCatalog(root), /must be a literal array/);
+      }
+    }
+  }
+});
 
 test("generated writeback-path catalog is in sync with adapter resources", async () => {
   const repoRoot = await findRepoRoot();
@@ -62,6 +89,18 @@ test("writebackPath substitutes and url-encodes params in template order", () =>
   assert.equal(writebackPath("telegram", "messages", { chatId: "C/1" }), "/telegram/chats/C%2F1/messages");
 });
 
+test("GitLab project parameters preserve namespace segments in canonical paths", () => {
+  for (const projectPath of ["acme/web", "acme/platform/web", "acme/a b/web"]) {
+    const root = `/gitlab/projects/${projectPath.split("/").map(encodeURIComponent).join("/")}`;
+    assert.equal(writebackPath("gitlab", "issues", { projectPath }), `${root}/issues`);
+    assert.equal(writebackPath("gitlab", "issues", { projectPath, issueIid: 42, slug: "hello world" }), `${root}/issues/42__hello%20world/meta.json`);
+    assert.equal(writebackPath("gitlab", "comments", { projectPath, issueIid: 42, slug: "hello" }), `${root}/issues/42__hello/comments`);
+  }
+  for (const projectPath of ["/acme/web", "acme//web", "acme/../web", "acme/./web", "acme/web/"]) {
+    assert.throws(() => writebackPath("gitlab", "issues", { projectPath }), WritebackPathError);
+  }
+});
+
 test("writebackPath disambiguates multi-template resources by exact param set", () => {
   assert.equal(writebackPath("notion", "pages", { databaseId: "db1" }), "/notion/databases/db1/pages");
   assert.equal(
@@ -80,6 +119,9 @@ test("writebackPath disambiguates multi-template resources by exact param set", 
 test("writebackPath throws loudly rather than guessing", () => {
   assert.throws(() => writebackPath("nope" as never, "x" as never), WritebackPathError);
   assert.throws(() => writebackPath("linear", "nope" as never), WritebackPathError);
+  for (const issueId of [".", ".."]) {
+    assert.throws(() => writebackPath("linear", "comments", { issueId }), WritebackPathError);
+  }
   // Missing a required param must fail, not emit a path with a literal `{issueId}`.
   assert.throws(() => writebackPath("linear", "comments", {}), WritebackPathError);
   // Prototype keys must not bypass the guard via Object.prototype.

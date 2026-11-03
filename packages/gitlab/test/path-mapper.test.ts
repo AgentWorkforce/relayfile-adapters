@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { writebackPath } from '@relayfile/adapter-core/writeback-paths';
 
 import {
   computeCommitCommentPath,
@@ -26,6 +27,13 @@ import {
 } from '../src/path-mapper.js';
 
 describe('path mapper', () => {
+  it('resolves helper create paths to the adapter-owned project layout', () => {
+    for (const projectPath of ['acme/web', 'acme/platform/web', 'acme/a b/web']) {
+      assert.equal(`${writebackPath('gitlab', 'issues', { projectPath })}/new.json`, computeIssueCreateDraftPath(projectPath, 'new'));
+      assert.equal(`${writebackPath('gitlab', 'merge-requests', { projectPath })}/new.json`, computeMergeRequestCreateDraftPath(projectPath, 'new'));
+    }
+  });
+
   it('computes the expected GitLab VFS paths', () => {
     assert.strictEqual(
       computeMetadataPath('acme/platform/api', 'merge_requests', 42, 'Add OAuth'),
