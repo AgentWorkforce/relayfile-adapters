@@ -275,7 +275,10 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(contents)) !== null) {
     if (/operations:\s*\[\s*\]/u.test(match.groups?.tail ?? "")) continue;
-    const declaration = /multiSegmentParams:\s*(\[[^\]]*\])/u.exec(match.groups?.tail ?? "");
+    const declaration = /\bmultiSegmentParams\s*:\s*(\[[^\]]*\])/u.exec(match.groups?.tail ?? "");
+    if (!declaration && /\bmultiSegmentParams\s*:/u.test(match.groups?.tail ?? "")) {
+      throw new Error(`multiSegmentParams for ${match[2]} must be a literal array of path parameter names`);
+    }
     const multiSegmentParams = normalizeMultiSegmentParams(declaration ? parseSourceParamArray(declaration[1]) : undefined, match[2]);
     out.push({ name: match[1], path: match[2], ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
   }

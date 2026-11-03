@@ -26,6 +26,13 @@ test("catalog preserves and validates multi-segment declarations from built and 
     } else {
       await assert.rejects(generateWritebackPathCatalog(root), /Invalid multiSegmentParams/);
     }
+    if (!built && valid) {
+      const source = await readFile(file, "utf8");
+      for (const expression of ["null", "projectParams", '"projectPath"']) {
+        await writeFile(file, source.replace(/multiSegmentParams: \[[^\]]*\]/u, `multiSegmentParams : ${expression}`));
+        await assert.rejects(generateWritebackPathCatalog(root), /must be a literal array/);
+      }
+    }
   }
 });
 
