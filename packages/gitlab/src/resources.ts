@@ -87,18 +87,20 @@ export const resources = [
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions",
     multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[^\/]+(?:__[^\/]+)?\/discussions(?:\/[^\/]+(?:\.json)?|\/[^\/]+\/notes\/[^\/]+\.json)?$/,
-    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    idPattern: /^(?!draft-)[A-Za-z0-9_.:-]+$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.schema.json",
     createExample: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.create.example.json",
+    operations: ["create", "delete"],
   },
   {
     name: "comments",
     path: "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments",
     multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/issues\/[^\/]+(?:__[^\/]+)?\/comments(?:\/[^\/]+(?:\.json)?)?$/,
-    idPattern: /^[A-Za-z0-9_.:-]+$/,
+    idPattern: /^[1-9]\d*$/,
     schema: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/.schema.json",
     createExample: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/.create.example.json",
+    operations: ["create", "delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

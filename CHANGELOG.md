@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-gitlab` accepts helper write identities without forwarding them to GitLab, routes hashed note drafts to creates, and exposes `isGitLabWritebackPath` with canonical project isolation.
 - `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 
 ### Added
