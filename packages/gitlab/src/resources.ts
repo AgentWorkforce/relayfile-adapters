@@ -90,7 +90,7 @@ export const resources = [
     idPattern: /^(?!draft-)[A-Za-z0-9_.:-]+$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.schema.json",
     createExample: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.create.example.json",
-    operations: ["create", "delete"],
+    operations: ["create","delete"],
   },
   {
     name: "comments",
@@ -100,7 +100,7 @@ export const resources = [
     idPattern: /^[1-9]\d*$/,
     schema: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/.schema.json",
     createExample: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/.create.example.json",
-    operations: ["create", "delete"],
+    operations: ["create","delete"],
   },
 ] as const satisfies readonly AdapterResourceConfig[];
 

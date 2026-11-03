@@ -424,6 +424,8 @@ function idPatternFor(adapterSlug, resourcePath) {
     if (resourcePath === '/gitlab/projects/{projectPath}/issues') {
       return pattern('^[1-9]\\d*$');
     }
+    if (resourcePath.endsWith('/comments')) return pattern('^[1-9]\\d*$');
+    if (resourcePath.endsWith('/discussions')) return pattern('^(?!draft-)[A-Za-z0-9_.:-]+$');
     if (resourcePath === '/gitlab/projects/{projectPath}/merge-requests') {
       return pattern('^[1-9]\\d*$');
     }

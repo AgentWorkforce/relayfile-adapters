@@ -224,8 +224,13 @@ function classifyGitLabUpsert(path: string): ReturnType<typeof classifyWrite> {
     const filename = decodeURIComponent(path.split('/').at(-1) ?? '');
     if (filename === '_index.json' || filename === 'metadata.json' ||
       (filename === 'meta.json' && !route.resource.path.endsWith('/meta.json'))) return null;
-    // Nested discussion-note paths support deletion, not top-level creation.
-    if (route.resource.name === 'discussions' && /\/discussions\/[^/]+\/notes\//u.test(path)) return null;
+    if (route.resource.name === 'comments') canonicalTarget(path, 'issues');
+    if (route.resource.name === 'discussions') {
+      canonicalTarget(path, 'merge_requests');
+      // Check only the resource suffix: namespaces may contain these names.
+      const suffix = path.slice(gitLabProjectPrefix(parsed.projectPath).length);
+      if (/\/discussions\/[^/]+\/notes\//u.test(suffix)) return null;
+    }
     return route;
   } catch {
     return null;

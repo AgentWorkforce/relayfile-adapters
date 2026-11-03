@@ -15,6 +15,7 @@ describe('GitLabWritebackHandler', () => {
       ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json', 'file_delete'],
       ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123/notes/99.json', 'file_delete'],
       ['/gitlab/projects/acme/platform/web/refs/feature%2Fbranch.json', 'file_upsert'],
+      ['/gitlab/projects/acme/discussions/team/notes/web/merge_requests/7__existing/discussions/draft-abc.json', 'file_upsert'],
     ]) assert.strictEqual(isGitLabWritebackPath(path, action), true, `${action}: ${path}`);
     for (const [path, action] of [
       ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json', 'file_upsert'],
@@ -25,6 +26,8 @@ describe('GitLabWritebackHandler', () => {
       ['/gitlab/projects/acme/platform/web/issues/draft-abc123.json', 'file_delete'],
       ['/gitlab/projects/acme/platform/web/issues/_index.json', 'file_upsert'],
       ['/gitlab/projects/acme%252Fother/web/issues/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/issues/not-an-iid/comments/draft-abc.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/not-an-iid/discussions/draft-abc.json', 'file_upsert'],
     ]) assert.strictEqual(isGitLabWritebackPath(path, action), false, `${action}: ${path}`);
   });
 
