@@ -9,10 +9,12 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-gitlab` helper writebacks no longer send the transport-only `idempotencyKey` to GitLab, treat `draft-…` note names as creates, and reject unsafe project paths.
 - `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 
 ### Added
 
+- `@relayfile/adapter-gitlab/writeback` exports `isGitLabWritebackPath` so queue admission can share the provider resolver's supported operations and path validation.
 - `@relayfile/adapter-gitlab` declares project/personal and group access token connection aliases for the existing GitLab event and filesystem contract.
 - `@relayfile/adapter-cloudflare` now maps hourly per-script Workers error rollups (`CloudflareWorkerErrorRollup`) to `/cloudflare/workers/errors/<script>/<YYYY-MM-DD>/<HH>.json`, with complete per-script (by date) and per-day (by hour) `_index.json` files, a root `/cloudflare/workers/errors/_index.json` pointing at each script's latest rollup, round-trippable path and id helpers, a read-only discovery schema, digest naming, and `LAYOUT.md` guidance. Consumers must bump the dependency and wire the new sync model to materialize it.
 - `@relayfile/adapter-bitbucket` now emits sorted root and resource indexes with stable record aliases, documents canonical paths and terminal states in `LAYOUT.md`, and excludes retired native Issues from writable discovery while preserving historical issue records.

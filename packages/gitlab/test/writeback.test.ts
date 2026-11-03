@@ -2,11 +2,71 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyWrite } from '@relayfile/adapter-core';
 
-import { GitLabWritebackHandler, resolveDeleteRequest, resolveGitLabWritebackRequest } from '../src/writeback.js';
+import { GitLabWritebackHandler, isGitLabWritebackPath, resolveDeleteRequest, resolveGitLabWritebackRequest } from '../src/writeback.js';
 import { resources } from '../src/resources.js';
 import { MockProvider, ok } from './helpers.js';
 
 describe('GitLabWritebackHandler', () => {
+  it('shares executable create and delete admission with queue consumers', () => {
+    for (const [path, action] of [
+      ['/gitlab/projects/acme/platform/web/issues/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/new.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123/notes/99.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/refs/feature%2Fbranch.json', 'file_upsert'],
+      ['/gitlab/projects/acme/discussions/team/notes/web/merge_requests/7__existing/discussions/draft-abc.json', 'file_upsert'],
+    ]) assert.strictEqual(isGitLabWritebackPath(path, action), true, `${action}: ${path}`);
+    for (const [path, action] of [
+      ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123/notes/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/not-a-number/discussions/abc123/notes/99.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/../notes/99.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/./notes/99.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/%2e%2e/notes/99.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/issues/draft-abc123.json', 'file_delete'],
+      ['/gitlab/projects/acme/platform/web/issues/_index.json', 'file_upsert'],
+      ['/gitlab/projects/acme%252Fother/web/issues/draft-abc123.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/issues/not-an-iid/comments/draft-abc.json', 'file_upsert'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/not-an-iid/discussions/draft-abc.json', 'file_upsert'],
+    ]) assert.strictEqual(isGitLabWritebackPath(path, action), false, `${action}: ${path}`);
+  });
+
+  it('accepts helper transport identity without forwarding it to GitLab', () => {
+    const request = resolveGitLabWritebackRequest('/gitlab/projects/acme/platform/web/issues/draft-abc123.json', JSON.stringify({ title: 'Helper', idempotencyKey: 'helper-write-1' }));
+    assert.deepStrictEqual(request, { method: 'POST', endpoint: '/api/v4/projects/acme%2Fplatform%2Fweb/issues', body: { title: 'Helper' } });
+    assert.throws(() => resolveGitLabWritebackRequest('/gitlab/projects/acme/platform/web/issues/draft-abc123.json', JSON.stringify({ title: 'Helper', idempotencyKey: 'helper-write-1', bogus: true })), /bogus is not supported/);
+    assert.throws(() => resolveGitLabWritebackRequest('/gitlab/projects/acme/platform/web/issues/draft-abc123.json', JSON.stringify({ title: 'Helper', idempotencyKey: 'helper-write-1', id: 7 })), /read-only/);
+  });
+
+  it('routes ordinary helper draft names to note and discussion creates', () => {
+    for (const [path, endpoint] of [
+      ['/gitlab/projects/acme/platform/web/issues/5__existing/comments/draft-abc123.json', '/api/v4/projects/acme%2Fplatform%2Fweb/issues/5/notes'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/draft-abc123.json', '/api/v4/projects/acme%2Fplatform%2Fweb/merge_requests/7/discussions'],
+      ['/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/new.json', '/api/v4/projects/acme%2Fplatform%2Fweb/merge_requests/7/discussions'],
+    ]) {
+      assert.deepStrictEqual(resolveGitLabWritebackRequest(path, JSON.stringify({ body: 'Helper note', idempotencyKey: 'helper-write-2' })), { method: 'POST', endpoint, body: { body: 'Helper note' } });
+    }
+  });
+
+  it('does not classify canonical note or discussion edits as supported updates', () => {
+    for (const path of [
+      '/gitlab/projects/acme/platform/web/issues/5__existing/comments/123.json',
+      '/gitlab/projects/acme/platform/web/merge_requests/7__existing/discussions/abc123.json',
+    ]) assert.strictEqual(classifyWrite(path, resources), null);
+  });
+
+  it('rejects encoded project separators and traversal before provider dispatch', () => {
+    for (const project of ['acme%2Fother/web', 'acme%252Fother/web', 'acme%25252Fother/web', 'acme/%252e%252e/web', 'acme/../web']) {
+      assert.throws(() => resolveGitLabWritebackRequest(`/gitlab/projects/${project}/issues/draft-abc123.json`, JSON.stringify({ title: 'Invalid project' })), /Unsupported GitLab writeback path/);
+      assert.throws(() => resolveGitLabWritebackRequest(`/gitlab/projects/${project}/issues/5__existing/meta.json`, JSON.stringify({ title: 'Invalid project' })), /Unsupported GitLab writeback path/);
+      assert.throws(() => resolveDeleteRequest(`/gitlab/projects/${project}/issues/5__existing/comments/123.json`), /Unsupported GitLab/);
+    }
+  });
+
   it('creates issues, merge requests, and branches through GitLab v4', () => {
     assert.deepStrictEqual(resolveGitLabWritebackRequest('/gitlab/projects/acme/api/issues/factory-draft.json', JSON.stringify({ title: 'Parity', labels: ['factory'] })), {
       method: 'POST', endpoint: '/api/v4/projects/acme%2Fapi/issues', body: { title: 'Parity', labels: 'factory' },
@@ -186,8 +246,9 @@ describe('GitLabWritebackHandler', () => {
       },
     );
     const route = classifyWrite(discussionNotePath, resources, { fsEvent: 'delete' });
-    assert.strictEqual(route?.kind, 'delete');
-    assert.strictEqual(route?.resource.name, 'discussions');
+    assert.strictEqual(route, null, 'generic discussion resource does not advertise note deletion');
+    assert.strictEqual(classifyWrite('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json', resources, { fsEvent: 'delete' }), null);
+    assert.strictEqual(isGitLabWritebackPath(discussionNotePath, 'file_delete'), true, 'provider-specific nested note deletion remains executable');
     assert.throws(
       () => resolveDeleteRequest('/gitlab/projects/acme/api/merge_requests/42__add-oauth/discussions/discussion-1.json'),
       /Unsupported GitLab delete writeback path/,

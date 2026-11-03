@@ -7,7 +7,7 @@ import type {
   WritebackPathTarget,
   WritebackResult,
 } from './types.js';
-import { decodeProjectPath, parseGitLabPath } from './path-mapper.js';
+import { decodeProjectPath, gitLabProjectPrefix, parseGitLabPath } from './path-mapper.js';
 import { resources } from './resources.js';
 
 export { ReadOnlyFieldError } from '@relayfile/adapter-core';
@@ -120,6 +120,7 @@ export class GitLabWritebackHandler {
     if (!parsed) {
       throw unsupported(path);
     }
+    canonicalProjectPath(path, parsed.projectPath);
 
     const route = classifyWrite(path, resources);
     const meta =
@@ -201,11 +202,46 @@ export class GitLabWritebackHandler {
   }
 }
 
+/** Executable file operations, shared with writeback queue admission. */
+export function isGitLabWritebackPath(path: string, action: string): boolean {
+  try {
+    if (action === 'file_delete') {
+      resolveDeleteRequest(path);
+      return true;
+    }
+    return action === 'file_upsert' && classifyGitLabUpsert(path) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function classifyGitLabUpsert(path: string): ReturnType<typeof classifyWrite> {
+  try {
+    const route = classifyWrite(path, resources);
+    const parsed = parseGitLabPath(path);
+    if (!route || !parsed) return null;
+    canonicalProjectPath(path, parsed.projectPath);
+    const filename = decodeURIComponent(path.split('/').at(-1) ?? '');
+    if (filename === '_index.json' || filename === 'metadata.json' ||
+      (filename === 'meta.json' && !route.resource.path.endsWith('/meta.json'))) return null;
+    if (route.resource.name === 'comments') canonicalTarget(path, 'issues');
+    if (route.resource.name === 'discussions') {
+      canonicalTarget(path, 'merge_requests');
+      // Check only the resource suffix: namespaces may contain these names.
+      const suffix = path.slice(gitLabProjectPrefix(parsed.projectPath).length);
+      if (/\/discussions\/[^/]+\/notes\//u.test(suffix)) return null;
+    }
+    return route;
+  } catch {
+    return null;
+  }
+}
+
 export function resolveGitLabWritebackRequest(
   path: string,
   content: string,
 ): GitLabWritebackRequest {
-  const route = classifyWrite(path, resources);
+  const route = classifyGitLabUpsert(path);
   if (!route) {
     throw unsupported(path);
   }
@@ -302,10 +338,14 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
     /^\/gitlab\/projects\/(.+?)\/merge_requests\/([^/]+)\/discussions\/([^/]+)\/notes\/([^/]+)\.json$/,
   );
   if (nested) {
+    if (!/^[1-9]\d*$/u.test(iid(nested[2])) || !/^[1-9]\d*$/u.test(nested[4]) ||
+      !/^(?!\.{1,2}$)[A-Za-z0-9_.:-]+$/u.test(nested[3])) {
+      throw new Error(`Unsupported GitLab delete writeback path: ${path}`);
+    }
     return {
       action: 'delete_merge_request_discussion',
       method: 'DELETE',
-      endpoint: `${mrEndpoint(decodeProjectPath(nested[1]))}/${iid(nested[2])}/discussions/${encodeURIComponent(nested[3])}/notes/${encodeURIComponent(nested[4])}`,
+      endpoint: `${mrEndpoint(canonicalProjectPath(path, decodeProjectPath(nested[1])))}/${iid(nested[2])}/discussions/${encodeURIComponent(nested[3])}/notes/${encodeURIComponent(nested[4])}`,
     };
   }
 
@@ -316,12 +356,13 @@ export function resolveDeleteRequest(path: string): GitLabWritebackRequest {
     route?.resource.name === 'comments' &&
     route.kind === 'delete' &&
     parsed.objectType === 'issues' &&
+    /^[1-9]\d*$/u.test(parsed.objectId) &&
     parsed.subResourceId
   ) {
     return {
       action: 'delete_issue_note',
       method: 'DELETE',
-      endpoint: `${issueEndpoint(parsed.projectPath)}/${parsed.objectId}/notes/${encodeURIComponent(parsed.subResourceId)}`,
+      endpoint: `${issueEndpoint(canonicalProjectPath(path, parsed.projectPath))}/${parsed.objectId}/notes/${encodeURIComponent(parsed.subResourceId)}`,
     };
   }
 
@@ -414,6 +455,9 @@ function payload(content: string): WritebackPayload {
   }
 
   const record = value as WritebackPayload;
+  // Persisted helper identity belongs to Relayfile's delivery protocol, not
+  // the GitLab API. Preserve strict validation for every provider field.
+  delete record.idempotencyKey;
   for (const key of Object.keys(record)) {
     if (READ_ONLY_FIELDS.has(key)) {
       throw new ReadOnlyFieldError(key);
@@ -555,7 +599,7 @@ function collectionProject(path: string, collection: string): string {
   if (!match?.[1]) {
     throw unsupported(path);
   }
-  return decodeProjectPath(match[1]);
+  return canonicalProjectPath(path, decodeProjectPath(match[1]));
 }
 
 function canonicalTarget(path: string, expected: 'issues' | 'merge_requests'): CanonicalTarget {
@@ -567,7 +611,13 @@ function canonicalTarget(path: string, expected: 'issues' | 'merge_requests'): C
   ) {
     throw unsupported(path);
   }
-  return { projectPath: parsed.projectPath, iid: parsed.objectId };
+  return { projectPath: canonicalProjectPath(path, parsed.projectPath), iid: parsed.objectId };
+}
+
+function canonicalProjectPath(path: string, projectPath: string): string {
+  if (projectPath.split('/').some(part => !part || part === '.' || part === '..' || /[%\\\u0000-\u001f\u007f]/u.test(part)) ||
+    !path.startsWith(`${gitLabProjectPrefix(projectPath)}/`)) throw unsupported(path);
+  return projectPath;
 }
 
 function iid(segment: string): string {

@@ -336,7 +336,7 @@ function pathPatternSourceFor(adapterSlug, resourcePath) {
     return '^/slack/channels/[^/]+/messages(?:/[^/]+(?:\\.json|/meta\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/merge_requests/{mergeRequestIid}__{slug}/discussions')) {
-    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?|/[^/]+/notes/[^/]+\\.json)?$';
+    return '^/gitlab/projects/.+?/merge_requests/[^/]+(?:__[^/]+)?/discussions(?:/[^/]+(?:\\.json)?)?$';
   }
   if (adapterSlug === 'gitlab' && resourcePath.includes('/issues/{issueIid}__{slug}/comments')) {
     return '^/gitlab/projects/.+?/issues/[^/]+(?:__[^/]+)?/comments(?:/[^/]+(?:\\.json)?)?$';
@@ -424,6 +424,8 @@ function idPatternFor(adapterSlug, resourcePath) {
     if (resourcePath === '/gitlab/projects/{projectPath}/issues') {
       return pattern('^[1-9]\\d*$');
     }
+    if (resourcePath.endsWith('/comments')) return pattern('^[1-9]\\d*$');
+    if (resourcePath.endsWith('/discussions')) return pattern('^(?!(?:draft-|new$))[A-Za-z0-9_.:-]+$');
     if (resourcePath === '/gitlab/projects/{projectPath}/merge-requests') {
       return pattern('^[1-9]\\d*$');
     }
