@@ -386,6 +386,9 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -396,6 +399,9 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "issueIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -406,6 +412,9 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -413,6 +422,9 @@ export const WRITEBACK_PATH_CATALOG = {
       {
         "path": "/gitlab/projects/{projectPath}/issues",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       },
@@ -422,6 +434,9 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "issueIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -432,6 +447,9 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -442,11 +460,17 @@ export const WRITEBACK_PATH_CATALOG = {
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       },
       {
         "path": "/gitlab/projects/{projectPath}/merge-requests",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       }
@@ -455,6 +479,9 @@ export const WRITEBACK_PATH_CATALOG = {
       {
         "path": "/gitlab/projects/{projectPath}/refs",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       }
@@ -1267,7 +1294,7 @@ export const WRITEBACK_PATH_CATALOG = {
   }
 } as const satisfies Record<
   string,
-  Record<string, readonly { path: string; params: readonly string[] }[]>
+  Record<string, readonly { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [

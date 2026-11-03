@@ -273,6 +273,7 @@ function renderResourcesTs(adapter) {
     'export interface AdapterResourceConfig {',
     '  readonly name: string;',
     '  readonly path: string;',
+    ...(adapter.multiSegmentParams ? ['  readonly multiSegmentParams?: readonly string[];'] : []),
     '  readonly pathPattern: RegExp;',
     '  readonly idPattern: RegExp;',
     '  readonly schema: string;',
@@ -287,6 +288,9 @@ function renderResourcesTs(adapter) {
       '  {',
       `    name: ${JSON.stringify(resource.name)},`,
       `    path: ${JSON.stringify(resource.resourcePath)},`,
+      ...(adapter.multiSegmentParams?.some((name) => resource.resourcePath.includes(`{${name}}`))
+        ? [`    multiSegmentParams: ${JSON.stringify(adapter.multiSegmentParams.filter((name) => resource.resourcePath.includes(`{${name}}`)))},`]
+        : []),
       `    pathPattern: ${resource.pathPatternLiteral},`,
       `    idPattern: ${resource.idPatternLiteral},`,
       `    schema: ${JSON.stringify(`discovery${resource.schemaPath}`)},`,

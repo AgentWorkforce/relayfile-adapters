@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { WRITEBACK_PATH_CATALOG, writebackPath, WritebackPathError } from "../../src/index.js";
 import {
@@ -8,6 +10,25 @@ import {
   writebackPathCatalogPaths,
 } from "../../src/writeback-paths/catalog-generator.js";
 import { findRepoRoot } from "../../src/triggers/catalog-generator.js";
+
+test("catalog preserves and validates multi-segment declarations from built and source resources", async (t) => {
+  for (const built of [false, true]) {
+    const root = await mkdtemp(join(tmpdir(), "writeback-path-metadata-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const directory = join(root, "packages", "gitlab", built ? "dist" : "src");
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(root, "packages", "gitlab", "package.json"), JSON.stringify({ name: "@relayfile/adapter-gitlab", type: "module" }));
+    const file = join(directory, built ? "resources.js" : "resources.ts");
+    const resource = (parameter: string) => `export const resources = [\n  {\n    name: "issues",\n    path: "/gitlab/projects/{projectPath}/issues",\n    multiSegmentParams: ["${parameter}"],\n  },\n];\n`;
+    await writeFile(file, resource("projectPath"));
+    const { catalog } = await generateWritebackPathCatalog(root);
+    assert.deepEqual(catalog.gitlab.issues[0].multiSegmentParams, ["projectPath"]);
+    if (!built) {
+      await writeFile(file, resource("typo"));
+      await assert.rejects(generateWritebackPathCatalog(root), /Invalid multiSegmentParams/);
+    }
+  }
+});
 
 test("generated writeback-path catalog is in sync with adapter resources", async () => {
   const repoRoot = await findRepoRoot();
@@ -60,6 +81,18 @@ test("writebackPath substitutes and url-encodes params in template order", () =>
   // Path segments are percent-encoded so identifiers round-trip safely.
   assert.equal(writebackPath("slack", "messages", { channelId: "C/1" }), "/slack/channels/C%2F1/messages");
   assert.equal(writebackPath("telegram", "messages", { chatId: "C/1" }), "/telegram/chats/C%2F1/messages");
+});
+
+test("GitLab project parameters preserve namespace segments in canonical paths", () => {
+  for (const projectPath of ["acme/web", "acme/platform/web", "acme/a b/web"]) {
+    const root = `/gitlab/projects/${projectPath.split("/").map(encodeURIComponent).join("/")}`;
+    assert.equal(writebackPath("gitlab", "issues", { projectPath }), `${root}/issues`);
+    assert.equal(writebackPath("gitlab", "issues", { projectPath, issueIid: 42, slug: "hello world" }), `${root}/issues/42__hello%20world/meta.json`);
+    assert.equal(writebackPath("gitlab", "comments", { projectPath, issueIid: 42, slug: "hello" }), `${root}/issues/42__hello/comments`);
+  }
+  for (const projectPath of ["/acme/web", "acme//web", "acme/../web", "acme/./web", "acme/web/"]) {
+    assert.throws(() => writebackPath("gitlab", "issues", { projectPath }), WritebackPathError);
+  }
 });
 
 test("writebackPath disambiguates multi-template resources by exact param set", () => {

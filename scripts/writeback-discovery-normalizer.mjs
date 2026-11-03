@@ -32,6 +32,7 @@ export function normalizeWritebackDiscoveryAdapter(adapter, options = {}) {
   });
   return {
     slug: adapter.slug,
+    ...(adapter.multiSegmentParams ? { multiSegmentParams: adapter.multiSegmentParams } : {}),
     title: adapter.title,
     overview: adapter.overview,
     ...(adapter.mountLabel ? { mountLabel: adapter.mountLabel } : {}),

@@ -376,6 +376,9 @@
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -386,6 +389,9 @@
           "projectPath",
           "issueIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -396,6 +402,9 @@
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -403,6 +412,9 @@
       {
         "path": "/gitlab/projects/{projectPath}/issues",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       },
@@ -412,6 +424,9 @@
           "projectPath",
           "issueIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -422,6 +437,9 @@
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       }
     ],
@@ -432,11 +450,17 @@
           "projectPath",
           "mergeRequestIid",
           "slug"
+        ],
+        "multiSegmentParams": [
+          "projectPath"
         ]
       },
       {
         "path": "/gitlab/projects/{projectPath}/merge-requests",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       }
@@ -445,6 +469,9 @@
       {
         "path": "/gitlab/projects/{projectPath}/refs",
         "params": [
+          "projectPath"
+        ],
+        "multiSegmentParams": [
           "projectPath"
         ]
       }

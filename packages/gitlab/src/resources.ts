@@ -1,6 +1,7 @@
 export interface AdapterResourceConfig {
   readonly name: string;
   readonly path: string;
+  readonly multiSegmentParams?: readonly string[];
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
   readonly schema: string;
@@ -14,6 +15,7 @@ export const resources = [
   {
     name: "issues",
     path: "/gitlab/projects/{projectPath}/issues",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/issues(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[1-9]\d*$/,
     schema: "discovery/gitlab/projects/{projectPath}/issues/.schema.json",
@@ -23,6 +25,7 @@ export const resources = [
   {
     name: "issues",
     path: "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/issues\/[1-9]\d*(?:__[^\/]+)?\/meta\.json$/,
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json/.schema.json",
@@ -32,6 +35,7 @@ export const resources = [
   {
     name: "merge-requests",
     path: "/gitlab/projects/{projectPath}/merge-requests",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge-requests(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[1-9]\d*$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge-requests/.schema.json",
@@ -41,6 +45,7 @@ export const resources = [
   {
     name: "merge-requests",
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[1-9]\d*(?:__[^\/]+)?\/meta\.json$/,
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json/.schema.json",
@@ -50,6 +55,7 @@ export const resources = [
   {
     name: "merge",
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[1-9]\d*(?:__[^\/]+)?\/merge\.json$/,
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json/.schema.json",
@@ -59,6 +65,7 @@ export const resources = [
   {
     name: "close-merge-request",
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[1-9]\d*(?:__[^\/]+)?\/close\.json$/,
     idPattern: /^[1-9]\d*(?:__.*)?$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json/.schema.json",
@@ -68,6 +75,7 @@ export const resources = [
   {
     name: "refs",
     path: "/gitlab/projects/{projectPath}/refs",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/refs(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^$/,
     schema: "discovery/gitlab/projects/{projectPath}/refs/.schema.json",
@@ -77,6 +85,7 @@ export const resources = [
   {
     name: "discussions",
     path: "/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge_requests\/[^\/]+(?:__[^\/]+)?\/discussions(?:\/[^\/]+(?:\.json)?|\/[^\/]+\/notes\/[^\/]+\.json)?$/,
     idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/discussions/.schema.json",
@@ -85,6 +94,7 @@ export const resources = [
   {
     name: "comments",
     path: "/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments",
+    multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/issues\/[^\/]+(?:__[^\/]+)?\/comments(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[A-Za-z0-9_.:-]+$/,
     schema: "discovery/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/comments/.schema.json",

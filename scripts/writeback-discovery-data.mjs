@@ -192,6 +192,7 @@ export const adapters = [
   },
   {
     slug: 'gitlab',
+    multiSegmentParams: ['projectPath'],
     title: 'GitLab adapter',
     overview:
       'The GitLab adapter exposes projects, merge requests, discussions, issues, commits, pipelines, jobs, deployments, and tags under `/gitlab`. Relayfile writeback can create and update issues and merge requests, create branches, accept or close/reopen merge requests, and add merge request discussions and issue notes.',
