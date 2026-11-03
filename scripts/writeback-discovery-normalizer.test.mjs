@@ -597,3 +597,12 @@ const githubLayoutManifest = {
     },
   ],
 };
+
+
+test('rejects unknown adapter multi-segment path parameter declarations', () => {
+  const gitlab = adapters.find((adapter) => adapter.slug === 'gitlab');
+  assert.deepEqual(normalizeWritebackDiscoveryAdapter(gitlab).multiSegmentParams, ['projectPath']);
+  for (const multiSegmentParams of [['projectPth'], 'projectPath', [42]]) {
+    assert.throws(() => normalizeWritebackDiscoveryAdapter({ ...gitlab, multiSegmentParams }), /invalid multiSegmentParams/);
+  }
+});

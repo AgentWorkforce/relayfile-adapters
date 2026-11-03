@@ -62,6 +62,9 @@ export function writebackPath(provider: string, resource: string, params: Writeb
         `Missing path parameter "${name}" for ${provider}/${resource} (template "${variant.path}")`
       );
     }
+    if (value === "." || value === "..") {
+      throw new WritebackPathError(`Invalid path parameter "${name}" for ${provider}/${resource}`);
+    }
     if (variant.multiSegmentParams?.includes(name)) {
       const segments = String(value).split("/");
       if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {

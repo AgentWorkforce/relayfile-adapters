@@ -12,19 +12,18 @@ import {
 import { findRepoRoot } from "../../src/triggers/catalog-generator.js";
 
 test("catalog preserves and validates multi-segment declarations from built and source resources", async (t) => {
-  for (const built of [false, true]) {
+  for (const built of [false, true]) for (const quote of ['"', "'"]) for (const valid of [true, false]) {
     const root = await mkdtemp(join(tmpdir(), "writeback-path-metadata-"));
     t.after(() => rm(root, { recursive: true, force: true }));
     const directory = join(root, "packages", "gitlab", built ? "dist" : "src");
     await mkdir(directory, { recursive: true });
     await writeFile(join(root, "packages", "gitlab", "package.json"), JSON.stringify({ name: "@relayfile/adapter-gitlab", type: "module" }));
     const file = join(directory, built ? "resources.js" : "resources.ts");
-    const resource = (parameter: string) => `export const resources = [\n  {\n    name: "issues",\n    path: "/gitlab/projects/{projectPath}/issues",\n    multiSegmentParams: ["${parameter}"],\n  },\n];\n`;
-    await writeFile(file, resource("projectPath"));
-    const { catalog } = await generateWritebackPathCatalog(root);
-    assert.deepEqual(catalog.gitlab.issues[0].multiSegmentParams, ["projectPath"]);
-    if (!built) {
-      await writeFile(file, resource("typo"));
+    await writeFile(file, `export const resources = [\n  {\n    name: "issues",\n    path: "/gitlab/projects/{projectPath}/issues",\n    multiSegmentParams: [${quote}${valid ? "projectPath" : "typo"}${quote},],\n  },\n];\n`);
+    if (valid) {
+      const { catalog } = await generateWritebackPathCatalog(root);
+      assert.deepEqual(catalog.gitlab.issues[0].multiSegmentParams, ["projectPath"]);
+    } else {
       await assert.rejects(generateWritebackPathCatalog(root), /Invalid multiSegmentParams/);
     }
   }
@@ -113,6 +112,9 @@ test("writebackPath disambiguates multi-template resources by exact param set", 
 test("writebackPath throws loudly rather than guessing", () => {
   assert.throws(() => writebackPath("nope" as never, "x" as never), WritebackPathError);
   assert.throws(() => writebackPath("linear", "nope" as never), WritebackPathError);
+  for (const issueId of [".", ".."]) {
+    assert.throws(() => writebackPath("linear", "comments", { issueId }), WritebackPathError);
+  }
   // Missing a required param must fail, not emit a path with a literal `{issueId}`.
   assert.throws(() => writebackPath("linear", "comments", {}), WritebackPathError);
   // Prototype keys must not bypass the guard via Object.prototype.

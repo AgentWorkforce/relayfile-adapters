@@ -210,19 +210,22 @@ async function readAdapterResources(
 
   let importError: string | undefined;
   if (builtEntryPoint) {
+    let moduleExports: { resources?: unknown } | undefined;
     try {
-      const moduleExports = (await import(pathToFileURL(builtEntryPoint).href)) as {
+      moduleExports = (await import(pathToFileURL(builtEntryPoint).href)) as {
         resources?: unknown;
       };
-      const resources = normalizeResources(moduleExports.resources);
-      if (resources.length > 0) {
-        return { resources };
-      }
     } catch (error) {
       // Remember the import failure so it surfaces as the adapter's reason
       // instead of a generic "no resources" message — a swallowed import
       // error otherwise hides a real build/runtime problem.
       importError = `Could not import built adapter resources: ${errorMessage(error)}`;
+    }
+    // Invalid loaded metadata is a contract error, not an import failure to
+    // silently hide behind a source fallback or an omitted adapter.
+    if (moduleExports) {
+      const resources = normalizeResources(moduleExports.resources);
+      if (resources.length > 0) return { resources };
     }
   }
 
@@ -273,7 +276,7 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
   while ((match = pattern.exec(contents)) !== null) {
     if (/operations:\s*\[\s*\]/u.test(match.groups?.tail ?? "")) continue;
     const declaration = /multiSegmentParams:\s*(\[[^\]]*\])/u.exec(match.groups?.tail ?? "");
-    const multiSegmentParams = normalizeMultiSegmentParams(declaration ? JSON.parse(declaration[1]) : undefined, match[2]);
+    const multiSegmentParams = normalizeMultiSegmentParams(declaration ? parseSourceParamArray(declaration[1]) : undefined, match[2]);
     out.push({ name: match[1], path: match[2], ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
   }
   return out;
@@ -329,6 +332,17 @@ function normalizeMultiSegmentParams(value: unknown, path: string): string[] {
     throw new Error(`Invalid multiSegmentParams for writeback template ${path}`);
   }
   return [...new Set(value as string[])];
+}
+
+/** Generated arrays are JSON; handwritten TypeScript also allows single quotes and a trailing comma. */
+function parseSourceParamArray(literal: string): string[] {
+  const entries = literal.slice(1, -1).trim().replace(/,\s*$/u, "");
+  if (!entries) return [];
+  return entries.split(",").map((entry) => {
+    const match = /^\s*(["'])([A-Za-z_][A-Za-z0-9_]*)\1\s*$/u.exec(entry);
+    if (!match) throw new Error("multiSegmentParams must be a literal array of path parameter names");
+    return match[2];
+  });
 }
 
 /** Placeholder names in template order, e.g. `/x/{a}/y/{b}` → `["a","b"]`. */
