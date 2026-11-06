@@ -3,6 +3,9 @@ import { describe, it } from 'node:test';
 
 import {
   JIRA_PATH_ROOT,
+  jiraCommentByIdAliasPath,
+  jiraCommentIssueRef,
+  jiraCommentsIndexPath,
   extractJiraIdFromPathSegment,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
@@ -20,6 +23,44 @@ import {
   jiraSprintByTitleAliasPath,
   jiraSprintPath,
 } from '../path-mapper.js';
+import { jiraCommentIndexRow } from '../index.js';
+
+describe('comment identity and discovery paths', () => {
+  it('exports the same authoritative index row consumed by the emitter', () => {
+    assert.deepEqual(jiraCommentIndexRow({ id: '500', issueKey: 'KAN-1', updated: '2026-10-02' }), {
+      id: '500', title: 'Comment 500', updated: '2026-10-02',
+      path: '/jira/issues/KAN-1/comments/500.json',
+      canonicalPath: '/jira/issues/KAN-1/comments/500.json', issueIdOrKey: 'KAN-1',
+    });
+    assert.equal(jiraCommentIndexRow({ id: '501', created: '2026-10-01' }).updated, '2026-10-01');
+    assert.equal(jiraCommentIndexRow({ id: '501' }).path, '/jira/comments/501.json');
+  });
+  it('round-trips opaque comment and parent identifiers without collisions', () => {
+    const alias = jiraCommentByIdAliasPath('500/01');
+    assert.equal(alias, '/jira/comments/by-id/500%2F01.json');
+    assert.equal(decodeURIComponent(alias.split('/').at(-1)!.replace(/\.json$/, '')), '500/01');
+    assert.notEqual(jiraCommentByIdAliasPath('500'), jiraCommentByIdAliasPath('501'));
+    const index = jiraCommentsIndexPath('KAN/1');
+    assert.equal(index, '/jira/issues/KAN%2F1/comments/_index.json');
+    assert.equal(decodeURIComponent(index.split('/')[3]!), 'KAN/1');
+    assert.equal(jiraCommentsIndexPath(), '/jira/comments/_index.json');
+    assert.throws(() => jiraCommentsIndexPath(' '), /non-empty/);
+    assert.throws(() => jiraCommentByIdAliasPath(' '), /non-empty/);
+  });
+
+  it('shares parent fallback precedence across native and sync payloads', () => {
+    for (const [record, expected] of [
+      [{ issueIdOrKey: ' KAN-1 ', issueKey: 'OTHER-1' }, 'KAN-1'],
+      [{ issueKey: 'KAN-1', issue: { id: '10000' } }, 'KAN-1'],
+      [{ issue_key: 'KAN-1' }, 'KAN-1'],
+      [{ issue: { key: 'KAN-1', id: '10000' } }, 'KAN-1'],
+      [{ issueId: '10000' }, '10000'], [{ issue_id: '10000' }, '10000'],
+      [{ issue: { id: 10000 } }, '10000'],
+      [{ issueIdOrKey: ' ', issueId: '10000' }, '10000'],
+      [{ id: '500' }, undefined], [null, undefined], [[], undefined],
+    ] as const) assert.equal(jiraCommentIssueRef(record), expected);
+  });
+});
 
 // AGENTS.md mandates round-trip, collision, and non-empty content tests for
 // every path-mapper helper / alias subtree. The legacy helpers

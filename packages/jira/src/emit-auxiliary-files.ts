@@ -26,10 +26,12 @@
  *      client lacks `readFile` — same back-compat as the confluence port.
  *   3. For every project and sprint record, write the canonical path and
  *      upsert the matching `_index.json` row.
- *   4. For every comment record, write the nested
+ *   4. For every comment record, write a stable by-id alias plus the nested
  *      `/jira/issues/<issueIdOrKey>/comments/<commentId>.json` path
  *      required for REST round-trip. Comments without an `issueIdOrKey`
  *      fall back to the flat legacy `/jira/comments/<commentId>.json`.
+ *      Global and per-issue indexes reconcile moves and sparse tombstones
+ *      using the parent identity saved at the by-id alias.
  *   5. For deleted records, all known alias and canonical paths are
  *      removed. Index rows are also removed in the same flush — this is
  *      the Devin regression captured in confluence#78 7ec987b:
@@ -54,7 +56,10 @@ import {
 
 import { sanitizeJiraRecordForStorage } from './jira-adapter.js';
 import {
+  jiraCommentByIdAliasPath,
+  jiraCommentIssueRef,
   jiraCommentPath,
+  jiraCommentsIndexPath,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
   jiraIssueByEditedPath,
@@ -76,15 +81,18 @@ import {
   jiraSprintsIndexPath,
 } from './path-mapper.js';
 import {
+  jiraCommentIndexRow,
   jiraIssueIndexRow,
   jiraProjectIndexRow,
   jiraSprintIndexRow,
   type JiraIssueIndexRow,
+  type JiraCommentIndexRow,
   type JiraProjectIndexRow,
   type JiraSprintIndexRow,
 } from './queries.js';
 import type {
   JiraComment,
+  JiraCommentParent,
   JiraIssue,
   JiraProject,
   JiraSprint,
@@ -115,8 +123,8 @@ export type JiraSprintEmitRecord =
  * back to the legacy flat path.
  */
 export type JiraCommentEmitRecord =
-  | (JiraComment & { issueIdOrKey?: string })
-  | { id: string; _deleted: true; issueIdOrKey?: string };
+  | (JiraComment & JiraCommentParent)
+  | ({ id: string; _deleted: true } & JiraCommentParent);
 
 export interface JiraEmitAuxiliaryFilesInput {
   workspaceId: string;
@@ -200,6 +208,7 @@ export function buildJiraRootIndexFile(
     { id: 'issues', title: 'Issues' },
     { id: 'projects', title: 'Projects' },
     { id: 'sprints', title: 'Sprints' },
+    { id: 'comments', title: 'Comments' },
   ],
 ): { path: string; content: string; contentType: typeof JSON_CONTENT_TYPE } {
   return {
@@ -672,24 +681,93 @@ async function emitComments(
   records: readonly JiraCommentEmitRecord[],
   connectionId: string | undefined,
 ): Promise<EmitAuxiliaryFilesResult> {
-  // Comments are not indexed — they live nested under their parent issue
-  // (or, for orphaned webhook payloads, under the flat legacy path).
-  return runEmitBatch(client, workspaceId, records, async (record) => {
+  // Keep only the last mutation for each id/path. The shared reconciler applies
+  // upserts after removals, so queuing both would resurrect a same-batch delete.
+  const indexes = new Map<string, Map<string, JiraCommentIndexRow | null>>();
+  const indexFor = (issueIdOrKey?: string): Map<string, JiraCommentIndexRow | null> => {
+    const path = jiraCommentsIndexPath(issueIdOrKey);
+    let index = indexes.get(path);
+    if (!index) {
+      index = new Map();
+      indexes.set(path, index);
+    }
+    return index;
+  };
+  const priorReader = new PriorAliasReader(client, workspaceId);
+  const result = await runEmitBatch(client, workspaceId, records, async (record) => {
     const id = readNonEmptyString((record as { id?: unknown }).id);
     if (!id) return {};
-    const issueIdOrKey = readNonEmptyString(
-      (record as { issueIdOrKey?: unknown }).issueIdOrKey,
-    );
+    const alias = jiraCommentByIdAliasPath(id);
+    const prior = await priorReader.read(alias);
+    const priorPayload = prior ? pickPayload(prior) : null;
+    const priorIssue = jiraCommentIssueRef(priorPayload);
+    const issueIdOrKey = jiraCommentIssueRef(record) ?? priorIssue;
+    // Recompute from stored identity rather than trusting a prior path field.
+    const priorPath = prior ? jiraCommentPath(id, priorIssue) : undefined;
     const path = jiraCommentPath(id, issueIdOrKey);
 
     if (isDeleteRecord(record)) {
-      return { deletes: [{ path }] };
+      indexFor().set(id, null);
+      if (priorIssue) indexFor(priorIssue).set(id, null);
+      if (issueIdOrKey) indexFor(issueIdOrKey).set(id, null);
+      return {
+        deletes: [...new Set([alias, path, ...(priorPath ? [priorPath] : [])])]
+          .map((path) => ({ path })),
+      };
     }
 
     const safe = sanitizeJiraRecordForStorage(record as unknown as Record<string, unknown>);
-    const content = renderObjectContent(safe, 'comment', id, connectionId, false);
-    return { writes: [{ path, content, contentType: JSON_CONTENT_TYPE }] };
+    if (issueIdOrKey) safe.issueIdOrKey = issueIdOrKey;
+    const content = JSON.stringify({
+      provider: JIRA_PROVIDER_NAME, objectType: 'comment', objectId: id,
+      path, canonicalPath: path, deleted: false, payload: safe,
+      ...(connectionId ? { connectionId } : {}),
+    }, null, 2);
+    const row = jiraCommentIndexRow({
+      ...record, id,
+      ...(issueIdOrKey ? { issueIdOrKey } : {}),
+    });
+    indexFor().set(id, row);
+    if (priorIssue && priorIssue !== issueIdOrKey) indexFor(priorIssue).set(id, null);
+    if (issueIdOrKey) indexFor(issueIdOrKey).set(id, row);
+    return {
+      writes: [path, alias].map((path) => ({ path, content, contentType: JSON_CONTENT_TYPE })),
+      deletes: priorPath && priorPath !== path ? [{ path: priorPath }] : [],
+    };
   });
+  for (const [path, mutations] of indexes) {
+    const index = new IndexFileReconciler<JiraCommentIndexRow>({
+      client, workspaceId, path,
+      builder: (rows) => ({
+        path,
+        content: `${JSON.stringify(rows.map(normalizeCommentIndexRow).sort(compareIndexRows))}\n`,
+        contentType: JSON_CONTENT_TYPE,
+      }),
+    });
+    for (const [id, row] of mutations) {
+      if (row) index.upsert(row);
+      else index.remove(id);
+    }
+    const flushed = await index.flush();
+    result.written += flushed.written;
+    result.errors.push(...flushed.errors);
+  }
+  return result;
+}
+
+/** Older consumers used updatedAt and omitted title/updated in comment rows. */
+function normalizeCommentIndexRow(row: JiraCommentIndexRow): JiraCommentIndexRow {
+  const issueIdOrKey = jiraCommentIssueRef(row);
+  const path = readNonEmptyString(row.canonicalPath) ?? readNonEmptyString(row.path)
+    ?? jiraCommentPath(row.id, issueIdOrKey);
+  return {
+    ...row,
+    title: readNonEmptyString(row.title) ?? `Comment ${row.id}`,
+    updated: readNonEmptyString(row.updated)
+      ?? readNonEmptyString((row as unknown as Record<string, unknown>).updatedAt) ?? '',
+    path,
+    canonicalPath: path,
+  };
 }
 
 // -- Shared helpers --------------------------------------------------------

@@ -91,6 +91,34 @@ export function jiraCommentPath(commentId: string, issueIdOrKey?: string): strin
   return `${JIRA_PATH_ROOT}/comments/${encodeJiraPathSegment(commentId)}.json`;
 }
 
+/** Parent issue reference shared by sync records and native comment webhooks. */
+export function jiraCommentIssueRef(record: unknown): string | undefined {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return undefined;
+  const value = record as Record<string, unknown>;
+  const issue = value.issue && typeof value.issue === 'object' && !Array.isArray(value.issue)
+    ? value.issue as Record<string, unknown> : {};
+  for (const candidate of [
+    value.issueIdOrKey, value.issueKey, value.issue_key, issue.key,
+    value.issueId, value.issue_id, issue.id,
+  ]) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) return String(candidate);
+  }
+  return undefined;
+}
+
+/** Stable reconciliation anchor independent of a mutable parent issue key. */
+export function jiraCommentByIdAliasPath(commentId: string): string {
+  return `${JIRA_PATH_ROOT}/comments/by-id/${encodeJiraPathSegment(commentId)}.json`;
+}
+
+/** Global discovery index, or the comment index for one parent issue. */
+export function jiraCommentsIndexPath(issueIdOrKey?: string): string {
+  return issueIdOrKey === undefined
+    ? `${JIRA_PATH_ROOT}/comments/_index.json`
+    : `${JIRA_PATH_ROOT}/issues/${encodeJiraPathSegment(issueIdOrKey)}/comments/_index.json`;
+}
+
 export function computeJiraPath(objectType: string, objectId: string, title?: string): string {
   const normalizedType = normalizeJiraObjectType(objectType);
   const normalizedId = assertNonEmptySegment(objectId, 'object id');

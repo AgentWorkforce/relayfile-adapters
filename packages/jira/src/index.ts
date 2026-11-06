@@ -27,7 +27,10 @@ export {
   computeJiraPath,
   encodeJiraPathSegment,
   extractJiraIdFromPathSegment,
+  jiraCommentByIdAliasPath,
+  jiraCommentIssueRef,
   jiraCommentPath,
+  jiraCommentsIndexPath,
   jiraIssueByIdAliasPath,
   jiraIssueByKeyAliasPath,
   jiraIssueByStatePath,
@@ -45,6 +48,7 @@ export type { JiraPathObjectType } from './path-mapper.js';
 export { aliasCollisionSuffix, slugifyAlias } from './alias-slug.js';
 
 export {
+  buildJiraRootIndexFile,
   emitJiraAuxiliaryFiles,
 } from './emit-auxiliary-files.js';
 export type {
@@ -52,15 +56,18 @@ export type {
   JiraEmitAuxiliaryFilesInput,
   JiraIssueEmitRecord,
   JiraProjectEmitRecord,
+  JiraRootIndexRow,
   JiraSprintEmitRecord,
 } from './emit-auxiliary-files.js';
 
 export {
+  jiraCommentIndexRow,
   jiraIssueIndexRow,
   jiraProjectIndexRow,
   jiraSprintIndexRow,
 } from './queries.js';
 export type {
+  JiraCommentIndexRow,
   JiraIssueIndexRow,
   JiraProjectIndexRow,
   JiraSprintIndexRow,

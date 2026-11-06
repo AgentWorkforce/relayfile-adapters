@@ -211,6 +211,16 @@ export interface JiraComment {
   jsdPublic?: boolean;
 }
 
+/** Parent identity accepted from native webhooks and normalized sync records. */
+export interface JiraCommentParent {
+  issueIdOrKey?: string;
+  issueKey?: string;
+  issue_key?: string;
+  issueId?: string;
+  issue_id?: string;
+  issue?: { id?: string; key?: string };
+}
+
 export interface JiraWebhookUser extends JiraUser {}
 
 export interface JiraWebhookBase {

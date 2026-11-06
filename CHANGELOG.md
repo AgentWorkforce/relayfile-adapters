@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-jira` now keeps comment aliases and global/per-issue indexes current across parent-key changes and sparse deletions, and exports their paths and parent-reference resolver for webhook consumers.
 - `@relayfile/adapter-gitlab` helper writebacks no longer send the transport-only `idempotencyKey` to GitLab, treat `draft-…` note names as creates, and reject unsafe project paths.
 - `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 

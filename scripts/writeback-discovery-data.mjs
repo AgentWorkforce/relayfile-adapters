@@ -293,11 +293,15 @@ export const adapters = [
   {
     slug: 'jira',
     title: 'Jira adapter',
+    // Comments use an adapter-owned global index helper, not a parent placeholder.
+    manualResourcesTs: true,
     overview:
       'The Jira adapter exposes issues, comments, projects, and sprints under `/jira`, with writeback routes for creating, updating, and deleting issues, projects, and issue comments, and for creating issue transitions.',
     readPaths: [
       ['/jira/issues/<issueIdOrKey>.json', 'Issue records.'],
       ['/jira/issues/<issueIdOrKey>/comments/<commentId>.json', 'Issue comment records.'],
+      ['/jira/comments/by-id/<commentId>.json', 'Stable comment aliases, including their canonical path and parent issue.'],
+      ['/jira/comments/_index.json', 'Global comment index; per-issue indexes also live beside nested comments.'],
       ['/jira/projects/<projectIdOrKey>.json', 'Project records.'],
       ['/jira/sprints/<sprintId>.json', 'Sprint records.'],
     ],
