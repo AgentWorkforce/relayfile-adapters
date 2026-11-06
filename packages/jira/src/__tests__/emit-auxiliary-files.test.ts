@@ -822,8 +822,25 @@ describe('comment discovery reconciliation', () => {
     assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'KAN-1');
     failures.clear();
     failures.add(jiraCommentByIdAliasPath('500'));
-    assert.ok((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'OPS-2' }] })).errors.length);
+    assert.ok((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'OPS-2' }] })).errors.some((error) => error.path === jiraCommentByIdAliasPath('500')));
     assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'KAN-1');
+  });
+
+  it('reports deferred aliases so targeted retries finish identity before a later sparse deletion', async () => {
+    const failures = new Set([jiraCommentsIndexPath()]);
+    const client = createClient({ failWriteOn: failures });
+    const comment = { id: '500', issueKey: 'KAN-1', body: 'Created' };
+    const failed = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [comment] });
+    const failedPaths = new Set(failed.errors.map((error) => error.path));
+    assert.ok(failedPaths.has(jiraCommentsIndexPath()));
+    assert.ok(failedPaths.has(jiraCommentByIdAliasPath('500')), 'every deferred alias must be reported to targeted retriers');
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false);
+    failures.clear();
+    assert.deepEqual((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [comment] })).errors, []);
+    assert.ok(client.files.has(jiraCommentByIdAliasPath('500')));
+    assert.deepEqual((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', _deleted: true }] })).errors, []);
+    assert.equal(client.files.has(jiraCommentPath('500', 'KAN-1')), false);
+    assert.deepEqual(rows(client, 'KAN-1'), []);
   });
 
   it('preserves legacy peer rows with updatedAt and no title/updated', async () => {

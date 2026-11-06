@@ -699,11 +699,18 @@ async function emitComments(
   indexFor(); // An explicit empty bucket still exposes a readable global index.
   const batchState = new Map<string, Record<string, unknown> | null>();
   const aliases = new Map<string, EmitPlan>();
+  const priorReadErrors: EmitAuxiliaryFilesResult['errors'] = [];
   const result = await runEmitBatch(client, workspaceId, records, async (record) => {
     const id = readNonEmptyString((record as { id?: unknown }).id);
     if (!id) return {};
     const alias = jiraCommentByIdAliasPath(id);
-    const prior = batchState.has(id) ? batchState.get(id) ?? null : await readCommentPriorAlias(client, workspaceId, alias);
+    let prior: Record<string, unknown> | null;
+    try {
+      prior = batchState.has(id) ? batchState.get(id) ?? null : await readCommentPriorAlias(client, workspaceId, alias);
+    } catch (error) {
+      priorReadErrors.push({ path: alias, error: String(error) });
+      return {};
+    }
     const priorPayload = prior ? pickPayload(prior) : null;
     const priorIssue = jiraCommentIssueRef(priorPayload);
     const issueIdOrKey = jiraCommentIssueRef(record) ?? priorIssue;
@@ -744,6 +751,7 @@ async function emitComments(
       deletes: priorPath && priorPath !== path ? [{ path: priorPath }] : [],
     };
   });
+  result.errors.push(...priorReadErrors);
   for (const [path, mutations] of indexes) {
     try {
       const existing = await readCommentIndexRows(client, workspaceId, path);
@@ -764,6 +772,13 @@ async function emitComments(
   // it only after canonical mutations and every affected index have succeeded.
   if (result.errors.length === 0) {
     accumulate(result, await runEmitBatch(client, workspaceId, [...aliases.values()], (plan) => plan));
+  } else {
+    for (const plan of aliases.values()) {
+      for (const op of [...(plan.writes ?? []), ...(plan.deletes ?? [])]) {
+        result.errors.push({ path: op.path,
+          error: 'Comment alias deferred until canonical and index mutations succeed; replay this comment mutation' });
+      }
+    }
   }
   return result;
 }
