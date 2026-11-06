@@ -9,10 +9,13 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/adapter-jira` now keeps comment aliases and global/per-issue indexes current across parent-key changes and sparse deletions.
 - `@relayfile/adapter-gitlab` helper writebacks no longer send the transport-only `idempotencyKey` to GitLab, treat `draft-…` note names as creates, and reject unsafe project paths.
 - `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 
 ### Added
+
+- `@relayfile/adapter-jira` exports comment path, parent-reference, index-row, and root-index helpers for webhook consumers.
 
 - `@relayfile/adapter-gitlab/writeback` exports `isGitLabWritebackPath` so queue admission can share the provider resolver's supported operations and path validation.
 - `@relayfile/adapter-gitlab` declares project/personal and group access token connection aliases for the existing GitLab event and filesystem contract.

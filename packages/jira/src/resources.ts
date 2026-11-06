@@ -1,3 +1,5 @@
+import { jiraCommentsIndexPath } from './path-mapper.js';
+
 export interface AdapterResourceConfig {
   readonly name: string;
   readonly path: string;
@@ -5,6 +7,7 @@ export interface AdapterResourceConfig {
   readonly idPattern: RegExp;
   readonly schema: string;
   readonly createExample?: string;
+  readonly sampleIndexPath?: string;
   readonly operations?: readonly AdapterResourceOperation[];
 }
 
@@ -14,6 +17,7 @@ export const resources = [
   {
     name: "comments",
     path: "/jira/issues/{issueIdOrKey}/comments",
+    sampleIndexPath: jiraCommentsIndexPath(),
     pathPattern: /^\/jira\/issues\/[^\/]+\/comments(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^(?:[A-Za-z0-9_.~-]+(?:--|__))?\d+$/,
     schema: "discovery/jira/issues/{issueIdOrKey}/comments/.schema.json",

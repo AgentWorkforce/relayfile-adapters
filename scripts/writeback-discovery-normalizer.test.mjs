@@ -513,11 +513,11 @@ test('generated full-record schemas keep system fields read-only where the data 
   }
 });
 
-test('only reddit opts out of a generated resources.ts', () => {
+test('only Jira comment indexes and Reddit custom routes opt out of generated resources.ts', () => {
   const manual = normalizeWritebackDiscoveryData(adapters).adapters
     .filter((adapter) => adapter.manualResourcesTs)
     .map((adapter) => adapter.slug);
-  assert.deepEqual(manual, ['reddit']);
+  assert.deepEqual(manual, ['jira', 'reddit']);
 });
 
 test('manualResourcesTsDrift accepts the hand-written reddit resources.ts', () => {

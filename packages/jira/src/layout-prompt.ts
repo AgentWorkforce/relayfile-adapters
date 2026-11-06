@@ -8,6 +8,8 @@ Always run \`ls\` before constructing a path. The jira adapter writes human-read
 \`/jira/issues/\`, \`/jira/projects/\`, and \`/jira/sprints/\` each own their canonical JSON records plus a sibling \`_index.json\` and \`by-*\` alias subtrees.
 \`/jira/issues/<issueIdOrKey>/comments/<commentId>.json\` is the nested form required to round-trip a comment through the Jira REST API (\`GET/PUT /rest/api/3/issue/{issueIdOrKey}/comment/{commentId}\`). A flat \`/jira/comments/<commentId>.json\` is retained only for legacy webhook payloads that lack issue context and cannot be edited.
 
+Comments also have a stable \`/jira/comments/by-id/<commentId>.json\` alias. Its provider envelope includes \`path\` and \`canonicalPath\` pointing at the current record, and preserves parent issue context. A changed issue key removes the old nested comment path. Sparse comment deletions use this alias to remove the prior canonical file and its index rows.
+
 ## Indexes
 
 \`/jira/issues/_index.json\` rows use:
@@ -21,6 +23,8 @@ Always run \`ls\` before constructing a path. The jira adapter writes human-read
 \`\`\`json
 { "id": "<id>", "title": "<human-readable>", "updated": "<iso8601>", "key": "<project or sprint key>" }
 \`\`\`
+
+\`/jira/comments/_index.json\` lists all materialized comments; \`/jira/issues/<issueIdOrKey>/comments/_index.json\` lists that issue's comments. Rows contain \`id\`, \`title\`, \`updated\`, \`path\`, \`canonicalPath\`, and \`issueIdOrKey\` when known. Missing timestamps are empty strings. A parent move removes the old per-issue row; a delete removes global and parent rows while retaining unrelated comments.
 
 Indexes are sorted by \`updated\` descending so the newest records are first.
 
@@ -68,6 +72,7 @@ ls /jira/issues/by-state
 ls /jira/issues/by-assignee
 ls /jira/issues/by-priority
 ls /jira/issues/by-edited/2026-05-12
+jq '.[] | {id, path, issueIdOrKey}' /jira/comments/_index.json
 jq '.[0]' /jira/issues/_index.json
 jq '.[] | select(.state == "In Progress") | {key, title}' /jira/issues/_index.json
 jq '{key, title, state}' /jira/issues/by-key/ENG-42.json

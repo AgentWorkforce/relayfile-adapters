@@ -25,6 +25,13 @@ export const layoutManifest: CoreLayoutManifestProvider = () => ({
       ],
     },
     {
+      path: 'jira/comments',
+      title: 'Comments',
+      materialization: 'eager',
+      aliasSegments: ['by-id'],
+      writebackResources: [],
+    },
+    {
       path: 'jira/projects',
       title: 'Projects',
       materialization: 'eager',

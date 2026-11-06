@@ -1,5 +1,7 @@
-import { extractJiraIdFromPathSegment } from './path-mapper.js';
+import { extractJiraIdFromPathSegment, jiraCommentIssueRef, jiraCommentPath } from './path-mapper.js';
 import type {
+  JiraComment,
+  JiraCommentParent,
   JiraIssue,
   JiraProject,
   JiraReadRequest,
@@ -7,6 +9,30 @@ import type {
 } from './types.js';
 
 // -- Index rows ------------------------------------------------------------
+
+export interface JiraCommentIndexRow {
+  id: string;
+  title: string;
+  updated: string;
+  path: string;
+  canonicalPath: string;
+  issueIdOrKey?: string;
+}
+
+/** Authoritative discovery row for a comment with optional parent context. */
+export function jiraCommentIndexRow(comment: JiraComment & JiraCommentParent): JiraCommentIndexRow {
+  const id = String(comment.id).trim();
+  const issueIdOrKey = jiraCommentIssueRef(comment);
+  const path = jiraCommentPath(id, issueIdOrKey);
+  return {
+    id,
+    title: `Comment ${id}`,
+    updated: readNonEmptyString(comment.updated) ?? readNonEmptyString(comment.created) ?? '',
+    path,
+    canonicalPath: path,
+    ...(issueIdOrKey ? { issueIdOrKey } : {}),
+  };
+}
 
 /**
  * Shape of `/jira/issues/_index.json` rows. Mirrors the LAYOUT contract:

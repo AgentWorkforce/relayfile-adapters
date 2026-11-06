@@ -9,7 +9,10 @@ import type {
 } from '../jira-adapter.js';
 import type { EmitReadInput, EmitReadResult } from '@relayfile/adapter-core';
 import {
+  jiraCommentByIdAliasPath,
+  jiraCommentIssueRef,
   jiraCommentPath,
+  jiraCommentsIndexPath,
   jiraIssueByAssigneeAliasPath,
   jiraIssueByCreatorAliasPath,
   jiraIssueByEditedPath,
@@ -30,6 +33,7 @@ import {
   jiraSprintPath,
   jiraSprintsIndexPath,
 } from '../path-mapper.js';
+import { resources } from '../resources.js';
 
 interface CapturingClient extends RelayFileClientLike {
   writes: WriteFileInput[];
@@ -118,6 +122,7 @@ describe('emitJiraAuxiliaryFiles', () => {
       { id: 'issues', title: 'Issues' },
       { id: 'projects', title: 'Projects' },
       { id: 'sprints', title: 'Sprints' },
+      { id: 'comments', title: 'Comments' },
     ]);
     assert.equal(client.deletes.length, 0);
   });
@@ -662,5 +667,193 @@ describe('emitJiraAuxiliaryFiles', () => {
     assert.ok(client.files.has(jiraIssueByIdAliasPath('10001')));
     assert.ok(client.files.has(jiraIssueByStatePath('In Progress', '10001')));
     assert.ok(client.files.has(jiraIssuesIndexPath()));
+  });
+});
+
+describe('comment discovery reconciliation', () => {
+  const rows = (client: CapturingClient, issue?: string): Array<Record<string, unknown>> =>
+    JSON.parse(client.files.get(jiraCommentsIndexPath(issue)) ?? '[]');
+
+  it('keeps sorted global and parent indexes, a stable full-payload alias, and unrelated comments on move/delete', async () => {
+    const client = createClient();
+    const emit = (comments: Parameters<typeof emitJiraAuxiliaryFiles>[1]['comments']) =>
+      emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: comments ?? [] });
+    await emit([{ id: '501', body: 'other', issueIdOrKey: 'KAN-1', updated: '2026-10-01' }]);
+    await emit([{ id: '500', body: 'first', issue: { id: '10000', key: 'KAN-1' }, updated: '2026-10-02' }]);
+    assert.deepEqual(rows(client).map((row) => row.id), ['500', '501']);
+    assert.deepEqual(rows(client, 'KAN-1').map((row) => row.id), ['500', '501']);
+    const oldPath = jiraCommentPath('500', 'KAN-1');
+    const aliasPath = jiraCommentByIdAliasPath('500');
+    assert.equal(client.files.get(aliasPath), client.files.get(oldPath));
+    assert.equal(resources.find((entry) => entry.name === 'comments')?.sampleIndexPath, jiraCommentsIndexPath());
+
+    await emit([{ id: '500', body: 'moved', issueKey: 'OPS-2', updated: '2026-10-03' }]);
+    const newPath = jiraCommentPath('500', 'OPS-2');
+    assert.equal(client.files.has(oldPath), false);
+    assert.equal(client.files.get(aliasPath), client.files.get(newPath));
+    const alias = JSON.parse(client.files.get(aliasPath)!);
+    assert.equal(alias.path, newPath);
+    assert.equal(alias.canonicalPath, newPath);
+    assert.equal(alias.provider, 'jira');
+    assert.equal(alias.objectType, 'comment');
+    assert.equal(alias.objectId, '500');
+    assert.equal(jiraCommentIssueRef(alias.payload), 'OPS-2');
+    assert.deepEqual(rows(client, 'KAN-1').map((row) => row.id), ['501']);
+    assert.deepEqual(rows(client, 'OPS-2').map((row) => row.id), ['500']);
+    assert.equal(rows(client).find((row) => row.id === '500')?.canonicalPath, newPath);
+    assert.ok(rows(client).every((row) => typeof row.title === 'string' && typeof row.updated === 'string'));
+
+    await emit([{ id: '500', _deleted: true }]);
+    assert.equal(client.files.has(aliasPath), false);
+    assert.equal(client.files.has(newPath), false);
+    assert.deepEqual(rows(client).map((row) => row.id), ['501']);
+    assert.deepEqual(rows(client, 'OPS-2'), []);
+    assert.ok(client.files.has(jiraCommentPath('501', 'KAN-1')));
+  });
+
+  it('migrates a legacy flat comment through its stable alias and retains parent context for sparse updates', async () => {
+    const client = createClient();
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', body: 'orphan' }] });
+    assert.ok(client.files.has(jiraCommentPath('500')));
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', body: 'resolved', issueId: '10000' }] });
+    assert.equal(client.files.has(jiraCommentPath('500')), false);
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', body: 'sparse edit' }] });
+    assert.ok(client.files.has(jiraCommentPath('500', '10000')));
+    assert.equal(rows(client)[0]?.issueIdOrKey, '10000');
+  });
+
+  it('uses the last mutation for repeated ids without resurrecting a deleted index row', async () => {
+    const client = createClient();
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [
+      { id: '500', issueIdOrKey: 'KAN-1', body: 'created' },
+      { id: '500', _deleted: true },
+    ] });
+    assert.deepEqual(rows(client), []);
+    assert.deepEqual(rows(client, 'KAN-1'), []);
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false);
+    assert.equal(client.files.has(jiraCommentPath('500', 'KAN-1')), false);
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [
+      { id: '500', _deleted: true, issueIdOrKey: 'KAN-1' },
+      { id: '500', issueIdOrKey: 'OPS-2', body: 'recreated' },
+    ] });
+    assert.equal(rows(client)[0]?.issueIdOrKey, 'OPS-2');
+    assert.deepEqual(rows(client, 'KAN-1'), []);
+    assert.equal(rows(client, 'OPS-2')[0]?.id, '500');
+  });
+
+  it('reports index failures without dropping successful comment writes', async () => {
+    const client = createClient({ failWriteOn: new Set([jiraCommentsIndexPath()]) });
+    const result = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'KAN-1' }] });
+    assert.ok(result.errors.some((error) => error.path === jiraCommentsIndexPath()));
+    assert.ok(client.files.has(jiraCommentPath('500', 'KAN-1')));
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false, 'alias advances only after indexes succeed');
+  });
+
+  it('materializes an explicit empty comment index without erasing existing rows', async () => {
+    const client = createClient();
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [] });
+    assert.equal(client.files.get(jiraCommentsIndexPath()), '[]\n');
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'KAN-1' }] });
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [] });
+    assert.deepEqual(rows(client).map((row) => row.id), ['500']);
+  });
+
+  it('uses batch-local parents for write-only clients without overwriting unreadable indexes', async () => {
+    const peerRows = JSON.stringify([{ id: '501', title: 'Peer', updated: '', issueIdOrKey: 'KAN-1' }]);
+    const client = createClient({ noRead: true, initialFiles: {
+      [jiraCommentsIndexPath()]: peerRows,
+      [jiraCommentsIndexPath('KAN-1')]: peerRows,
+    } });
+    const result = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [
+      { id: '500', issueKey: 'KAN-1' }, { id: '500', _deleted: true },
+      { id: '502', issueKey: 'KAN-1' }, { id: '502', issueKey: 'OPS-2' },
+    ] });
+    assert.ok(result.errors.some((error) => error.path === jiraCommentsIndexPath()));
+    assert.equal(client.files.has(jiraCommentPath('500', 'KAN-1')), false);
+    assert.equal(client.files.has(jiraCommentPath('502', 'KAN-1')), false);
+    assert.ok(client.files.has(jiraCommentPath('502', 'OPS-2')));
+    assert.equal(client.files.get(jiraCommentsIndexPath()), peerRows);
+    assert.equal(client.files.get(jiraCommentsIndexPath('KAN-1')), peerRows);
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false);
+  });
+
+  it('retries old-parent index cleanup before advancing a moved comment alias', async () => {
+    const failures = new Set<string>();
+    const client = createClient({ failWriteOn: failures });
+    const emit = (issueKey: string) => emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey }] });
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '501', issueKey: 'KAN-1' }] });
+    await emit('KAN-1');
+    failures.add(jiraCommentsIndexPath('KAN-1'));
+    const failed = await emit('OPS-2');
+    assert.ok(failed.errors.some((error) => error.path === jiraCommentsIndexPath('KAN-1')));
+    assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'KAN-1');
+    failures.clear();
+    assert.deepEqual((await emit('OPS-2')).errors, []);
+    assert.deepEqual(rows(client, 'KAN-1').map((row) => row.id), ['501']);
+    assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'OPS-2');
+  });
+
+  it('retains a sparse deletion retry anchor until all comment indexes are updated', async () => {
+    const failures = new Set<string>();
+    const client = createClient({ failWriteOn: failures });
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'KAN-1' }] });
+    failures.add(jiraCommentsIndexPath());
+    const deleted = [{ id: '500', _deleted: true as const }];
+    assert.ok((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: deleted })).errors.length);
+    assert.ok(client.files.has(jiraCommentByIdAliasPath('500')));
+    failures.clear();
+    assert.deepEqual((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: deleted })).errors, []);
+    assert.deepEqual(rows(client), []);
+    assert.deepEqual(rows(client, 'KAN-1'), []);
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false);
+  });
+
+  it('reports failed index and alias reads without erasing peer rows or advancing reconciliation', async () => {
+    const failures = new Set<string>();
+    const client = createClient({ failReadOn: failures });
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [
+      { id: '500', issueKey: 'KAN-1' }, { id: '501', issueKey: 'KAN-1' },
+    ] });
+    const baseline = client.files.get(jiraCommentsIndexPath());
+    failures.add(jiraCommentsIndexPath());
+    const result = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'OPS-2' }] });
+    assert.ok(result.errors.some((error) => error.path === jiraCommentsIndexPath()));
+    assert.equal(client.files.get(jiraCommentsIndexPath()), baseline);
+    assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'KAN-1');
+    failures.clear();
+    failures.add(jiraCommentByIdAliasPath('500'));
+    assert.ok((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', issueKey: 'OPS-2' }] })).errors.some((error) => error.path === jiraCommentByIdAliasPath('500')));
+    assert.equal(jiraCommentIssueRef(JSON.parse(client.files.get(jiraCommentByIdAliasPath('500'))!).payload), 'KAN-1');
+  });
+
+  it('reports deferred aliases so targeted retries finish identity before a later sparse deletion', async () => {
+    const failures = new Set([jiraCommentsIndexPath()]);
+    const client = createClient({ failWriteOn: failures });
+    const comment = { id: '500', issueKey: 'KAN-1', body: 'Created' };
+    const failed = await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [comment] });
+    const failedPaths = new Set(failed.errors.map((error) => error.path));
+    assert.ok(failedPaths.has(jiraCommentsIndexPath()));
+    assert.ok(failedPaths.has(jiraCommentByIdAliasPath('500')), 'every deferred alias must be reported to targeted retriers');
+    assert.equal(client.files.has(jiraCommentByIdAliasPath('500')), false);
+    failures.clear();
+    assert.deepEqual((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [comment] })).errors, []);
+    assert.ok(client.files.has(jiraCommentByIdAliasPath('500')));
+    assert.deepEqual((await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [{ id: '500', _deleted: true }] })).errors, []);
+    assert.equal(client.files.has(jiraCommentPath('500', 'KAN-1')), false);
+    assert.deepEqual(rows(client, 'KAN-1'), []);
+  });
+
+  it('preserves legacy peer rows with updatedAt and no title/updated', async () => {
+    const client = createClient({ initialFiles: {
+      [jiraCommentsIndexPath()]: JSON.stringify([
+        { id: '501', path: jiraCommentPath('501', 'KAN-1'), issueIdOrKey: 'KAN-1', updatedAt: '2026-10-03' },
+      ]),
+    } });
+    await emitJiraAuxiliaryFiles(client, { workspaceId: 'ws-1', comments: [
+      { id: '500', issueIdOrKey: 'KAN-1', updated: '2026-10-02' },
+    ] });
+    assert.deepEqual(rows(client).map((row) => row.id), ['501', '500']);
+    assert.equal(rows(client)[0]?.title, 'Comment 501');
+    assert.equal(rows(client)[0]?.updated, '2026-10-03');
   });
 });
