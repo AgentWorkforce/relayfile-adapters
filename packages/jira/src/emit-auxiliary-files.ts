@@ -147,7 +147,10 @@ export interface JiraEmitAuxiliaryFilesInput {
  * `(provider, records)` and calls this function with a shimmed
  * `AuxiliaryEmitterClient`. Accepts either the shared client contract or
  * the adapter's own `RelayFileClientLike` (structurally compatible —
- * `readFile` is optional in both).
+ * `readFile` is optional in both). Comment canonical writes can proceed
+ * without reads, but index reconciliation reports an error rather than
+ * overwrite an unknown baseline. Stable comment aliases advance only after
+ * canonical cleanup and all affected indexes succeed, preserving retries.
  */
 export async function emitJiraAuxiliaryFiles(
   client: AuxiliaryEmitterClient | RelayFileClientLike,
@@ -184,7 +187,7 @@ export async function emitJiraAuxiliaryFiles(
   if (hasSprints) {
     accumulate(aggregate, await emitSprints(emitterClient, workspaceId, sprints, input.connectionId));
   }
-  if (hasComments && comments.length > 0) {
+  if (hasComments) {
     accumulate(aggregate, await emitComments(emitterClient, workspaceId, comments, input.connectionId));
   }
 
@@ -693,12 +696,14 @@ async function emitComments(
     }
     return index;
   };
-  const priorReader = new PriorAliasReader(client, workspaceId);
+  indexFor(); // An explicit empty bucket still exposes a readable global index.
+  const batchState = new Map<string, Record<string, unknown> | null>();
+  const aliases = new Map<string, EmitPlan>();
   const result = await runEmitBatch(client, workspaceId, records, async (record) => {
     const id = readNonEmptyString((record as { id?: unknown }).id);
     if (!id) return {};
     const alias = jiraCommentByIdAliasPath(id);
-    const prior = await priorReader.read(alias);
+    const prior = batchState.has(id) ? batchState.get(id) ?? null : await readCommentPriorAlias(client, workspaceId, alias);
     const priorPayload = prior ? pickPayload(prior) : null;
     const priorIssue = jiraCommentIssueRef(priorPayload);
     const issueIdOrKey = jiraCommentIssueRef(record) ?? priorIssue;
@@ -710,8 +715,10 @@ async function emitComments(
       indexFor().set(id, null);
       if (priorIssue) indexFor(priorIssue).set(id, null);
       if (issueIdOrKey) indexFor(issueIdOrKey).set(id, null);
+      batchState.set(id, prior ?? { id, ...(issueIdOrKey ? { issueIdOrKey } : {}) });
+      aliases.set(id, { deletes: [{ path: alias }] });
       return {
-        deletes: [...new Set([alias, path, ...(priorPath ? [priorPath] : [])])]
+        deletes: [...new Set([path, ...(priorPath ? [priorPath] : [])])]
           .map((path) => ({ path })),
       };
     }
@@ -730,29 +737,79 @@ async function emitComments(
     indexFor().set(id, row);
     if (priorIssue && priorIssue !== issueIdOrKey) indexFor(priorIssue).set(id, null);
     if (issueIdOrKey) indexFor(issueIdOrKey).set(id, row);
+    batchState.set(id, safe);
+    aliases.set(id, { writes: [{ path: alias, content, contentType: JSON_CONTENT_TYPE }] });
     return {
-      writes: [path, alias].map((path) => ({ path, content, contentType: JSON_CONTENT_TYPE })),
+      writes: [{ path, content, contentType: JSON_CONTENT_TYPE }],
       deletes: priorPath && priorPath !== path ? [{ path: priorPath }] : [],
     };
   });
   for (const [path, mutations] of indexes) {
-    const index = new IndexFileReconciler<JiraCommentIndexRow>({
-      client, workspaceId, path,
-      builder: (rows) => ({
-        path,
-        content: `${JSON.stringify(rows.map(normalizeCommentIndexRow).sort(compareIndexRows))}\n`,
-        contentType: JSON_CONTENT_TYPE,
-      }),
-    });
-    for (const [id, row] of mutations) {
-      if (row) index.upsert(row);
-      else index.remove(id);
+    try {
+      const existing = await readCommentIndexRows(client, workspaceId, path);
+      const merged = new Map(existing.map((row) => [row.id, row]));
+      for (const [id, row] of mutations) {
+        if (row) merged.set(id, row);
+        else merged.delete(id);
+      }
+      await client.writeFile({ workspaceId, path,
+        content: `${JSON.stringify([...merged.values()].map(normalizeCommentIndexRow).sort(compareIndexRows))}\n`,
+        contentType: JSON_CONTENT_TYPE });
+      result.written++;
+    } catch (error) {
+      result.errors.push({ path, error: String(error) });
     }
-    const flushed = await index.flush();
-    result.written += flushed.written;
-    result.errors.push(...flushed.errors);
+  }
+  // The stable alias is also the retry anchor for old-parent cleanup. Advance
+  // it only after canonical mutations and every affected index have succeeded.
+  if (result.errors.length === 0) {
+    accumulate(result, await runEmitBatch(client, workspaceId, [...aliases.values()], (plan) => plan));
   }
   return result;
+}
+
+/** Unknown prior state must stay retryable instead of overwriting its anchor. */
+async function readCommentPriorAlias(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<Record<string, unknown> | null> {
+  if (!client.readFile) return null;
+  const parsed = await readCommentJson(client, workspaceId, path);
+  if (parsed === undefined) return null;
+  if (!isRecord(parsed)) throw new Error('Invalid comment alias baseline');
+  return parsed;
+}
+
+/** Refuse an unreadable baseline rather than erasing unrelated comment rows. */
+async function readCommentIndexRows(
+  client: AuxiliaryEmitterClient,
+  workspaceId: string,
+  path: string,
+): Promise<JiraCommentIndexRow[]> {
+  const rows = await readCommentJson(client, workspaceId, path);
+  if (rows === undefined) return [];
+  if (!Array.isArray(rows) || rows.some((row) => !isRecord(row) || !readNonEmptyString(row.id))) {
+    throw new Error('Invalid comment index baseline');
+  }
+  return rows as JiraCommentIndexRow[];
+}
+
+async function readCommentJson(client: AuxiliaryEmitterClient, workspaceId: string, path: string): Promise<unknown> {
+  if (!client.readFile) throw new Error('Comment index reconciliation requires readFile');
+  let content: string | undefined;
+  try {
+    const file = await client.readFile({ workspaceId, path });
+    if (file == null) return undefined;
+    if (typeof file.content !== 'string') throw new Error('Unreadable comment storage baseline');
+    content = file.content;
+  } catch (error) {
+    const value = isRecord(error) ? error : {};
+    const response = isRecord(value.response) ? value.response : {};
+    if ((value.status ?? value.statusCode ?? response.status) === 404) return undefined;
+    throw error;
+  }
+  return content === undefined ? undefined : JSON.parse(content);
 }
 
 /** Older consumers used updatedAt and omitted title/updated in comment rows. */
