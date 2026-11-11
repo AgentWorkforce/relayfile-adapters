@@ -158,7 +158,9 @@ export class PreviewTransport implements RelayTransport {
     for (const [recordPath, value] of this.data) {
       if (!recordPath.startsWith(prefix)) continue;
       const remainder = recordPath.slice(prefix.length);
-      if (remainder && !remainder.includes('/') && remainder.endsWith('.json')) records.push(value as T);
+      const flatRecord = remainder !== '_index.json' && remainder.endsWith('.json') && !remainder.includes('/');
+      const directoryRecord = /^[^/]+\/meta\.json$/u.test(remainder);
+      if (flatRecord || directoryRecord) records.push(value as T);
     }
     return records;
   }

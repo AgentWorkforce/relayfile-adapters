@@ -3,13 +3,31 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { WRITEBACK_PATH_CATALOG, writebackPath, WritebackPathError } from "../../src/index.js";
+import { WRITEBACK_PATH_CATALOG, readbackPath, writebackPath, WritebackPathError } from "../../src/index.js";
 import {
   generateWritebackPathCatalog,
   renderWritebackPathCatalogModule,
   writebackPathCatalogPaths,
 } from "../../src/writeback-paths/catalog-generator.js";
 import { findRepoRoot } from "../../src/triggers/catalog-generator.js";
+
+test("catalog preserves adapter-owned read paths and rejects mismatched parameters in built and source declarations", async (t) => {
+  for (const built of [false, true]) for (const valid of [true, false]) {
+    const root = await mkdtemp(join(tmpdir(), "readback-path-metadata-"));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const directory = join(root, "packages", "gitlab", built ? "dist" : "src");
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(root, "packages", "gitlab", "package.json"), JSON.stringify({ name: "@relayfile/adapter-gitlab", type: "module" }));
+    await writeFile(join(directory, built ? "resources.js" : "resources.ts"), `export const resources = [\n  {\n    name: "merge-requests",\n    path: "/gitlab/projects/{projectPath}/merge-requests",\n    readPath: "/gitlab/projects/{${valid ? "projectPath" : "other"}}/merge_requests",\n  },\n];\n`);
+    if (valid) {
+      const { catalog } = await generateWritebackPathCatalog(root);
+      assert.equal((catalog.gitlab['merge-requests'][0] as { readPath?: string }).readPath,
+        "/gitlab/projects/{projectPath}/merge_requests");
+    } else {
+      await assert.rejects(generateWritebackPathCatalog(root), /Invalid readPath/);
+    }
+  }
+});
 
 test("catalog preserves and validates multi-segment declarations from built and source resources", async (t) => {
   for (const built of [false, true]) for (const quote of ['"', "'"]) for (const valid of [true, false]) {
@@ -99,6 +117,24 @@ test("GitLab project parameters preserve namespace segments in canonical paths",
   for (const projectPath of ["/acme/web", "acme//web", "acme/../web", "acme/./web", "acme/web/"]) {
     assert.throws(() => writebackPath("gitlab", "issues", { projectPath }), WritebackPathError);
   }
+});
+
+test("readbackPath uses adapter read targets with the same variant selection and path validation", () => {
+  for (const projectPath of ["acme/web", "acme/platform/web", "acme/a b/web"]) {
+    const root = `/gitlab/projects/${projectPath.split("/").map(encodeURIComponent).join("/")}`;
+    assert.equal(readbackPath("gitlab", "merge-requests", { projectPath }), `${root}/merge_requests`);
+    assert.equal(writebackPath("gitlab", "merge-requests", { projectPath }), `${root}/merge-requests`);
+    assert.equal(readbackPath("gitlab", "merge-requests", { projectPath, mergeRequestIid: 7, slug: "hello world" }),
+      `${root}/merge_requests/7__hello%20world/meta.json`);
+  }
+  assert.equal(readbackPath("linear", "comments", { issueId: "ISS/1" }),
+    writebackPath("linear", "comments", { issueId: "ISS/1" }));
+  for (const projectPath of ["/acme/web", "acme//web", "acme/../web", "acme/./web", "acme/web/"]) {
+    assert.throws(() => readbackPath("gitlab", "merge-requests", { projectPath }), WritebackPathError);
+  }
+  assert.throws(() => readbackPath("gitlab", "merge-requests", {}), WritebackPathError);
+  assert.throws(() => readbackPath("gitlab", "merge-requests", { projectPath: "acme/web", unknown: 1 }), WritebackPathError);
+  assert.throws(() => readbackPath("constructor", "x"), WritebackPathError);
 });
 
 test("writebackPath disambiguates multi-template resources by exact param set", () => {

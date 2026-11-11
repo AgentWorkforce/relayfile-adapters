@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -45,6 +45,40 @@ test('relayClient.path resolves catalog paths and write drops a collection draft
   await linear.write('comments', { issueId: 'ISS-1' }, { body: 'hi' });
   const draft = await onlyJsonIn(path.join(root, 'linear/issues/ISS-1/comments'));
   assert.deepEqual(draft.body, { body: 'hi' });
+});
+
+test('GitLab lists canonical issue and merge-request records while preserving draft write paths', async (t) => {
+  const { root, opts } = await mount();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const projectPath = 'acme/platform/web';
+  const projectRoot = path.join(root, 'gitlab/projects', projectPath);
+  const gitlab = helpers.gitlabClient(opts);
+  for (const resource of ['issues', 'merge_requests']) {
+    await mkdir(path.join(projectRoot, resource, '7__example'), { recursive: true });
+    await writeFile(path.join(projectRoot, resource, '_index.json'), JSON.stringify([{ iid: 7 }]));
+    await writeFile(path.join(projectRoot, resource, '7__example/meta.json'), JSON.stringify({ iid: 7, type: resource }));
+  }
+  assert.deepEqual(await gitlab.issues.list({ projectPath }), [{ iid: 7, type: 'issues' }]);
+  assert.deepEqual(await gitlab['merge-requests'].list({ projectPath }), [{ iid: 7, type: 'merge_requests' }]);
+  assert.deepEqual(await gitlab['merge-requests'].read({ projectPath, mergeRequestIid: 7, slug: 'example' }), { iid: 7, type: 'merge_requests' });
+  assert.equal(gitlab['merge-requests'].path({ projectPath }), '/gitlab/projects/acme/platform/web/merge-requests');
+  await gitlab['merge-requests'].write({ projectPath }, { title: 'draft', source_branch: 'feature', target_branch: 'main' });
+  assert.deepEqual((await onlyJsonIn(path.join(projectRoot, 'merge-requests'))).body,
+    { title: 'draft', source_branch: 'feature', target_branch: 'main' });
+});
+
+test('GitLab custom transports receive canonical read paths and existing draft write paths', async () => {
+  const projectPath = 'acme/platform/web';
+  const record = { iid: 7, title: 'example' };
+  const transport = new PreviewTransport({ fixtures: {
+    '/gitlab/projects/acme/platform/web/merge_requests': [record],
+    '/gitlab/projects/acme/platform/web/merge_requests/7__example/meta.json': record,
+  } });
+  const requests = helpers.gitlabClient({ transport })['merge-requests'];
+  assert.deepEqual(await requests.list({ projectPath }), [record]);
+  assert.deepEqual(await requests.read({ projectPath, mergeRequestIid: 7, slug: 'example' }), record);
+  await requests.write({ projectPath }, { title: 'draft' });
+  assert.match(transport.actions.at(-1)?.path ?? '', /^\/gitlab\/projects\/acme\/platform\/web\/merge-requests\//);
 });
 
 test('final-write authorization redirects the native VFS fallback before filesystem mutation', async () => {

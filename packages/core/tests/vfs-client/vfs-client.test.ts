@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -62,6 +62,73 @@ test("readJsonFile / listJsonFiles read back mount content", async () => {
   assert.deepEqual(await readJsonFile(opts, "linear", "getIssue", "/linear/issues/ISS-9.json"), { id: "ISS-9" });
   const listed = await listJsonFiles<{ id: string }>(opts, "linear", "listIssues", "/linear/issues");
   assert.deepEqual(listed.map((f) => f.value.id), ["ISS-9"]);
+});
+
+test("listJsonFiles returns flat and immediate directory records, not collection scaffolding or descendants", async (t) => {
+  const { root, opts } = await mount();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const collection = path.join(root, "provider/records");
+  for (const directory of ["7__first/comments", "8__second", "by-id/7", "empty", "child-only/nested"]) {
+    await mkdir(path.join(collection, directory), { recursive: true });
+  }
+  for (const [file, value] of [
+    ["_index.json", [{ id: 7 }, { id: 8 }]],
+    ["7__first/meta.json", { id: 7 }],
+    ["8__second/meta.json", { id: 8 }],
+    ["flat.json", { id: 9 }],
+    ["7__first/comments/comment.json", { id: "comment" }],
+    ["by-id/7/meta.json", { id: "alias" }],
+    ["child-only/nested/meta.json", { id: "descendant" }],
+  ] as const) {
+    await writeFile(path.join(collection, file), JSON.stringify(value));
+  }
+  // A symlink alias must not duplicate a canonical directory record.
+  await symlink(path.join(collection, "7__first"), path.join(collection, "alias-directory"));
+  const listed = await listJsonFiles<{ id: number }>(opts, "provider", "list.records", "/provider/records/");
+  assert.deepEqual(listed, [
+    { path: "/provider/records/7__first/meta.json", value: { id: 7 } },
+    { path: "/provider/records/8__second/meta.json", value: { id: 8 } },
+    { path: "/provider/records/flat.json", value: { id: 9 } },
+  ]);
+});
+
+test("listJsonFiles ignores an index even when it is malformed or the only file", async (t) => {
+  const { root, opts } = await mount();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "provider/records"), { recursive: true });
+  await writeFile(path.join(root, "provider/records/_index.json"), "not JSON");
+  assert.deepEqual(await listJsonFiles(opts, "provider", "list.records", "/provider/records"), []);
+  assert.deepEqual(await listJsonFiles(opts, "provider", "list.records", "/missing"), []);
+});
+
+test("listJsonFiles preserves parse errors for flat and directory records", async (t) => {
+  const { root, opts } = await mount();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const recordPath of ["flat/record.json", "directory/record/meta.json"]) {
+    await mkdir(path.dirname(path.join(root, recordPath)), { recursive: true });
+    await writeFile(path.join(root, recordPath), "not JSON");
+    await assert.rejects(
+      listJsonFiles(opts, "provider", "list.records", `/${recordPath.split("/")[0]}`),
+      (error: unknown) => error instanceof RelayfileWritebackError
+        && error.provider === "provider" && error.operation === "list.records"
+        && error.retryable === false && error.cause instanceof SyntaxError
+    );
+  }
+});
+
+test("listJsonFiles tolerates absent directory metadata but preserves missing flat-record errors", async (t) => {
+  const { root, opts } = await mount();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "records/record"), { recursive: true });
+  // Deterministic stand-in for metadata disappearing before the read.
+  await symlink(path.join(root, "missing"), path.join(root, "records/record/meta.json"));
+  assert.deepEqual(await listJsonFiles(opts, "provider", "list.records", "/records"), []);
+  await symlink(path.join(root, "missing"), path.join(root, "records/flat.json"));
+  await assert.rejects(
+    listJsonFiles(opts, "provider", "list.records", "/records"),
+    (error: unknown) => error instanceof RelayfileWritebackError
+      && (error.cause as NodeJS.ErrnoException).code === "ENOENT"
+  );
 });
 
 test("a path escaping the mount root throws RelayfileWritebackError", async () => {

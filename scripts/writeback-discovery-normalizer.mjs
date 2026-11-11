@@ -149,6 +149,7 @@ export function normalizeWritebackEndpointResource(adapterSlug, endpoint, layout
   return {
     name: resourceNameFor(adapterSlug, resourcePath),
     resourcePath,
+    ...(endpoint.readPath !== undefined ? { readPath: endpoint.readPath } : {}),
     schemaPath: `${discoveryPath}/.schema.json`,
     ...(endpoint.discoveryPath ? { sharedDiscovery: true } : {}),
     ...(endpoint.createSupported === false || endpoint.example === undefined

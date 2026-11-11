@@ -12,7 +12,7 @@ import type { RelayClientOptions } from './transport.js';
  * the writeback-path catalog.
  */
 export interface ResourceClient {
-  /** Resolve this resource's canonical mount path (no IO). */
+  /** Resolve this resource's writeback target (no IO). */
   path(params?: RelayParams): string;
   /**
    * Write `body`: a uniquely-named draft for a collection resource, or a direct

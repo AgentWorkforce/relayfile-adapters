@@ -8,6 +8,7 @@ import {
   clearPreviewTransport,
   getProcessRelayTransport,
   githubClient,
+  gitlabClient,
   linearClient,
   relayClient,
   slackClient,
@@ -39,6 +40,32 @@ function barrier(parties: number): () => Promise<void> {
     await ready;
   };
 }
+
+test('preview collection lists mirror mounted flat and directory records without indexes or descendants', async () => {
+  const projectPath = 'synthetic/subgroup/project';
+  const prefix = '/gitlab/projects/synthetic/subgroup/project';
+  const issue = { id: 1001, iid: 1, title: 'Synthetic issue' };
+  const request = { id: 2001, iid: 2, title: 'Synthetic request' };
+  const preview = new PreviewTransport({ fixtures: {
+    [`${prefix}/issues/_index.json`]: [{ id: issue.id }],
+    [`${prefix}/issues/1__synthetic-issue/meta.json`]: issue,
+    [`${prefix}/issues/flat.json`]: { id: 'flat-record' },
+    [`${prefix}/issues/1__synthetic-issue/comments/3.json`]: { id: 'child-comment' },
+    [`${prefix}/issues/1__synthetic-issue/children/meta.json`]: { id: 'nested-child' },
+    [`${prefix}/issues/by-id/1.json`]: { id: 'alias' },
+    [`${prefix}/issues/by-id/1/meta.json`]: { id: 'directory-alias' },
+    [`${prefix}/merge_requests/_index.json`]: [{ id: request.id }],
+    [`${prefix}/merge_requests/2__synthetic-request/meta.json`]: request,
+  } });
+  const gitlab = gitlabClient({ transport: preview });
+  assert.deepEqual(await gitlab.issues.list({ projectPath }), [issue, { id: 'flat-record' }]);
+  assert.deepEqual(await gitlab['merge-requests'].list({ projectPath }), [request]);
+  const explicit = [{ id: 'explicit-collection' }];
+  preview.seed(`${prefix}/issues`, explicit);
+  const listed = await gitlab.issues.list({ projectPath });
+  assert.deepEqual(listed, explicit);
+  assert.notStrictEqual(listed, explicit);
+});
 
 test('Slack preview records a post and threaded reply with stable simulated receipts', async () => {
   const preview = new PreviewTransport();

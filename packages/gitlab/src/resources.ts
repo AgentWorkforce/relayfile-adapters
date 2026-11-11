@@ -1,6 +1,7 @@
 export interface AdapterResourceConfig {
   readonly name: string;
   readonly path: string;
+  readonly readPath?: string;
   readonly multiSegmentParams?: readonly string[];
   readonly pathPattern: RegExp;
   readonly idPattern: RegExp;
@@ -35,6 +36,7 @@ export const resources = [
   {
     name: "merge-requests",
     path: "/gitlab/projects/{projectPath}/merge-requests",
+    readPath: "/gitlab/projects/{projectPath}/merge_requests",
     multiSegmentParams: ["projectPath"],
     pathPattern: /^\/gitlab\/projects\/.+?\/merge-requests(?:\/[^\/]+(?:\.json)?)?$/,
     idPattern: /^[1-9]\d*$/,
