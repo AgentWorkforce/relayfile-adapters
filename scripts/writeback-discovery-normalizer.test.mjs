@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { adapters } from './writeback-discovery-data.mjs';
@@ -609,5 +611,39 @@ test('rejects unknown adapter multi-segment path parameter declarations', () => 
   assert.deepEqual(normalizeWritebackDiscoveryAdapter(gitlab).multiSegmentParams, ['projectPath']);
   for (const multiSegmentParams of [['projectPth'], 'projectPath', [42]]) {
     assert.throws(() => normalizeWritebackDiscoveryAdapter({ ...gitlab, multiSegmentParams }), /invalid multiSegmentParams/);
+  }
+});
+
+test('preserves the GitLab collection read path without changing its write or schema contract', () => {
+  const gitlab = normalizeWritebackDiscoveryAdapter(adapters.find((adapter) => adapter.slug === 'gitlab'));
+  const endpoint = gitlab.endpoints.find((entry) => entry.path === '/gitlab/projects/{projectPath}/merge-requests/new.json');
+  assert.equal(endpoint.resource.readPath, '/gitlab/projects/{projectPath}/merge_requests');
+  assert.equal(endpoint.resource.resourcePath, '/gitlab/projects/{projectPath}/merge-requests');
+  assert.equal(endpoint.resource.schemaPath, '/gitlab/projects/{projectPath}/merge-requests/.schema.json');
+  assert.equal(Object.hasOwn(endpoint.schema, 'readPath'), false);
+  assert.equal(gitlab.resources.filter((resource) => resource.readPath !== undefined).length, 1);
+});
+
+test('discovery regeneration retains the GitLab read-path metadata consumed by the catalog', async () => {
+  const outDir = mkdtempSync(join(tmpdir(), 'writeback-read-path-'));
+  try {
+    execFileSync(process.execPath, [fileURLToPath(new URL('./generate-writeback-discovery.mjs', import.meta.url)), '--out-dir', outDir]);
+    const generated = readFileSync(join(outDir, 'packages/gitlab/src/resources.ts'), 'utf8');
+    // CI builds before this suite. Generate the catalog from the freshly
+    // generated source, not the checkout's already-correct resources or dist.
+    writeFileSync(join(outDir, 'packages/gitlab/package.json'), JSON.stringify({ name: '@relayfile/adapter-gitlab' }));
+    const { generateWritebackPathCatalog } = await import('../packages/core/dist/src/writeback-paths/catalog-generator.js');
+    const { catalog } = await generateWritebackPathCatalog(outDir);
+    assert.deepEqual(catalog.gitlab['merge-requests'].find((entry) => entry.path === '/gitlab/projects/{projectPath}/merge-requests'), {
+      path: '/gitlab/projects/{projectPath}/merge-requests',
+      readPath: '/gitlab/projects/{projectPath}/merge_requests',
+      params: ['projectPath'],
+      multiSegmentParams: ['projectPath'],
+    });
+    assert.match(generated, /readonly readPath\?: string;/);
+    assert.match(generated, /path: "\/gitlab\/projects\/\{projectPath\}\/merge-requests",\n    readPath: "\/gitlab\/projects\/\{projectPath\}\/merge_requests",/);
+    assert.equal(generated, readFileSync(new URL('../packages/gitlab/src/resources.ts', import.meta.url), 'utf8'));
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
   }
 });

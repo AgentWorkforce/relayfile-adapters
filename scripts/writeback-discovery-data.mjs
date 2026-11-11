@@ -207,7 +207,7 @@ export const adapters = [
     endpoints: [
       endpoint('/gitlab/projects/{projectPath}/issues/new.json', 'Create GitLab issue', 'Creates a GitLab issue in the project named by the path.', ['title'], gitlabIssueCreateProps(), { title: 'Replace example issue title', description: 'Replace example issue description.', labels: ['factory'] }, { operations: ['create'] }),
       endpoint('/gitlab/projects/{projectPath}/issues/{issueIid}__{slug}/meta.json', 'Update GitLab issue', 'Updates mutable fields on a GitLab issue.', [], gitlabIssueUpdateProps(), { title: 'Replace example issue title' }, { operations: ['update'] }),
-      endpoint('/gitlab/projects/{projectPath}/merge-requests/new.json', 'Create GitLab merge request', 'Creates a GitLab merge request from a source branch into a target branch.', ['source_branch', 'target_branch', 'title'], gitlabMergeRequestProps(), { source_branch: 'factory/gitlab-parity', target_branch: 'main', title: 'Replace example merge request title', description: 'Replace example merge request description.' }, { operations: ['create'] }),
+      endpoint('/gitlab/projects/{projectPath}/merge-requests/new.json', 'Create GitLab merge request', 'Creates a GitLab merge request from a source branch into a target branch.', ['source_branch', 'target_branch', 'title'], gitlabMergeRequestProps(), { source_branch: 'factory/gitlab-parity', target_branch: 'main', title: 'Replace example merge request title', description: 'Replace example merge request description.' }, { operations: ['create'], readPath: '/gitlab/projects/{projectPath}/merge_requests' }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/meta.json', 'Update GitLab merge request', 'Updates mutable fields on a GitLab merge request.', [], gitlabMergeRequestUpdateProps(), { title: 'Replace example merge request title' }, { operations: ['update'] }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/merge.json', 'Merge GitLab merge request', 'Accepts a GitLab merge request.', [], gitlabMergeProps(), { merge_commit_message: 'feat: merge factory work', squash: true }, { operations: ['update'] }),
       endpoint('/gitlab/projects/{projectPath}/merge_requests/{mergeRequestIid}__{slug}/close.json', 'Close or reopen GitLab merge request', 'Closes or reopens a GitLab merge request.', ['state_event'], gitlabMergeRequestCloseProps(), { state_event: 'close' }, { operations: ['update'] }),
@@ -836,9 +836,10 @@ export const adapters = [
 ];
 
 function endpoint(path, title, description, required, properties, example, schemaExtra = {}) {
-  const { operations, createSupported, discoveryPath, idPatternNote, ...schemaOverrides } = schemaExtra;
+  const { operations, createSupported, discoveryPath, idPatternNote, readPath, ...schemaOverrides } = schemaExtra;
   return {
     path,
+    ...(readPath !== undefined ? { readPath } : {}),
     ...(discoveryPath ? { discoveryPath } : {}),
     ...(idPatternNote ? { idPatternNote } : {}),
     schemaPath: path.replace(/new\.json$/, 'new.schema.json'),
