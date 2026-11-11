@@ -457,6 +457,7 @@
       },
       {
         "path": "/gitlab/projects/{projectPath}/merge-requests",
+        "readPath": "/gitlab/projects/{projectPath}/merge_requests",
         "params": [
           "projectPath"
         ],

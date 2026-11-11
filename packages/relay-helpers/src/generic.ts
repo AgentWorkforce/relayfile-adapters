@@ -8,6 +8,7 @@ import {
 import {
   WRITEBACK_PATH_CATALOG,
   writebackPath,
+  readbackPath,
   type WritebackProvider,
   type WritebackResource
 } from '@relayfile/adapter-core/writeback-paths';
@@ -29,7 +30,7 @@ export type RelayParams = Record<string, string | number>;
  */
 export interface RelayClient<P extends WritebackProvider> {
   readonly provider: P;
-  /** Resolve a resource's canonical mount path (no IO). */
+  /** Resolve a resource's writeback target (no IO); read/list use its canonical read target. */
   path(resource: WritebackResource<P> & string, params?: RelayParams): string;
   /**
    * Write `body`. For a collection resource (e.g. `/linear/issues/{id}/comments`)
@@ -92,7 +93,7 @@ export function relayClient<P extends WritebackProvider>(
       // `async` so a validation/path error rejects the promise rather than
       // throwing synchronously — keeps `read` consistent with `write`/`list`
       // for callers using `.catch()`.
-      const path = writebackPath(provider, resource, params);
+      const path = readbackPath(provider, resource, params);
       if (!isItemPath(path)) {
         throw new Error(
           `read("${String(resource)}") resolves to collection "${path}"; read a specific item path or use list(). Known resources for ${provider}: ${knownResources()}`
@@ -110,7 +111,7 @@ export function relayClient<P extends WritebackProvider>(
       return readJsonFile<T>(opts, provider, `read.${String(resource)}`, path);
     },
     async list<T>(resource: WritebackResource<P> & string, params: RelayParams = {}): Promise<T[]> {
-      const path = writebackPath(provider, resource, params);
+      const path = readbackPath(provider, resource, params);
       if (isItemPath(path)) {
         throw new Error(
           `list("${String(resource)}") resolves to item "${path}"; use read() instead. Known resources for ${provider}: ${knownResources()}`

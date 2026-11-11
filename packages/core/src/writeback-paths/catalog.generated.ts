@@ -5,7 +5,8 @@
  * `resources.ts` (`{ name, path }`) — the same source the writeback worker's
  * `classifyWrite` routes drafts against. Resources with `operations: []` are
  * read-only and intentionally omitted. A consumer resolves a concrete draft path
- * with `writebackPath(provider, resource, params)`.
+ * with `writebackPath(provider, resource, params)`. Optional adapter-owned
+ * `readPath` targets are resolved by `readbackPath` with the same parameters.
  */
 
 export const WRITEBACK_PATH_CATALOG = {
@@ -467,6 +468,7 @@ export const WRITEBACK_PATH_CATALOG = {
       },
       {
         "path": "/gitlab/projects/{projectPath}/merge-requests",
+        "readPath": "/gitlab/projects/{projectPath}/merge_requests",
         "params": [
           "projectPath"
         ],
@@ -1294,7 +1296,7 @@ export const WRITEBACK_PATH_CATALOG = {
   }
 } as const satisfies Record<
   string,
-  Record<string, readonly { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
+  Record<string, readonly { path: string; readPath?: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = [

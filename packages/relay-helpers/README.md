@@ -75,7 +75,10 @@ await notion.pages.list({ databaseId });               // list a collection
 - `write(params, body)` drops a uniquely-named draft for a collection resource,
   or writes directly to an item resource (a path ending in `.json`). The
   Relayfile writeback worker turns the draft into the real provider call.
-- `read` / `list` operate over the catalog paths.
+- `path` resolves the writeback target. `read` / `list` use the adapter's
+  canonical `readPath` when it differs, otherwise the same catalog path.
+  Local collection lists return flat JSON records and immediate record-directory
+  `meta.json` files, excluding collection `_index.json` and nested child artifacts.
 - Unknown providers/resources or missing path params throw loudly — never a
   guessed path.
 

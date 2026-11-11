@@ -714,12 +714,30 @@ export async function listJsonFiles<T>(
 ): Promise<Array<{ path: string; value: T }>> {
   try {
     const absoluteDir = toAbsolutePath(client, relayDir);
-    const entries = await readdirIfPresent(absoluteDir);
+    const entries = await readdir(absoluteDir, { withFileTypes: true }).catch((cause: unknown) => {
+      if (isNoEntryError(cause)) return [];
+      throw cause;
+    });
     const out: Array<{ path: string; value: T }> = [];
     for (const entry of entries) {
-      if (!entry.endsWith(".json")) continue;
-      const relayPath = `${relayDir.replace(/\/+$/, "")}/${entry}`;
-      const value = JSON.parse(await readFile(path.join(absoluteDir, entry), "utf8")) as T;
+      if (entry.name === "_index.json") continue;
+      // Directory records own child artifacts, but only their immediate meta.json
+      // is a collection member. Do not recurse into comments or alias trees.
+      const recordPath = entry.isDirectory()
+        ? `${entry.name}/meta.json`
+        : entry.name.endsWith(".json") ? entry.name : undefined;
+      if (recordPath === undefined) continue;
+      let contents: string;
+      try {
+        contents = await readFile(path.join(absoluteDir, recordPath), "utf8");
+      } catch (cause) {
+        // Non-record directories and directory records removed during listing
+        // have no metadata. Other read failures retain the existing error contract.
+        if (entry.isDirectory() && isNoEntryError(cause)) continue;
+        throw cause;
+      }
+      const relayPath = `${relayDir.replace(/\/+$/, "")}/${recordPath}`;
+      const value = JSON.parse(contents) as T;
       out.push({ path: relayPath, value });
     }
     return out;

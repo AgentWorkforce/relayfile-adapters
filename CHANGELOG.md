@@ -9,6 +9,7 @@ published version with a date and open a fresh empty `[Unreleased]` above it.
 
 ### Fixed
 
+- `@relayfile/relay-helpers` collection reads now return immediate canonical directory records alongside flat JSON records, exclude `_index.json`, and read GitLab merge requests from their canonical collection while retaining existing draft write paths.
 - `@relayfile/adapter-gitlab` helper writebacks no longer send the transport-only `idempotencyKey` to GitLab, treat `draft-…` note names as creates, and reject unsafe project paths.
 - `@relayfile/adapter-gitlab` helper writeback paths now preserve project namespace and subgroup separators, matching the adapter's mounted project directories.
 

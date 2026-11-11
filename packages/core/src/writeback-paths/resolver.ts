@@ -15,7 +15,7 @@ export class WritebackPathError extends Error {
 }
 
 export type WritebackPathParams = Record<string, string | number>;
-type PathVariant = { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] };
+type PathVariant = { path: string; readPath?: string; params: readonly string[]; multiSegmentParams?: readonly string[] };
 
 /**
  * Resolve the canonical Relayfile-mount directory path for a provider
@@ -33,6 +33,21 @@ export function writebackPath<P extends WritebackProvider>(
 ): string;
 export function writebackPath(provider: string, resource: string, params?: WritebackPathParams): string;
 export function writebackPath(provider: string, resource: string, params: WritebackPathParams = {}): string {
+  return resolveResourcePath(provider, resource, params, false);
+}
+
+/** Resolve an adapter's canonical read target, falling back to its writeback path. */
+export function readbackPath<P extends WritebackProvider>(
+  provider: P,
+  resource: WritebackResource<P> & string,
+  params?: WritebackPathParams
+): string;
+export function readbackPath(provider: string, resource: string, params?: WritebackPathParams): string;
+export function readbackPath(provider: string, resource: string, params: WritebackPathParams = {}): string {
+  return resolveResourcePath(provider, resource, params, true);
+}
+
+function resolveResourcePath(provider: string, resource: string, params: WritebackPathParams, read: boolean): string {
   const catalog = WRITEBACK_PATH_CATALOG as Record<
     string,
     Record<string, readonly PathVariant[]>
@@ -52,7 +67,7 @@ export function writebackPath(provider: string, resource: string, params: Writeb
     );
   }
   const variant = selectVariant(provider, resource, providerEntry[resource], params);
-  return variant.path.replace(/\{([^}]+)\}/gu, (_match, name: string) => {
+  return (read ? variant.readPath ?? variant.path : variant.path).replace(/\{([^}]+)\}/gu, (_match, name: string) => {
     // `Object.hasOwn`, not `params[name]`: a template param named like
     // "toString"/"constructor" would otherwise resolve to an Object.prototype
     // member and bypass the missing-param check, baking garbage into the path.

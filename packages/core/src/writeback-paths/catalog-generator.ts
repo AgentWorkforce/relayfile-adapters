@@ -18,6 +18,8 @@ import { findRepoRoot } from "../triggers/catalog-generator.js";
 export interface WritebackResourcePath {
   /** Path template with `{param}` placeholders, e.g. `/linear/issues/{issueId}/comments`. */
   path: string;
+  /** Canonical read target when the adapter's draft-write directory differs. */
+  readPath?: string;
   /** Placeholder names in template order, e.g. `["issueId"]`. */
   params: string[];
   /** Parameters whose adapter-owned values span several slash-separated segments. */
@@ -63,6 +65,7 @@ interface AdapterPackage {
 interface AdapterResource {
   name: string;
   path: string;
+  readPath?: string;
   operations?: readonly string[];
   multiSegmentParams?: readonly string[];
 }
@@ -74,7 +77,8 @@ const GENERATED_HEADER = `/**
  * \`resources.ts\` (\`{ name, path }\`) — the same source the writeback worker's
  * \`classifyWrite\` routes drafts against. Resources with \`operations: []\` are
  * read-only and intentionally omitted. A consumer resolves a concrete draft path
- * with \`writebackPath(provider, resource, params)\`.
+ * with \`writebackPath(provider, resource, params)\`. Optional adapter-owned
+ * \`readPath\` targets are resolved by \`readbackPath\` with the same parameters.
  */
 `;
 
@@ -183,7 +187,7 @@ export function renderWritebackPathCatalogModule(generation: WritebackPathCatalo
   return `${GENERATED_HEADER}
 export const WRITEBACK_PATH_CATALOG = ${renderInlineJson(generation.catalog)} as const satisfies Record<
   string,
-  Record<string, readonly { path: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
+  Record<string, readonly { path: string; readPath?: string; params: readonly string[]; multiSegmentParams?: readonly string[] }[]>
 >;
 
 export const ADAPTERS_WITHOUT_WRITEBACK_PATHS = ${renderInlineJson(generation.adaptersWithoutWritebackPaths)} as const;
@@ -255,7 +259,8 @@ function normalizeResources(value: unknown): AdapterResource[] {
       !(Array.isArray(operations) && operations.length === 0)
     ) {
       const multiSegmentParams = normalizeMultiSegmentParams(entry.multiSegmentParams, path);
-      out.push({ name, path, ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
+      const readPath = normalizeReadPath(entry.readPath, path);
+      out.push({ name, path, ...(readPath ? { readPath } : {}), ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
     }
   }
   return out;
@@ -280,7 +285,12 @@ async function readResourcesFromSource(entryPoint: string): Promise<AdapterResou
       throw new Error(`multiSegmentParams for ${match[2]} must be a literal array of path parameter names`);
     }
     const multiSegmentParams = normalizeMultiSegmentParams(declaration ? parseSourceParamArray(declaration[1]) : undefined, match[2]);
-    out.push({ name: match[1], path: match[2], ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
+    const readDeclaration = /\breadPath\s*:\s*(["'])([^"']+)\1/u.exec(match.groups?.tail ?? "");
+    if (!readDeclaration && /\breadPath\s*:/u.test(match.groups?.tail ?? "")) {
+      throw new Error(`Invalid readPath for ${match[2]}: must be a literal path template`);
+    }
+    const readPath = normalizeReadPath(readDeclaration?.[2], match[2]);
+    out.push({ name: match[1], path: match[2], ...(readPath ? { readPath } : {}), ...(multiSegmentParams.length ? { multiSegmentParams } : {}) });
   }
   return out;
 }
@@ -299,6 +309,7 @@ function sortCatalog(
       if (!byPath.has(resource.path)) {
         byPath.set(resource.path, {
           path: resource.path,
+          ...(resource.readPath ? { readPath: resource.readPath } : {}),
           params: extractParams(resource.path),
           ...(resource.multiSegmentParams?.length ? { multiSegmentParams: [...resource.multiSegmentParams] } : {}),
         });
@@ -326,6 +337,15 @@ function sortCatalog(
 
 function normalizeEol(value: string): string {
   return value.replace(/\r\n/gu, "\n");
+}
+
+function normalizeReadPath(value: unknown, path: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !value.startsWith("/")
+    || JSON.stringify(extractParams(value).sort()) !== JSON.stringify(extractParams(path).sort())) {
+    throw new Error(`Invalid readPath for writeback template ${path}: must use the same path parameters`);
+  }
+  return value;
 }
 
 function normalizeMultiSegmentParams(value: unknown, path: string): string[] {
