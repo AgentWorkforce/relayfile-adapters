@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: fast-path-${{ inputs.ref }}
+  group: fast-path-${{ inputs.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   test:
@@ -39,7 +39,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
       - run: npm ci
       - name: Build
         run: npx turbo build
@@ -61,7 +60,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22.22.2"
-          cache: npm
       - run: npm ci
       - name: Build all packages
         run: npx turbo build
