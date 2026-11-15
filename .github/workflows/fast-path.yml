@@ -1,0 +1,105 @@
+# Fast path: run the CI checks and pack the npm packages on Blacksmith
+# runners, outside the shared GitHub-hosted queue. Anyone with write access
+# (people or agents) may start it; nothing runs until Khaliq approves the
+# fast-path environment.
+# npm publishing here uses trusted publishing (OIDC bound to publish.yml), so
+# the fast path does not publish: it packs every publishable @relayfile/*
+# package with `npm pack` and uploads the tarballs as a workflow artifact.
+# It never publishes to npm and never moves a dist-tag.
+name: fast-path
+run-name: fast-path ${{ inputs.ref }} (${{ inputs.reason }})
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to check (a PR branch is fine)
+        required: true
+        default: main
+      reason:
+        description: Why this needs the fast path
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: fast-path-${{ inputs.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    environment: fast-path
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npx turbo build
+      - name: Typecheck
+        run: npx turbo typecheck
+      - name: Test
+        run: npm test
+      - name: Writeback discovery regeneration is in sync
+        run: npm run check:writeback-discovery-regen
+
+  pack:
+    needs: test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.test.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: npm
+      - run: npm ci
+      - name: Build all packages
+        run: npx turbo build
+      - name: Resolve publishable packages
+        id: resolve
+        run: node scripts/resolve-publish-targets.mjs all >> "$GITHUB_OUTPUT"
+      - name: Sync internal dependency specifiers
+        run: node scripts/sync-internal-dependencies.mjs
+      - name: Pack packages
+        env:
+          RESOLVED_PACKAGES: ${{ steps.resolve.outputs.packages }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/fast-path-packs"
+          while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            case "$pkg" in
+              *[!a-zA-Z0-9_-]*)
+                echo "Invalid package slug: $pkg" >&2
+                exit 1
+                ;;
+            esac
+            (cd "packages/$pkg" && npm pack --ignore-scripts --pack-destination "$GITHUB_WORKSPACE/fast-path-packs")
+          done < <(printf '%s\n' "$RESOLVED_PACKAGES" | tr ' ,' '\n' | sed '/^$/d')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages-${{ needs.test.outputs.sha }}
+          path: fast-path-packs/*.tgz
+          if-no-files-found: error
+      - name: Summary
+        env:
+          REF: ${{ inputs.ref }}
+          SHA: ${{ needs.test.outputs.sha }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          {
+            echo "### relayfile-adapters fast path"
+            echo "- ref: \`$REF\` at \`$SHA\`"
+            echo "- reason: $REASON"
+            echo "- artifact: \`npm-packages-$SHA\` (not published to npm; trusted publishing is bound to publish.yml)"
+            echo "- tarballs:"
+            for f in fast-path-packs/*.tgz; do echo "  - \`$(basename "$f")\`"; done
+          } >> "$GITHUB_STEP_SUMMARY"
