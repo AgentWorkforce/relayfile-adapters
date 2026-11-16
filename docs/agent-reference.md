@@ -1,0 +1,261 @@
+# Task-specific repository reference
+
+Read this for the task-specific constraints linked from AGENTS.md. Paths in code spans are relative to the repository root.
+
+## Repository conventions
+
+### Adapter contract
+
+Every adapter under `packages/<name>` MUST:
+
+- Export a `path-mapper.ts` with typed helpers for every canonical record path it emits. Importing the helper is the only supported way to compute a path; consumers must not construct paths by string concatenation.
+- Emit a provider-specific `LAYOUT.md` at the root of its provider tree (e.g. `/<provider>/LAYOUT.md`) of at least ~1000 bytes describing the tree, naming convention, indexes, aliases, and copy-pasteable `jq`/`ls` examples. The 250-300 byte generic fallback is not acceptable for any shipping adapter.
+- Emit `_index.json` files at each resource root listing all materialized records. The row schema MUST include `{ id, title, updated }` at a minimum; additional fields are encouraged when they enable filterless reads (e.g. `state`, `key`, `is_bot`, `parent_id`).
+- Provide `by-*` alias subtree views when the underlying entity has a natural human-readable lookup key distinct from its stable ID (titles, names, keys, statuses, parents). Each alias path must resolve to the same record as the canonical path. Alias content may be either a minimal pointer `{ id, canonicalPath, ...minimal pointer fields }` or a materialized canonical mirror, but the choice must be consistent within a resource and covered by tests.
+- Use `packages/core/src/alias-slug.ts` (`slugifyAlias`, `aliasCollisionSuffix`) for slug normalization and collision suffixes. Provider-local alias modules should re-export those helpers for backward compatibility. NEVER write a new slugifier.
+
+### Declared catalogs: triggers, scope keys, writeback paths, and inbound capabilities
+
+An adapter declares part of its contract as **data** so consumers
+(`@agentworkforce/persona-kit`, which types persona authoring, and the in-repo
+`@relayfile/relay-helpers`, which resolves draft paths into ergonomic clients)
+can autocomplete and lint against it. When you add an adapter or change what it
+supports, keep these current:
+
+- **`supportedEvents(): string[]`** (adapter class, or a `webhooks:` block in
+  `<provider>.mapping.yaml`) — the trigger event names the adapter emits
+  (`pull_request.opened`). Feeds `@relayfile/adapter-core/triggers`
+  (`KNOWN_TRIGGER_CATALOG`).
+- **`supportedScopeKeys(): string[]`** (adapter class, or a `scopeKeys:` block in
+  `<provider>.mapping.yaml`) — the connection-scope **filter** keys a persona may
+  set under `integrations.<provider>.scope` (github → `owner`/`repo`). These are
+  the user-facing filter params on the adapter config, NOT infra fields
+  (`connectionId`, tokens). Feeds `@relayfile/adapter-core/scope-keys`
+  (`KNOWN_SCOPE_KEY_CATALOG`). Declare only keys a persona should actually set;
+  the set isn't derivable, which is why it's an explicit method.
+- **`resources.ts`** (`{ name, path }[]`, generated from the `writebacks:`/
+  `resources:` mapping blocks) — the canonical mount **path templates** a draft
+  is written to in order to trigger a mutation. Each template is a path like
+  `/linear/issues/{issueId}/comments`. This is the same data the writeback
+  worker's `classifyWrite` routes against. Feeds
+  `@relayfile/adapter-core/writeback-paths` (`WRITEBACK_PATH_CATALOG` + the
+  `writebackPath(provider, resource, params)` resolver). A resource `name` can
+  hold several templates (the same entity mounted at different roots); the
+  resolver disambiguates by the exact param set. Read-only adapters with no
+  writeback resources are listed in `ADAPTERS_WITHOUT_WRITEBACK_PATHS`, not
+  silently dropped.
+- **`inbound.ts`** (`inboundCapabilities`) — canonical provider ID/root,
+  provider-config aliases, accepted Nango/Hookdeck event kinds, source
+  detection, and logical-key policy. Feeds
+  `@relayfile/adapter-core/inbound` (`INBOUND_CAPABILITY_CATALOG`,
+  `INBOUND_CAPABILITY_CATALOG_VERSION`, and `logicalEventKey`). Do not add a
+  consumer-local provider allowlist when this declaration can own it.
+
+> "scope" is overloaded here: `docs/integration-scopes.yaml` tracks **OAuth
+> permission scopes** (`data.records:read`) for app registration — a different
+> thing from `supportedScopeKeys()` (connection filter keys). Don't conflate them.
+
+The catalogs are generated, committed artifacts. After changing any of the above,
+regenerate (adapters must be built first — the generators import them):
+```bash
+npx turbo build
+npx adapter-core triggers generate
+npx adapter-core scope-keys generate
+npx adapter-core writeback-paths generate
+npx adapter-core inbound generate
+```
+
+This is **CI-enforced**: `npm test` (→ `turbo test`) runs an in-sync test per
+catalog that regenerates and diffs the committed files, so changing a declaration
+without regenerating fails the build. Ad-hoc check form:
+`npx adapter-core triggers check` / `npx adapter-core scope-keys check` /
+`npx adapter-core writeback-paths check` / `npx adapter-core inbound check`.
+
+Cross-repo: a catalog change reaches `@agentworkforce/persona-kit` only on its
+next `@relayfile/adapter-core` dep bump (release coordination — see
+[Cross-repo coordination](#cross-repo-coordination)). A *missing* `/triggers`,
+`/scope-keys`, `/writeback-paths`, or `/inbound` export hard-fails the consumer's
+build; a *stale* catalog merely lags until the bump.
+
+In-repo: `@relayfile/relay-helpers` (`packages/relay-helpers`) consumes
+`/writeback-paths` directly as a workspace dep, so a new writeback-capable
+adapter (a new provider in `WRITEBACK_PATH_CATALOG`) makes its
+*"every catalog provider has a named client export"* / generated-clients-in-sync
+tests go red in the **same** `turbo test`. Fix by regenerating its clients:
+`npm run gen -w @relayfile/relay-helpers`. No cross-repo lag — the build here
+enforces it.
+
+### Generated adapter path templates are not authoritative
+
+Older mapping specs and generated workflow prompts may still contain the legacy
+`/<provider>/<resource>/<id>/metadata.json` shape. Treat those as historical
+scaffolding only. Before shipping any adapter path change, compare every emitted
+canonical path against the contract below:
+
+- Entities with child artifacts MUST use directory records ending in `meta.json`.
+- Entities without child artifacts MUST use flat `.json` records.
+- If a generated template disagrees with `path-mapper.ts`, update the template,
+  README, discovery docs, and tests in the same PR.
+- Add a regression test that fails on the legacy `metadata.json` shape whenever
+  the entity owns child files.
+
+### Naming convention
+
+The cross-adapter joiner between a human-readable slug and the provider's stable ID is **`<slug>__<id>`** (double underscore). The shape depends on whether the entity owns child files:
+
+- **Flat records** (entities with no sub-artifacts): `<slug>__<id>.json` at a canonical resource directory. Example: `/jira/issues/task-1__10000.json`.
+- **Directory records** (entities WITH sub-artifacts, e.g. GitHub PRs with `diff.patch`/`files/**`, Slack channels with `messages/**`): `<id>__<slug>/meta.json`. Example: `/github/repos/o/r/pulls/42__fix-thing/meta.json`.
+
+Rule of thumb: if the entity owns child files, use a directory plus `meta.json`. Otherwise, prefer the flat form — it is simpler and matches the "human-discoverable filesystem" pitch.
+
+Slug rules (always go through `slugifyAlias`):
+
+- ASCII only, lowercase, hyphen-separated.
+- Truncate to 80 characters at a word boundary.
+- Empty slugs fall back to the bare ID (or `untitled` for aliases).
+- Never roll your own slugifier; reuse `packages/core/src/alias-slug.ts`.
+
+ID format: whatever the provider's stable ID is (UUID, numeric, string key). Do not normalize provider IDs.
+
+### Indexes
+
+- `/<provider>/_index.json` enumerates top-level resource roots (e.g. `{ "id": "issues", "title": "Issues" }`-style entries).
+- `/<provider>/<resource>/_index.json` enumerates all records with `{ id, title, updated, ...natural-filter-fields }`.
+- Indexes MUST stay sorted by `updated` descending so consumers can rely on order without re-sorting.
+
+### Aliases
+
+- Path shape: `/<provider>/<resource>/by-<key>/<slug>__<id>.json` (e.g. `/notion/pages/by-title/my-page__a1b2c3d4.json`).
+- Collisions: append a deterministic short hash of the ID via `aliasCollisionSuffix`. NEVER pick "first writer wins" — collision handling must be deterministic across sync runs.
+- Alias files are either minimal pointers (`{ id, canonicalPath, title? }`) or materialized canonical mirrors. Keep the choice consistent within each resource, and document/test it so readers know whether to follow `canonicalPath` or read the alias body directly.
+
+### Versioning
+
+- NEVER bump `version` in `package.json` in feature PRs. The publish workflow handles version bumps.
+- If you change a path-mapper helper's output, add the new helper additively and deprecate the old (export both, JSDoc-deprecate the old). Or implement reader-side back-compat: try the new path, fall back to the old. NEVER break existing consumers without a deprecation window.
+
+### Tests
+
+- `npx turbo build typecheck test` at the repo root MUST pass before any PR is opened.
+- Each path-mapper helper needs round-trip tests (compose -> parse -> equality).
+- Each alias subtree needs a collision test.
+- Each `LAYOUT.md` emitter needs a non-empty content test (length plus key-substring assertions).
+
+### Cross-repo coordination
+
+- Cloud (`AgentWorkforce/cloud`) consumes these adapters. After a path-mapper change ships and is published, cloud needs a dep bump and possibly a full provider resync. Coordinate by mentioning the follow-up in the adapter PR body.
+
+### Do not bump package versions in feature PRs
+
+Versions in `packages/*/package.json` are bumped by the publish phase, not in the PR that introduces the change. The repo's pattern (see `chore(release): bump all (patch)` commits in history) is:
+
+1. Open a feature PR with the source change only — leave `version` fields untouched.
+2. After merge, the publish workflow (`.github/workflows/publish.yml`, `workflow_dispatch`) handles the version bump and npm publish.
+
+If you bump a version in a feature PR, downstream consumers (e.g. the `cloud` repo) may pin to a version that hasn't been published yet, breaking installs. Always leave version bumps to the release flow.
+
+### Adding a new adapter package: discoverable by `publish.yml`
+
+The publish workflow's "Resolve packages to publish" step delegates to `scripts/resolve-publish-targets.mjs`, which auto-discovers every non-private directory under `packages/` from the filesystem. **A new adapter package needs no manual edits to `.github/workflows/publish.yml` to be publishable** — as long as its `package.json` exists and is not marked `"private": true`, it will be picked up by `package=all`, the `missing` selector, and any group alias that includes its slug.
+
+What you _do_ need to do when adding a new adapter:
+
+1. Ensure the package has a `package.json` with `"private"` unset (or `false`) and a `version` field — otherwise the resolver skips it.
+2. If the new adapter belongs to a category that maps to a `GROUPS` alias in `scripts/resolve-publish-targets.mjs` (e.g. `crm`, `messaging`, `storage`), add its slug to that group so it can be published as part of the group. Adding new group aliases is optional.
+
+Quick sanity check before opening the PR — confirms the resolver sees the new package (should list every non-private slug under `packages/`):
+```bash
+node scripts/resolve-publish-targets.mjs all
+```
+
+If your new adapter is missing from the output, check that `packages/<slug>/package.json` exists and is not marked private.
+
+### Changelog
+
+Curate `[Unreleased]` in `CHANGELOG.md` as you land PRs — it carries the
+cross-package, user-facing release narrative for the adapters workspace. There
+are no per-package changelogs today; the root `CHANGELOG.md` is the single
+source of truth.
+
+Changelog entries should be concise and impact-first. Prefer one short bullet
+per user-visible change: name the adapter, path-mapper helper, `LAYOUT.md`,
+writeback resource, or catalog touched and the practical effect. Drop issue/PR
+links, internal review notes, implementation backstory, and "foundation
+for..." phrasing unless that text clearly explains the shipped impact. Path-mapper
+and `LAYOUT.md` changes that consumers must resync against belong here (see
+[Cross-repo coordination](#cross-repo-coordination)).
+
+### Releases
+```bash
+# from GitHub Actions: workflow_dispatch -> "Publish Package"
+#   package: all | missing | a group alias (storage, messaging, calendar,
+#            devtools, crm, pm, support, analytics, email, commerce, db) |
+#            one or more package dir names, comma- or space-separated
+#   version: patch | minor | major | prerelease | none (publish current
+#            package.json as-is) | an exact semver like 1.2.3 or 0.2.0-beta.1
+#   tag:     latest | next | beta (npm dist-tag)
+#   dry_run: true to skip the actual publish, version commit, and push
+```
+
+The workflow (`.github/workflows/publish.yml`) installs and builds the whole
+workspace with `npx turbo build`, resolves publish targets via
+`scripts/resolve-publish-targets.mjs`, bumps `version` in each resolved
+`packages/<slug>/package.json` (`npm version --no-git-tag-version`, skipped when
+`version: none`), syncs internal dependency specifiers
+(`scripts/sync-internal-dependencies.mjs`), publishes each target to npm with
+`--provenance`, then commits the version bumps as `chore(release): bump ...` and
+pushes. The version bump happens here, never in the feature PR — see
+[Versioning](#versioning) and [Do not bump package versions in feature
+PRs](#do-not-bump-package-versions-in-feature-prs).
+
+The workflow does **not** touch `CHANGELOG.md` — there is no changelog
+automation. Cutting `[Unreleased]` into a dated, versioned section is a manual
+step the releaser performs (rename `[Unreleased]`, open a fresh empty one above
+it) alongside running the publish workflow.
+
+### Adapter writeback discovery is required
+
+Every adapter resource that supports writeback must declare file-native writeback metadata:
+
+1. `src/resources.ts` entry with a resource path, schema path, create example path, and `idPattern` regex.
+2. `.schema.json` — JSON Schema draft 2020-12 for the full synced record shape, not only the create payload.
+3. `.create.example.json` — a minimal valid create document that omits read-only fields.
+
+Each adapter must also ship `<adapter>/.adapter.md` in its discovery tree with an overview, read-only mount summary, resource table, operation table, and ID pattern section. Source schema details from the strongest available integration contract: JSON Schema, OpenAPI, Postman collection, provider docs, or the adapter writeback resolver. Field-level descriptions are required, create-time required fields must be explicit, provider enum values must be represented as `enum` values, and server-managed fields such as `id`, `createdAt`, `updatedAt`, `url`, `_webhook`, and `_connection` must use `"readOnly": true`.
+
+New resources must not introduce a magic `new.json` create path. Creates happen by writing a valid JSON document to any non-canonical filename in the resource directory; edits happen by writing mutable fields to a canonical `<id>.json`; deletes happen by removing a canonical `<id>.json`. When adding a new adapter or writeback route, update `scripts/writeback-discovery-data.mjs`, regenerate the discovery files with `node scripts/generate-writeback-discovery.mjs`, and run `npm run test:writeback-discovery`. Do not rely on prompts alone to describe writeback shapes.
+
+Tracking docs are part of the adapter contract. When adding a new integration, adding/removing writeback resources, or changing whether an endpoint is backed by OpenAPI, JSON Schema, Postman, provider docs, or inline code, update `docs/writeback-spec-coverage.md` in the same PR. If a change affects any other integration tracking document, such as scope/permission inventories, schema provenance notes, provider capability matrices, or generated discovery coverage, update that tracking doc alongside the code and mention the doc update in the PR summary.
+
+
+
+
+
+# Relayfile Integration Digest Contract
+
+Relayfile digest rendering is generic upstream over workspace events. Every
+adapter that exposes provider records to Relayfile must expose usable metadata
+and layout aliases for that generic renderer. When adding or materially changing
+an adapter:
+
+- Classify lifecycle actions explicitly. Terminal states such as `closed`,
+  `merged`, `archived`, `completed`, `canceled`, and `resolved` must not fall
+  through to a generic "updated" line unless the provider has no terminal
+  concept.
+- Do not model terminal lifecycle states as deletion in adapter webhook
+  handling. Only actual upstream deletes should produce delete semantics.
+- Keep digest behavior and layout aliases aligned with the category matrix in
+  `docs/digest-layout-contract.md`. Issue-tracking resources must expose
+  `by-state`, `by-assignee`, `by-creator`, and `by-priority` unless the matrix
+  documents an explicit exception; status-driven build/deploy resources must
+  expose `by-status`.
+- If an adapter exports a digest compatibility handler, build it with
+  `createDigestHandler` and shared digest types from `@relayfile/adapter-core`.
+  Adapter-local code should only identify provider records, declare lifecycle
+  action rules, optionally narrow canonical record paths, and configure alias
+  segments. Do not reimplement sorting, path prefix filtering, alias/index/layout
+  suppression, or digest bullet assembly in adapter packages.
+- Run `npm run test:digest-contracts` after adding or changing an adapter,
+  layout manifest, or category matrix entry.
+
+Full rule: `.claude/rules/relayfile-integration-digests.md`.

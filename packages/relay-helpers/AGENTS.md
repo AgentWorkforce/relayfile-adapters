@@ -1,40 +1,27 @@
-# relay-helpers — agent notes
+# Working in relay-helpers
 
-## Invariant: a named client for every catalog provider
+- Every provider in `WRITEBACK_PATH_CATALOG` must expose a named providerClient export; keep the catalog/provider-client and generated-client sync checks green.
+- Never hand-edit `src/generated/clients.ts`. Regenerate from the upstream catalog with `npm run gen -w @relayfile/relay-helpers`, then run `npm run test -w @relayfile/relay-helpers`.
+- Bespoke providers belong in `BESPOKE_PROVIDERS`; enrich `providerClient(...)` with `Object.assign`. Avoid resource-name collisions: GitHub’s helper is `mergePullRequest`, not `merge`.
+- Paths come from `writebackPath`, `relayClient` and `providerClient`, never provider literals. Correct upstream `resources.ts`, regenerate and update the dependency when a path is wrong.
+- See [catalog coordination](../../docs/agent-reference.md#declared-catalogs-triggers-scope-keys-writeback-paths-and-inbound-capabilities) for upstream adapter obligations.
 
-This package MUST expose a named `<provider>Client` for **every** provider in
-`@relayfile/adapter-core/writeback-paths` (`WRITEBACK_PATH_CATALOG`). The test
-**"every catalog provider has a named client export"** (`src/relay-helpers.test.ts`)
-fails CI until it does — so this can't silently drift.
+## Agency and guidance
 
-The named clients for the plain providers are **generated** — `src/generated/clients.ts`
-is emitted by `scripts/generate-clients.mjs` from the catalog. Do not hand-edit
-it. When `@relayfile/adapter-core` is bumped and a new provider appears (a new
-writeback-capable adapter shipped upstream in `relayfile-adapters`), the in-sync
-test goes red. To fix it:
+- Act autonomously on routine assigned work; ask forgiveness rather than permission. Preserve explicit production, release and credential gates.
+- For guidance, ask the engineering leads, the agent that spawned you, or the layered owner on Agent Relay.
+- Only a truly pressing or blocking question goes to `khaliq-gant` or `will-washburn` on Agent Relay.
 
-1. Regenerate:
-   ```bash
-   npm run gen -w @relayfile/relay-helpers
-   ```
-   This adds the new `<provider>Client` (camelCased slug — `azure-blob` →
-   `azureBlobClient`) to `src/generated/clients.ts`. `index.ts` does
-   `export *` from it, so no re-export edit is needed.
-2. If the provider deserves ergonomic named methods (like `linear`/`github`/`slack`
-   with `comment`/`post`/`mergePullRequest`), add it to `BESPOKE_PROVIDERS` in
-   the generator and write a bespoke module that *enriches* `providerClient(...)`
-   via `Object.assign` — but watch for a method name that collides with a catalog
-   resource key (that's why github's merge helper is `mergePullRequest`, not
-   `merge`).
-3. `npm run test -w @relayfile/relay-helpers` must pass.
+## Cross-repo context
 
-## Paths are never hardcoded here
+- Before and during changes, understand how this repo fits the wider system; consult its repo map and related-repo docs where available.
+- Check relevant agents’ summaries on Agent Relay and proactively contact owning agents about dependencies, adjacent changes and work in flight.
 
-Every path comes from the catalog via `writebackPath` / `relayClient` /
-`providerClient`. Do not write `/linear/issues/...` literals — that reintroduces
-the drift this package exists to prevent. If a path is wrong, fix it in the
-adapter's `resources.ts` upstream (relayfile-adapters), regenerate the catalog,
-and bump the dep.
+## Pull requests (when used)
 
-The upstream obligation (an adapter author noticing a new provider lands here)
-is documented in `../../AGENTS.md` → "Declared catalogs".
+- Open PRs as ready for review by default. If merging requires Khaliq’s OK, use `merge-train:hold` instead of draft status.
+- If you open a PR, immediately subscribe to its feedback through Agent Relay using [this skill](https://github.com/AgentWorkforce/skills/blob/main/skills/subscribing-relay-webhooks-and-writebacks/SKILL.md), and verify subscription readiness.
+- Evaluate each review finding. Address applicable feedback and explain declined changes in the thread.
+- A PR is not ready while feedback remains unaddressed or merge conflicts remain.
+- When ready, alert the CODEOWNERS and the agent that spawned you on Agent Relay.
+- Keep related open PRs from going stale: find their authoring agent on Agent Relay and coordinate; if that agent is no longer on the relay, escalate to the CODEOWNERS or the layered owner.
